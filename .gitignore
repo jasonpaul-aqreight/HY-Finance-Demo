@@ -1,0 +1,59 @@
+# ─── Dependencies ────────────────────────────────────────────────────────────
+node_modules/
+.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# ─── Next.js ─────────────────────────────────────────────────────────────────
+.next/
+out/
+build/
+
+# ─── Data files (CSVs and SQLite databases) ──────────────────────────────────
+data/*.csv
+data/*.db
+data/*.db-shm
+data/*.db-wal
+data/settings.json
+
+# ─── Testing ─────────────────────────────────────────────────────────────────
+coverage/
+test-results/
+playwright-report/
+.playwright-mcp/
+
+# ─── IDE & OS ────────────────────────────────────────────────────────────────
+.DS_Store
+*.pem
+.vscode/
+.idea/
+
+# ─── Debug logs ──────────────────────────────────────────────────────────────
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ─── Environment ─────────────────────────────────────────────────────────────
+.env*
+
+# ─── TypeScript build artifacts ──────────────────────────────────────────────
+*.tsbuildinfo
+next-env.d.ts
+
+# ─── Vercel ──────────────────────────────────────────────────────────────────
+.vercel
+
+# ─── Screenshots (verification artifacts) ────────────────────────────────────
+*.png
+
+# ─── Serena / Claude agent state ─────────────────────────────────────────────
+.serena/
+.claude/
+
+# ─── BMAD output artifacts ───────────────────────────────────────────────────
+_bmad-output/
