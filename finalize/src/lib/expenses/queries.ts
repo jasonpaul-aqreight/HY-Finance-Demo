@@ -292,10 +292,11 @@ export function getCostCompositionByType(start: string, end: string, costType: C
   `).all(start, end) as CompositionRow[];
 }
 
-export function getTopExpensesByType(start: string, end: string, costType: CostTypeParam): TopExpenseRow[] {
+export function getTopExpensesByType(start: string, end: string, costType: CostTypeParam, order: 'desc' | 'asc' = 'desc'): TopExpenseRow[] {
   const db = getDb();
   const typeFilter = costType === 'cogs' ? `AND gm.AccType = 'CO'` :
                      costType === 'opex' ? `AND gm.AccType = 'EP'` : '';
+  const orderDir = order === 'asc' ? 'ASC' : 'DESC';
   return db.prepare(`
     SELECT
       gm.AccNo AS acc_no,
@@ -309,7 +310,7 @@ export function getTopExpensesByType(start: string, end: string, costType: CostT
       ${typeFilter}
     GROUP BY gm.AccNo, gm.Description, gm.AccType
     HAVING SUM(gl.HomeDR) - SUM(gl.HomeCR) > 0
-    ORDER BY net_cost DESC
+    ORDER BY net_cost ${orderDir}
     LIMIT 10
   `).all(start, end) as TopExpenseRow[];
 }

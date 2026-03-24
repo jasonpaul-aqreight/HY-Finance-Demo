@@ -43,10 +43,19 @@ export function useAllCustomerReturns(filters: V2Filters) {
   return useSWR<TopDebtorRow[]>(`/api/return/credit-v2/top-debtors?${params}`, fetcher);
 }
 
+export function useAllCustomerReturnsAll() {
+  return useSWR<TopDebtorRow[]>('/api/return/credit-v2/top-debtors', fetcher);
+}
+
 export function useCustomerReturnDetails(debtorCode: string | null, filters: V2Filters) {
   const params = buildParams(filters);
   params.set('debtor_code', debtorCode ?? '');
   const key = debtorCode ? `/api/return/credit-v2/customer-returns?${params}` : null;
+  return useSWR<CustomerReturnRow[]>(key, fetcher);
+}
+
+export function useCustomerReturnDetailsAll(debtorCode: string | null) {
+  const key = debtorCode ? `/api/return/credit-v2/customer-returns?debtor_code=${debtorCode}` : null;
   return useSWR<CustomerReturnRow[]>(key, fetcher);
 }
 

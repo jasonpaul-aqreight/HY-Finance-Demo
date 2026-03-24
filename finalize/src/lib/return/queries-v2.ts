@@ -187,6 +187,47 @@ export function getAllCustomerReturns(start: string, end: string): TopDebtorRow[
   `).all(start, end) as TopDebtorRow[];
 }
 
+export function getAllCustomerReturnsAll(): TopDebtorRow[] {
+  const db = getDb();
+  return db.prepare(`
+    SELECT
+      a.DebtorCode AS debtor_code,
+      COALESCE(d.CompanyName, a.DebtorCode) AS company_name,
+      COUNT(*) AS return_count,
+      COALESCE(SUM(a.LocalNetTotal), 0) AS total_return_value,
+      COALESCE(SUM(COALESCE(a.KnockOffAmt, 0)), 0) AS total_knocked_off,
+      COALESCE(SUM(COALESCE(a.RefundAmt, 0)), 0) AS total_refunded,
+      COALESCE(SUM(a.LocalNetTotal - COALESCE(a.KnockOffAmt, 0) - COALESCE(a.RefundAmt, 0)), 0) AS unresolved,
+      SUM(CASE WHEN COALESCE(a.KnockOffAmt, 0) + COALESCE(a.RefundAmt, 0) = 0 THEN 1 ELSE 0 END) AS outstanding_count
+    FROM arcn a
+    LEFT JOIN debtor d ON d.DebtorCode = a.DebtorCode
+    WHERE ${RETURN_FILTER}
+    GROUP BY a.DebtorCode, d.CompanyName
+    ORDER BY total_return_value DESC
+  `).all() as TopDebtorRow[];
+}
+
+export function getCustomerReturnDetailsAll(debtorCode: string): CustomerReturnRow[] {
+  const db = getDb();
+  return db.prepare(`
+    SELECT
+      a.DocKey AS doc_key,
+      a.DocNo AS doc_no,
+      DATE(a.DocDate, '+8 hours') AS doc_date,
+      a.LocalNetTotal AS net_total,
+      COALESCE(a.KnockOffAmt, 0) AS knocked_off,
+      COALESCE(a.RefundAmt, 0) AS refunded,
+      (a.LocalNetTotal - COALESCE(a.KnockOffAmt, 0) - COALESCE(a.RefundAmt, 0)) AS unresolved,
+      COALESCE(a.Reason, cn.Reason, '') AS reason,
+      COALESCE(a.OurInvoiceNo, '') AS our_invoice_no
+    FROM arcn a
+    LEFT JOIN cn ON cn.DocKey = a.SourceKey AND a.SourceType = 'CN'
+    WHERE ${RETURN_FILTER}
+      AND a.DebtorCode = ?
+    ORDER BY a.DocDate DESC
+  `).all(debtorCode) as CustomerReturnRow[];
+}
+
 export function getCustomerReturnDetails(debtorCode: string, start: string, end: string): CustomerReturnRow[] {
   const db = getDb();
   return db.prepare(`
@@ -234,6 +275,8 @@ export function getReturnProducts(start: string, end: string, dimension: ReturnP
   };
 
   const cfg = dimensionConfig[dimension];
+  const fruitOnly = dimension === 'fruit' || dimension === 'variant';
+  const fruitFilter = fruitOnly ? `AND dtl.ItemCode NOT LIKE 'ZZ-ZZ-%' AND dtl.ItemCode NOT LIKE 'XX-ZZ-%'` : '';
 
   return db.prepare(`
     SELECT
@@ -250,6 +293,7 @@ export function getReturnProducts(start: string, end: string, dimension: ReturnP
       AND cn.CNType = 'RETURN'
       AND dtl.ItemCode IS NOT NULL AND dtl.ItemCode != ''
       AND dtl.ItemCode NOT LIKE 'ZZ-ZZ-ZBKT%'
+      ${fruitFilter}
       AND ${DATE_MYT('cn.DocDate')} BETWEEN ? AND ?
     GROUP BY ${cfg.groupBy}
     ORDER BY ${metric === 'value' ? 'total_value' : 'cn_count'} DESC

@@ -37,7 +37,7 @@ export function MarginTrendChart({ filters }: Props) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Overall Margin Trend</CardTitle>
+        <CardTitle>Profitability Trend</CardTitle>
       </CardHeader>
       <CardContent>
         {isLoading ? (

@@ -3,7 +3,7 @@
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useCallback, useMemo, useTransition } from 'react';
 import useSWR from 'swr';
-import { format, subMonths } from 'date-fns';
+import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns';
 
 export interface MarginDashboardFilters {
   startDate: string;
@@ -29,8 +29,8 @@ export function useDashboardFilters() {
   );
 
   const defaults = useMemo(() => {
-    const endDate = bounds?.max_date ? new Date(bounds.max_date) : new Date();
-    const startDate = subMonths(endDate, 12); // default: trailing 12 months
+    const endDate = endOfMonth(bounds?.max_date ? new Date(bounds.max_date) : new Date());
+    const startDate = startOfMonth(subMonths(endDate, 11)); // 12 months inclusive
     return { start: format(startDate, 'yyyy-MM-dd'), end: format(endDate, 'yyyy-MM-dd') };
   }, [bounds]);
 

@@ -1,6 +1,8 @@
 export function formatRM(value: number | null | undefined, decimals = 0): string {
   if (value == null) return 'RM 0';
-  return `RM ${Math.abs(value).toLocaleString('en-MY', {
+  const abs = Math.abs(value);
+  const sign = value < 0 ? '-' : '';
+  return `${sign}RM ${abs.toLocaleString('en-MY', {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
   })}`;

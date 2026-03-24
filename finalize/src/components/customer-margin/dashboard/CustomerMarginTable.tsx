@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -193,7 +193,7 @@ export function CustomerMarginTable({ filters }: Props) {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const limit = 20;
 
-  const { data, isLoading } = useCustomerMargins(filters, sort, order, page, limit);
+  const { data, isLoading } = useCustomerMargins(filters, sort, order, page, limit, selectedCustomers);
 
   const toggleSort = useCallback((col: string) => {
     if (sort === col) {
@@ -247,12 +247,7 @@ export function CustomerMarginTable({ filters }: Props) {
     </TableHead>
   );
 
-  const rows = data?.rows ?? [];
-  const filteredRows = useMemo(() => {
-    if (selectedCustomers.length === 0) return rows;
-    const set = new Set(selectedCustomers);
-    return rows.filter(r => set.has(r.debtor_code));
-  }, [rows, selectedCustomers]);
+  const filteredRows = data?.rows ?? [];
 
   return (
     <Card>

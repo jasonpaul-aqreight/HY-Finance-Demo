@@ -11,10 +11,9 @@ export async function GET(request: NextRequest) {
     const start = searchParams.get('start_date') ?? defaults.start;
     const end = searchParams.get('end_date') ?? defaults.end;
 
-    const limit = parseInt(searchParams.get('limit') ?? '500', 10);
     const suppliers = searchParams.getAll('supplier');
     const itemGroups = searchParams.getAll('item_group');
-    const data = getPriceSpread(start, end, limit, suppliers, itemGroups);
+    const data = getPriceSpread(start, end, suppliers, itemGroups);
     return NextResponse.json({ data });
   } catch (error) {
     console.error('Error fetching price spread:', error);

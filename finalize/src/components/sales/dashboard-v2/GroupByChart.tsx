@@ -39,6 +39,7 @@ const STACK_LABELS: Record<StackDimension, string> = {
   'outlet': 'Outlet',
   'customer-type': 'Customer Category',
   'fruit-country': 'Country',
+  'fruit-variant': 'Variant',
 };
 
 const BAR_SIZE = 28;
@@ -53,6 +54,7 @@ interface PivotResult {
 function pivotForStackedChart(
   rows: StackedRow[],
   maxCategories = 8,
+  perPrimary = false,
 ): PivotResult {
   // Rows are already filtered to selected primaries by parent
   const primaryTotals = new Map<string, number>();
@@ -64,16 +66,48 @@ function pivotForStackedChart(
     .map(([name]) => name);
   const topPrimarySet = new Set(topPrimaries);
 
-  const stackTotals = new Map<string, number>();
+  let topStackSet: Set<string>;
+  let hasOthers: boolean;
+
+  if (perPrimary) {
+    // Pick top N per primary group, then union all into the legend
+    const allTopStacks = new Set<string>();
+    let anyHasOthers = false;
+    for (const primary of topPrimaries) {
+      const stacksForPrimary = new Map<string, number>();
+      for (const r of rows) {
+        if (r.primary_name !== primary) continue;
+        stacksForPrimary.set(r.stack_name, (stacksForPrimary.get(r.stack_name) ?? 0) + r.total_sales);
+      }
+      const sorted = [...stacksForPrimary.entries()].sort((a, b) => b[1] - a[1]);
+      for (const [name] of sorted.slice(0, maxCategories)) allTopStacks.add(name);
+      if (sorted.length > maxCategories) anyHasOthers = true;
+    }
+    topStackSet = allTopStacks;
+    hasOthers = anyHasOthers;
+  } else {
+    // Global top N
+    const stackTotals = new Map<string, number>();
+    for (const r of rows) {
+      if (!topPrimarySet.has(r.primary_name)) continue;
+      stackTotals.set(r.stack_name, (stackTotals.get(r.stack_name) ?? 0) + r.total_sales);
+    }
+    const sortedStacks = [...stackTotals.entries()].sort((a, b) => b[1] - a[1]);
+    topStackSet = new Set(sortedStacks.slice(0, maxCategories).map(([name]) => name));
+    hasOthers = sortedStacks.length > maxCategories;
+  }
+
+  // Build ordered categories list sorted by global total
+  const globalStackTotals = new Map<string, number>();
   for (const r of rows) {
     if (!topPrimarySet.has(r.primary_name)) continue;
-    stackTotals.set(r.stack_name, (stackTotals.get(r.stack_name) ?? 0) + r.total_sales);
+    if (!topStackSet.has(r.stack_name)) continue;
+    globalStackTotals.set(r.stack_name, (globalStackTotals.get(r.stack_name) ?? 0) + r.total_sales);
   }
-  const sortedStacks = [...stackTotals.entries()].sort((a, b) => b[1] - a[1]);
-  const topStacks = sortedStacks.slice(0, maxCategories).map(([name]) => name);
-  const topStackSet = new Set(topStacks);
-  const hasOthers = sortedStacks.length > maxCategories;
-  const categories = hasOthers ? [...topStacks, 'Others'] : topStacks;
+  const sortedCategories = [...globalStackTotals.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([name]) => name);
+  const categories = hasOthers ? [...sortedCategories, 'Others'] : sortedCategories;
 
   const chartData = topPrimaries.map(primary => {
     const row: Record<string, string | number> = { name: primary };
@@ -137,9 +171,12 @@ interface GroupByChartProps {
 }
 
 export function GroupByChart({ selectedData, stackedData, isStacked, title, groupBy, stackBy, onStackChange }: GroupByChartProps) {
+  const isVariantStack = groupBy === 'fruit' && stackBy === 'fruit-variant';
   const { chartData: pivotData, categories } = useMemo(
-    () => isStacked ? pivotForStackedChart(stackedData) : { chartData: [], categories: [] },
-    [stackedData, isStacked]
+    () => isStacked
+      ? pivotForStackedChart(stackedData, isVariantStack ? 4 : 8, isVariantStack)
+      : { chartData: [], categories: [] },
+    [stackedData, isStacked, isVariantStack]
   );
 
   const barData = useMemo(() => selectedData.map(d => ({
@@ -182,6 +219,12 @@ export function GroupByChart({ selectedData, stackedData, isStacked, title, grou
           </div>
         )}
       </div>
+      {groupBy === 'fruit' && stackBy === 'fruit-variant' && (
+        <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          Showing top 4 variants per fruit to prevent overcrowding. Remaining variants are grouped into &ldquo;Others&rdquo;.
+          For a more detailed breakdown, use <strong>Group by: Variant</strong> and select a fruit from the dropdown in the table below.
+        </div>
+      )}
       <ResponsiveContainer width="100%" height={chartHeight}>
         <BarChart
           layout="vertical"

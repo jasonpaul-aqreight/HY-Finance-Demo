@@ -38,9 +38,11 @@ export function useCustomerMargins(
   sort = 'gross_profit',
   order = 'desc',
   page = 1,
-  limit = 50
+  limit = 50,
+  selectedCustomers: string[] = []
 ) {
   const params = buildParams(filters);
+  for (const c of selectedCustomers) params.append('customer', c);
   params.set('sort', sort);
   params.set('order', order);
   params.set('page', String(page));

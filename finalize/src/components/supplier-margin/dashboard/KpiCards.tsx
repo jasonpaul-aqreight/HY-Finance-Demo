@@ -11,7 +11,7 @@ interface KpiCardProps {
   valueColor?: string;
 }
 
-function KpiCard({ title, value, valueColor }: KpiCardProps) {
+function KpiCard({ title, value, valueColor, formula }: KpiCardProps & { formula?: string }) {
   return (
     <Card>
       <CardHeader className="pb-1 pt-4 px-4">
@@ -21,6 +21,7 @@ function KpiCard({ title, value, valueColor }: KpiCardProps) {
       </CardHeader>
       <CardContent className="px-4 pb-4">
         <div className={`text-2xl font-bold ${valueColor ?? ''}`}>{value}</div>
+        {formula && <p className="text-[10px] text-muted-foreground mt-0.5">{formula}</p>}
       </CardContent>
     </Card>
   );
@@ -55,22 +56,26 @@ export function KpiCards({ filters }: { filters: DashboardFilters }) {
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
       <KpiCard
-        title="Total Revenue"
+        title="Gross Sales"
         value={formatRM(current.revenue)}
+        formula="IV + CS (excl. credit notes)"
       />
       <KpiCard
         title="Purchase Cost"
         value={formatRM(current.cogs)}
+        formula="Avg purchase price × sold qty"
       />
       <KpiCard
         title="Gross Profit"
         value={formatRM(current.profit)}
         valueColor={current.profit >= 0 ? 'text-emerald-600' : 'text-red-600'}
+        formula="Gross Sales − Purchase Cost"
       />
       <KpiCard
         title="Overall Margin"
         value={current.margin_pct != null ? `${current.margin_pct.toFixed(1)}%` : '—'}
         valueColor={marginColor(current.margin_pct)}
+        formula="Gross Profit ÷ Gross Sales"
       />
       <KpiCard
         title="Active Suppliers"

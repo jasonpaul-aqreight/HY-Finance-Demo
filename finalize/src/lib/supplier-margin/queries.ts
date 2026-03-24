@@ -131,7 +131,7 @@ export function getSuppliers(): Array<{ AccNo: string; CompanyName: string }> {
     SELECT DISTINCT c.AccNo, c.CompanyName
     FROM creditor c
     JOIN pi ON c.AccNo = pi.CreditorCode
-    WHERE pi.Cancelled = 'F'
+    WHERE pi.Cancelled = 'F' AND c.IsActive = 'T'
     ORDER BY c.CompanyName
   `).all() as Array<{ AccNo: string; CompanyName: string }>;
 }
@@ -257,6 +257,7 @@ function fetchTopLowestSupplier(start: string, end: string) {
     JOIN item_sales ist ON si.ItemCode = ist.ItemCode
     JOIN item_total_purchased itp ON si.ItemCode = itp.ItemCode
     JOIN creditor c ON si.CreditorCode = c.AccNo
+    WHERE c.IsActive = 'T'
     GROUP BY si.CreditorCode
     HAVING rev >= ?
     ORDER BY margin_pct DESC
@@ -507,6 +508,7 @@ export function getSupplierTrend(
     JOIN item_sales ist ON si.ItemCode = ist.ItemCode AND si.period = ist.period
     JOIN item_total itp ON si.ItemCode = itp.ItemCode AND si.period = itp.period
     JOIN creditor c ON si.CreditorCode = c.AccNo
+    WHERE c.IsActive = 'T'
     GROUP BY si.period, si.CreditorCode
     ORDER BY si.period ASC
   `).all(...codes, start, end, start, end, start, end) as SupplierTrendRow[];
@@ -697,6 +699,7 @@ export function getSupplierTable(
     JOIN item_total_purchased itp ON si.ItemCode = itp.ItemCode
     JOIN creditor c ON si.CreditorCode = c.AccNo
     LEFT JOIN creditor_type ct ON c.CreditorType = ct.CreditorType
+    WHERE c.IsActive = 'T'
     GROUP BY si.CreditorCode, c.CompanyName, ct.Description
     ORDER BY attributed_revenue DESC
   `).all(...params) as SupplierRow[];
@@ -945,6 +948,7 @@ export function getPriceComparison(
     JOIN selling_prices sp ON pp.ItemCode = sp.ItemCode
     JOIN item i ON pp.ItemCode = i.ItemCode
     JOIN creditor c ON pp.CreditorCode = c.AccNo
+    WHERE c.IsActive = 'T'
     ORDER BY sp.revenue DESC
     LIMIT ?
   `).all(start, end, start, end, start, end, limit) as PriceComparisonRow[];
@@ -955,7 +959,6 @@ export function getPriceComparison(
 export function getPriceSpread(
   start: string,
   end: string,
-  limit = 500,
   suppliers: string[] = [],
   itemGroups: string[] = [],
 ): PriceSpreadRow[] {
@@ -980,9 +983,6 @@ export function getPriceSpread(
 
   // selling_prices CTE params (IV then CS)
   params.push(start, end, start, end);
-
-  // LIMIT
-  params.push(limit);
 
   return db.prepare(`
     WITH purchase_prices AS (
@@ -1035,7 +1035,7 @@ export function getPriceSpread(
       FROM pidtl pd
       JOIN pi ON pi.DocKey = pd.DocKey
       JOIN creditor c ON pi.CreditorCode = c.AccNo
-      WHERE pi.Cancelled = 'F'
+      WHERE pi.Cancelled = 'F' AND c.IsActive = 'T'
         AND pd.ItemCode IS NOT NULL AND pd.ItemCode != ''
       GROUP BY pd.ItemCode
     )
@@ -1053,7 +1053,6 @@ export function getPriceSpread(
     JOIN item i ON pp.ItemCode = i.ItemCode
     LEFT JOIN supplier_names sn ON pp.ItemCode = sn.ItemCode
     ORDER BY margin_pct ASC
-    LIMIT ?
   `).all(...params) as PriceSpreadRow[];
 }
 
@@ -1087,7 +1086,7 @@ export function getItemListProcurement(
       AND pd.Qty > 0
       AND DATE(pi.DocDate, '+8 hours') BETWEEN ? AND ?
     GROUP BY pd.ItemCode, i.Description
-    HAVING COUNT(DISTINCT pi.CreditorCode) > 1
+    HAVING COUNT(DISTINCT pi.CreditorCode) >= 1
     ORDER BY total_buy DESC
   `).all(start, end) as ProcurementItemRow[];
 }
@@ -1149,7 +1148,7 @@ export function getItemProcurementSummary(
     FROM pi
     JOIN pidtl pd ON pi.DocKey = pd.DocKey
     LEFT JOIN creditor c ON pi.CreditorCode = c.AccNo
-    WHERE pi.Cancelled = 'F'
+    WHERE pi.Cancelled = 'F' AND (c.IsActive = 'T' OR c.IsActive IS NULL)
       AND pd.ItemCode = ? AND pd.Qty > 0
       AND DATE(pi.DocDate, '+8 hours') BETWEEN ? AND ?
     GROUP BY pi.CreditorCode, c.CompanyName

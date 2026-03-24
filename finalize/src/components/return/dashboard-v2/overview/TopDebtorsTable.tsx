@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { useAllCustomerReturns, useCustomerReturnDetails } from '@/hooks/return/useCreditDataV2';
-import type { V2Filters } from '@/hooks/return/useDashboardFiltersV2';
+import { useAllCustomerReturnsAll, useCustomerReturnDetailsAll } from '@/hooks/return/useCreditDataV2';
 import type { TopDebtorRow } from '@/lib/return/queries-v2';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -54,8 +53,8 @@ function UnresolvedCell({ unresolved, knockedOff, refunded, className = '' }: {
 
 // ─── Detail rows (expanded) ─────────────────────────────────────────────────
 
-function CustomerDetailRows({ debtorCode, filters }: { debtorCode: string; filters: V2Filters }) {
-  const { data, isLoading } = useCustomerReturnDetails(debtorCode, filters);
+function CustomerDetailRows({ debtorCode }: { debtorCode: string }) {
+  const { data, isLoading } = useCustomerReturnDetailsAll(debtorCode);
 
   if (isLoading) {
     return (
@@ -121,8 +120,8 @@ function CustomerDetailRows({ debtorCode, filters }: { debtorCode: string; filte
 
 // ─── Main table ─────────────────────────────────────────────────────────────
 
-export function TopDebtorsTable({ filters }: { filters: V2Filters }) {
-  const { data, isLoading } = useAllCustomerReturns(filters);
+export function TopDebtorsTable() {
+  const { data, isLoading } = useAllCustomerReturnsAll();
   const [sortKey, setSortKey] = useState<SortKey>('total_return_value');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [expandedCode, setExpandedCode] = useState<string | null>(null);
@@ -171,7 +170,7 @@ export function TopDebtorsTable({ filters }: { filters: V2Filters }) {
         <CardHeader className="pb-2"><CardTitle className="text-sm">Customer Returns</CardTitle></CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground py-8 text-center">
-            No return credit notes in this period.
+            No return credit notes found.
           </p>
         </CardContent>
       </Card>
@@ -222,7 +221,6 @@ export function TopDebtorsTable({ filters }: { filters: V2Filters }) {
                     row={row}
                     isExpanded={isExpanded}
                     onToggle={() => toggleExpand(row.debtor_code)}
-                    filters={filters}
                   />
                 );
               })}
@@ -267,12 +265,11 @@ export function TopDebtorsTable({ filters }: { filters: V2Filters }) {
 // ─── Customer row + expansion ───────────────────────────────────────────────
 
 function CustomerRow({
-  row, isExpanded, onToggle, filters,
+  row, isExpanded, onToggle,
 }: {
   row: TopDebtorRow;
   isExpanded: boolean;
   onToggle: () => void;
-  filters: V2Filters;
 }) {
   return (
     <>
@@ -302,7 +299,7 @@ function CustomerRow({
           />
         </TableCell>
       </TableRow>
-      {isExpanded && <CustomerDetailRows debtorCode={row.debtor_code} filters={filters} />}
+      {isExpanded && <CustomerDetailRows debtorCode={row.debtor_code} />}
     </>
   );
 }

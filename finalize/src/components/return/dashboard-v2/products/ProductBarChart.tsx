@@ -11,14 +11,14 @@ import {
 import { formatRM, formatCount } from '@/lib/format';
 
 const DIMENSIONS: { key: ReturnProductDimension; label: string }[] = [
-  { key: 'item', label: 'Item' },
+  { key: 'item', label: 'All' },
   { key: 'fruit', label: 'Fruit' },
   { key: 'variant', label: 'Variant' },
   { key: 'country', label: 'Country' },
 ];
 
 const DIMENSION_LABELS: Record<ReturnProductDimension, string> = {
-  item: 'Item',
+  item: 'All',
   fruit: 'Fruit',
   variant: 'Variant',
   country: 'Country',

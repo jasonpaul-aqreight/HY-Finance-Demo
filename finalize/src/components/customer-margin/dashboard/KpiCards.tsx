@@ -28,17 +28,19 @@ export function KpiCards({ filters }: KpiCardsProps) {
   if (isLoading || !data) return <SkeletonCards />;
 
   const cards = [
-    { title: 'Total Revenue', value: formatRM(data.total_revenue), color: 'text-foreground' },
-    { title: 'Total COGS', value: formatRM(data.total_cogs), color: 'text-foreground' },
+    { title: 'Net Sales', value: formatRM(data.total_revenue), color: 'text-foreground', formula: 'IV + DN − CN' },
+    { title: 'Total COGS', value: formatRM(data.total_cogs), color: 'text-foreground', formula: 'Cost of goods sold' },
     {
       title: 'Gross Profit',
       value: formatRM(data.gross_profit),
       color: data.gross_profit >= 0 ? 'text-emerald-600' : 'text-red-600',
+      formula: 'Net Sales − COGS',
     },
     {
       title: 'Overall Margin',
       value: formatMarginPct(data.margin_pct),
       color: marginColor(data.margin_pct),
+      formula: 'Gross Profit ÷ Net Sales',
     },
     { title: 'Active Customers', value: formatCount(data.active_customers), color: 'text-foreground' },
   ];
@@ -52,6 +54,9 @@ export function KpiCards({ filters }: KpiCardsProps) {
           </CardHeader>
           <CardContent>
             <div className={`text-xl font-bold ${card.color}`}>{card.value}</div>
+            {'formula' in card && card.formula && (
+              <p className="text-[10px] text-muted-foreground mt-0.5">{card.formula}</p>
+            )}
           </CardContent>
         </Card>
       ))}

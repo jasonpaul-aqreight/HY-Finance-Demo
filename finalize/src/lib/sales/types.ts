@@ -2,12 +2,12 @@
 
 export type GroupByDimension = 'customer' | 'customer-type' | 'agent' | 'outlet' | 'fruit' | 'fruit-country' | 'fruit-variant';
 
-export type StackDimension = 'agent' | 'fruit' | 'outlet' | 'customer-type' | 'fruit-country';
+export type StackDimension = 'agent' | 'fruit' | 'outlet' | 'customer-type' | 'fruit-country' | 'fruit-variant';
 
 export const STACK_OPTIONS: Record<GroupByDimension, StackDimension[]> = {
   'customer':      ['agent', 'fruit', 'fruit-country', 'outlet'],
   'customer-type': ['agent', 'fruit', 'fruit-country'],
-  'fruit':         ['customer-type'],
+  'fruit':         ['customer-type', 'fruit-variant'],
   'fruit-country': ['fruit'],
   'fruit-variant': ['customer-type'],
   'agent':         ['fruit', 'fruit-country', 'outlet'],

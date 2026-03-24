@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import useSWR from 'swr';
-import { format, subMonths } from 'date-fns';
+import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns';
 
 export interface DashboardFiltersV2 {
   startDate: string;
@@ -23,9 +23,8 @@ export function useDashboardFiltersV2() {
   // Initialize filters once bounds arrive
   useEffect(() => {
     if (bounds && !filters) {
-      const endDate = new Date(bounds.max_date);
-      const startDate = subMonths(endDate, 11);
-      startDate.setDate(1);
+      const endDate = endOfMonth(new Date(bounds.max_date));
+      const startDate = startOfMonth(subMonths(endDate, 11));
       setFiltersState({
         startDate: format(startDate, 'yyyy-MM-dd'),
         endDate: format(endDate, 'yyyy-MM-dd'),

@@ -40,6 +40,12 @@ export function useGroupByFilters(groupBy: GroupByDimension, data: GroupByRow[])
       result = result.filter((row) => row.customer_type === dropdownValue);
     }
 
+    // Apply dropdown filter — agent active status (single-select)
+    if (groupBy === 'agent' && typeof dropdownValue === 'string' && dropdownValue !== '') {
+      const activeFlag = dropdownValue === 'Active' ? 'T' : 'F';
+      result = result.filter((row) => row.is_active === activeFlag);
+    }
+
     // Apply dropdown filter — fruit-variant fruit (multi-select)
     if (groupBy === 'fruit-variant' && Array.isArray(dropdownValue) && dropdownValue.length > 0) {
       result = result.filter((row) => {

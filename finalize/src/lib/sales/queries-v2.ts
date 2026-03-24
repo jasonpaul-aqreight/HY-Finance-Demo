@@ -241,33 +241,72 @@ export function getGroupByData(group: GroupByDimension, start: string, end: stri
 
 type AnyDim = GroupByDimension | StackDimension;
 
+// Dimensions that require line-item tables (fruit data)
+const LINE_ITEM_DIMS: Set<AnyDim> = new Set(['fruit', 'fruit-country', 'fruit-variant']);
+
 interface DimMapping {
-  expr: string;
+  /** Expression used in SELECT for display name */
+  selectExpr: string;
+  /** Expression used in GROUP BY (must not use aggregates) */
+  groupExpr: string;
   joins: string[];
+  /** Optional CTE to resolve display names (for customer dimension) */
+  cte?: string;
+  /** Join to attach CTE-resolved names */
+  cteJoin?: string;
+  /** Number of extra ? params the CTE needs (bound before the main WHERE params) */
+  cteParams?: number;
 }
 
-function getDimMapping(dim: AnyDim): DimMapping {
+function getDimMapping(dim: AnyDim, role: 'primary' | 'stack'): DimMapping {
   switch (dim) {
     case 'customer':
-      return { expr: "COALESCE(s.DebtorName, s.DebtorCode, '(Unknown)')", joins: [] };
+      // Group by DebtorCode, resolve canonical name via CTE so all sub-groups
+      // (per agent, fruit, etc.) get the same display name as the base query.
+      // CTE uses ? placeholders for date params (bound separately).
+      return {
+        selectExpr: `_cust_${role}.canonical_name`,
+        groupExpr: 's.DebtorCode',
+        joins: [],
+        cte: `_cust_names_${role} AS (
+          SELECT DebtorCode, MAX(DebtorName) AS canonical_name
+          FROM (
+            SELECT DebtorCode, DebtorName, DocDate FROM iv WHERE Cancelled='F'
+            UNION ALL SELECT DebtorCode, DebtorName, DocDate FROM cs WHERE Cancelled='F'
+            UNION ALL SELECT DebtorCode, DebtorName, DocDate FROM cn WHERE Cancelled='F'
+          ) WHERE DATE(DocDate, '+8 hours') BETWEEN ? AND ?
+          GROUP BY DebtorCode
+        )`,
+        cteJoin: `LEFT JOIN _cust_names_${role} _cust_${role} ON s.DebtorCode = _cust_${role}.DebtorCode`,
+        /** Number of extra ? params this CTE needs (start, end) */
+        cteParams: 2,
+      };
     case 'customer-type':
       return {
-        expr: "COALESCE(d.DebtorType, '(Uncategorized)')",
+        selectExpr: "COALESCE(d.DebtorType, '(Uncategorized)')",
+        groupExpr: "COALESCE(d.DebtorType, '(Uncategorized)')",
         joins: ['LEFT JOIN debtor d ON s.DebtorCode = d.DebtorCode'],
       };
     case 'fruit':
-      return { expr: "COALESCE(s.FruitName, 'OTHERS')", joins: [] };
+      return { selectExpr: "COALESCE(s.FruitName, 'OTHERS')", groupExpr: "COALESCE(s.FruitName, 'OTHERS')", joins: [] };
     case 'fruit-country':
-      return { expr: "COALESCE(s.FruitCountry, '(Unknown)')", joins: [] };
+      return { selectExpr: "COALESCE(s.FruitCountry, '(Unknown)')", groupExpr: "COALESCE(s.FruitCountry, '(Unknown)')", joins: [] };
     case 'fruit-variant':
+      // When used as a stack dimension (e.g. group=fruit, stack=variant), return
+      // just the variant name so it doesn't repeat the fruit prefix.
+      // When used as a primary dimension, return the full "Fruit — Variant" combo.
+      if (role === 'stack') {
+        return { selectExpr: "COALESCE(s.FruitVariant, 'OTHERS')", groupExpr: "COALESCE(s.FruitVariant, 'OTHERS')", joins: [] };
+      }
       return {
-        expr: "COALESCE(s.FruitName,'OTHERS') || ' — ' || COALESCE(s.FruitVariant,'OTHERS')",
+        selectExpr: "COALESCE(s.FruitName,'OTHERS') || ' — ' || COALESCE(s.FruitVariant,'OTHERS')",
+        groupExpr: "COALESCE(s.FruitName,'OTHERS') || ' — ' || COALESCE(s.FruitVariant,'OTHERS')",
         joins: [],
       };
     case 'agent':
-      return { expr: "COALESCE(s.SalesAgent, '(Unassigned)')", joins: [] };
+      return { selectExpr: "COALESCE(s.SalesAgent, '(Unassigned)')", groupExpr: "COALESCE(s.SalesAgent, '(Unassigned)')", joins: [] };
     case 'outlet':
-      return { expr: "COALESCE(s.SalesLocation, '(Unassigned)')", joins: [] };
+      return { selectExpr: "COALESCE(s.SalesLocation, '(Unassigned)')", groupExpr: "COALESCE(s.SalesLocation, '(Unassigned)')", joins: [] };
   }
 }
 
@@ -278,23 +317,22 @@ export function getGroupByDataStacked(
   end: string,
 ): StackedRow[] {
   const db = getDb();
-  const primary = getDimMapping(group);
-  const secondary = getDimMapping(stack);
+  const primary = getDimMapping(group, 'primary');
+  const secondary = getDimMapping(stack, 'stack');
 
-  // Deduplicate joins
+  // Collect joins and CTEs
   const allJoins = [...new Set([...primary.joins, ...secondary.joins])];
+  if (primary.cteJoin) allJoins.push(primary.cteJoin);
+  if (secondary.cteJoin) allJoins.push(secondary.cteJoin);
+  const ctes = [primary.cte, secondary.cte].filter(Boolean);
 
-  const sql = `
-    SELECT
-      ${primary.expr} AS primary_name,
-      ${secondary.expr} AS stack_name,
-      COALESCE(SUM(CASE
-        WHEN s.src IN ('IV','CS') THEN s.SubTotal
-        WHEN s.src='CN' THEN -s.SubTotal
-        ELSE 0
-      END), 0) AS total_sales
-    FROM (
-      SELECT 'IV' AS src, DocDate, SubTotal, DebtorCode, DebtorName,
+  // Use line-item tables (SubTotal) when either dimension needs fruit data,
+  // otherwise use header tables (NetTotal) to match base query totals.
+  const needsLineItems = LINE_ITEM_DIMS.has(group) || LINE_ITEM_DIMS.has(stack);
+
+  const unionSql = needsLineItems
+    ? `
+      SELECT 'IV' AS src, DocDate, SubTotal AS Amount, DebtorCode, DebtorName,
              SalesAgent, SalesLocation, FruitName, FruitCountry, FruitVariant
       FROM sales_invoice
       UNION ALL
@@ -304,13 +342,46 @@ export function getGroupByDataStacked(
       UNION ALL
       SELECT 'CN', DocDate, SubTotal, DebtorCode, DebtorName,
              SalesAgent, SalesLocation, FruitName, FruitCountry, FruitVariant
-      FROM sales_credit_note
+      FROM sales_credit_note`
+    : `
+      SELECT 'IV' AS src, DocDate, NetTotal AS Amount, DebtorCode, DebtorName,
+             SalesAgent, SalesLocation, NULL AS FruitName, NULL AS FruitCountry, NULL AS FruitVariant
+      FROM iv WHERE Cancelled='F'
+      UNION ALL
+      SELECT 'CS', DocDate, NetTotal, DebtorCode, DebtorName,
+             SalesAgent, SalesLocation, NULL, NULL, NULL
+      FROM cs WHERE Cancelled='F'
+      UNION ALL
+      SELECT 'CN', DocDate, NetTotal, DebtorCode, DebtorName,
+             SalesAgent, SalesLocation, NULL, NULL, NULL
+      FROM cn WHERE Cancelled='F'`;
+
+  const ctePart = ctes.length > 0 ? `WITH ${ctes.join(',\n')}` : '';
+
+  const sql = `
+    ${ctePart}
+    SELECT
+      ${primary.selectExpr} AS primary_name,
+      ${secondary.selectExpr} AS stack_name,
+      COALESCE(SUM(CASE
+        WHEN s.src IN ('IV','CS') THEN s.Amount
+        WHEN s.src='CN' THEN -s.Amount
+        ELSE 0
+      END), 0) AS total_sales
+    FROM (${unionSql}
     ) s
     ${allJoins.join('\n    ')}
     WHERE DATE(s.DocDate, '+8 hours') BETWEEN ? AND ?
-    GROUP BY primary_name, stack_name
+    GROUP BY ${primary.groupExpr}, ${secondary.groupExpr}
     ORDER BY total_sales DESC
   `;
 
-  return db.prepare(sql).all(start, end) as StackedRow[];
+  // Build params: CTE params (date range for each CTE that needs it) come first,
+  // then the main WHERE date range params.
+  const params: string[] = [];
+  if (primary.cteParams) params.push(start, end);
+  if (secondary.cteParams) params.push(start, end);
+  params.push(start, end); // main WHERE clause
+
+  return db.prepare(sql).all(...params) as StackedRow[];
 }

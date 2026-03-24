@@ -101,6 +101,23 @@ export function GroupByFilters({
         </Select>
       )}
 
+      {/* Agent tab: active status dropdown (single-select) */}
+      {groupBy === 'agent' && (
+        <Select
+          value={dropdownValue as string}
+          onValueChange={(val) => onDropdownChange(val ?? '')}
+        >
+          <SelectTrigger size="sm">
+            <SelectValue placeholder="All Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">All Status</SelectItem>
+            <SelectItem value="Active">Active</SelectItem>
+            <SelectItem value="Inactive">Inactive</SelectItem>
+          </SelectContent>
+        </Select>
+      )}
+
       {/* Variant tab: fruit dropdown (multi-select) */}
       {groupBy === 'fruit-variant' && fruitOptions.length > 0 && (
         <FruitMultiSelect

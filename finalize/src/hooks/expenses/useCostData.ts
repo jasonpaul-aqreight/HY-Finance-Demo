@@ -36,8 +36,10 @@ export function useCostComposition(filters: DashboardFilters) {
   return useSWR(`/api/expenses/cost/composition?${params}`, fetcher);
 }
 
-export function useTopExpenses(filters: DashboardFilters) {
-  const params = costParams(filters);
+export function useTopExpenses(filters: DashboardFilters, costType?: string, order?: string) {
+  const params = dateParams(filters);
+  params.set('cost_type', costType ?? filters.costType);
+  if (order) params.set('order', order);
   return useSWR(`/api/expenses/cost/top-expenses?${params}`, fetcher);
 }
 

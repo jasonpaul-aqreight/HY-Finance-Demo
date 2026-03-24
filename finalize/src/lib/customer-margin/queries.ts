@@ -139,7 +139,7 @@ function buildHeaderFilterWhere(filters: MarginFilters, prefix = ''): { where: s
 }
 
 function addDebtorFilters(filters: MarginFilters, params: unknown[]): string {
-  const clauses: string[] = [];
+  const clauses: string[] = ['d.IsActive = \'T\''];
   if (filters.types?.length) {
     clauses.push(`d.DebtorType IN (${filters.types.map(() => '?').join(',')})`);
     params.push(...filters.types);
@@ -157,12 +157,9 @@ export function getMarginKpi(filters: MarginFilters): KpiData {
   const db = getDb();
   const { where: hWhere, params: hParams } = buildHeaderFilterWhere(filters, 'h');
 
-  // Build combined query with optional debtor type/agent filters
-  const debtorJoin = (filters.types?.length || filters.agents?.length)
-    ? 'JOIN debtor d ON combined.debtor_code = d.DebtorCode' : '';
-  const debtorFilter = (filters.types?.length || filters.agents?.length)
-    ? (() => { const p: unknown[] = []; const s = addDebtorFilters(filters, p); return { sql: s, params: p }; })()
-    : { sql: '', params: [] };
+  // Build combined query — always join debtor to filter inactive customers
+  const debtorJoin = 'JOIN debtor d ON combined.debtor_code = d.DebtorCode';
+  const debtorFilter = (() => { const p: unknown[] = []; const s = addDebtorFilters(filters, p); return { sql: s, params: p }; })();
 
   const row = db.prepare(`
     SELECT
@@ -189,12 +186,12 @@ export function getMarginKpi(filters: MarginFilters): KpiData {
         SUM(CASE WHEN src = 'CN' THEN revenue ELSE 0 END) AS cn_rev
       FROM (
         SELECT 'IV' AS src, h.DebtorCode AS debtor_code, h.LocalNetTotal AS revenue,
-               COALESCE((SELECT SUM(MIN(d.LocalTotalCost, d.LocalSubTotal * 5)) FROM ivdtl d WHERE d.DocKey = h.DocKey), 0) AS cost,
+               COALESCE((SELECT SUM(CASE WHEN d.LocalTotalCost IS NOT NULL AND d.LocalTotalCost >= 0 THEN d.LocalTotalCost ELSE 0 END) FROM ivdtl d WHERE d.DocKey = h.DocKey), 0) AS cost,
                h.DocDate
         FROM iv h WHERE h.Cancelled='F' AND ${hWhere}
         UNION ALL
         SELECT 'DN', h.DebtorCode, h.LocalNetTotal,
-               COALESCE((SELECT SUM(MIN(d.LocalTotalCost, d.LocalSubTotal * 5)) FROM dndtl d WHERE d.DocKey = h.DocKey), 0),
+               COALESCE((SELECT SUM(CASE WHEN d.LocalTotalCost IS NOT NULL AND d.LocalTotalCost >= 0 THEN d.LocalTotalCost ELSE 0 END) FROM dndtl d WHERE d.DocKey = h.DocKey), 0),
                h.DocDate
         FROM dn h WHERE (h.Cancelled='F' OR h.Cancelled IS NULL) AND ${hWhere}
         UNION ALL
@@ -218,21 +215,18 @@ export function getMarginTrend(filters: MarginFilters): TrendRow[] {
   const db = getDb();
   const { where, params } = buildHeaderFilterWhere(filters, 'h');
 
-  // For type/agent filters we need a subquery approach
-  let customerFilter = '';
+  // Always filter inactive customers; optionally filter by type/agent
+  const clauses: string[] = ['IsActive = \'T\''];
   const extraParams: unknown[] = [];
-  if (filters.types?.length || filters.agents?.length) {
-    const clauses: string[] = [];
-    if (filters.types?.length) {
-      clauses.push(`DebtorType IN (${filters.types.map(() => '?').join(',')})`);
-      extraParams.push(...filters.types);
-    }
-    if (filters.agents?.length) {
-      clauses.push(`SalesAgent IN (${filters.agents.map(() => '?').join(',')})`);
-      extraParams.push(...filters.agents);
-    }
-    customerFilter = `AND debtor_code IN (SELECT DebtorCode FROM debtor WHERE ${clauses.join(' AND ')})`;
+  if (filters.types?.length) {
+    clauses.push(`DebtorType IN (${filters.types.map(() => '?').join(',')})`);
+    extraParams.push(...filters.types);
   }
+  if (filters.agents?.length) {
+    clauses.push(`SalesAgent IN (${filters.agents.map(() => '?').join(',')})`);
+    extraParams.push(...filters.agents);
+  }
+  const customerFilter = `AND debtor_code IN (SELECT DebtorCode FROM debtor WHERE ${clauses.join(' AND ')})`;
 
   const rows = db.prepare(`
     SELECT
@@ -259,12 +253,12 @@ export function getMarginTrend(filters: MarginFilters): TrendRow[] {
       SELECT 'IV' AS src, h.DebtorCode AS debtor_code,
              strftime('%Y-%m', h.DocDate, '+8 hours') AS period,
              h.LocalNetTotal AS revenue,
-             COALESCE((SELECT SUM(MIN(d.LocalTotalCost, d.LocalSubTotal * 5)) FROM ivdtl d WHERE d.DocKey = h.DocKey), 0) AS cost
+             COALESCE((SELECT SUM(CASE WHEN d.LocalTotalCost IS NOT NULL AND d.LocalTotalCost >= 0 THEN d.LocalTotalCost ELSE 0 END) FROM ivdtl d WHERE d.DocKey = h.DocKey), 0) AS cost
       FROM iv h WHERE h.Cancelled='F' AND ${where}
       UNION ALL
       SELECT 'DN', h.DebtorCode, strftime('%Y-%m', h.DocDate, '+8 hours'),
              h.LocalNetTotal,
-             COALESCE((SELECT SUM(MIN(d.LocalTotalCost, d.LocalSubTotal * 5)) FROM dndtl d WHERE d.DocKey = h.DocKey), 0)
+             COALESCE((SELECT SUM(CASE WHEN d.LocalTotalCost IS NOT NULL AND d.LocalTotalCost >= 0 THEN d.LocalTotalCost ELSE 0 END) FROM dndtl d WHERE d.DocKey = h.DocKey), 0)
       FROM dn h WHERE (h.Cancelled='F' OR h.Cancelled IS NULL) AND ${where}
       UNION ALL
       SELECT 'CN', h.DebtorCode, strftime('%Y-%m', h.DocDate, '+8 hours'),
@@ -293,19 +287,16 @@ export function getCustomerMargins(
   const { where, params } = buildHeaderFilterWhere(filters, 'h');
 
   const extraParams: unknown[] = [];
-  let debtorFilter = '';
-  if (filters.types?.length || filters.agents?.length) {
-    const clauses: string[] = [];
-    if (filters.types?.length) {
-      clauses.push(`d.DebtorType IN (${filters.types.map(() => '?').join(',')})`);
-      extraParams.push(...filters.types);
-    }
-    if (filters.agents?.length) {
-      clauses.push(`d.SalesAgent IN (${filters.agents.map(() => '?').join(',')})`);
-      extraParams.push(...filters.agents);
-    }
-    debtorFilter = ' AND ' + clauses.join(' AND ');
+  const debtorClauses: string[] = ['d.IsActive = \'T\''];
+  if (filters.types?.length) {
+    debtorClauses.push(`d.DebtorType IN (${filters.types.map(() => '?').join(',')})`);
+    extraParams.push(...filters.types);
   }
+  if (filters.agents?.length) {
+    debtorClauses.push(`d.SalesAgent IN (${filters.agents.map(() => '?').join(',')})`);
+    extraParams.push(...filters.agents);
+  }
+  const debtorFilter = ' AND ' + debtorClauses.join(' AND ');
 
   const allowedSorts = ['revenue', 'cogs', 'gross_profit', 'margin_pct', 'iv_count', 'cn_count', 'return_rate_pct', 'company_name'];
   const sortCol = allowedSorts.includes(sort) ? sort : 'gross_profit';
@@ -326,12 +317,12 @@ export function getCustomerMargins(
         COALESCE(SUM(CASE WHEN src = 'CN' THEN revenue ELSE 0 END), 0) AS cn_rev
       FROM (
         SELECT 'IV' AS src, h.DebtorCode AS debtor_code, h.LocalNetTotal AS revenue,
-               COALESCE((SELECT SUM(MIN(d.LocalTotalCost, d.LocalSubTotal * 5)) FROM ivdtl d WHERE d.DocKey = h.DocKey), 0) AS cost,
+               COALESCE((SELECT SUM(CASE WHEN d.LocalTotalCost IS NOT NULL AND d.LocalTotalCost >= 0 THEN d.LocalTotalCost ELSE 0 END) FROM ivdtl d WHERE d.DocKey = h.DocKey), 0) AS cost,
                h.DocDate
         FROM iv h WHERE h.Cancelled='F' AND ${where}
         UNION ALL
         SELECT 'DN', h.DebtorCode, h.LocalNetTotal,
-               COALESCE((SELECT SUM(MIN(d.LocalTotalCost, d.LocalSubTotal * 5)) FROM dndtl d WHERE d.DocKey = h.DocKey), 0),
+               COALESCE((SELECT SUM(CASE WHEN d.LocalTotalCost IS NOT NULL AND d.LocalTotalCost >= 0 THEN d.LocalTotalCost ELSE 0 END) FROM dndtl d WHERE d.DocKey = h.DocKey), 0),
                h.DocDate
         FROM dn h WHERE (h.Cancelled='F' OR h.Cancelled IS NULL) AND ${where}
         UNION ALL
@@ -404,13 +395,13 @@ export function getCustomerMonthly(code: string, start: string, end: string): Cu
     FROM (
       SELECT 'IV' AS src, strftime('%Y-%m', h.DocDate, '+8 hours') AS period,
              h.LocalNetTotal AS revenue,
-             COALESCE((SELECT SUM(MIN(d.LocalTotalCost, d.LocalSubTotal * 5)) FROM ivdtl d WHERE d.DocKey = h.DocKey), 0) AS cost
+             COALESCE((SELECT SUM(CASE WHEN d.LocalTotalCost IS NOT NULL AND d.LocalTotalCost >= 0 THEN d.LocalTotalCost ELSE 0 END) FROM ivdtl d WHERE d.DocKey = h.DocKey), 0) AS cost
       FROM iv h WHERE h.Cancelled='F' AND h.DebtorCode = ?
         AND DATE(h.DocDate, '+8 hours') BETWEEN ? AND ?
       UNION ALL
       SELECT 'DN', strftime('%Y-%m', h.DocDate, '+8 hours'),
              h.LocalNetTotal,
-             COALESCE((SELECT SUM(MIN(d.LocalTotalCost, d.LocalSubTotal * 5)) FROM dndtl d WHERE d.DocKey = h.DocKey), 0)
+             COALESCE((SELECT SUM(CASE WHEN d.LocalTotalCost IS NOT NULL AND d.LocalTotalCost >= 0 THEN d.LocalTotalCost ELSE 0 END) FROM dndtl d WHERE d.DocKey = h.DocKey), 0)
       FROM dn h WHERE (h.Cancelled='F' OR h.Cancelled IS NULL) AND h.DebtorCode = ?
         AND DATE(h.DocDate, '+8 hours') BETWEEN ? AND ?
       UNION ALL
@@ -490,12 +481,12 @@ export function getMarginByType(filters: MarginFilters): TypeMarginRow[] {
           - SUM(CASE WHEN src = 'CN' THEN cost ELSE 0 END) AS net_cogs
       FROM (
         SELECT 'IV' AS src, h.DebtorCode AS debtor_code, h.LocalNetTotal AS revenue,
-               COALESCE((SELECT SUM(MIN(d.LocalTotalCost, d.LocalSubTotal * 5)) FROM ivdtl d WHERE d.DocKey = h.DocKey), 0) AS cost,
+               COALESCE((SELECT SUM(CASE WHEN d.LocalTotalCost IS NOT NULL AND d.LocalTotalCost >= 0 THEN d.LocalTotalCost ELSE 0 END) FROM ivdtl d WHERE d.DocKey = h.DocKey), 0) AS cost,
                h.DocDate
         FROM iv h WHERE h.Cancelled='F' AND ${where}
         UNION ALL
         SELECT 'DN', h.DebtorCode, h.LocalNetTotal,
-               COALESCE((SELECT SUM(MIN(d.LocalTotalCost, d.LocalSubTotal * 5)) FROM dndtl d WHERE d.DocKey = h.DocKey), 0),
+               COALESCE((SELECT SUM(CASE WHEN d.LocalTotalCost IS NOT NULL AND d.LocalTotalCost >= 0 THEN d.LocalTotalCost ELSE 0 END) FROM dndtl d WHERE d.DocKey = h.DocKey), 0),
                h.DocDate
         FROM dn h WHERE (h.Cancelled='F' OR h.Cancelled IS NULL) AND ${where}
         UNION ALL
@@ -507,6 +498,7 @@ export function getMarginByType(filters: MarginFilters): TypeMarginRow[] {
       GROUP BY debtor_code
     ) c
     LEFT JOIN debtor d ON c.debtor_code = d.DebtorCode
+    WHERE d.IsActive = 'T'
     GROUP BY COALESCE(d.DebtorType, 'Unassigned')
     ORDER BY revenue DESC
   `).all(...params, ...params, ...params) as TypeMarginRow[];
@@ -518,21 +510,19 @@ export function getMarginByProductGroup(filters: MarginFilters): ProductGroupRow
   const db = getDb();
   const { where, params } = buildHeaderFilterWhere(filters);
 
-  const customerSubquery = (filters.types?.length || filters.agents?.length)
-    ? (() => {
-        const clauses: string[] = [];
-        const p: unknown[] = [];
-        if (filters.types?.length) {
-          clauses.push(`DebtorType IN (${filters.types.map(() => '?').join(',')})`);
-          p.push(...filters.types);
-        }
-        if (filters.agents?.length) {
-          clauses.push(`SalesAgent IN (${filters.agents.map(() => '?').join(',')})`);
-          p.push(...filters.agents);
-        }
-        return { sql: `AND h.DebtorCode IN (SELECT DebtorCode FROM debtor WHERE ${clauses.join(' AND ')})`, params: p };
-      })()
-    : { sql: '', params: [] };
+  const customerSubquery = (() => {
+    const clauses: string[] = ['IsActive = \'T\''];
+    const p: unknown[] = [];
+    if (filters.types?.length) {
+      clauses.push(`DebtorType IN (${filters.types.map(() => '?').join(',')})`);
+      p.push(...filters.types);
+    }
+    if (filters.agents?.length) {
+      clauses.push(`SalesAgent IN (${filters.agents.map(() => '?').join(',')})`);
+      p.push(...filters.agents);
+    }
+    return { sql: `AND h.DebtorCode IN (SELECT DebtorCode FROM debtor WHERE ${clauses.join(' AND ')})`, params: p };
+  })();
 
   let pgFilter = '';
   const pgParams: unknown[] = [];
@@ -569,7 +559,7 @@ export function getMarginByProductGroup(filters: MarginFilters): ProductGroupRow
       SELECT 'IV' AS src,
              COALESCE(NULLIF(i.ItemGroup, ''), 'Unclassified') AS item_group,
              dtl.LocalSubTotal AS line_rev,
-             MIN(dtl.LocalTotalCost, dtl.LocalSubTotal * 5) AS line_cost
+             CASE WHEN dtl.LocalTotalCost IS NOT NULL AND dtl.LocalTotalCost >= 0 THEN dtl.LocalTotalCost ELSE 0 END AS line_cost
       FROM ivdtl dtl
       JOIN iv h ON dtl.DocKey = h.DocKey
       LEFT JOIN item i ON dtl.ItemCode = i.ItemCode
@@ -595,7 +585,7 @@ export function getMarginByProductGroup(filters: MarginFilters): ProductGroupRow
       SELECT 'DN',
              COALESCE(NULLIF(i.ItemGroup, ''), 'Unclassified'),
              dtl.LocalSubTotal,
-             MIN(dtl.LocalTotalCost, dtl.LocalSubTotal * 5)
+             CASE WHEN dtl.LocalTotalCost IS NOT NULL AND dtl.LocalTotalCost >= 0 THEN dtl.LocalTotalCost ELSE 0 END
       FROM dndtl dtl
       JOIN dn h ON dtl.DocKey = h.DocKey
       LEFT JOIN item i ON dtl.ItemCode = i.ItemCode
@@ -619,21 +609,19 @@ export function getMarginByProductGroup(filters: MarginFilters): ProductGroupRow
 export function getProductCustomerMatrix(filters: MarginFilters): ProductCustomerCell[] {
   const db = getDb();
 
-  const customerSubquery = (filters.types?.length || filters.agents?.length)
-    ? (() => {
-        const clauses: string[] = [];
-        const p: unknown[] = [];
-        if (filters.types?.length) {
-          clauses.push(`DebtorType IN (${filters.types.map(() => '?').join(',')})`);
-          p.push(...filters.types);
-        }
-        if (filters.agents?.length) {
-          clauses.push(`SalesAgent IN (${filters.agents.map(() => '?').join(',')})`);
-          p.push(...filters.agents);
-        }
-        return { sql: `AND h.DebtorCode IN (SELECT DebtorCode FROM debtor WHERE ${clauses.join(' AND ')})`, params: p };
-      })()
-    : { sql: '', params: [] };
+  const customerSubquery = (() => {
+    const clauses: string[] = ['IsActive = \'T\''];
+    const p: unknown[] = [];
+    if (filters.types?.length) {
+      clauses.push(`DebtorType IN (${filters.types.map(() => '?').join(',')})`);
+      p.push(...filters.types);
+    }
+    if (filters.agents?.length) {
+      clauses.push(`SalesAgent IN (${filters.agents.map(() => '?').join(',')})`);
+      p.push(...filters.agents);
+    }
+    return { sql: `AND h.DebtorCode IN (SELECT DebtorCode FROM debtor WHERE ${clauses.join(' AND ')})`, params: p };
+  })();
 
   let custFilter = '';
   const custParams: unknown[] = [];
@@ -665,7 +653,7 @@ export function getProductCustomerMatrix(filters: MarginFilters): ProductCustome
       SELECT 'IV' AS src, h.DebtorCode AS debtor_code,
              COALESCE(NULLIF(i.ItemGroup, ''), 'Unclassified') AS item_group,
              dtl.LocalSubTotal AS line_rev,
-             MIN(dtl.LocalTotalCost, dtl.LocalSubTotal * 5) AS line_cost
+             CASE WHEN dtl.LocalTotalCost IS NOT NULL AND dtl.LocalTotalCost >= 0 THEN dtl.LocalTotalCost ELSE 0 END AS line_cost
       FROM ivdtl dtl
       JOIN iv h ON dtl.DocKey = h.DocKey
       LEFT JOIN item i ON dtl.ItemCode = i.ItemCode
@@ -688,7 +676,6 @@ export function getProductCustomerMatrix(filters: MarginFilters): ProductCustome
     )
     LEFT JOIN debtor d ON debtor_code = d.DebtorCode
     GROUP BY debtor_code, item_group
-    HAVING revenue > 0
     ORDER BY revenue DESC
     LIMIT 500
   `).all(
@@ -704,19 +691,16 @@ export function getCreditNoteImpact(filters: MarginFilters): CreditNoteImpactRow
   const { where, params } = buildHeaderFilterWhere(filters, 'h');
 
   const extraParams: unknown[] = [];
-  let debtorFilter = '';
-  if (filters.types?.length || filters.agents?.length) {
-    const clauses: string[] = [];
-    if (filters.types?.length) {
-      clauses.push(`d.DebtorType IN (${filters.types.map(() => '?').join(',')})`);
-      extraParams.push(...filters.types);
-    }
-    if (filters.agents?.length) {
-      clauses.push(`d.SalesAgent IN (${filters.agents.map(() => '?').join(',')})`);
-      extraParams.push(...filters.agents);
-    }
-    debtorFilter = ' AND ' + clauses.join(' AND ');
+  const debtorClauses: string[] = ['d.IsActive = \'T\''];
+  if (filters.types?.length) {
+    debtorClauses.push(`d.DebtorType IN (${filters.types.map(() => '?').join(',')})`);
+    extraParams.push(...filters.types);
   }
+  if (filters.agents?.length) {
+    debtorClauses.push(`d.SalesAgent IN (${filters.agents.map(() => '?').join(',')})`);
+    extraParams.push(...filters.agents);
+  }
+  const debtorFilter = ' AND ' + debtorClauses.join(' AND ');
 
   return db.prepare(`
     SELECT
@@ -746,7 +730,7 @@ export function getCreditNoteImpact(filters: MarginFilters): CreditNoteImpactRow
         COALESCE(SUM(CASE WHEN src = 'CN' THEN cost ELSE 0 END), 0) AS cn_cost
       FROM (
         SELECT 'IV' AS src, h.DebtorCode AS debtor_code, h.LocalNetTotal AS revenue,
-               COALESCE((SELECT SUM(MIN(d.LocalTotalCost, d.LocalSubTotal * 5)) FROM ivdtl d WHERE d.DocKey = h.DocKey), 0) AS cost,
+               COALESCE((SELECT SUM(CASE WHEN d.LocalTotalCost IS NOT NULL AND d.LocalTotalCost >= 0 THEN d.LocalTotalCost ELSE 0 END) FROM ivdtl d WHERE d.DocKey = h.DocKey), 0) AS cost,
                h.DocDate
         FROM iv h WHERE h.Cancelled='F' AND ${where}
         UNION ALL
@@ -771,19 +755,16 @@ export function getMarginDistribution(filters: MarginFilters): DistributionBucke
   const { where, params } = buildHeaderFilterWhere(filters, 'h');
 
   const extraParams: unknown[] = [];
-  let debtorFilter = '';
-  if (filters.types?.length || filters.agents?.length) {
-    const clauses: string[] = [];
-    if (filters.types?.length) {
-      clauses.push(`d.DebtorType IN (${filters.types.map(() => '?').join(',')})`);
-      extraParams.push(...filters.types);
-    }
-    if (filters.agents?.length) {
-      clauses.push(`d.SalesAgent IN (${filters.agents.map(() => '?').join(',')})`);
-      extraParams.push(...filters.agents);
-    }
-    debtorFilter = ' AND ' + clauses.join(' AND ');
+  const debtorClauses: string[] = ['d.IsActive = \'T\''];
+  if (filters.types?.length) {
+    debtorClauses.push(`d.DebtorType IN (${filters.types.map(() => '?').join(',')})`);
+    extraParams.push(...filters.types);
   }
+  if (filters.agents?.length) {
+    debtorClauses.push(`d.SalesAgent IN (${filters.agents.map(() => '?').join(',')})`);
+    extraParams.push(...filters.agents);
+  }
+  const debtorFilter = ' AND ' + debtorClauses.join(' AND ');
 
   return db.prepare(`
     SELECT
@@ -830,12 +811,12 @@ export function getMarginDistribution(filters: MarginFilters): DistributionBucke
             - SUM(CASE WHEN src = 'CN' THEN cost ELSE 0 END) AS net_cogs
         FROM (
           SELECT 'IV' AS src, h.DebtorCode AS debtor_code, h.LocalNetTotal AS revenue,
-                 COALESCE((SELECT SUM(MIN(d.LocalTotalCost, d.LocalSubTotal * 5)) FROM ivdtl d WHERE d.DocKey = h.DocKey), 0) AS cost,
+                 COALESCE((SELECT SUM(CASE WHEN d.LocalTotalCost IS NOT NULL AND d.LocalTotalCost >= 0 THEN d.LocalTotalCost ELSE 0 END) FROM ivdtl d WHERE d.DocKey = h.DocKey), 0) AS cost,
                  h.DocDate
           FROM iv h WHERE h.Cancelled='F' AND ${where}
           UNION ALL
           SELECT 'DN', h.DebtorCode, h.LocalNetTotal,
-                 COALESCE((SELECT SUM(MIN(d.LocalTotalCost, d.LocalSubTotal * 5)) FROM dndtl d WHERE d.DocKey = h.DocKey), 0),
+                 COALESCE((SELECT SUM(CASE WHEN d.LocalTotalCost IS NOT NULL AND d.LocalTotalCost >= 0 THEN d.LocalTotalCost ELSE 0 END) FROM dndtl d WHERE d.DocKey = h.DocKey), 0),
                  h.DocDate
           FROM dn h WHERE (h.Cancelled='F' OR h.Cancelled IS NULL) AND ${where}
           UNION ALL
@@ -861,7 +842,8 @@ export function getFilterCustomers(): { code: string; name: string | null }[] {
   return db.prepare(`
     SELECT d.DebtorCode AS code, d.CompanyName AS name
     FROM debtor d
-    WHERE EXISTS (SELECT 1 FROM iv WHERE iv.DebtorCode = d.DebtorCode AND iv.Cancelled = 'F')
+    WHERE d.IsActive = 'T'
+      AND EXISTS (SELECT 1 FROM iv WHERE iv.DebtorCode = d.DebtorCode AND iv.Cancelled = 'F')
     ORDER BY d.CompanyName
   `).all() as { code: string; name: string | null }[];
 }
@@ -871,6 +853,7 @@ export function getFilterTypes(): string[] {
   return (db.prepare(`
     SELECT DISTINCT COALESCE(DebtorType, 'Unassigned') AS t
     FROM debtor
+    WHERE IsActive = 'T'
     ORDER BY t
   `).all() as { t: string }[]).map(r => r.t);
 }

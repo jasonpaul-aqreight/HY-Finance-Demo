@@ -13,7 +13,7 @@ import {
   ReferenceLine,
   ZAxis,
 } from 'recharts';
-import { usePriceSpread, useDimensions } from '@/hooks/supplier-margin/useMarginData';
+import { usePriceSpread } from '@/hooks/supplier-margin/useMarginData';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { DashboardFilters } from '@/hooks/supplier-margin/useDashboardFilters';
 
@@ -172,7 +172,7 @@ type MarginView = 'all' | 'outliers';
 
 export function PriceScatterChart({ filters }: { filters: DashboardFilters }) {
   const { data: raw, isLoading } = usePriceSpread(filters);
-  const { data: dims } = useDimensions();
+  const [pinnedPoint, setPinnedPoint] = useState<ScatterPoint | null>(null);
   const [selectedSuppliers, setSelectedSuppliers] = useState<string[]>([]);
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [marginView, setMarginView] = useState<MarginView>('all');
@@ -216,26 +216,42 @@ export function PriceScatterChart({ filters }: { filters: DashboardFilters }) {
     return { allPoints, maxPrice };
   }, [raw]);
 
-  // Supplier dropdown options from dimensions API
-  const supplierOptions = useMemo(() => {
-    const suppliers: Array<{ AccNo: string; CompanyName: string }> = dims?.suppliers ?? [];
-    return suppliers.map((s) => ({
-      key: s.AccNo,
-      label: s.CompanyName,
-      sub: s.AccNo,
-    }));
-  }, [dims]);
+  // Step 1: Apply margin view filter first — this drives the dropdown options
+  const marginFilteredPoints = useMemo(() => {
+    if (marginView !== 'outliers') return allPoints;
+    return allPoints.filter((p) => {
+      const m = p.margin_pct ?? 0;
+      return m < 0 || m > 40;
+    });
+  }, [allPoints, marginView]);
 
-  // Item dropdown options derived from scatter data, filtered by selected suppliers
+  // Step 2: Supplier options derived from margin-filtered data
+  const supplierOptions = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const p of marginFilteredPoints) {
+      const codes = p.supplier_codes.split(',').filter(Boolean);
+      const names = p.supplier_names.split(',').filter(Boolean);
+      codes.forEach((code, i) => {
+        const trimmed = code.trim();
+        if (!seen.has(trimmed)) {
+          seen.set(trimmed, names[i]?.trim() ?? trimmed);
+        }
+      });
+    }
+    return Array.from(seen.entries())
+      .map(([code, name]) => ({ key: code, label: name, sub: code }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [marginFilteredPoints]);
+
+  // Step 3: Item options derived from margin-filtered data, further filtered by selected suppliers
   const itemOptions = useMemo(() => {
-    let items = allPoints;
+    let items = marginFilteredPoints;
     if (selectedSuppliers.length > 0) {
       items = items.filter((p) => {
         const codes = p.supplier_codes.split(',');
         return selectedSuppliers.some((s) => codes.includes(s));
       });
     }
-    // Deduplicate by item_code
     const seen = new Set<string>();
     return items
       .filter((p) => {
@@ -248,9 +264,19 @@ export function PriceScatterChart({ filters }: { filters: DashboardFilters }) {
         label: p.name,
         sub: p.item_code,
       }));
-  }, [allPoints, selectedSuppliers]);
+  }, [marginFilteredPoints, selectedSuppliers]);
 
-  // Clear item selections that are no longer valid when suppliers change
+  // Clear stale supplier selections when margin view changes
+  useEffect(() => {
+    if (selectedSuppliers.length === 0) return;
+    const validKeys = new Set(supplierOptions.map((s) => s.key));
+    const filtered = selectedSuppliers.filter((k) => validKeys.has(k));
+    if (filtered.length !== selectedSuppliers.length) {
+      setSelectedSuppliers(filtered);
+    }
+  }, [supplierOptions, selectedSuppliers]);
+
+  // Clear stale item selections when suppliers or margin view changes
   useEffect(() => {
     if (selectedItems.length === 0) return;
     const validKeys = new Set(itemOptions.map((i) => i.key));
@@ -260,9 +286,9 @@ export function PriceScatterChart({ filters }: { filters: DashboardFilters }) {
     }
   }, [itemOptions, selectedItems]);
 
-  // Filter points based on selections + margin view
+  // Step 4: Final filtered points (margin already applied via marginFilteredPoints)
   const filteredPoints = useMemo(() => {
-    let pts = allPoints;
+    let pts = marginFilteredPoints;
     if (selectedSuppliers.length > 0) {
       pts = pts.filter((p) => {
         const codes = p.supplier_codes.split(',');
@@ -273,14 +299,8 @@ export function PriceScatterChart({ filters }: { filters: DashboardFilters }) {
       const itemSet = new Set(selectedItems);
       pts = pts.filter((p) => itemSet.has(p.item_code));
     }
-    if (marginView === 'outliers') {
-      pts = pts.filter((p) => {
-        const m = p.margin_pct ?? 0;
-        return m < 0 || m > 40;
-      });
-    }
     return pts;
-  }, [allPoints, selectedSuppliers, selectedItems, marginView]);
+  }, [marginFilteredPoints, selectedSuppliers, selectedItems]);
 
   // 3-tier margin classification
   const lossPoints = filteredPoints.filter((p) => (p.margin_pct ?? 0) < 0);
@@ -418,25 +438,28 @@ export function PriceScatterChart({ filters }: { filters: DashboardFilters }) {
                 formatter={(value: string) => <span style={{ marginRight: 12 }}>{value}</span>}
               />
 
-              <Tooltip
-                content={({ active, payload }) => {
-                  if (!active || !payload?.length) return null;
-                  const p = payload[0].payload as ScatterPoint;
-                  return (
-                    <div className="bg-card border rounded-md shadow-sm p-2 text-sm max-w-[280px]">
-                      <p className="font-semibold truncate">{p.name}</p>
-                      <p className="text-xs text-muted-foreground font-mono">{p.item_code}</p>
-                      {p.supplier_names && (
-                        <p className="text-xs text-muted-foreground truncate">{p.supplier_names}</p>
-                      )}
-                      <p>Purchase: RM{p.x.toFixed(2)}</p>
-                      <p>Selling: RM{p.y.toFixed(2)}</p>
-                      <p>Margin: {p.margin_pct != null ? `${p.margin_pct.toFixed(1)}%` : '—'}</p>
-                      <p>Revenue: RM{p.z.toLocaleString('en-MY', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
-                    </div>
-                  );
-                }}
-              />
+              {/* Hide hover tooltip when a point is pinned */}
+              {!pinnedPoint && (
+                <Tooltip
+                  content={({ active, payload }) => {
+                    if (!active || !payload?.length) return null;
+                    const p = payload[0].payload as ScatterPoint;
+                    return (
+                      <div className="bg-card border rounded-md shadow-sm p-2 text-sm max-w-[280px]">
+                        <p className="font-semibold truncate">{p.name}</p>
+                        <p className="text-xs text-muted-foreground font-mono">{p.item_code}</p>
+                        {p.supplier_names && (
+                          <p className="text-xs text-muted-foreground truncate">{p.supplier_names}</p>
+                        )}
+                        <p>Purchase: RM{p.x.toFixed(2)}</p>
+                        <p>Selling: RM{p.y.toFixed(2)}</p>
+                        <p>Margin: {p.margin_pct != null ? `${p.margin_pct.toFixed(1)}%` : '—'}</p>
+                        <p>Revenue: RM{p.z.toLocaleString('en-MY', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
+                      </div>
+                    );
+                  }}
+                />
+              )}
 
               <Scatter
                 name="Healthy (>5%)"
@@ -445,6 +468,8 @@ export function PriceScatterChart({ filters }: { filters: DashboardFilters }) {
                 fillOpacity={0.7}
                 stroke="#059669"
                 strokeWidth={1}
+                cursor="pointer"
+                onClick={(data: { payload?: ScatterPoint }) => { if (data?.payload) setPinnedPoint(data.payload); }}
               />
 
               <Scatter
@@ -454,6 +479,8 @@ export function PriceScatterChart({ filters }: { filters: DashboardFilters }) {
                 fillOpacity={0.7}
                 stroke="#d97706"
                 strokeWidth={1}
+                cursor="pointer"
+                onClick={(data: { payload?: ScatterPoint }) => { if (data?.payload) setPinnedPoint(data.payload); }}
               />
 
               <Scatter
@@ -463,9 +490,50 @@ export function PriceScatterChart({ filters }: { filters: DashboardFilters }) {
                 fillOpacity={0.7}
                 stroke="#dc2626"
                 strokeWidth={1}
+                cursor="pointer"
+                onClick={(data: { payload?: ScatterPoint }) => { if (data?.payload) setPinnedPoint(data.payload); }}
               />
             </ScatterChart>
           </ResponsiveContainer>
+        )}
+
+        {/* Pop-out dialog when a dot is clicked */}
+        {pinnedPoint && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
+            onClick={() => setPinnedPoint(null)}
+          >
+            <div
+              className="bg-card border rounded-lg shadow-lg p-4 text-sm max-w-[340px] w-full select-text"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <p className="font-semibold text-base">{pinnedPoint.name}</p>
+                <button
+                  onClick={() => setPinnedPoint(null)}
+                  className="text-muted-foreground hover:text-foreground text-lg leading-none shrink-0 px-1"
+                >
+                  ×
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground font-mono mb-1">{pinnedPoint.item_code}</p>
+              {pinnedPoint.supplier_names && (
+                <p className="text-xs text-muted-foreground mb-2">{pinnedPoint.supplier_names}</p>
+              )}
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                <span className="text-muted-foreground">Purchase:</span>
+                <span className="font-medium">RM{pinnedPoint.x.toFixed(2)}</span>
+                <span className="text-muted-foreground">Selling:</span>
+                <span className="font-medium">RM{pinnedPoint.y.toFixed(2)}</span>
+                <span className="text-muted-foreground">Margin:</span>
+                <span className={`font-medium ${(pinnedPoint.margin_pct ?? 0) < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                  {pinnedPoint.margin_pct != null ? `${pinnedPoint.margin_pct.toFixed(1)}%` : '—'}
+                </span>
+                <span className="text-muted-foreground">Revenue:</span>
+                <span className="font-medium">RM{pinnedPoint.z.toLocaleString('en-MY', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
+              </div>
+            </div>
+          </div>
         )}
       </CardContent>
     </Card>

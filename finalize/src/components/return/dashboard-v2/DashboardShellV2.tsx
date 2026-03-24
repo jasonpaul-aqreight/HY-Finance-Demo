@@ -11,7 +11,7 @@ import { SettlementBreakdown } from './refunds/SettlementBreakdown';
 import { ProductBarChart } from './products/ProductBarChart';
 
 export function DashboardShellV2() {
-  const { filters, setFilters, ready } = useDashboardFiltersV2();
+  const { filters, setFilters, ready, bounds } = useDashboardFiltersV2();
 
   if (!ready) {
     return (
@@ -23,8 +23,8 @@ export function DashboardShellV2() {
 
   return (
     <main className="max-w-[1600px] mx-auto px-6 py-6">
-      <div className="flex items-center justify-end mb-6">
-        <DateRangeFilterV2 filters={filters} onUpdate={setFilters} />
+      <div className="mb-6">
+        <DateRangeFilterV2 filters={filters} onUpdate={setFilters} bounds={bounds} />
       </div>
 
       <div className="space-y-6">
@@ -41,7 +41,14 @@ export function DashboardShellV2() {
 
         <ProductBarChart filters={filters} />
         <MonthlyTrendChart filters={filters} />
-        <TopDebtorsTable filters={filters} />
+        {/* Separator — table is not filtered by date range */}
+        <div className="mt-8 flex items-center gap-3">
+          <div className="h-px flex-1 bg-border" />
+          <span className="text-xs text-muted-foreground">All return records — not filtered by date range above</span>
+          <div className="h-px flex-1 bg-border" />
+        </div>
+
+        <TopDebtorsTable />
       </div>
     </main>
   );

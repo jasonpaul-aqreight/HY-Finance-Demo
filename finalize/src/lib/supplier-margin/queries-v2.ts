@@ -119,7 +119,7 @@ function buildSupplierTypeFilter(supplierTypes: string[] | undefined, tableAlias
   if (!supplierTypes || supplierTypes.length === 0) return { sql: '', params: [] };
   const placeholders = supplierTypes.map(() => '?').join(',');
   return {
-    sql: `AND ${tableAlias}.CreditorCode IN (SELECT AccNo FROM creditor WHERE CreditorType IN (${placeholders}))`,
+    sql: `AND ${tableAlias}.CreditorCode IN (SELECT AccNo FROM creditor WHERE IsActive = 'T' AND CreditorType IN (${placeholders}))`,
     params: [...supplierTypes],
   };
 }
@@ -169,7 +169,7 @@ export function getDimensionsV2() {
     SELECT DISTINCT c.AccNo, c.CompanyName
     FROM creditor c
     JOIN pi ON c.AccNo = pi.CreditorCode
-    WHERE pi.Cancelled = 'F'
+    WHERE pi.Cancelled = 'F' AND c.IsActive = 'T'
     ORDER BY c.CompanyName
   `).all() as Array<{ AccNo: string; CompanyName: string }>;
 
@@ -403,7 +403,7 @@ export function getMarginTrendV2(
     const selectSupplier = perSupplier
       ? `si.CreditorCode AS creditor_code, c.CompanyName AS company_name,`
       : '';
-    const joinCreditor = perSupplier ? `JOIN creditor c ON si.CreditorCode = c.AccNo` : '';
+    const joinCreditor = perSupplier ? `JOIN creditor c ON si.CreditorCode = c.AccNo AND c.IsActive = 'T'` : '';
     const groupBySupplier = perSupplier ? `, si.CreditorCode, c.CompanyName` : '';
 
     return db.prepare(`
@@ -648,6 +648,7 @@ export function getTopBottomSuppliersV2(
     JOIN item_sales ist ON si.ItemCode = ist.ItemCode
     JOIN item_total itp ON si.ItemCode = itp.ItemCode
     JOIN creditor c ON si.CreditorCode = c.AccNo
+    WHERE c.IsActive = 'T'
     GROUP BY si.CreditorCode, c.CompanyName
     ORDER BY ${sortBy === 'margin_pct' ? 'margin_pct' : 'profit'} ${order === 'asc' ? 'ASC' : 'DESC'}
     LIMIT ?
@@ -856,6 +857,7 @@ export function getSupplierTableV2(
     JOIN item_total itp ON si.ItemCode = itp.ItemCode
     JOIN creditor c ON si.CreditorCode = c.AccNo
     LEFT JOIN creditor_type ct ON c.CreditorType = ct.CreditorType
+    WHERE c.IsActive = 'T'
     GROUP BY si.CreditorCode, c.CompanyName, ct.Description
     ORDER BY revenue DESC
   `).all(...params) as SupplierTableRowV2[];
@@ -962,7 +964,7 @@ export function getItemSupplierSummaryV2(
     FROM pi
     JOIN pidtl pd ON pi.DocKey = pd.DocKey
     LEFT JOIN creditor c ON pi.CreditorCode = c.AccNo
-    WHERE pi.Cancelled = 'F'
+    WHERE pi.Cancelled = 'F' AND (c.IsActive = 'T' OR c.IsActive IS NULL)
       AND pd.ItemCode = ?
       AND pd.Qty > 0
       AND DATE(pi.DocDate, '+8 hours') BETWEEN ? AND ?
@@ -989,7 +991,7 @@ export function getItemPriceMonthlyV2(
     FROM pi
     JOIN pidtl pd ON pi.DocKey = pd.DocKey
     LEFT JOIN creditor c ON pi.CreditorCode = c.AccNo
-    WHERE pi.Cancelled = 'F'
+    WHERE pi.Cancelled = 'F' AND (c.IsActive = 'T' OR c.IsActive IS NULL)
       AND pd.ItemCode = ?
       AND pd.Qty > 0
       AND DATE(pi.DocDate, '+8 hours') BETWEEN ? AND ?
@@ -1016,7 +1018,7 @@ export function getItemPriceWeeklyV2(
     FROM pi
     JOIN pidtl pd ON pi.DocKey = pd.DocKey
     LEFT JOIN creditor c ON pi.CreditorCode = c.AccNo
-    WHERE pi.Cancelled = 'F'
+    WHERE pi.Cancelled = 'F' AND (c.IsActive = 'T' OR c.IsActive IS NULL)
       AND pd.ItemCode = ?
       AND pd.Qty > 0
       AND DATE(pi.DocDate, '+8 hours') BETWEEN ? AND ?

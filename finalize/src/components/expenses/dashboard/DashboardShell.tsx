@@ -71,18 +71,18 @@ export function DashboardShell() {
               </div>
             </div>
 
-            {/* Cost Trend (full width) */}
-            <CostTrendChart filters={filters} setFilters={setFilters} />
-
-            {/* Cost Composition + Top 10 Expenses (side by side, 40:60) */}
-            <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
-              <div className="xl:col-span-2">
-                <CostCompositionChart filters={filters} />
+            {/* Cost Trend + Cost Composition (side by side, 70:30) */}
+            <div className="grid grid-cols-1 xl:grid-cols-10 gap-6">
+              <div className="xl:col-span-7">
+                <CostTrendChart filters={filters} setFilters={setFilters} />
               </div>
               <div className="xl:col-span-3">
-                <TopExpensesChart filters={filters} />
+                <CostCompositionChart filters={filters} />
               </div>
             </div>
+
+            {/* Top 10 Expenses (full width, own toggles) */}
+            <TopExpensesChart filters={filters} />
 
             {/* ── Section 2: Expenses Breakdown ─────────────────── */}
             <SectionDivider

@@ -1,29 +1,23 @@
 'use client';
 
+import { DateRangeSection } from '@/components/shared/DateRangeSection';
 import type { V2Filters } from '@/hooks/return/useDashboardFiltersV2';
 
 interface Props {
   filters: V2Filters;
   onUpdate: (updates: Partial<V2Filters>) => void;
+  bounds?: { min_date: string; max_date: string };
 }
 
-export function DateRangeFilterV2({ filters, onUpdate }: Props) {
+export function DateRangeFilterV2({ filters, onUpdate, bounds }: Props) {
   return (
-    <div className="flex items-center gap-3 text-sm">
-      <label className="text-muted-foreground font-medium">Time Range</label>
-      <input
-        type="date"
-        value={filters.startDate}
-        onChange={(e) => onUpdate({ startDate: e.target.value })}
-        className="border rounded-md px-2 py-1.5 bg-background text-sm"
-      />
-      <label className="text-muted-foreground font-medium">&rarr;</label>
-      <input
-        type="date"
-        value={filters.endDate}
-        onChange={(e) => onUpdate({ endDate: e.target.value })}
-        className="border rounded-md px-2 py-1.5 bg-background text-sm"
-      />
-    </div>
+    <DateRangeSection
+      label="Date Range"
+      startDate={filters.startDate}
+      endDate={filters.endDate}
+      onStartDateChange={(v) => onUpdate({ startDate: v })}
+      onEndDateChange={(v) => onUpdate({ endDate: v })}
+      bounds={bounds}
+    />
   );
 }

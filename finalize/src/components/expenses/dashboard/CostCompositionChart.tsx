@@ -42,14 +42,14 @@ export function CostCompositionChart({ filters }: { filters: DashboardFilters })
         <p className="text-sm text-muted-foreground">Total: {formatRM(total)}</p>
       </CardHeader>
       <CardContent>
-        <ResponsiveContainer width="100%" height={420}>
+        <ResponsiveContainer width="100%" height={350}>
           <PieChart>
             <Pie
               data={pieData}
               cx="50%"
               cy="50%"
-              innerRadius={70}
-              outerRadius={110}
+              innerRadius={60}
+              outerRadius={100}
               dataKey="net_cost"
               nameKey="category"
               labelLine={false}
