@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useProductCustomerMatrix } from '@/hooks/customer-margin/useMarginData';
+import { useStableData } from '@/hooks/useStableData';
 import type { MarginDashboardFilters } from '@/hooks/customer-margin/useDashboardFilters';
 import { marginBgColor } from '@/lib/customer-margin/format';
 
@@ -12,7 +13,8 @@ interface Props {
 
 export function ProductCustomerMatrix({ filters }: Props) {
   const [showMatrix, setShowMatrix] = useState(false);
-  const { data, isLoading } = useProductCustomerMatrix(filters);
+  const { data: rawData } = useProductCustomerMatrix(filters);
+  const data = useStableData(rawData);
 
   // Pivot the flat data into a matrix
   const customerMap = new Map<string, { name: string; groups: Map<string, number> }>();
@@ -44,7 +46,7 @@ export function ProductCustomerMatrix({ filters }: Props) {
       </CardHeader>
       {showMatrix && (
         <CardContent>
-          {isLoading ? (
+          {!data ? (
             <div className="py-8 text-center text-muted-foreground">Loading...</div>
           ) : (
             <div className="overflow-x-auto">

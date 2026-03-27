@@ -1,6 +1,7 @@
 'use client';
 
 import { useV3Kpis, useV3BSComparison } from '@/hooks/pnl/usePLDataV3';
+import { useStableData } from '@/hooks/useStableData';
 import { Card, CardContent } from '@/components/ui/card';
 import { formatRM, formatPct } from '@/lib/pnl/format';
 import { cn } from '@/lib/utils';
@@ -55,10 +56,12 @@ function SkeletonRow() {
 }
 
 export function PLKpiCardsV3({ fy }: Props) {
-  const { data, isLoading } = useV3Kpis(fy);
-  const { data: bsData } = useV3BSComparison(fy);
+  const { data: rawData } = useV3Kpis(fy);
+  const data = useStableData(rawData);
+  const { data: rawBsData } = useV3BSComparison(fy);
+  const bsData = useStableData(rawBsData);
 
-  if (isLoading || !data) {
+  if (!data) {
     return (
       <div className="space-y-4">
         <SkeletonRow />
@@ -97,7 +100,7 @@ export function PLKpiCardsV3({ fy }: Props) {
       subtitle: 'Gross Profit - OPEX',
       alarm: operating_profit < 0 ? 'negative' : 'positive',
       valueColor: operating_profit < 0 ? 'red' : 'green' },
-    { title: 'Net Profit', value: formatRM(data.net_profit),
+    { title: 'Profit/Loss', value: formatRM(data.net_profit),
       subtitle: `EBIT + Other Income - Tax | Margin: ${formatPct(net_margin_pct)}`,
       alarm: data.net_profit < 0 ? 'negative' : 'positive',
       valueColor: data.net_profit < 0 ? 'red' : 'green' },

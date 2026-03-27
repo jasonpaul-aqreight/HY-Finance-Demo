@@ -1,7 +1,7 @@
 import { getDb } from './db';
 import { getRefDate } from './queries';
 import { daysInMonth } from './date-utils';
-import { computeCreditScoreV2, riskTierFromScore, type CreditScoreV2Weights, type RiskThresholds } from './credit-score-v2';
+import { computeCreditScoreV2, type CreditScoreV2Weights, type RiskThresholds } from './credit-score-v2';
 import { getSettingsV2 } from './settings';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -253,6 +253,8 @@ export function getCreditHealthTableV2(
   page = 1,
   pageSize = 20,
   search = '',
+  riskFilter = '',
+  categoryFilter = '',
 ): { rows: CreditHealthV2Row[]; total: number } {
   const db = getDb();
   const refDate = getRefDate();
@@ -301,33 +303,6 @@ export function getCreditHealthTableV2(
     aging_count: number;
   }[];
 
-  // Payment consistency: months with payment / months with invoices (last 12 months)
-  const consistencySql = `
-    SELECT DebtorCode,
-      COUNT(DISTINCT strftime('%Y-%m', DocDate, '+8 hours')) AS months_with_payment
-    FROM ar_payment
-    WHERE Cancelled = 'F'
-      AND DATE(DocDate, '+8 hours') >= DATE($refDate, '-12 months')
-    GROUP BY DebtorCode
-  `;
-  const payMonths = db.prepare(consistencySql).all({ refDate }) as {
-    DebtorCode: string; months_with_payment: number;
-  }[];
-  const payMonthsMap = new Map(payMonths.map(r => [r.DebtorCode, r.months_with_payment]));
-
-  const invMonthsSql = `
-    SELECT DebtorCode,
-      COUNT(DISTINCT strftime('%Y-%m', DocDate, '+8 hours')) AS months_with_invoices
-    FROM ar_invoice
-    WHERE Cancelled = 'F'
-      AND DATE(DocDate, '+8 hours') >= DATE($refDate, '-12 months')
-    GROUP BY DebtorCode
-  `;
-  const invMonths = db.prepare(invMonthsSql).all({ refDate }) as {
-    DebtorCode: string; months_with_invoices: number;
-  }[];
-  const invMonthsMap = new Map(invMonths.map(r => [r.DebtorCode, r.months_with_invoices]));
-
   // Payment timeliness: avg days late across paid invoices (last 12 months)
   const timelinessSql = `
     SELECT
@@ -346,18 +321,14 @@ export function getCreditHealthTableV2(
   }[];
   const timelinessMap = new Map(timelinessData.map(r => [r.DebtorCode, r.avg_days_late]));
 
-  // Build rows with credit scores
+  // Build rows with credit health scores
   let rows: CreditHealthV2Row[] = customers.map(c => {
     const hasCreditLimit = (c.credit_limit ?? 0) > 0;
     const utilPct = hasCreditLimit ? (c.total_outstanding / c.credit_limit) * 100 : null;
-    const monthsPay = payMonthsMap.get(c.debtor_code) ?? 0;
-    const monthsInv = invMonthsMap.get(c.debtor_code) ?? 0;
-    const consistency = monthsInv > 0 ? monthsPay / monthsInv : null;
 
     const overdueLimit = c.overdue_limit ?? 0;
-    const overdueBreached = overdueLimit > 0
-      ? c.total_outstanding > overdueLimit
-      : (hasCreditLimit ? c.total_outstanding > c.credit_limit : false);
+    const creditLimitBreached = hasCreditLimit && c.total_outstanding > c.credit_limit;
+    const overdueLimitBreached = overdueLimit > 0 && c.total_outstanding > overdueLimit;
 
     const avgDaysLate = timelinessMap.get(c.debtor_code) ?? null;
 
@@ -365,9 +336,9 @@ export function getCreditHealthTableV2(
       creditUtilizationPct: utilPct,
       hasCreditLimit,
       oldestOverdueDays: c.max_overdue_days,
-      paymentConsistency: consistency,
       avgDaysLate,
-      overdueBreached,
+      creditLimitBreached,
+      overdueLimitBreached,
     }, weights, thresholds, neutralScore);
 
     return {
@@ -395,6 +366,16 @@ export function getCreditHealthTableV2(
     );
   }
 
+  // Filter by risk tier
+  if (riskFilter) {
+    rows = rows.filter(r => r.risk_tier === riskFilter);
+  }
+
+  // Filter by category (debtor type)
+  if (categoryFilter) {
+    rows = rows.filter(r => r.debtor_type === categoryFilter);
+  }
+
   const total = rows.length;
 
   // Sort
@@ -412,4 +393,128 @@ export function getCreditHealthTableV2(
   rows = rows.slice(startIdx, startIdx + pageSize);
 
   return { rows, total };
+}
+
+// ─── Customer Profile ───────────────────────────────────────────────────────
+
+export interface CustomerProfileData {
+  display_term: string;
+  is_active: boolean;
+  debtor_type: string;
+  sales_agent: string;
+  avg_payment_days: number | null;
+  // Credit health metrics (always included)
+  credit_limit: number;
+  total_outstanding: number;
+  utilization_pct: number | null;
+  aging_count: number;
+  oldest_due: string | null;
+  max_overdue_days: number;
+  credit_score: number;
+  risk_tier: string;
+}
+
+export function getCustomerProfile(debtorCode: string): CustomerProfileData {
+  const db = getDb();
+  const refDate = getRefDate();
+  const settings = getSettingsV2();
+  const weights: CreditScoreV2Weights = settings.creditScoreWeights;
+  const thresholds: RiskThresholds = settings.riskThresholds;
+  const neutralScore = settings.neutralScore ?? 0;
+
+  // Debtor master data
+  const debtor = db.prepare(`
+    SELECT
+      COALESCE(DisplayTerm, '') AS display_term,
+      COALESCE(IsActive, 'F') AS is_active,
+      COALESCE(DebtorType, '') AS debtor_type,
+      COALESCE(SalesAgent, '') AS sales_agent,
+      COALESCE(CreditLimit, 0) AS credit_limit,
+      COALESCE(OverdueLimit, 0) AS overdue_limit
+    FROM debtor
+    WHERE DebtorCode = ?
+  `).get(debtorCode) as {
+    display_term: string; is_active: string; debtor_type: string; sales_agent: string;
+    credit_limit: number; overdue_limit: number;
+  } | undefined;
+
+  // Outstanding invoices
+  const invoiceStats = db.prepare(`
+    SELECT
+      COALESCE(SUM(Outstanding), 0) AS total_outstanding,
+      MIN(DATE(DueDate, '+8 hours')) AS oldest_due,
+      MIN(CASE WHEN DATE(DueDate, '+8 hours') < $refDate THEN DATE(DueDate, '+8 hours') END) AS oldest_overdue_due,
+      COUNT(CASE WHEN DATE(DueDate, '+8 hours') < $refDate THEN 1 END) AS aging_count
+    FROM ar_invoice
+    WHERE Cancelled = 'F' AND Outstanding > 0 AND DebtorCode = $debtorCode
+  `).get({ refDate, debtorCode }) as {
+    total_outstanding: number; oldest_due: string | null;
+    oldest_overdue_due: string | null; aging_count: number;
+  };
+
+  const maxOverdueDays = invoiceStats.oldest_overdue_due
+    ? Math.max(0, Math.round((new Date(refDate).getTime() - new Date(invoiceStats.oldest_overdue_due).getTime()) / 86400000))
+    : 0;
+
+  // Credit utilization
+  const creditLimit = debtor?.credit_limit ?? 0;
+  const hasCreditLimit = creditLimit > 0;
+  const utilPct = hasCreditLimit ? (invoiceStats.total_outstanding / creditLimit) * 100 : null;
+
+  // Avg payment period (last 12 months)
+  const timeliness = db.prepare(`
+    SELECT
+      AVG(julianday(DATE(p.DocDate, '+8 hours')) - julianday(DATE(i.DocDate, '+8 hours'))) AS avg_days
+    FROM ar_payment_knock_off ko
+    JOIN ar_payment p ON p.DocKey = ko.DocKey
+    JOIN ar_invoice i ON i.DocKey = ko.KnockOffDocKey
+    WHERE p.Cancelled = 'F'
+      AND ko.KnockOffDocType = 'RI'
+      AND i.DebtorCode = ?
+  `).get(debtorCode) as { avg_days: number | null } | undefined;
+
+  // Avg days late for timeliness scoring (last 12 months, compared to DueDate)
+  const avgDaysLateRow = db.prepare(`
+    SELECT
+      AVG(julianday(DATE(p.DocDate, '+8 hours')) - julianday(DATE(i.DueDate, '+8 hours'))) AS avg_days_late
+    FROM ar_payment_knock_off ko
+    JOIN ar_payment p ON p.DocKey = ko.DocKey
+    JOIN ar_invoice i ON i.DocKey = ko.KnockOffDocKey
+    WHERE p.Cancelled = 'F'
+      AND ko.KnockOffDocType = 'RI'
+      AND DATE(p.DocDate, '+8 hours') >= DATE(?, '-12 months')
+      AND i.DebtorCode = ?
+  `).get(refDate, debtorCode) as { avg_days_late: number | null } | undefined;
+
+  const avgDaysLate = avgDaysLateRow?.avg_days_late ?? null;
+
+  // Double breach: check BOTH credit limit AND overdue limit
+  const overdueLimit = debtor?.overdue_limit ?? 0;
+  const creditLimitBreached = hasCreditLimit && invoiceStats.total_outstanding > creditLimit;
+  const overdueLimitBreached = overdueLimit > 0 && invoiceStats.total_outstanding > overdueLimit;
+
+  const score = computeCreditScoreV2({
+    creditUtilizationPct: utilPct,
+    hasCreditLimit,
+    oldestOverdueDays: maxOverdueDays,
+    avgDaysLate,
+    creditLimitBreached,
+    overdueLimitBreached,
+  }, weights, thresholds, neutralScore);
+
+  return {
+    display_term: debtor?.display_term ?? '',
+    is_active: (debtor?.is_active ?? 'F') === 'T',
+    debtor_type: debtor?.debtor_type ?? '',
+    sales_agent: debtor?.sales_agent ?? '',
+    avg_payment_days: timeliness?.avg_days != null ? Math.round(timeliness.avg_days) : null,
+    credit_limit: creditLimit,
+    total_outstanding: invoiceStats.total_outstanding,
+    utilization_pct: utilPct != null ? Math.round(utilPct * 10) / 10 : null,
+    aging_count: invoiceStats.aging_count,
+    oldest_due: invoiceStats.oldest_due,
+    max_overdue_days: maxOverdueDays,
+    credit_score: score.score,
+    risk_tier: score.riskTier,
+  };
 }

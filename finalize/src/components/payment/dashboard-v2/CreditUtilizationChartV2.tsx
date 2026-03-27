@@ -2,6 +2,7 @@
 
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { useCreditUtilizationV2 } from '@/hooks/payment/usePaymentDataV2';
+import { useStableData } from '@/hooks/useStableData';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -21,7 +22,8 @@ const CATEGORY_COLORS: Record<string, string> = {
 const CATEGORY_ORDER = ['Within Limit', 'Near Limit', 'Over Limit', 'No Limit Set'];
 
 export default function CreditUtilizationChartV2() {
-  const { data, isLoading } = useCreditUtilizationV2();
+  const { data: rawData } = useCreditUtilizationV2();
+  const data = useStableData(rawData);
 
   const chartData = CATEGORY_ORDER.map(cat => {
     const found = data?.find(d => d.category === cat);
@@ -42,7 +44,7 @@ export default function CreditUtilizationChartV2() {
         <CardTitle>Credit Utilization Distribution</CardTitle>
       </CardHeader>
       <CardContent>
-        {isLoading ? (
+        {!data ? (
           <div className="h-[300px] animate-pulse rounded bg-muted" />
         ) : (
           <>
@@ -65,6 +67,7 @@ export default function CreditUtilizationChartV2() {
                   </Pie>
                   <Tooltip
                     formatter={(value, name) => [`${value} customers`, name as string]}
+                    wrapperStyle={{ zIndex: 50 }}
                   />
                 </PieChart>
               </ResponsiveContainer>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useMarginTrend } from '@/hooks/supplier-margin/useMarginData';
+import { useStableData } from '@/hooks/useStableData';
 import type { DashboardFilters } from '@/hooks/supplier-margin/useDashboardFilters';
 import {
   ComposedChart,
@@ -49,9 +50,10 @@ function CustomTooltip({ active, payload, label }: {
 }
 
 export function MarginTrendChart({ filters }: { filters: DashboardFilters }) {
-  const { data, isLoading } = useMarginTrend({ ...filters, granularity: 'monthly' });
+  const { data: rawData } = useMarginTrend({ ...filters, granularity: 'monthly' });
+  const data = useStableData(rawData);
 
-  if (isLoading || !data) {
+  if (!data) {
     return (
       <Card>
         <CardHeader><CardTitle>Overall Margin Trend</CardTitle></CardHeader>
@@ -96,7 +98,7 @@ export function MarginTrendChart({ filters }: { filters: DashboardFilters }) {
               axisLine={false}
               domain={[0, 'auto']}
             />
-            <Tooltip content={<CustomTooltip />} />
+            <Tooltip wrapperStyle={{ zIndex: 50 }} content={<CustomTooltip />} />
             <Legend wrapperStyle={{ fontSize: 12 }} />
 
             <Bar yAxisId="left" dataKey="profit" name="Gross Profit" fill={COLORS.grossProfit} />

@@ -1,63 +1,55 @@
-/** V2 Credit Score — Configurable 5-factor model */
+/** V2 Credit Health Score — Configurable 4-factor model */
 
 export interface CreditScoreV2Weights {
   utilization: number;        // 0-100
   overdueDays: number;        // 0-100
-  paymentConsistency: number; // 0-100
   timeliness: number;         // 0-100
-  breach: number;             // 0-100
+  doubleBreach: number;       // 0-100
 }
 
 export interface CreditScoreV2Input {
   creditUtilizationPct: number | null; // Outstanding / CreditLimit * 100
   hasCreditLimit: boolean;
   oldestOverdueDays: number;           // 0 if nothing overdue
-  paymentConsistency: number | null;   // months_with_payment / months_with_invoices (0-1)
   avgDaysLate: number | null;          // avg days late across paid invoices (last 12 months)
-  overdueBreached: boolean;            // Outstanding > OverdueLimit
+  creditLimitBreached: boolean;        // Outstanding > CreditLimit
+  overdueLimitBreached: boolean;       // Outstanding > OverdueLimit
 }
 
 export interface CreditScoreV2Result {
   score: number;        // 0-100 composite
-  riskTier: string;     // 'Low' | 'Moderate' | 'Elevated' | 'High'
+  riskTier: string;     // 'Low' | 'Moderate' | 'High'
   utilizationComponent: number;
   overdueComponent: number;
-  consistencyComponent: number;
   timelinessComponent: number;
-  breachComponent: number;
+  doubleBreachComponent: number;
 }
 
 export interface RiskThresholds {
   low: number;
-  moderate: number;
   high: number;
 }
 
 const DEFAULT_WEIGHTS: CreditScoreV2Weights = {
-  utilization: 35,
-  overdueDays: 25,
-  paymentConsistency: 15,
-  timeliness: 15,
-  breach: 10,
+  utilization: 40,
+  overdueDays: 30,
+  timeliness: 20,
+  doubleBreach: 10,
 };
 
 const DEFAULT_THRESHOLDS: RiskThresholds = {
-  low: 85,
-  moderate: 65,
-  high: 35,
+  low: 75,
+  high: 30,
 };
 
+/** Credit Utilization: Score = max(0, 100 - utilization%) */
 function utilizationComponent(pct: number | null, hasCreditLimit: boolean, neutralScore: number): number {
   if (!hasCreditLimit) return neutralScore;
   if (pct == null) return 100;
-  if (pct <= 50) return 90 + (50 - pct) / 50 * 10;     // 90-100
-  if (pct <= 80) return 60 + (80 - pct) / 30 * 29;      // 60-89
-  if (pct <= 100) return 30 + (100 - pct) / 20 * 29;    // 30-59
-  // >100%
-  const score = 29 - Math.min(pct - 100, 100) / 100 * 29;
-  return Math.max(0, Math.round(score));
+  return Math.max(0, Math.round(100 - pct));
 }
 
+/** Overdue Days: scoring ladder based on oldest overdue invoice */
 function overdueComponent(days: number): number {
   if (days <= 0) return 100;
   if (days <= 30) return 80;
@@ -67,14 +59,7 @@ function overdueComponent(days: number): number {
   return 0;
 }
 
-function consistencyComponent(ratio: number | null, neutralScore: number): number {
-  if (ratio == null) return neutralScore;
-  if (ratio >= 0.9) return 100;
-  if (ratio >= 0.7) return 75;
-  if (ratio >= 0.5) return 50;
-  return 25;
-}
-
+/** Payment Timeliness: scoring ladder based on average days late */
 function timelinessComponent(avgDaysLate: number | null, neutralScore: number): number {
   if (avgDaysLate == null) return neutralScore;
   if (avgDaysLate <= 0) return 100;
@@ -85,18 +70,19 @@ function timelinessComponent(avgDaysLate: number | null, neutralScore: number): 
   return 0;
 }
 
-function breachComponent(breached: boolean): number {
-  return breached ? 0 : 100;
+/** Double Breach: 0 if BOTH credit limit AND overdue limit are breached, 100 otherwise */
+function doubleBreachComponent(creditLimitBreached: boolean, overdueLimitBreached: boolean): number {
+  return (creditLimitBreached && overdueLimitBreached) ? 0 : 100;
 }
 
-/** Risk tier from credit score (score-based, used for customer table) */
+/** Risk tier from credit health score */
 export function riskTierFromScore(
   score: number,
   thresholds: RiskThresholds = DEFAULT_THRESHOLDS,
 ): string {
   if (score >= thresholds.low) return 'Low';
-  if (score >= thresholds.moderate) return 'Moderate';
-  return 'High';
+  if (score <= thresholds.high) return 'High';
+  return 'Moderate';
 }
 
 /** Risk tier from utilization % (used for Credit Utilization donut categories — NOT score-based) */
@@ -116,16 +102,14 @@ export function computeCreditScoreV2(
 ): CreditScoreV2Result {
   const util = utilizationComponent(input.creditUtilizationPct, input.hasCreditLimit, neutralScore);
   const overdue = overdueComponent(input.oldestOverdueDays);
-  const consistency = consistencyComponent(input.paymentConsistency, neutralScore);
   const timely = timelinessComponent(input.avgDaysLate, neutralScore);
-  const breach = breachComponent(input.overdueBreached);
+  const dblBreach = doubleBreachComponent(input.creditLimitBreached, input.overdueLimitBreached);
 
   const score = Math.round(
     (weights.utilization / 100) * util +
     (weights.overdueDays / 100) * overdue +
-    (weights.paymentConsistency / 100) * consistency +
     (weights.timeliness / 100) * timely +
-    (weights.breach / 100) * breach
+    (weights.doubleBreach / 100) * dblBreach
   );
 
   const riskTier = riskTierFromScore(score, thresholds);
@@ -135,9 +119,8 @@ export function computeCreditScoreV2(
     riskTier,
     utilizationComponent: util,
     overdueComponent: overdue,
-    consistencyComponent: consistency,
     timelinessComponent: timely,
-    breachComponent: breach,
+    doubleBreachComponent: dblBreach,
   };
 }
 

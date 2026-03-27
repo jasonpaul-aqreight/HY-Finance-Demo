@@ -1,6 +1,7 @@
 'use client';
 
 import { useRevenueSummary } from '@/hooks/sales/useRevenueSummary';
+import { useStableData } from '@/hooks/useStableData';
 import type { DashboardFiltersV2 } from '@/hooks/sales/useDashboardFiltersV2';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatRM } from '@/lib/format';
@@ -58,9 +59,10 @@ function toV1Filters(filters: DashboardFiltersV2) {
 }
 
 export function KpiCardsV2({ filters }: { filters: DashboardFiltersV2 }) {
-  const { data, isLoading } = useRevenueSummary(toV1Filters(filters));
+  const { data: rawData } = useRevenueSummary(toV1Filters(filters));
+  const data = useStableData(rawData);
 
-  if (isLoading || !data) {
+  if (!data) {
     return (
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
         {Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)}

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useReturnProducts } from '@/hooks/return/useCreditDataV2';
+import { useStableData } from '@/hooks/useStableData';
 import type { ReturnProductDimension, ReturnProductMetric } from '@/lib/return/queries-v2';
 import type { V2Filters } from '@/hooks/return/useDashboardFiltersV2';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -32,12 +33,13 @@ const METRICS: { key: ReturnProductMetric; label: string }[] = [
 export function ProductBarChart({ filters }: { filters: V2Filters }) {
   const [dimension, setDimension] = useState<ReturnProductDimension>('item');
   const [metric, setMetric] = useState<ReturnProductMetric>('frequency');
-  const { data, isLoading } = useReturnProducts(filters, dimension, metric);
+  const { data: rawData } = useReturnProducts(filters, dimension, metric);
+  const data = useStableData(rawData);
 
   const metricLabel = metric === 'value' ? 'Value' : 'Frequency';
   const title = `Top 10 Returns by ${DIMENSION_LABELS[dimension]}`;
 
-  if (isLoading || !data) {
+  if (!data) {
     return (
       <Card>
         <CardHeader className="pb-2"><CardTitle className="text-sm">{title}</CardTitle></CardHeader>
@@ -128,6 +130,7 @@ export function ProductBarChart({ filters }: { filters: V2Filters }) {
               )}
             />
             <Tooltip
+              wrapperStyle={{ zIndex: 50 }}
               content={({ active, payload }) => {
                 if (!active || !payload?.length) return null;
                 const d = payload[0].payload;

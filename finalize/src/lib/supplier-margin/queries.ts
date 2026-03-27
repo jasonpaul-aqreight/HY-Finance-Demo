@@ -883,6 +883,45 @@ export function getSupplierItems(
   `).all(creditorCode, start, end, start, end, start, end) as SupplierItemRow[];
 }
 
+// ─── Supplier Item Price Trends (for profile sparklines) ────────────────────
+
+export interface SupplierItemPriceTrend {
+  item_code: string;
+  prices: number[]; // 12 monthly avg prices, oldest first
+}
+
+export function getSupplierItemPriceTrends(
+  creditorCode: string,
+  start: string,
+  end: string
+): SupplierItemPriceTrend[] {
+  const db = getDb();
+
+  const rows = db.prepare(`
+    SELECT
+      pd.ItemCode AS item_code,
+      strftime('%Y-%m', pi.DocDate, '+8 hours') AS month,
+      ROUND(SUM(pd.LocalSubTotal) / NULLIF(SUM(pd.Qty), 0), 2) AS avg_price
+    FROM pi
+    JOIN pidtl pd ON pi.DocKey = pd.DocKey
+    WHERE pi.Cancelled = 'F'
+      AND pi.CreditorCode = ?
+      AND pd.ItemCode IS NOT NULL AND pd.ItemCode != ''
+      AND DATE(pi.DocDate, '+8 hours') BETWEEN ? AND ?
+    GROUP BY pd.ItemCode, month
+    ORDER BY pd.ItemCode, month
+  `).all(creditorCode, start, end) as { item_code: string; month: string; avg_price: number }[];
+
+  // Group by item_code
+  const map = new Map<string, number[]>();
+  for (const r of rows) {
+    if (!map.has(r.item_code)) map.set(r.item_code, []);
+    map.get(r.item_code)!.push(r.avg_price);
+  }
+
+  return Array.from(map.entries()).map(([item_code, prices]) => ({ item_code, prices }));
+}
+
 // ─── Price Comparison (D1) ──────────────────────────────────────────────────
 
 export function getPriceComparison(
@@ -1228,4 +1267,60 @@ export function getItemProcurementSummary(
   const sellPrice = getItemSellPriceV2(itemCode, start, end);
 
   return { suppliers, sellPrice };
+}
+
+// ─── Supplier Profile Summary ───────────────────────────────────────────────
+
+export interface SupplierProfileSummary {
+  is_active: boolean;
+  items_supplied_count: number;
+  single_supplier_count: number;
+  single_supplier_items: string[];
+}
+
+export function getSupplierProfileSummary(creditorCode: string, start: string, end: string): SupplierProfileSummary {
+  const db = getDb();
+
+  // Is active
+  const cred = db.prepare(`SELECT IsActive FROM creditor WHERE AccNo = ?`).get(creditorCode) as { IsActive: string } | undefined;
+  const isActive = (cred?.IsActive ?? 'F') === 'T';
+
+  // Items supplied by this supplier in period
+  const supplierItems = db.prepare(`
+    SELECT DISTINCT pd.ItemCode
+    FROM pi
+    JOIN pidtl pd ON pi.DocKey = pd.DocKey
+    WHERE pi.Cancelled = 'F'
+      AND pi.CreditorCode = ?
+      AND pd.ItemCode IS NOT NULL AND pd.ItemCode != ''
+      AND DATE(pi.DocDate, '+8 hours') BETWEEN ? AND ?
+  `).all(creditorCode, start, end) as { ItemCode: string }[];
+  const supplierItemCodes = supplierItems.map(r => r.ItemCode);
+
+  if (supplierItemCodes.length === 0) {
+    return { is_active: isActive, items_supplied_count: 0, single_supplier_count: 0, single_supplier_items: [] };
+  }
+
+  // Find which of those items have ONLY this supplier in the period
+  const placeholders = supplierItemCodes.map(() => '?').join(',');
+  const multiSupplierItems = db.prepare(`
+    SELECT DISTINCT pd.ItemCode
+    FROM pi
+    JOIN pidtl pd ON pi.DocKey = pd.DocKey
+    WHERE pi.Cancelled = 'F'
+      AND pd.ItemCode IN (${placeholders})
+      AND pd.ItemCode IS NOT NULL AND pd.ItemCode != ''
+      AND pi.CreditorCode != ?
+      AND DATE(pi.DocDate, '+8 hours') BETWEEN ? AND ?
+  `).all(...supplierItemCodes, creditorCode, start, end) as { ItemCode: string }[];
+  const multiSet = new Set(multiSupplierItems.map(r => r.ItemCode));
+
+  const singleItems = supplierItemCodes.filter(code => !multiSet.has(code));
+
+  return {
+    is_active: isActive,
+    items_supplied_count: supplierItemCodes.length,
+    single_supplier_count: singleItems.length,
+    single_supplier_items: singleItems,
+  };
 }

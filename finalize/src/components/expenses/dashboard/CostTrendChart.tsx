@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import { useCostTrend } from '@/hooks/expenses/useCostData';
+import { useStableData } from '@/hooks/useStableData';
 import type { DashboardFilters, Granularity } from '@/hooks/expenses/useDashboardFilters';
 import {
   BarChart,
@@ -67,7 +68,8 @@ interface CostTrendChartProps {
 }
 
 export function CostTrendChart({ filters, setFilters }: CostTrendChartProps) {
-  const { data, isLoading } = useCostTrend(filters);
+  const { data: rawData } = useCostTrend(filters);
+  const data = useStableData(rawData);
 
   // Pivot: rows are {month, category1: val, category2: val, ...}
   const chartData = useMemo(() => {
@@ -97,7 +99,7 @@ export function CostTrendChart({ filters, setFilters }: CostTrendChartProps) {
       .map(([cat]) => cat);
   }, [chartData]);
 
-  if (isLoading || !data) {
+  if (!data) {
     return (
       <Card>
         <CardHeader><CardTitle>Cost Trend</CardTitle></CardHeader>
@@ -146,7 +148,7 @@ export function CostTrendChart({ filters, setFilters }: CostTrendChartProps) {
               tickLine={false}
               axisLine={false}
             />
-            <Tooltip content={<CustomTooltip />} />
+            <Tooltip wrapperStyle={{ zIndex: 50 }} content={<CustomTooltip />} />
             <Legend wrapperStyle={{ fontSize: 12 }} />
             {activeCategories.map((cat, idx) => (
               <Bar

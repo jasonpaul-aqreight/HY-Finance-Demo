@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useV3Statement } from '@/hooks/pnl/usePLDataV3';
+import { useStableData } from '@/hooks/useStableData';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -63,10 +64,11 @@ function isGroupEmpty(group: { subtotal: V2PeriodValues }) {
 }
 
 export function PLStatementTableV3({ fy }: Props) {
-  const { data, isLoading } = useV3Statement(fy);
+  const { data: rawData } = useV3Statement(fy);
+  const data = useStableData(rawData);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
-  if (isLoading || !data) {
+  if (!data) {
     return (
       <Card className="rounded-xl ring-1 ring-foreground/10">
         <CardContent className="p-6 h-96 animate-pulse bg-muted/30" />

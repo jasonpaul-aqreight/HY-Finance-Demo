@@ -1,7 +1,6 @@
 'use client';
 
-import { useRouter, useSearchParams, usePathname } from 'next/navigation';
-import { useCallback, useMemo } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import useSWR from 'swr';
 import { format, subMonths } from 'date-fns';
 
@@ -19,53 +18,50 @@ export interface DashboardFiltersV2 {
 const fetcher = (url: string) => fetch(url).then(r => r.json());
 
 export function useDashboardFiltersV2() {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-
   const { data: bounds } = useSWR<{ min_date: string; max_date: string }>(
     '/api/supplier-margin/margin/v2/date-bounds',
     fetcher,
     { revalidateOnFocus: false }
   );
 
-  const defaults = useMemo(() => {
-    const endDate = bounds?.max_date ? new Date(bounds.max_date) : new Date();
-    const startDate = subMonths(endDate, 12);
-    return { start: format(startDate, 'yyyy-MM-dd'), end: format(endDate, 'yyyy-MM-dd') };
-  }, [bounds]);
+  const [filters, setFiltersState] = useState<DashboardFiltersV2 | null>(null);
 
-  const filters: DashboardFiltersV2 = useMemo(() => ({
-    startDate: searchParams.get('start') ?? defaults.start,
-    endDate: searchParams.get('end') ?? defaults.end,
-    granularity: (searchParams.get('g') ?? 'monthly') as Granularity,
-    supplierTypes: searchParams.getAll('st'),
-    suppliers: searchParams.getAll('supplier'),
-    itemGroups: searchParams.getAll('ig'),
-  }), [searchParams, defaults.start, defaults.end]);
+  // Initialize filters once bounds arrive
+  useEffect(() => {
+    if (bounds && !filters) {
+      const endDate = new Date(bounds.max_date);
+      const startDate = subMonths(endDate, 12);
+      setFiltersState({
+        startDate: format(startDate, 'yyyy-MM-dd'),
+        endDate: format(endDate, 'yyyy-MM-dd'),
+        granularity: 'monthly',
+        supplierTypes: [],
+        suppliers: [],
+        itemGroups: [],
+      });
+    }
+  }, [bounds, filters]);
 
   const setFilters = useCallback((updates: Partial<DashboardFiltersV2>) => {
-    const params = new URLSearchParams(searchParams.toString());
-    if (updates.startDate !== undefined) params.set('start', updates.startDate);
-    if (updates.endDate !== undefined) params.set('end', updates.endDate);
-    if (updates.granularity !== undefined) params.set('g', updates.granularity);
-    if (updates.supplierTypes !== undefined) {
-      params.delete('st');
-      for (const st of updates.supplierTypes) params.append('st', st);
-    }
-    if (updates.suppliers !== undefined) {
-      params.delete('supplier');
-      for (const s of updates.suppliers) params.append('supplier', s);
-    }
-    if (updates.itemGroups !== undefined) {
-      params.delete('ig');
-      for (const ig of updates.itemGroups) params.append('ig', ig);
-    }
-    router.push(`${pathname}?${params.toString()}`);
-  }, [router, pathname, searchParams]);
+    setFiltersState(prev => {
+      if (!prev) return prev;
+      return { ...prev, ...updates };
+    });
+  }, []);
 
-  const hasUrlDates = searchParams.has('start') && searchParams.has('end');
-  const ready = hasUrlDates || !!bounds;
+  const ready = !!filters;
 
-  return { filters, setFilters, ready, bounds };
+  return {
+    filters: filters ?? {
+      startDate: '',
+      endDate: '',
+      granularity: 'monthly' as Granularity,
+      supplierTypes: [],
+      suppliers: [],
+      itemGroups: [],
+    },
+    setFilters,
+    ready,
+    bounds,
+  };
 }

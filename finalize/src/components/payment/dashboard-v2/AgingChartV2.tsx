@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useAging, useAgingByDimension } from '@/hooks/payment/usePaymentDataV2';
+import { useStableData } from '@/hooks/useStableData';
 import { formatRM } from '@/lib/payment/format';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LabelList, Legend,
@@ -30,12 +31,14 @@ type ViewMode = 'all' | 'agent' | 'type';
 
 export default function AgingChartV2() {
   const [viewMode, setViewMode] = useState<ViewMode>('all');
-  const { data: agingData, isLoading: agingLoading } = useAging();
-  const { data: dimData, isLoading: dimLoading } = useAgingByDimension(
+  const { data: rawAgingData } = useAging();
+  const agingData = useStableData(rawAgingData);
+  const { data: rawDimData } = useAgingByDimension(
     viewMode === 'type' ? 'type' : 'agent',
   );
+  const dimData = useStableData(rawDimData);
 
-  const isLoading = viewMode === 'all' ? agingLoading : dimLoading;
+  const isLoading = viewMode === 'all' ? !agingData : !dimData;
 
   // Simple chart data for "All" view
   const simpleChartData = useMemo(() => {
@@ -118,7 +121,7 @@ export default function AgingChartV2() {
                 tick={{ fontSize: 11 }}
               />
               <YAxis type="category" dataKey="bucket" tick={{ fontSize: 11 }} width={80} />
-              <Tooltip formatter={(value) => [formatRM(value as number), 'Outstanding']} />
+              <Tooltip formatter={(value) => [formatRM(value as number), 'Outstanding']} wrapperStyle={{ zIndex: 50 }} />
               <Bar dataKey="total_outstanding" radius={[0, 4, 4, 0]}>
                 {simpleChartData.map((entry) => (
                   <Cell key={entry.bucket} fill={BUCKET_COLORS[entry.bucket] ?? '#888'} />
@@ -143,6 +146,7 @@ export default function AgingChartV2() {
               <YAxis type="category" dataKey="bucket" tick={{ fontSize: 11 }} width={80} />
               <Tooltip
                 formatter={(value, name) => [formatRM(value as number), name as string]}
+                wrapperStyle={{ zIndex: 50 }}
               />
               <Legend wrapperStyle={{ fontSize: 11 }} />
               {dimensions.map((dim, i) => (

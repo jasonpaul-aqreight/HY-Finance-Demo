@@ -146,6 +146,38 @@ export function useMarginDistribution(filters: DashboardFilters, entity: 'suppli
   return useSWR<Array<{ bucket: string; count: number }>>(`/api/supplier-margin/margin/distribution?${params}`, fetcher);
 }
 
+// Supplier profile summary (isActive, single-supplier items)
+export function useSupplierProfileSummary(creditorCode: string | null, startDate: string, endDate: string) {
+  const params = creditorCode ? new URLSearchParams({
+    creditor_code: creditorCode,
+    start_date: startDate,
+    end_date: endDate,
+  }) : null;
+  return useSWR<{
+    is_active: boolean;
+    single_supplier_count: number;
+    single_supplier_items: string[];
+  }>(
+    params ? `/api/supplier-margin/margin/supplier-profile-summary?${params}` : null,
+    fetcher,
+    { revalidateOnFocus: false },
+  );
+}
+
+// Supplier item price trends (sparklines for profile)
+export function useSupplierItemTrends(creditorCode: string | null, startDate: string, endDate: string) {
+  const params = creditorCode ? new URLSearchParams({
+    creditor_code: creditorCode,
+    start_date: startDate,
+    end_date: endDate,
+  }) : null;
+  return useSWR<{ data: { item_code: string; prices: number[] }[] }>(
+    params ? `/api/supplier-margin/margin/supplier-item-trends?${params}` : null,
+    fetcher,
+    { revalidateOnFocus: false },
+  );
+}
+
 // ─── Procurement hooks ──────────────────────────────────────────────────────
 
 export function useProcurementItems(filters: DashboardFilters) {

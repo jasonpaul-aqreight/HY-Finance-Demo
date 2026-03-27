@@ -1,6 +1,7 @@
 'use client';
 
 import { useMarginSummary } from '@/hooks/supplier-margin/useMarginData';
+import { useStableData } from '@/hooks/useStableData';
 import type { DashboardFilters } from '@/hooks/supplier-margin/useDashboardFilters';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatRM, marginColor } from '@/lib/supplier-margin/format';
@@ -41,9 +42,10 @@ function SkeletonCard() {
 }
 
 export function KpiCards({ filters }: { filters: DashboardFilters }) {
-  const { data, isLoading } = useMarginSummary(filters);
+  const { data: rawData } = useMarginSummary(filters);
+  const data = useStableData(rawData);
 
-  if (isLoading || !data) {
+  if (!data) {
     return (
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
         {Array.from({ length: 5 }).map((_, i) => <SkeletonCard key={i} />)}

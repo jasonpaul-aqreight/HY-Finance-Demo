@@ -2,6 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useMarginTrend } from '@/hooks/customer-margin/useMarginData';
+import { useStableData } from '@/hooks/useStableData';
 import type { MarginDashboardFilters } from '@/hooks/customer-margin/useDashboardFilters';
 import { formatRM } from '@/lib/customer-margin/format';
 import {
@@ -32,7 +33,8 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
 }
 
 export function MarginTrendChart({ filters }: Props) {
-  const { data, isLoading } = useMarginTrend(filters);
+  const { data: rawData } = useMarginTrend(filters);
+  const data = useStableData(rawData);
 
   return (
     <Card>
@@ -40,7 +42,7 @@ export function MarginTrendChart({ filters }: Props) {
         <CardTitle>Profitability Trend</CardTitle>
       </CardHeader>
       <CardContent>
-        {isLoading ? (
+        {!data ? (
           <div className="flex h-[360px] items-center justify-center text-muted-foreground">Loading...</div>
         ) : (
           <ResponsiveContainer width="100%" height={360}>
@@ -59,7 +61,7 @@ export function MarginTrendChart({ filters }: Props) {
                 tick={{ fontSize: 11 }}
                 domain={['auto', 'auto']}
               />
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip wrapperStyle={{ zIndex: 50 }} content={<CustomTooltip />} />
               <Legend />
               <Bar yAxisId="left" dataKey="gross_profit" name="Gross Profit" fill="#3b82f6" radius={[2, 2, 0, 0]} />
               <Line yAxisId="right" type="monotone" dataKey="margin_pct" name="Margin %" stroke="#ef4444" strokeWidth={2} dot={{ r: 2.5, fill: '#ef4444' }} />

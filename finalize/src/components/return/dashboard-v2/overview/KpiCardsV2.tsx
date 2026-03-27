@@ -1,6 +1,7 @@
 'use client';
 
 import { useReturnOverview } from '@/hooks/return/useCreditDataV2';
+import { useStableData } from '@/hooks/useStableData';
 import type { V2Filters } from '@/hooks/return/useDashboardFiltersV2';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatRM, formatCount } from '@/lib/format';
@@ -74,9 +75,10 @@ function ReconFormulaTooltip() {
 }
 
 export function KpiCardsV2({ filters }: { filters: V2Filters }) {
-  const { data, isLoading } = useReturnOverview(filters);
+  const { data: rawData } = useReturnOverview(filters);
+  const data = useStableData(rawData);
 
-  if (isLoading || !data) {
+  if (!data) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         {Array.from({ length: 5 }).map((_, i) => <SkeletonCard key={i} />)}

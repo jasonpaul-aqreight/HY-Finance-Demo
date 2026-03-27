@@ -23,11 +23,7 @@ interface GroupedCategory {
   rows: Row[];
 }
 
-const CATEGORY_ORDER = [
-  'Payroll', 'Electricity & Water', 'Packaging Materials',
-  'Fuel', 'Rental', 'Repair & Maintenance', 'Vehicle & Equipment Upkeep',
-  'Depreciation', 'Insurance', 'Finance Costs', 'Other OPEX',
-];
+import { CATEGORY_ORDER } from '@/lib/shared/expense-categories';
 
 function exportCsv(groups: GroupedCategory[], total: number) {
   const headers = ['Category', 'Account No', 'Account Name', 'Net Cost (RM)', '% of OPEX'];

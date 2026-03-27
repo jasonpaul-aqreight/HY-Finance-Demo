@@ -87,9 +87,34 @@ export function useCreditHealthV2(
   order: 'asc' | 'desc',
   page: number,
   search: string,
+  riskFilter = '',
+  categoryFilter = '',
 ) {
   return useSWR<{ rows: CreditHealthV2Row[]; total: number }>(
-    `/api/payment/v2/credit-health?sort=${sort}&order=${order}&page=${page}&page_size=20&search=${encodeURIComponent(search)}`,
+    `/api/payment/v2/credit-health?sort=${sort}&order=${order}&page=${page}&page_size=20&search=${encodeURIComponent(search)}&risk=${encodeURIComponent(riskFilter)}&category=${encodeURIComponent(categoryFilter)}`,
+    fetcher,
+    { revalidateOnFocus: false },
+  );
+}
+
+// Customer profile (debtor master + avg payment period + credit health)
+export function useCustomerProfile(debtorCode: string | null) {
+  return useSWR<{
+    display_term: string;
+    is_active: boolean;
+    debtor_type: string;
+    sales_agent: string;
+    avg_payment_days: number | null;
+    credit_limit: number;
+    total_outstanding: number;
+    utilization_pct: number | null;
+    aging_count: number;
+    oldest_due: string | null;
+    max_overdue_days: number;
+    credit_score: number;
+    risk_tier: string;
+  }>(
+    debtorCode ? `/api/payment/customer-profile?debtor_code=${encodeURIComponent(debtorCode)}` : null,
     fetcher,
     { revalidateOnFocus: false },
   );

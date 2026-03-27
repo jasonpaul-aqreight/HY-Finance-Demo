@@ -1,6 +1,7 @@
 'use client';
 
 import { useV3BSTrend } from '@/hooks/pnl/usePLDataV3';
+import { useStableData } from '@/hooks/useStableData';
 import { Card, CardContent } from '@/components/ui/card';
 import { formatRMCompact } from '@/lib/pnl/format';
 import {
@@ -26,9 +27,10 @@ function formatYAxis(value: number): string {
 }
 
 export function BSTrendChartV3({ fy, range }: Props) {
-  const { data, isLoading } = useV3BSTrend(fy, range);
+  const { data: rawData } = useV3BSTrend(fy, range);
+  const data = useStableData(rawData);
 
-  if (isLoading || !data) {
+  if (!data) {
     return (
       <Card className="rounded-xl ring-1 ring-foreground/10 h-full">
         <CardContent className="p-6 h-[380px] animate-pulse bg-muted/30" />
@@ -56,6 +58,7 @@ export function BSTrendChartV3({ fy, range }: Props) {
               <XAxis dataKey="month" tick={{ fontSize: 13, fill: '#1a1a1a' }} tickLine={false} />
               <YAxis tickFormatter={formatYAxis} tick={{ fontSize: 13, fill: '#1a1a1a' }} tickLine={false} axisLine={false} />
               <Tooltip
+                wrapperStyle={{ zIndex: 50 }}
                 formatter={(value: unknown, name: unknown) => [
                   formatRMCompact(value as number),
                   name as string,

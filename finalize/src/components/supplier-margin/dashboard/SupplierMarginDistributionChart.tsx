@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useMarginDistribution } from '@/hooks/supplier-margin/useMarginData';
+import { useStableData } from '@/hooks/useStableData';
 import type { DashboardFilters } from '@/hooks/supplier-margin/useDashboardFilters';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
@@ -37,7 +38,8 @@ function renderLabel(props: any) {
 
 export function SupplierMarginDistributionChart({ filters }: { filters: DashboardFilters }) {
   const [entity, setEntity] = useState<Entity>('suppliers');
-  const { data, isLoading } = useMarginDistribution(filters, entity);
+  const { data: rawData } = useMarginDistribution(filters, entity);
+  const data = useStableData(rawData);
 
   const entityLabel = entity === 'suppliers' ? 'Supplier' : 'Item';
   const countLabel = entity === 'suppliers' ? 'suppliers' : 'items';
@@ -66,7 +68,7 @@ export function SupplierMarginDistributionChart({ filters }: { filters: Dashboar
         </div>
       </CardHeader>
       <CardContent>
-        {isLoading ? (
+        {!data ? (
           <div className="flex h-[320px] items-center justify-center text-muted-foreground">Loading...</div>
         ) : !data || data.length === 0 ? (
           <div className="flex h-[320px] items-center justify-center text-muted-foreground">No data</div>
@@ -88,7 +90,7 @@ export function SupplierMarginDistributionChart({ filters }: { filters: Dashboar
                   <Cell key={i} fill={BUCKET_COLORS[d.bucket] ?? '#6b7280'} />
                 ))}
               </Pie>
-              <Tooltip formatter={(v) => [`${v} ${countLabel}`, 'Count']} />
+              <Tooltip wrapperStyle={{ zIndex: 50 }} formatter={(v) => [`${v} ${countLabel}`, 'Count']} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
             </PieChart>
           </ResponsiveContainer>

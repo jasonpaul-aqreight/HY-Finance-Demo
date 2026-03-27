@@ -2,6 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useMarginDistribution } from '@/hooks/customer-margin/useMarginData';
+import { useStableData } from '@/hooks/useStableData';
 import type { MarginDashboardFilters } from '@/hooks/customer-margin/useDashboardFilters';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
@@ -36,7 +37,8 @@ function renderLabel(props: any) {
 }
 
 export function MarginDistributionChart({ filters }: Props) {
-  const { data, isLoading } = useMarginDistribution(filters);
+  const { data: rawData } = useMarginDistribution(filters);
+  const data = useStableData(rawData);
 
   return (
     <Card>
@@ -44,7 +46,7 @@ export function MarginDistributionChart({ filters }: Props) {
         <CardTitle>Customer Margin Distribution</CardTitle>
       </CardHeader>
       <CardContent>
-        {isLoading ? (
+        {!data ? (
           <div className="flex h-[320px] items-center justify-center text-muted-foreground">Loading...</div>
         ) : (
           <ResponsiveContainer width="100%" height={320}>
@@ -64,7 +66,7 @@ export function MarginDistributionChart({ filters }: Props) {
                   <Cell key={i} fill={BUCKET_COLORS[d.bucket] ?? '#6b7280'} />
                 ))}
               </Pie>
-              <Tooltip formatter={(v) => [`${v} customers`, 'Count']} />
+              <Tooltip wrapperStyle={{ zIndex: 50 }} formatter={(v) => [`${v} customers`, 'Count']} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
             </PieChart>
           </ResponsiveContainer>

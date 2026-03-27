@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import { useMultiYearPL } from '@/hooks/pnl/usePLDataV3';
+import { useStableData } from '@/hooks/useStableData';
 import type { MultiYearPLRow } from '@/hooks/pnl/usePLDataV3';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -75,6 +76,7 @@ function MiniChart({ label, color, data, dataKey, fy }: {
             <YAxis hide domain={['auto', 'auto']} />
             {hasNegative && <ReferenceLine y={0} stroke="#d1d5db" strokeWidth={1} />}
             <Tooltip
+              wrapperStyle={{ zIndex: 50 }}
               formatter={(value: unknown) => [formatRMCompact(value as number), label]}
               contentStyle={{ borderRadius: 6, fontSize: 11, padding: '4px 8px' }}
               labelStyle={{ fontSize: 10, fontWeight: 600 }}
@@ -117,7 +119,8 @@ function TrendArrow({ current, prior, isMargin }: { current: number; prior: numb
 }
 
 export function YoYComparisonV3({ fy }: Props) {
-  const { data: allData, isLoading } = useMultiYearPL();
+  const { data: rawAllData } = useMultiYearPL();
+  const allData = useStableData(rawAllData);
 
   const data = useMemo(() => {
     if (!allData) return [];
@@ -127,7 +130,7 @@ export function YoYComparisonV3({ fy }: Props) {
     return allData.filter(d => d.fyNumber >= fyNum - 3 && d.fyNumber <= fyNum);
   }, [allData, fy]);
 
-  if (isLoading || !allData) {
+  if (!allData) {
     return (
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <Card className="rounded-xl ring-1 ring-foreground/10">

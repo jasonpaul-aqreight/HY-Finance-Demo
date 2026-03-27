@@ -2,6 +2,7 @@
 
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { useCollectionTrend, useKpisV2 } from '@/hooks/payment/usePaymentDataV2';
+import { useStableData } from '@/hooks/useStableData';
 import { formatRM } from '@/lib/payment/format';
 import type { DashboardFiltersV2 } from '@/hooks/payment/useDashboardFiltersV2';
 import {
@@ -13,7 +14,8 @@ interface CollectionTrendChartV2Props {
 }
 
 export default function CollectionTrendChartV2({ filters }: CollectionTrendChartV2Props) {
-  const { data, isLoading } = useCollectionTrend(filters);
+  const { data: rawData } = useCollectionTrend(filters);
+  const data = useStableData(rawData);
   const { data: kpiData } = useKpisV2(filters);
 
   const avgCollection = kpiData?.avg_monthly_collection ?? null;
@@ -24,7 +26,7 @@ export default function CollectionTrendChartV2({ filters }: CollectionTrendChart
         <CardTitle>Invoiced vs Collected</CardTitle>
       </CardHeader>
       <CardContent>
-        {isLoading || !data ? (
+        {!data ? (
           <div className="h-[300px] animate-pulse rounded bg-muted" />
         ) : (
           <ResponsiveContainer width="100%" height={300}>
@@ -39,6 +41,7 @@ export default function CollectionTrendChartV2({ filters }: CollectionTrendChart
                 tick={{ fontSize: 11 }}
               />
               <Tooltip
+                wrapperStyle={{ zIndex: 50 }}
                 formatter={(value, name) => [
                   formatRM(value as number),
                   name === 'total_collected' ? 'Collected' : 'Invoiced',

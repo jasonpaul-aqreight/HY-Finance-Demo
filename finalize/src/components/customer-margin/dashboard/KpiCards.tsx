@@ -2,6 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useMarginKpi } from '@/hooks/customer-margin/useMarginData';
+import { useStableData } from '@/hooks/useStableData';
 import type { MarginDashboardFilters } from '@/hooks/customer-margin/useDashboardFilters';
 import { formatRM, formatMarginPct, formatCount, marginColor } from '@/lib/customer-margin/format';
 
@@ -23,9 +24,10 @@ function SkeletonCards() {
 }
 
 export function KpiCards({ filters }: KpiCardsProps) {
-  const { data, isLoading } = useMarginKpi(filters);
+  const { data: rawData } = useMarginKpi(filters);
+  const data = useStableData(rawData);
 
-  if (isLoading || !data) return <SkeletonCards />;
+  if (!data) return <SkeletonCards />;
 
   const cards = [
     { title: 'Net Sales', value: formatRM(data.total_revenue), color: 'text-foreground', formula: 'IV + DN − CN' },

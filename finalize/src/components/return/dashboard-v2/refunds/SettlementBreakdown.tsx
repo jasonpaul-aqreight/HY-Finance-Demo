@@ -1,6 +1,7 @@
 'use client';
 
 import { useRefundData } from '@/hooks/return/useCreditDataV2';
+import { useStableData } from '@/hooks/useStableData';
 import type { V2Filters } from '@/hooks/return/useDashboardFiltersV2';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatRM } from '@/lib/format';
@@ -23,9 +24,10 @@ function ProgressRow({ label, amount, pct, color }: { label: string; amount: num
 }
 
 export function SettlementBreakdown({ filters }: { filters: V2Filters }) {
-  const { data, isLoading } = useRefundData(filters);
+  const { data: rawData } = useRefundData(filters);
+  const data = useStableData(rawData);
 
-  if (isLoading || !data) {
+  if (!data) {
     return (
       <Card>
         <CardHeader className="pb-2"><CardTitle className="text-sm">Settlement Breakdown</CardTitle></CardHeader>

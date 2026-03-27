@@ -12,6 +12,7 @@ import {
   Cell,
 } from 'recharts';
 import { useTopBottomSuppliers, useTopBottomItems } from '@/hooks/supplier-margin/useMarginData';
+import { useStableData } from '@/hooks/useStableData';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { formatRM } from '@/lib/supplier-margin/format';
@@ -70,15 +71,17 @@ export function TopBottomChart({ filters }: { filters: DashboardFilters }) {
   const sortBy = metric === 'margin' ? 'margin_pct' : 'profit';
 
   // Supplier data
-  const { data: supplierData, isLoading: supplierLoading } = useTopBottomSuppliers(
+  const { data: rawSupplierData } = useTopBottomSuppliers(
     filters, order, 10, sortBy
   );
+  const supplierData = useStableData(rawSupplierData);
   // Item data
-  const { data: itemData, isLoading: itemLoading } = useTopBottomItems(
+  const { data: rawItemData } = useTopBottomItems(
     filters, order, 10, sortBy
   );
+  const itemData = useStableData(rawItemData);
 
-  const isLoading = entity === 'suppliers' ? supplierLoading : itemLoading;
+  const isLoading = entity === 'suppliers' ? !supplierData : !itemData;
 
   const chartData = useMemo(() => {
     if (entity === 'suppliers') {
@@ -155,6 +158,7 @@ export function TopBottomChart({ filters }: { filters: DashboardFilters }) {
               />
               <YAxis type="category" dataKey="name" width={200} tick={{ fontSize: 11 }} />
               <Tooltip
+                wrapperStyle={{ zIndex: 50 }}
                 content={({ active, payload }) => {
                   if (!active || !payload?.length) return null;
                   const row = payload[0].payload;

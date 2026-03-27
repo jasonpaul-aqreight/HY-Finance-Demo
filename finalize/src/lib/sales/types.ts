@@ -1,18 +1,6 @@
 // Shared types and constants for sales queries — safe to import from client components
 
-export type GroupByDimension = 'customer' | 'customer-type' | 'agent' | 'outlet' | 'fruit' | 'fruit-country' | 'fruit-variant';
-
-export type StackDimension = 'agent' | 'fruit' | 'outlet' | 'customer-type' | 'fruit-country' | 'fruit-variant';
-
-export const STACK_OPTIONS: Record<GroupByDimension, StackDimension[]> = {
-  'customer':      ['agent', 'fruit', 'fruit-country', 'outlet'],
-  'customer-type': ['agent', 'fruit', 'fruit-country'],
-  'fruit':         ['customer-type', 'fruit-variant'],
-  'fruit-country': ['fruit'],
-  'fruit-variant': ['customer-type'],
-  'agent':         ['fruit', 'fruit-country', 'outlet'],
-  'outlet':        ['fruit-country', 'fruit'],
-};
+export type GroupByDimension = 'customer' | 'customer-type' | 'agent' | 'outlet' | 'fruit';
 
 export interface GroupByRow {
   name: string;
@@ -22,10 +10,4 @@ export interface GroupByRow {
   credit_notes: number;
   doc_count: number;
   [key: string]: string | number | null;
-}
-
-export interface StackedRow {
-  primary_name: string;
-  stack_name: string;
-  total_sales: number;
 }

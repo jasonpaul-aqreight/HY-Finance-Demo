@@ -1,6 +1,7 @@
 'use client';
 
 import { useV3Monthly } from '@/hooks/pnl/usePLDataV3';
+import { useStableData } from '@/hooks/useStableData';
 import { Card, CardContent } from '@/components/ui/card';
 import { formatRMCompact } from '@/lib/pnl/format';
 import {
@@ -21,9 +22,10 @@ interface Props {
 }
 
 export function MonthlyPLTrendV3({ fy, range }: Props) {
-  const { data, isLoading } = useV3Monthly(fy, range);
+  const { data: rawData } = useV3Monthly(fy, range);
+  const data = useStableData(rawData);
 
-  if (isLoading || !data) {
+  if (!data) {
     return (
       <Card className="rounded-xl ring-1 ring-foreground/10">
         <CardContent className="p-6 h-80 animate-pulse bg-muted/30" />
@@ -36,8 +38,8 @@ export function MonthlyPLTrendV3({ fy, range }: Props) {
     'Net Sales': d.net_sales,
     COGS: d.cogs,
     OPEX: d.expenses,
-    'Net Profit (+)': d.net_profit >= 0 ? d.net_profit : 0,
-    'Net Profit (-)': d.net_profit < 0 ? d.net_profit : 0,
+    'Profit/Loss (+)': d.net_profit >= 0 ? d.net_profit : 0,
+    'Profit/Loss (-)': d.net_profit < 0 ? d.net_profit : 0,
   }));
 
   return (
@@ -59,11 +61,12 @@ export function MonthlyPLTrendV3({ fy, range }: Props) {
                 tickFormatter={(v) => formatRMCompact(v)}
               />
               <Tooltip
+                wrapperStyle={{ zIndex: 50 }}
                 formatter={(value, name) => {
                   const v = value as number;
-                  if (name === 'Net Profit (+)' && v === 0) return [null, null];
-                  if (name === 'Net Profit (-)' && v === 0) return [null, null];
-                  const label = (name === 'Net Profit (+)' || name === 'Net Profit (-)') ? 'Net Profit' : name;
+                  if (name === 'Profit/Loss (+)' && v === 0) return [null, null];
+                  if (name === 'Profit/Loss (-)' && v === 0) return [null, null];
+                  const label = (name === 'Profit/Loss (+)' || name === 'Profit/Loss (-)') ? 'Profit/Loss' : name;
                   return [formatRMCompact(v), label];
                 }}
                 labelStyle={{ fontWeight: 600 }}
@@ -76,7 +79,7 @@ export function MonthlyPLTrendV3({ fy, range }: Props) {
                   <div className="flex items-center justify-center gap-5 mt-2 text-xs">
                     <span className="flex items-center gap-1.5">
                       <span className="inline-block w-3 h-3 rounded-sm" style={{ background: 'linear-gradient(to right, #22c55e 50%, #ef4444 50%)' }} />
-                      Net Profit
+                      Profit/Loss
                     </span>
                     <span className="flex items-center gap-1.5">
                       <span className="inline-block w-4 h-0.5" style={{ backgroundColor: '#2E5090' }} />
@@ -93,8 +96,8 @@ export function MonthlyPLTrendV3({ fy, range }: Props) {
                   </div>
                 )}
               />
-              <Bar dataKey="Net Profit (+)" fill="#22c55e" radius={[2, 2, 0, 0]} stackId="np" legendType="none" />
-              <Bar dataKey="Net Profit (-)" fill="#ef4444" radius={[0, 0, 2, 2]} stackId="np" legendType="none" />
+              <Bar dataKey="Profit/Loss (+)" fill="#22c55e" radius={[2, 2, 0, 0]} stackId="np" legendType="none" />
+              <Bar dataKey="Profit/Loss (-)" fill="#ef4444" radius={[0, 0, 2, 2]} stackId="np" legendType="none" />
               <Line
                 type="monotone"
                 dataKey="Net Sales"

@@ -59,6 +59,23 @@ export function useCustomerReturnDetailsAll(debtorCode: string | null) {
   return useSWR<CustomerReturnRow[]>(key, fetcher);
 }
 
+// Customer return summary (for profile metrics)
+export function useCustomerReturnSummary(debtorCode: string | null) {
+  return useSWR<{ return_count: number; unresolved: number }>(
+    debtorCode ? `/api/return/credit-v2/customer-return-summary?debtor_code=${encodeURIComponent(debtorCode)}` : null,
+    fetcher,
+    { revalidateOnFocus: false },
+  );
+}
+
+// Customer return trend (last 12 months, for profile sparkline)
+export function useCustomerReturnTrend(debtorCode: string | null) {
+  return useSWR<{ month: string; count: number; value: number }[]>(
+    debtorCode ? `/api/return/credit-v2/customer-return-trend?debtor_code=${encodeURIComponent(debtorCode)}` : null,
+    fetcher,
+  );
+}
+
 export function useReturnProducts(filters: V2Filters, dimension: ReturnProductDimension = 'item', metric: ReturnProductMetric = 'frequency') {
   const params = buildParams(filters);
   params.set('dimension', dimension);

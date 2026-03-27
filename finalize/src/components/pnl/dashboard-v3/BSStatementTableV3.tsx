@@ -1,6 +1,7 @@
 'use client';
 
 import { useV3BSComparison } from '@/hooks/pnl/usePLDataV3';
+import { useStableData } from '@/hooks/useStableData';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -33,9 +34,10 @@ function CellValue({ value }: { value: number }) {
 }
 
 export function BSStatementTableV3({ fy }: Props) {
-  const { data, isLoading } = useV3BSComparison(fy);
+  const { data: rawData } = useV3BSComparison(fy);
+  const data = useStableData(rawData);
 
-  if (isLoading || !data) {
+  if (!data) {
     return (
       <Card className="rounded-xl ring-1 ring-foreground/10 h-full">
         <CardContent className="p-6 h-[380px] animate-pulse bg-muted/30" />

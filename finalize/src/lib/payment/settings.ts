@@ -43,13 +43,11 @@ export interface SettingsV2 {
   creditScoreWeights: {
     utilization: number;
     overdueDays: number;
-    paymentConsistency: number;
     timeliness: number;
-    breach: number;
+    doubleBreach: number;
   };
   riskThresholds: {
     low: number;
-    moderate: number;
     high: number;
   };
   neutralScore?: number;
@@ -59,16 +57,14 @@ export interface SettingsV2 {
 
 export const DEFAULT_SETTINGS_V2: SettingsV2 = {
   creditScoreWeights: {
-    utilization: 35,
-    overdueDays: 25,
-    paymentConsistency: 15,
-    timeliness: 15,
-    breach: 10,
+    utilization: 40,
+    overdueDays: 30,
+    timeliness: 20,
+    doubleBreach: 10,
   },
   riskThresholds: {
-    low: 85,
-    moderate: 65,
-    high: 35,
+    low: 75,
+    high: 30,
   },
 };
 
@@ -82,6 +78,48 @@ interface SettingsFile {
 const SETTINGS_PATH = path.resolve(process.cwd(), '../data/settings.json');
 
 let _cached: SettingsFile | null = null;
+
+function migrateV2(raw: Record<string, unknown>): SettingsV2 {
+  const v2Raw = (raw ?? {}) as Record<string, unknown>;
+  const weights = (v2Raw.creditScoreWeights ?? {}) as Record<string, number>;
+  const thresholds = (v2Raw.riskThresholds ?? {}) as Record<string, number>;
+
+  // Migrate old 5-factor weights → 4-factor by dropping paymentConsistency
+  const hasOldConsistency = 'paymentConsistency' in weights;
+  const hasOldBreach = 'breach' in weights && !('doubleBreach' in weights);
+  const hasOldModerate = 'moderate' in thresholds;
+
+  let migratedWeights = { ...DEFAULT_SETTINGS_V2.creditScoreWeights };
+  if (hasOldConsistency || hasOldBreach) {
+    // Old format detected — use defaults for clean migration
+    migratedWeights = { ...DEFAULT_SETTINGS_V2.creditScoreWeights };
+  } else if (weights.utilization != null) {
+    migratedWeights = {
+      utilization: weights.utilization ?? DEFAULT_SETTINGS_V2.creditScoreWeights.utilization,
+      overdueDays: weights.overdueDays ?? DEFAULT_SETTINGS_V2.creditScoreWeights.overdueDays,
+      timeliness: weights.timeliness ?? DEFAULT_SETTINGS_V2.creditScoreWeights.timeliness,
+      doubleBreach: weights.doubleBreach ?? DEFAULT_SETTINGS_V2.creditScoreWeights.doubleBreach,
+    };
+  }
+
+  let migratedThresholds = { ...DEFAULT_SETTINGS_V2.riskThresholds };
+  if (hasOldModerate) {
+    // Old 3-threshold format → use defaults
+    migratedThresholds = { ...DEFAULT_SETTINGS_V2.riskThresholds };
+  } else if (thresholds.low != null && thresholds.high != null) {
+    migratedThresholds = {
+      low: thresholds.low,
+      high: thresholds.high,
+    };
+  }
+
+  return {
+    ...DEFAULT_SETTINGS_V2,
+    ...v2Raw,
+    creditScoreWeights: migratedWeights,
+    riskThresholds: migratedThresholds,
+  };
+}
 
 function readAll(): SettingsFile {
   if (_cached) return _cached;
@@ -99,17 +137,9 @@ function readAll(): SettingsFile {
       return migrated;
     }
 
-    const parsedV2 = parsed.v2 ?? {};
     _cached = {
       v1: { ...DEFAULT_SETTINGS, ...(parsed.v1 ?? {}) },
-      v2: {
-        ...DEFAULT_SETTINGS_V2,
-        ...parsedV2,
-        creditScoreWeights: {
-          ...DEFAULT_SETTINGS_V2.creditScoreWeights,
-          ...(parsedV2.creditScoreWeights ?? {}),
-        },
-      },
+      v2: migrateV2(parsed.v2 ?? {}),
     };
     return _cached;
   } catch {
@@ -164,14 +194,14 @@ export function getSettingsV2(): SettingsV2 {
 
 export function saveSettingsV2(s: SettingsV2): { ok: boolean; error?: string } {
   const w = s.creditScoreWeights;
-  const sum = w.utilization + w.overdueDays + w.paymentConsistency + w.timeliness + w.breach;
+  const sum = w.utilization + w.overdueDays + w.timeliness + w.doubleBreach;
   if (sum !== 100) {
-    return { ok: false, error: `Credit score weights must sum to 100 (got ${sum})` };
+    return { ok: false, error: `Credit health score weights must sum to 100 (got ${sum})` };
   }
 
   const t = s.riskThresholds;
-  if (t.low <= t.moderate || t.moderate <= t.high) {
-    return { ok: false, error: 'Risk thresholds must be in descending order (Low > Moderate > High)' };
+  if (t.low <= t.high) {
+    return { ok: false, error: 'Low Risk threshold must be greater than High Risk threshold' };
   }
 
   const all = readAll();

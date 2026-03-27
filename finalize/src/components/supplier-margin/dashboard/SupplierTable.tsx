@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useMemo, useRef, useEffect, Fragment } from 'react';
-import { useSupplierTable, useSupplierItems, useSparklines, useDimensions } from '@/hooks/supplier-margin/useMarginData';
+import { useState, useMemo, useRef, useEffect } from 'react';
+import { useSupplierTable, useSparklines, useDimensions } from '@/hooks/supplier-margin/useMarginData';
 import { Sparkline } from './Sparkline';
 import type { DashboardFilters } from '@/hooks/supplier-margin/useDashboardFilters';
 import {
@@ -14,8 +14,9 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { formatRM, formatCount, marginColor } from '@/lib/supplier-margin/format';
+import { formatRM, marginColor } from '@/lib/supplier-margin/format';
 import { Search, ChevronDown, X } from 'lucide-react';
+import { SupplierProfileModal } from '@/components/profiles/SupplierProfileModal';
 
 interface SupplierRow {
   creditor_code: string;
@@ -30,18 +31,6 @@ interface SupplierRow {
   price_spread: number | null;
   items_supplied: number;
   trend?: 'up' | 'down' | 'flat';
-}
-
-interface ItemRow {
-  item_code: string;
-  description: string;
-  item_group: string | null;
-  qty_purchased: number;
-  avg_purchase_price: number | null;
-  qty_sold: number;
-  revenue: number;
-  cogs: number;
-  margin_pct: number | null;
 }
 
 type SortKey = 'company_name' | 'attributed_revenue' | 'attributed_cogs' | 'attributed_profit' | 'margin_pct' | 'items_supplied';
@@ -110,7 +99,7 @@ function SupplierCombobox({
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Search suppliers..."
+              placeholder="Search by supplier code or name..."
               className="flex-1 bg-transparent text-sm outline-none"
               autoFocus
             />
@@ -141,60 +130,6 @@ function SupplierCombobox({
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-/* ── Item breakdown (expanded row) ─────────────────────────────────────────── */
-
-function ItemBreakdownTable({ creditorCode, filters }: { creditorCode: string; filters: DashboardFilters }) {
-  const { data, isLoading } = useSupplierItems(creditorCode, filters);
-
-  if (isLoading) return <div className="p-4 text-sm text-muted-foreground">Loading items...</div>;
-
-  const items: ItemRow[] = data?.data ?? [];
-
-  return (
-    <div className="bg-muted/30 border-t">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Item Code</TableHead>
-            <TableHead>Description</TableHead>
-            <TableHead>Group</TableHead>
-            <TableHead className="text-right">Qty Purchased</TableHead>
-            <TableHead className="text-right">Avg Purchase</TableHead>
-            <TableHead className="text-right">Qty Sold</TableHead>
-            <TableHead className="text-right">Revenue</TableHead>
-            <TableHead className="text-right">Purchase Cost</TableHead>
-            <TableHead className="text-right">Margin %</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {items.map((item) => (
-            <TableRow key={item.item_code}>
-              <TableCell className="font-mono text-xs">{item.item_code}</TableCell>
-              <TableCell className="text-xs max-w-[200px] truncate">{item.description}</TableCell>
-              <TableCell className="text-xs">{item.item_group ?? '—'}</TableCell>
-              <TableCell className="text-right text-xs">{formatCount(item.qty_purchased)}</TableCell>
-              <TableCell className="text-right text-xs font-mono">{item.avg_purchase_price != null ? formatRM(item.avg_purchase_price, 2) : '—'}</TableCell>
-              <TableCell className="text-right text-xs">{formatCount(item.qty_sold)}</TableCell>
-              <TableCell className="text-right text-xs font-mono">{formatRM(item.revenue, 2)}</TableCell>
-              <TableCell className="text-right text-xs font-mono">{formatRM(item.cogs, 2)}</TableCell>
-              <TableCell className={`text-right text-xs font-medium ${marginColor(item.margin_pct)}`}>
-                {item.margin_pct != null ? `${item.margin_pct.toFixed(1)}%` : '—'}
-              </TableCell>
-            </TableRow>
-          ))}
-          {items.length === 0 && (
-            <TableRow>
-              <TableCell colSpan={10} className="text-center text-muted-foreground py-4 text-xs">
-                No item data for this supplier in selected period
-              </TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
     </div>
   );
 }
@@ -231,8 +166,8 @@ export function SupplierTable({ filters }: { filters: DashboardFilters }) {
   const [sortKey, setSortKey] = useState<SortKey>('attributed_revenue');
   const [sortAsc, setSortAsc] = useState(false);
   const [page, setPage] = useState(0);
-  const [expandedCode, setExpandedCode] = useState<string | null>(null);
   const [selectedSuppliers, setSelectedSuppliers] = useState<string[]>([]);
+  const [profileSupplier, setProfileSupplier] = useState<SupplierRow | null>(null);
 
   const rows: SupplierRow[] = data?.data ?? [];
 
@@ -289,7 +224,9 @@ export function SupplierTable({ filters }: { filters: DashboardFilters }) {
     <Card>
       <CardHeader className="pb-2 space-y-2">
         <div className="flex items-center justify-between">
-          <CardTitle>Supplier Analysis</CardTitle>
+          <div>
+            <CardTitle>Supplier Analysis</CardTitle>
+          </div>
           <div className="flex items-center gap-2">
             <div className="w-64">
               <SupplierCombobox
@@ -313,7 +250,6 @@ export function SupplierTable({ filters }: { filters: DashboardFilters }) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-8"></TableHead>
                 <TableHead>Code</TableHead>
                 <SortHeader col="company_name" label="Supplier Name" />
                 <TableHead>Type</TableHead>
@@ -327,43 +263,35 @@ export function SupplierTable({ filters }: { filters: DashboardFilters }) {
             </TableHeader>
             <TableBody>
               {pageRows.map((row, i) => (
-                <Fragment key={row.creditor_code}>
-                  <TableRow
-                    className={`cursor-pointer ${i % 2 === 0 ? 'bg-muted/20' : ''} ${expandedCode === row.creditor_code ? 'bg-muted/40' : ''}`}
-                    onClick={() => setExpandedCode(expandedCode === row.creditor_code ? null : row.creditor_code)}
-                  >
-                    <TableCell className="text-xs">{expandedCode === row.creditor_code ? '▼' : '▶'}</TableCell>
-                    <TableCell className="font-mono text-xs">{row.creditor_code}</TableCell>
-                    <TableCell className="text-sm font-medium max-w-[200px] truncate">{row.company_name}</TableCell>
-                    <TableCell className="text-xs">{row.supplier_type ?? '—'}</TableCell>
-                    <TableCell className="text-right text-sm">{row.items_supplied}</TableCell>
-                    <TableCell className="text-right font-mono text-sm">{formatRM(row.attributed_revenue)}</TableCell>
-                    <TableCell className="text-right font-mono text-sm">{formatRM(row.attributed_cogs)}</TableCell>
-                    <TableCell className="text-right font-mono text-sm font-semibold">{formatRM(row.attributed_profit)}</TableCell>
-                    <TableCell className="w-[130px]">
-                      <div className="flex items-center gap-1">
-                        <Sparkline data={sparklines[row.creditor_code] ?? []} />
-                        {row.trend === 'up' && <span className="text-emerald-600 text-xs font-medium">▲</span>}
-                        {row.trend === 'down' && <span className="text-red-600 text-xs font-medium">▼</span>}
-                        {row.trend === 'flat' && <span className="text-muted-foreground text-xs">—</span>}
-                      </div>
-                    </TableCell>
-                    <TableCell className={`text-right text-sm font-medium ${marginColor(row.margin_pct)}`}>
-                      {row.margin_pct != null ? `${row.margin_pct.toFixed(1)}%` : '—'}
-                    </TableCell>
-                  </TableRow>
-                  {expandedCode === row.creditor_code && (
-                    <TableRow key={`${row.creditor_code}-detail`}>
-                      <TableCell colSpan={10} className="p-0">
-                        <ItemBreakdownTable creditorCode={row.creditor_code} filters={filters} />
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </Fragment>
+                <TableRow
+                  key={row.creditor_code}
+                  className={i % 2 === 0 ? 'bg-muted/20' : ''}
+                >
+                  <TableCell className="font-mono text-xs">{row.creditor_code}</TableCell>
+                  <TableCell className="text-sm font-medium max-w-[200px] truncate">
+                    <button className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer" onClick={() => setProfileSupplier(row)}>{row.company_name}</button>
+                  </TableCell>
+                  <TableCell className="text-xs">{row.supplier_type ?? '—'}</TableCell>
+                  <TableCell className="text-sm">{row.items_supplied}</TableCell>
+                  <TableCell className="text-sm">{formatRM(row.attributed_revenue)}</TableCell>
+                  <TableCell className="text-sm">{formatRM(row.attributed_cogs)}</TableCell>
+                  <TableCell className="text-sm font-semibold">{formatRM(row.attributed_profit)}</TableCell>
+                  <TableCell className="w-[130px]">
+                    <div className="flex items-center gap-1">
+                      <Sparkline data={sparklines[row.creditor_code] ?? []} />
+                      {row.trend === 'up' && <span className="text-emerald-600 text-xs font-medium">▲</span>}
+                      {row.trend === 'down' && <span className="text-red-600 text-xs font-medium">▼</span>}
+                      {row.trend === 'flat' && <span className="text-muted-foreground text-xs">—</span>}
+                    </div>
+                  </TableCell>
+                  <TableCell className={`text-sm font-medium ${marginColor(row.margin_pct)}`}>
+                    {row.margin_pct != null ? `${row.margin_pct.toFixed(1)}%` : '—'}
+                  </TableCell>
+                </TableRow>
               ))}
               {pageRows.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                     No supplier data for selected period
                   </TableCell>
                 </TableRow>
@@ -388,6 +316,24 @@ export function SupplierTable({ filters }: { filters: DashboardFilters }) {
           </div>
         )}
       </CardContent>
+
+      {profileSupplier && (
+        <SupplierProfileModal
+          open={!!profileSupplier}
+          onClose={() => setProfileSupplier(null)}
+          creditorCode={profileSupplier.creditor_code}
+          companyName={profileSupplier.company_name}
+          initialStartDate={filters.startDate}
+          initialEndDate={filters.endDate}
+          supplierMetrics={{
+            attributed_revenue: profileSupplier.attributed_revenue,
+            attributed_cogs: profileSupplier.attributed_cogs,
+            attributed_profit: profileSupplier.attributed_profit,
+            margin_pct: profileSupplier.margin_pct,
+            items_supplied: profileSupplier.items_supplied,
+          }}
+        />
+      )}
     </Card>
   );
 }

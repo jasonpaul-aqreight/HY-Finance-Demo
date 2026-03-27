@@ -1,6 +1,7 @@
 'use client';
 
 import { useReturnTrend } from '@/hooks/return/useCreditDataV2';
+import { useStableData } from '@/hooks/useStableData';
 import type { V2Filters } from '@/hooks/return/useDashboardFiltersV2';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -9,9 +10,10 @@ import {
 import { formatRM } from '@/lib/format';
 
 export function MonthlyTrendChart({ filters }: { filters: V2Filters }) {
-  const { data, isLoading } = useReturnTrend(filters);
+  const { data: rawData } = useReturnTrend(filters);
+  const data = useStableData(rawData);
 
-  if (isLoading || !data) {
+  if (!data) {
     return (
       <Card>
         <CardHeader className="pb-2"><CardTitle className="text-sm">Monthly Return Trend</CardTitle></CardHeader>
@@ -40,6 +42,7 @@ export function MonthlyTrendChart({ filters }: { filters: V2Filters }) {
             />
             <YAxis tickFormatter={(v) => formatRM(v)} tick={{ fontSize: 11 }} />
             <Tooltip
+              wrapperStyle={{ zIndex: 50 }}
               content={({ active, payload, label }) => {
                 if (!active || !payload?.length) return null;
                 return (

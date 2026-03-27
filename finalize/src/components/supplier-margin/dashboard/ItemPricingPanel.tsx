@@ -238,7 +238,7 @@ function ItemPriceTrendChart({
               axisLine={false}
               tickFormatter={(v) => formatRM(v, 2)}
             />
-            <Tooltip content={<PriceTrendTooltip />} />
+            <Tooltip wrapperStyle={{ zIndex: 50 }} content={<PriceTrendTooltip />} />
             <Legend
               wrapperStyle={{ fontSize: 12, cursor: 'pointer' }}
             />

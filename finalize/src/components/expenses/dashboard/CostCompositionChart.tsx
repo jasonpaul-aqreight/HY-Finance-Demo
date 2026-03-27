@@ -1,6 +1,7 @@
 'use client';
 
 import { useCostComposition } from '@/hooks/expenses/useCostData';
+import { useStableData } from '@/hooks/useStableData';
 import type { DashboardFilters } from '@/hooks/expenses/useDashboardFilters';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,9 +22,10 @@ function CustomTooltip({ active, payload }: {
 }
 
 export function CostCompositionChart({ filters }: { filters: DashboardFilters }) {
-  const { data, isLoading } = useCostComposition(filters);
+  const { data: rawData } = useCostComposition(filters);
+  const data = useStableData(rawData);
 
-  if (isLoading || !data) {
+  if (!data) {
     return (
       <Card>
         <CardHeader><CardTitle>Cost Composition</CardTitle></CardHeader>
@@ -62,7 +64,7 @@ export function CostCompositionChart({ filters }: { filters: DashboardFilters })
                 />
               ))}
             </Pie>
-            <Tooltip content={<CustomTooltip />} />
+            <Tooltip wrapperStyle={{ zIndex: 50 }} content={<CustomTooltip />} />
             <Legend wrapperStyle={{ fontSize: 12 }} />
           </PieChart>
         </ResponsiveContainer>

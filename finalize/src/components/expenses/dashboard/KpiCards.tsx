@@ -1,6 +1,7 @@
 'use client';
 
 import { useCostKpis } from '@/hooks/expenses/useCostData';
+import { useStableData } from '@/hooks/useStableData';
 import type { DashboardFilters } from '@/hooks/expenses/useDashboardFilters';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatRM } from '@/lib/format';
@@ -47,9 +48,10 @@ function SkeletonCard() {
 }
 
 export function KpiCards({ filters }: { filters: DashboardFilters }) {
-  const { data, isLoading } = useCostKpis(filters);
+  const { data: rawData } = useCostKpis(filters);
+  const data = useStableData(rawData);
 
-  if (isLoading || !data) {
+  if (!data) {
     return (
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)}

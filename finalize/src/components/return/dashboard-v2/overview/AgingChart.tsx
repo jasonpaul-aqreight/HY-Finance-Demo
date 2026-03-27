@@ -1,6 +1,7 @@
 'use client';
 
 import { useReturnAging } from '@/hooks/return/useCreditDataV2';
+import { useStableData } from '@/hooks/useStableData';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid, Cell } from 'recharts';
 import { formatRM, formatCount } from '@/lib/format';
@@ -14,9 +15,10 @@ const BUCKET_COLORS: Record<string, string> = {
 };
 
 export function AgingChart() {
-  const { data, isLoading } = useReturnAging();
+  const { data: rawData } = useReturnAging();
+  const data = useStableData(rawData);
 
-  if (isLoading || !data) {
+  if (!data) {
     return (
       <Card>
         <CardHeader className="pb-2"><CardTitle className="text-sm">Aging of Unresolved Returns</CardTitle></CardHeader>
@@ -45,6 +47,7 @@ export function AgingChart() {
             <XAxis type="number" tickFormatter={(v) => formatRM(v)} />
             <YAxis type="category" dataKey="bucket" width={80} tick={{ fontSize: 12 }} />
             <Tooltip
+              wrapperStyle={{ zIndex: 50 }}
               content={({ active, payload, label }) => {
                 if (!active || !payload?.length) return null;
                 const d = payload[0].payload;

@@ -2,18 +2,28 @@
 
 import { useDashboardFiltersV2 } from '@/hooks/payment/useDashboardFiltersV2';
 import { DateRangeFilter } from './DateRangeFilter';
-import KpiCardsV2 from './KpiCardsV2';
+import SnapshotKpiCards from './SnapshotKpiCards';
+import PeriodKpiCards from './PeriodKpiCards';
 import AgingChartV2 from './AgingChartV2';
 import CollectionTrendChartV2 from './CollectionTrendChartV2';
 import CreditUtilizationChartV2 from './CreditUtilizationChartV2';
 import DsoTrendChartV2 from './DsoTrendChartV2';
 import CustomerTableV2 from './CustomerTableV2';
 
-function SectionDivider({ title }: { title: string }) {
+function SectionHeader({ title, subtitle }: { title: string; subtitle: string }) {
   return (
-    <div className="flex items-center gap-3 pt-2">
-      <h2 className="text-sm font-medium text-muted-foreground">{title}</h2>
-      <div className="h-px flex-1 bg-border" />
+    <div className="relative">
+      <div className="absolute inset-0 flex items-center" aria-hidden="true">
+        <div className="w-full border-t border-border" />
+      </div>
+      <div className="relative flex items-center gap-3">
+        <span className="bg-background pr-3">
+          <h2 className="text-base font-semibold tracking-tight text-foreground">{title}</h2>
+        </span>
+        <span className="rounded-full border border-border bg-background px-2.5 py-0.5 text-xs font-medium text-foreground">
+          {subtitle}
+        </span>
+      </div>
     </div>
   );
 }
@@ -32,49 +42,42 @@ export function DashboardShellV2() {
 
   return (
     <div className="mx-auto max-w-[1600px] px-6 py-8">
-      {/* Date Range Filter */}
-      <DateRangeFilter
-        filters={filters}
-        setFilters={setFilters}
-        bounds={bounds}
-      />
+      {/* ═══ Section 1: Trend & Collection (date-filtered) ═══ */}
+      <SectionHeader title="Trend & Collection" subtitle="Filtered by date range" />
 
-      {/* KPIs */}
-      <div className="mt-6">
-        <SectionDivider title="Overview" />
-        <div className="mt-3">
-          <KpiCardsV2 filters={filters} />
-        </div>
+      <div className="mt-4">
+        <DateRangeFilter
+          filters={filters}
+          setFilters={setFilters}
+          bounds={bounds}
+        />
       </div>
 
-      {/* Charts Row 1: 2 cols — Aging + Collection Trend */}
-      <div className="mt-6">
-        <SectionDivider title="Analysis" />
-        <div className="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <DsoTrendChartV2 filters={filters} />
-          <CollectionTrendChartV2 filters={filters} />
-        </div>
+      <div className="mt-4">
+        <PeriodKpiCards filters={filters} />
       </div>
 
-      {/* Charts Row 2: 2 cols — Aging + Credit Utilization */}
+      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <DsoTrendChartV2 filters={filters} />
+        <CollectionTrendChartV2 filters={filters} />
+      </div>
+
+      {/* ═══ Section 2: Outstanding Position (as of today) ═══ */}
+      <div className="mt-10">
+        <SectionHeader title="Outstanding Position" subtitle="As of today" />
+      </div>
+
+      <div className="mt-4">
+        <SnapshotKpiCards filters={filters} />
+      </div>
+
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <AgingChartV2 />
         <CreditUtilizationChartV2 />
       </div>
 
-      {/* Separator — table is not filtered by date range */}
-      <div className="mt-8 flex items-center gap-3">
-        <div className="h-px flex-1 bg-border" />
-        <span className="text-xs text-muted-foreground">All outstanding invoices — not filtered by date range above</span>
-        <div className="h-px flex-1 bg-border" />
-      </div>
-
-      {/* Customer Table */}
       <div className="mt-4">
-        <SectionDivider title="Customer Credit Health" />
-        <div className="mt-3">
-          <CustomerTableV2 />
-        </div>
+        <CustomerTableV2 />
       </div>
     </div>
   );

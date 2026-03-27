@@ -358,6 +358,66 @@ export function getRefundLog(start: string, end: string, limit = 20): RefundLogR
   `).all(start, end, limit) as RefundLogRow[];
 }
 
+// ─── Customer Return Summary (for profile metrics) ──────────────────────
+
+export interface CustomerReturnSummary {
+  return_count: number;
+  unresolved: number;
+}
+
+export function getCustomerReturnSummary(debtorCode: string): CustomerReturnSummary {
+  const db = getDb();
+  const row = db.prepare(`
+    SELECT
+      COUNT(*) AS return_count,
+      COALESCE(SUM(LocalNetTotal - COALESCE(KnockOffAmt, 0) - COALESCE(RefundAmt, 0)), 0) AS unresolved
+    FROM arcn
+    WHERE (Cancelled = 'F' OR Cancelled IS NULL) AND CNType = 'RETURN'
+      AND DebtorCode = ?
+  `).get(debtorCode) as { return_count: number; unresolved: number };
+  return {
+    return_count: row?.return_count ?? 0,
+    unresolved: Math.max(0, row?.unresolved ?? 0),
+  };
+}
+
+// ─── Customer Return Trend (last 12 months from ref date) ────────────────
+
+export interface CustomerReturnTrendRow {
+  month: string;
+  count: number;
+  value: number;
+}
+
+export function getCustomerReturnTrend(debtorCode: string): CustomerReturnTrendRow[] {
+  const db = getDb();
+  // Generate last 12 months and left-join to fill gaps with zeroes
+  return db.prepare(`
+    WITH months AS (
+      SELECT strftime('%Y-%m', DATE('now', '+8 hours', '-' || m || ' months')) AS month
+      FROM (SELECT 11 AS m UNION ALL SELECT 10 UNION ALL SELECT 9
+            UNION ALL SELECT 8 UNION ALL SELECT 7 UNION ALL SELECT 6
+            UNION ALL SELECT 5 UNION ALL SELECT 4 UNION ALL SELECT 3
+            UNION ALL SELECT 2 UNION ALL SELECT 1 UNION ALL SELECT 0)
+    ),
+    returns AS (
+      SELECT
+        strftime('%Y-%m', DocDate, '+8 hours') AS month,
+        COUNT(*) AS count,
+        COALESCE(SUM(LocalNetTotal), 0) AS value
+      FROM arcn
+      WHERE (Cancelled = 'F' OR Cancelled IS NULL) AND CNType = 'RETURN'
+        AND DebtorCode = ?
+        AND DATE(DocDate, '+8 hours') >= DATE('now', '+8 hours', '-12 months')
+      GROUP BY month
+    )
+    SELECT m.month, COALESCE(r.count, 0) AS count, COALESCE(r.value, 0) AS value
+    FROM months m
+    LEFT JOIN returns r ON r.month = m.month
+    ORDER BY m.month
+  `).all(debtorCode) as CustomerReturnTrendRow[];
+}
+
 export function getReturnDateBounds(): { min_date: string; max_date: string } {
   const db = getDb();
   return db.prepare(`

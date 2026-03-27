@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { useDsoTrendV2 } from '@/hooks/payment/usePaymentDataV2';
+import { useStableData } from '@/hooks/useStableData';
 import type { DashboardFiltersV2 } from '@/hooks/payment/useDashboardFiltersV2';
 import {
   ComposedChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine,
@@ -13,7 +14,8 @@ interface DsoTrendChartV2Props {
 }
 
 export default function DsoTrendChartV2({ filters }: DsoTrendChartV2Props) {
-  const { data, isLoading } = useDsoTrendV2(filters);
+  const { data: rawData } = useDsoTrendV2(filters);
+  const data = useStableData(rawData);
 
   const avgDso = useMemo(() => {
     if (!data || data.length === 0) return null;
@@ -29,7 +31,7 @@ export default function DsoTrendChartV2({ filters }: DsoTrendChartV2Props) {
         <CardTitle>DSO Trend</CardTitle>
       </CardHeader>
       <CardContent>
-        {isLoading || !data ? (
+        {!data ? (
           <div className="h-[300px] animate-pulse rounded bg-muted" />
         ) : (
           <ResponsiveContainer width="100%" height={300}>
@@ -40,6 +42,7 @@ export default function DsoTrendChartV2({ filters }: DsoTrendChartV2Props) {
                 label={{ value: 'Days', angle: -90, position: 'insideLeft', style: { fontSize: 11 } }}
               />
               <Tooltip
+                wrapperStyle={{ zIndex: 50 }}
                 formatter={(value) => [
                   value != null ? `${Number(value).toFixed(1)} days` : '--',
                   'DSO',

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useTopExpenses } from '@/hooks/expenses/useCostData';
+import { useStableData } from '@/hooks/useStableData';
 import type { DashboardFilters } from '@/hooks/expenses/useDashboardFilters';
 import {
   BarChart,
@@ -76,12 +77,13 @@ export function TopExpensesChart({ filters }: { filters: DashboardFilters }) {
   const [direction, setDirection] = useState<Direction>('top');
 
   const order = direction === 'top' ? 'desc' : 'asc';
-  const { data, isLoading } = useTopExpenses(filters, costType, order);
+  const { data: rawData } = useTopExpenses(filters, costType, order);
+  const data = useStableData(rawData);
 
   const dirLabel = direction === 'top' ? 'Top' : 'Bottom';
   const title = `${dirLabel} 10 Expenses`;
 
-  if (isLoading || !data) {
+  if (!data) {
     return (
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-2 px-4">
@@ -178,7 +180,7 @@ export function TopExpensesChart({ filters }: { filters: DashboardFilters }) {
                 tick={{ fontSize: 11, fill: '#1f2937' }}
                 tickLine={false}
               />
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip wrapperStyle={{ zIndex: 50 }} content={<CustomTooltip />} />
               <Bar dataKey="net_cost" name="Net Cost" radius={[0, 4, 4, 0]}>
                 {chartData.map((entry: { cost_type: string }, idx: number) => (
                   <Cell

@@ -1,18 +1,21 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { useAllCustomerReturnsAll, useCustomerReturnDetailsAll } from '@/hooks/return/useCreditDataV2';
+import { useAllCustomerReturnsAll } from '@/hooks/return/useCreditDataV2';
+import { useStableData } from '@/hooks/useStableData';
 import type { TopDebtorRow } from '@/lib/return/queries-v2';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardAction } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { formatRM, formatCount } from '@/lib/format';
+import { CustomerProfileModal } from '@/components/profiles/CustomerProfileModal';
 
 // ─── Sort helpers ────────────────────────────────────────────────────────────
 
-type SortKey = 'company_name' | 'return_count' | 'total_return_value' | 'total_knocked_off' | 'total_refunded' | 'unresolved';
+type SortKey = 'debtor_code' | 'company_name' | 'return_count' | 'total_return_value' | 'total_knocked_off' | 'total_refunded' | 'unresolved';
 type SortDir = 'asc' | 'desc';
 
 const PAGE_SIZE = 20;
@@ -51,86 +54,46 @@ function UnresolvedCell({ unresolved, knockedOff, refunded, className = '' }: {
   return <span className={`text-red-600 ${className}`}>{formatRM(unresolved)}</span>;
 }
 
-// ─── Detail rows (expanded) ─────────────────────────────────────────────────
-
-function CustomerDetailRows({ debtorCode }: { debtorCode: string }) {
-  const { data, isLoading } = useCustomerReturnDetailsAll(debtorCode);
-
-  if (isLoading) {
-    return (
-      <TableRow>
-        <TableCell colSpan={7} className="bg-muted/30">
-          <div className="py-3 text-xs text-muted-foreground text-center">Loading returns...</div>
-        </TableCell>
-      </TableRow>
-    );
-  }
-
-  if (!data || data.length === 0) {
-    return (
-      <TableRow>
-        <TableCell colSpan={7} className="bg-muted/30">
-          <div className="py-3 text-xs text-muted-foreground text-center">No return records found.</div>
-        </TableCell>
-      </TableRow>
-    );
-  }
-
-  return (
-    <>
-      {/* Sub-header */}
-      <TableRow className="bg-muted/40">
-        <TableCell className="text-[11px] font-semibold text-muted-foreground pl-10">Doc No</TableCell>
-        <TableCell className="text-[11px] font-semibold text-muted-foreground">Date</TableCell>
-        <TableCell className="text-[11px] font-semibold text-muted-foreground text-right">Amount</TableCell>
-        <TableCell className="text-[11px] font-semibold text-muted-foreground text-right">Knocked Off</TableCell>
-        <TableCell className="text-[11px] font-semibold text-muted-foreground text-right">Refunded</TableCell>
-        <TableCell className="text-[11px] font-semibold text-muted-foreground text-right">Unresolved</TableCell>
-        <TableCell className="text-[11px] font-semibold text-muted-foreground">Reason</TableCell>
-      </TableRow>
-      {data.map((row) => (
-        <TableRow key={row.doc_key} className="bg-muted/20 hover:bg-muted/30">
-          <TableCell className="text-xs pl-10 font-mono">{row.doc_no}</TableCell>
-          <TableCell className="text-xs">{row.doc_date}</TableCell>
-          <TableCell className="text-xs text-right">{formatRM(row.net_total)}</TableCell>
-          <TableCell className="text-xs text-right">
-            {row.knocked_off > 0 ? formatRM(row.knocked_off) : '—'}
-          </TableCell>
-          <TableCell className="text-xs text-right">
-            {row.refunded > 0 ? (
-              <span className="text-blue-600">{formatRM(row.refunded)}</span>
-            ) : '—'}
-          </TableCell>
-          <TableCell className="text-xs text-right">
-            <UnresolvedCell
-              unresolved={row.unresolved}
-              knockedOff={row.knocked_off}
-              refunded={row.refunded}
-              className="text-xs"
-            />
-          </TableCell>
-          <TableCell className="text-xs max-w-[180px] truncate" title={row.reason}>
-            {row.reason || '—'}
-          </TableCell>
-        </TableRow>
-      ))}
-    </>
-  );
-}
-
 // ─── Main table ─────────────────────────────────────────────────────────────
 
+type StatusFilter = 'outstanding' | 'all';
+
 export function TopDebtorsTable() {
-  const { data, isLoading } = useAllCustomerReturnsAll();
-  const [sortKey, setSortKey] = useState<SortKey>('total_return_value');
+  const { data: rawData } = useAllCustomerReturnsAll();
+  const data = useStableData(rawData);
+  const [sortKey, setSortKey] = useState<SortKey>('unresolved');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
-  const [expandedCode, setExpandedCode] = useState<string | null>(null);
   const [page, setPage] = useState(1);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('outstanding');
+  const [selectedCustomer, setSelectedCustomer] = useState<TopDebtorRow | null>(null);
+
+  const textColumns: SortKey[] = ['debtor_code', 'company_name'];
+
+  const filtered = useMemo(() => {
+    if (!data) return [];
+    let rows = data;
+
+    // Status filter
+    if (statusFilter === 'outstanding') {
+      rows = rows.filter(r => r.unresolved > 0.01);
+    }
+
+    // Search filter
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      rows = rows.filter(r =>
+        r.debtor_code.toLowerCase().includes(q) ||
+        r.company_name.toLowerCase().includes(q)
+      );
+    }
+
+    return rows;
+  }, [data, statusFilter, search]);
 
   const sorted = useMemo(() => {
-    if (!data) return [];
-    return sortData(data, sortKey, sortDir);
-  }, [data, sortKey, sortDir]);
+    return sortData(filtered, sortKey, sortDir);
+  }, [filtered, sortKey, sortDir]);
 
   const totalPages = Math.ceil(sorted.length / PAGE_SIZE);
   const paged = sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -140,22 +103,12 @@ export function TopDebtorsTable() {
       setSortDir(d => d === 'asc' ? 'desc' : 'asc');
     } else {
       setSortKey(key);
-      setSortDir(key === 'company_name' ? 'asc' : 'desc');
+      setSortDir(textColumns.includes(key) ? 'asc' : 'desc');
     }
     setPage(1);
-    setExpandedCode(null);
   }
 
-  function toggleExpand(code: string) {
-    setExpandedCode(prev => prev === code ? null : code);
-  }
-
-  function goToPage(p: number) {
-    setPage(p);
-    setExpandedCode(null);
-  }
-
-  if (isLoading || !data) {
+  if (!data) {
     return (
       <Card>
         <CardHeader className="pb-2"><CardTitle className="text-sm">Customer Returns</CardTitle></CardHeader>
@@ -164,20 +117,8 @@ export function TopDebtorsTable() {
     );
   }
 
-  if (data.length === 0) {
-    return (
-      <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-sm">Customer Returns</CardTitle></CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground py-8 text-center">
-            No return credit notes found.
-          </p>
-        </CardContent>
-      </Card>
-    );
-  }
-
   const columns: { key: SortKey; label: string; align?: 'right' }[] = [
+    { key: 'debtor_code', label: 'Code' },
     { key: 'company_name', label: 'Customer' },
     { key: 'return_count', label: 'Returns', align: 'right' },
     { key: 'total_return_value', label: 'Total Value', align: 'right' },
@@ -188,118 +129,133 @@ export function TopDebtorsTable() {
 
   return (
     <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm">Customer Returns</CardTitle>
-        <p className="text-xs text-muted-foreground">
-          {formatCount(data.length)} customers &middot; Click a row to expand return breakdown
-        </p>
+      <CardHeader>
+        <div>
+          <CardTitle className="text-sm">Customer Returns</CardTitle>
+          <p className="text-xs text-muted-foreground">
+            {formatCount(sorted.length)} customers
+            {statusFilter === 'outstanding' && data.length > 0 && (
+              <> of {formatCount(data.length)} total</>
+            )}
+          </p>
+        </div>
+        <CardAction>
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              placeholder="Search by code or name..."
+              value={search}
+              onChange={e => { setSearch(e.target.value); setPage(1); }}
+              className="h-7 w-48 rounded-md border border-input bg-transparent px-2 text-sm"
+            />
+            <Select
+              value={statusFilter}
+              onValueChange={val => { setStatusFilter(val as StatusFilter); setPage(1); }}
+            >
+              <SelectTrigger size="sm" className="w-[150px]">
+                <SelectValue>{statusFilter === 'outstanding' ? 'Unresolved Only' : 'All Returns'}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="outstanding">Unresolved Only</SelectItem>
+                <SelectItem value="all">All Returns</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardAction>
       </CardHeader>
       <CardContent className="p-0">
-        <div className="border-t">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-8" />
-                {columns.map(col => (
-                  <TableHead
-                    key={col.key}
-                    className={`cursor-pointer select-none hover:bg-muted/50 ${col.align === 'right' ? 'text-right' : ''}`}
-                    onClick={() => toggleSort(col.key)}
-                  >
-                    {col.label}
-                    <SortIcon active={sortKey === col.key} dir={sortDir} />
-                  </TableHead>
-                ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {paged.map((row) => {
-                const isExpanded = expandedCode === row.debtor_code;
-                return (
-                  <CustomerRow
-                    key={row.debtor_code}
-                    row={row}
-                    isExpanded={isExpanded}
-                    onToggle={() => toggleExpand(row.debtor_code)}
-                  />
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
-
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t">
-            <p className="text-xs text-muted-foreground">
-              Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, sorted.length)} of {formatCount(sorted.length)}
-            </p>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => goToPage(page - 1)}
-                disabled={page === 1}
-              >
-                Prev
-              </Button>
-              <span className="text-xs text-muted-foreground">
-                Page {page} of {totalPages}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => goToPage(page + 1)}
-                disabled={page === totalPages}
-              >
-                Next
-              </Button>
+        {sorted.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-8 text-center">
+            {search ? 'No matching customers found.' : 'No outstanding returns.'}
+          </p>
+        ) : (
+          <>
+            <div className="border-t">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    {columns.map(col => (
+                      <TableHead
+                        key={col.key}
+                        className={`cursor-pointer select-none hover:bg-muted/50 ${col.align === 'right' ? 'text-right' : ''}`}
+                        onClick={() => toggleSort(col.key)}
+                      >
+                        {col.label}
+                        <SortIcon active={sortKey === col.key} dir={sortDir} />
+                      </TableHead>
+                    ))}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paged.map((row) => (
+                    <TableRow key={row.debtor_code}>
+                      <TableCell className="font-mono text-xs">{row.debtor_code}</TableCell>
+                      <TableCell className="font-medium max-w-[220px] truncate" title={row.company_name}>
+                        <button className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer" onClick={() => setSelectedCustomer(row)}>{row.company_name}</button>
+                      </TableCell>
+                      <TableCell className="text-right">{formatCount(row.return_count)}</TableCell>
+                      <TableCell className="text-right">{formatRM(row.total_return_value)}</TableCell>
+                      <TableCell className="text-right">{formatRM(row.total_knocked_off)}</TableCell>
+                      <TableCell className="text-right">
+                        {row.total_refunded > 0 ? (
+                          <span className="text-blue-600">{formatRM(row.total_refunded)}</span>
+                        ) : '—'}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <UnresolvedCell
+                          unresolved={row.unresolved}
+                          knockedOff={row.total_knocked_off}
+                          refunded={row.total_refunded}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </div>
-          </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between px-4 py-3 border-t">
+                <p className="text-xs text-muted-foreground">
+                  Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, sorted.length)} of {formatCount(sorted.length)}
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => { setPage(p => p - 1); }}
+                    disabled={page === 1}
+                  >
+                    Prev
+                  </Button>
+                  <span className="text-xs text-muted-foreground">
+                    Page {page} of {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => { setPage(p => p + 1); }}
+                    disabled={page === totalPages}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </CardContent>
+
+      {selectedCustomer && (
+        <CustomerProfileModal
+          open={!!selectedCustomer}
+          onClose={() => setSelectedCustomer(null)}
+          debtorCode={selectedCustomer.debtor_code}
+          companyName={selectedCustomer.company_name}
+          defaultTab="returns"
+        />
+      )}
     </Card>
-  );
-}
-
-// ─── Customer row + expansion ───────────────────────────────────────────────
-
-function CustomerRow({
-  row, isExpanded, onToggle,
-}: {
-  row: TopDebtorRow;
-  isExpanded: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <>
-      <TableRow
-        className="cursor-pointer hover:bg-muted/40"
-        onClick={onToggle}
-      >
-        <TableCell className="w-8 text-center text-muted-foreground">
-          {isExpanded ? '▼' : '▶'}
-        </TableCell>
-        <TableCell className="font-medium max-w-[220px] truncate" title={row.company_name}>
-          {row.company_name}
-        </TableCell>
-        <TableCell className="text-right">{formatCount(row.return_count)}</TableCell>
-        <TableCell className="text-right">{formatRM(row.total_return_value)}</TableCell>
-        <TableCell className="text-right">{formatRM(row.total_knocked_off)}</TableCell>
-        <TableCell className="text-right">
-          {row.total_refunded > 0 ? (
-            <span className="text-blue-600">{formatRM(row.total_refunded)}</span>
-          ) : '—'}
-        </TableCell>
-        <TableCell className="text-right">
-          <UnresolvedCell
-            unresolved={row.unresolved}
-            knockedOff={row.total_knocked_off}
-            refunded={row.total_refunded}
-          />
-        </TableCell>
-      </TableRow>
-      {isExpanded && <CustomerDetailRows debtorCode={row.debtor_code} />}
-    </>
   );
 }

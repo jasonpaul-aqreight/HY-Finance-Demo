@@ -2,6 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useMarginByType } from '@/hooks/customer-margin/useMarginData';
+import { useStableData } from '@/hooks/useStableData';
 import type { MarginDashboardFilters } from '@/hooks/customer-margin/useDashboardFilters';
 import { formatRM } from '@/lib/customer-margin/format';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -11,7 +12,8 @@ interface Props {
 }
 
 export function MarginByTypeChart({ filters }: Props) {
-  const { data, isLoading } = useMarginByType(filters);
+  const { data: rawData } = useMarginByType(filters);
+  const data = useStableData(rawData);
 
   const chartData = (data ?? []).map(r => ({
     ...r,
@@ -24,7 +26,7 @@ export function MarginByTypeChart({ filters }: Props) {
         <CardTitle>Margin by Customer Type</CardTitle>
       </CardHeader>
       <CardContent>
-        {isLoading ? (
+        {!data ? (
           <div className="flex h-[320px] items-center justify-center text-muted-foreground">Loading...</div>
         ) : (
           <ResponsiveContainer width="100%" height={320}>
@@ -33,6 +35,7 @@ export function MarginByTypeChart({ filters }: Props) {
               <XAxis dataKey="label" tick={{ fontSize: 10 }} angle={-20} textAnchor="end" height={60} />
               <YAxis tickFormatter={v => `${v}%`} tick={{ fontSize: 11 }} />
               <Tooltip
+                wrapperStyle={{ zIndex: 50 }}
                 formatter={(v, name) => [
                   name === 'margin_pct' ? `${Number(v).toFixed(1)}%` : formatRM(Number(v)),
                   name === 'margin_pct' ? 'Margin %' : 'Revenue',

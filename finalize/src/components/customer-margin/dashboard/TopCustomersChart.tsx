@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useCustomerMargins } from '@/hooks/customer-margin/useMarginData';
+import { useStableData } from '@/hooks/useStableData';
 import type { MarginDashboardFilters } from '@/hooks/customer-margin/useDashboardFilters';
 import { formatRM } from '@/lib/customer-margin/format';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
@@ -27,10 +28,12 @@ export function TopCustomersChart({ filters }: Props) {
 
   const order = direction === 'lowest' ? 'asc' : 'desc';
 
-  const { data: profitData, isLoading: profitLoading } = useCustomerMargins(filters, 'gross_profit', order, 1, 10);
-  const { data: marginData, isLoading: marginLoading } = useCustomerMargins(filters, 'margin_pct', order, 1, 50);
+  const { data: rawProfitData } = useCustomerMargins(filters, 'gross_profit', order, 1, 10);
+  const profitData = useStableData(rawProfitData);
+  const { data: rawMarginData } = useCustomerMargins(filters, 'margin_pct', order, 1, 50);
+  const marginData = useStableData(rawMarginData);
 
-  const isLoading = metric === 'profit' ? profitLoading : marginLoading;
+  const isLoading = metric === 'profit' ? !profitData : !marginData;
 
   const chartData = metric === 'profit'
     ? (profitData?.rows ?? []).map(r => ({
@@ -110,6 +113,7 @@ export function TopCustomersChart({ filters }: Props) {
               />
               <YAxis type="category" dataKey="name" width={200} tick={{ fontSize: 11 }} />
               <Tooltip
+                wrapperStyle={{ zIndex: 50 }}
                 formatter={(v) => metric === 'profit' ? formatRM(Number(v)) : `${Number(v).toFixed(1)}%`}
                 labelStyle={{ fontWeight: 600 }}
               />

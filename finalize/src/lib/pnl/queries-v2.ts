@@ -1,5 +1,6 @@
 import { getDb } from './db';
 import { decodePeriod, encodePeriod, periodLabel, fyNameToNumber, fyToPeriodRange, fyPeriods } from './period-utils';
+import { getExpenseCategory, CATEGORY_ORDER } from '@/lib/shared/expense-categories';
 import type {
   V2KpiData,
   V2MonthlyRow,
@@ -239,11 +240,15 @@ export function getV2PLStatement(fy: string, projects?: string[]): V2StatementRe
   const { clause: projClause, params: projParams } = buildProjectFilter(projects);
 
   // Get account-level detail for all needed periods
+  // Group by ParentAccNo where available so child accounts roll up into their parent
   const accountRows = db.prepare(`
     SELECT
       gm.AccType,
-      gm.AccNo,
-      gm.Description,
+      COALESCE(gm.ParentAccNo, gm.AccNo) AS AccNo,
+      COALESCE(
+        (SELECT p.Description FROM gl_mast p WHERE p.AccNo = gm.ParentAccNo),
+        gm.Description
+      ) AS Description,
       pb.PeriodNo,
       plf.Seq,
       CASE
@@ -257,8 +262,8 @@ export function getV2PLStatement(fy: string, projects?: string[]): V2StatementRe
     WHERE at.IsBSType = 'F'
       AND pb.PeriodNo BETWEEN ? AND ?
       ${projClause}
-    GROUP BY gm.AccType, gm.AccNo, pb.PeriodNo, plf.CreditAsPositive
-    ORDER BY plf.Seq, gm.AccNo
+    GROUP BY gm.AccType, COALESCE(gm.ParentAccNo, gm.AccNo), pb.PeriodNo, plf.CreditAsPositive
+    ORDER BY plf.Seq, COALESCE(gm.ParentAccNo, gm.AccNo)
   `).all(priorFrom, fyTo, ...projParams) as {
     AccType: string; AccNo: string; Description: string;
     PeriodNo: number; Seq: number; net_amount: number;
@@ -279,10 +284,18 @@ export function getV2PLStatement(fy: string, projects?: string[]): V2StatementRe
 
   const accMap: Record<string, AccData> = {};
   for (const r of accountRows) {
-    const key = r.AccNo;
+    // Layer 3: For expenses (EP), group by expense category instead of individual account
+    let key = r.AccNo;
+    let description = r.Description;
+    if (r.AccType === 'EP') {
+      const category = getExpenseCategory(r.AccNo);
+      key = `CAT:${category}`;
+      description = category;
+    }
+
     if (!accMap[key]) {
       accMap[key] = {
-        accno: r.AccNo, description: r.Description, accType: r.AccType, seq: r.Seq,
+        accno: key, description, accType: r.AccType, seq: r.Seq,
         current_month: 0, prev_month: 0, ytd: 0, prior_ytd: 0, monthly: zeros(),
       };
     }
@@ -310,7 +323,15 @@ export function getV2PLStatement(fy: string, projects?: string[]): V2StatementRe
     const accounts: V2StatementAccount[] = Object.values(accMap)
       .filter(a => a.accType === fmt.AccType)
       .filter(a => a.current_month !== 0 || a.prev_month !== 0 || a.ytd !== 0 || a.prior_ytd !== 0)
-      .sort((a, b) => a.accno.localeCompare(b.accno))
+      .sort((a, b) => {
+        // For EP categories, sort by defined category order
+        if (a.accType === 'EP' && a.accno.startsWith('CAT:')) {
+          const ai = CATEGORY_ORDER.indexOf(a.description);
+          const bi = CATEGORY_ORDER.indexOf(b.description);
+          return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+        }
+        return a.accno.localeCompare(b.accno);
+      })
       .map(a => ({
         accno: a.accno,
         description: a.description,

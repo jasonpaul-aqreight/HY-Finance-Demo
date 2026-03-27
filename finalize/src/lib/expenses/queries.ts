@@ -1,5 +1,6 @@
 import { getDb } from './db';
 import { getPreviousPeriod } from './date-utils';
+import { buildCategoryCaseSQL } from '@/lib/shared/expense-categories';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -45,53 +46,16 @@ export interface FiscalYearRow {
 }
 
 // ─── Reusable cost category CASE expression ──────────────────────────────────
-// Maps GL accounts (from GLMast.csv AccType) into dashboard categories.
-//
-// Source data:
-//   AccType='CO' → COGS  (16 accounts: 600-0000 … 621-0000)
-//   AccType='EP' → OPEX  (167 accounts: 900-xxxx)
-//
-// OPEX sub-grouping (hardcoded by account number pattern):
-//   Payroll                    → S001, S101-S113, D102-D121, W001/W101/W102, S801-S803
-//   Electricity & Water        → E001
-//   Packaging Materials         → P005
-//   Fuel                        → D001, P002, P100-P119
-//   Rental                      → R200-R243
-//   Repair & Maintenance        → R300-R304
-//   Vehicle & Equipment Upkeep  → U001, U100-U120, U200-U207 (vehicles + machinery)
-//   Depreciation                → D003
-//   Insurance                   → F002, F004, I001, I003, I004
-//   Finance Costs               → T003, H001, L001, B001, B002, B003
-//   Other OPEX                  → everything else
-//
-// Updated 2026-03-17.
+// Generated from shared/expense-categories.ts using COALESCE(ParentAccNo, AccNo)
+// so that child accounts automatically inherit their parent's category.
+// Updated 2026-03-27.
+
+const OPEX_CATEGORY_CASE = buildCategoryCaseSQL('gm');
 
 const COST_CATEGORY_CASE = `
   CASE
     WHEN gm.AccType = 'CO' THEN 'COGS'
-    WHEN gm.AccNo = '900-S001'
-      OR gm.AccNo BETWEEN '900-S101' AND '900-S113'
-      OR gm.AccNo IN ('900-W001','900-W101','900-W102')
-      OR gm.AccNo BETWEEN '900-D102' AND '900-D121'
-      OR gm.AccNo BETWEEN '900-S801' AND '900-S803'
-      THEN 'Payroll'
-    WHEN gm.AccNo = '900-E001' THEN 'Electricity & Water'
-    WHEN gm.AccNo = '900-P005' THEN 'Packaging Materials'
-    WHEN gm.AccNo IN ('900-D001','900-P002')
-      OR gm.AccNo LIKE '900-P1%' THEN 'Fuel'
-    WHEN gm.AccNo BETWEEN '900-R200' AND '900-R243' THEN 'Rental'
-    WHEN gm.AccNo BETWEEN '900-R300' AND '900-R304'
-      THEN 'Repair & Maintenance'
-    WHEN gm.AccNo = '900-U001'
-      OR gm.AccNo BETWEEN '900-U100' AND '900-U120'
-      OR gm.AccNo BETWEEN '900-U200' AND '900-U207'
-      THEN 'Vehicle & Equipment Upkeep'
-    WHEN gm.AccNo = '900-D003' THEN 'Depreciation'
-    WHEN gm.AccNo IN ('900-F002','900-F004','900-I001','900-I003','900-I004')
-      THEN 'Insurance'
-    WHEN gm.AccNo IN ('900-T003','900-H001','900-L001','900-B001','900-B002','900-B003')
-      THEN 'Finance Costs'
-    ELSE 'Other OPEX'
+    ELSE (${OPEX_CATEGORY_CASE})
   END
 `;
 

@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
 import { useCreditNoteImpact } from '@/hooks/customer-margin/useMarginData';
+import { useStableData } from '@/hooks/useStableData';
 import type { MarginDashboardFilters } from '@/hooks/customer-margin/useDashboardFilters';
 import { formatRM, formatMarginPct } from '@/lib/customer-margin/format';
 
@@ -15,7 +16,8 @@ interface Props {
 const PAGE_SIZE = 20;
 
 export function CreditNoteImpactTable({ filters }: Props) {
-  const { data, isLoading } = useCreditNoteImpact(filters);
+  const { data: rawData } = useCreditNoteImpact(filters);
+  const data = useStableData(rawData);
   const [page, setPage] = useState(1);
 
   const allRows = data ?? [];
@@ -28,7 +30,7 @@ export function CreditNoteImpactTable({ filters }: Props) {
         <CardTitle>Credit Note Impact on Margins</CardTitle>
       </CardHeader>
       <CardContent>
-        {isLoading ? (
+        {!data ? (
           <div className="flex h-40 items-center justify-center text-muted-foreground">Loading...</div>
         ) : (
           <>

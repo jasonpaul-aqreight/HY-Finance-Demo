@@ -1,7 +1,6 @@
 'use client';
 
-import { useRouter, useSearchParams, usePathname } from 'next/navigation';
-import { useCallback, useMemo, useTransition } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import useSWR from 'swr';
 import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns';
 
@@ -17,59 +16,50 @@ export interface MarginDashboardFilters {
 const fetcher = (url: string) => fetch(url).then(r => r.json());
 
 export function useDashboardFilters() {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const [, startTransition] = useTransition();
-
   const { data: bounds } = useSWR<{ min_date: string; max_date: string }>(
     '/api/customer-margin/margin/date-bounds',
     fetcher,
     { revalidateOnFocus: false }
   );
 
-  const defaults = useMemo(() => {
-    const endDate = endOfMonth(bounds?.max_date ? new Date(bounds.max_date) : new Date());
-    const startDate = startOfMonth(subMonths(endDate, 11)); // 12 months inclusive
-    return { start: format(startDate, 'yyyy-MM-dd'), end: format(endDate, 'yyyy-MM-dd') };
-  }, [bounds]);
+  const [filters, setFiltersState] = useState<MarginDashboardFilters | null>(null);
 
-  const filters: MarginDashboardFilters = useMemo(() => ({
-    startDate: searchParams.get('start') ?? defaults.start,
-    endDate: searchParams.get('end') ?? defaults.end,
-    customers: searchParams.getAll('customer'),
-    types: searchParams.getAll('type'),
-    agents: searchParams.getAll('agent'),
-    productGroups: searchParams.getAll('group'),
-  }), [searchParams, defaults.start, defaults.end]);
+  // Initialize filters once bounds arrive
+  useEffect(() => {
+    if (bounds && !filters) {
+      const endDate = endOfMonth(new Date(bounds.max_date));
+      const startDate = startOfMonth(subMonths(endDate, 11));
+      setFiltersState({
+        startDate: format(startDate, 'yyyy-MM-dd'),
+        endDate: format(endDate, 'yyyy-MM-dd'),
+        customers: [],
+        types: [],
+        agents: [],
+        productGroups: [],
+      });
+    }
+  }, [bounds, filters]);
 
   const setFilters = useCallback((updates: Partial<MarginDashboardFilters>) => {
-    const params = new URLSearchParams(searchParams.toString());
-    if (updates.startDate !== undefined) params.set('start', updates.startDate);
-    if (updates.endDate !== undefined) params.set('end', updates.endDate);
-    if (updates.customers !== undefined) {
-      params.delete('customer');
-      for (const c of updates.customers) params.append('customer', c);
-    }
-    if (updates.types !== undefined) {
-      params.delete('type');
-      for (const t of updates.types) params.append('type', t);
-    }
-    if (updates.agents !== undefined) {
-      params.delete('agent');
-      for (const a of updates.agents) params.append('agent', a);
-    }
-    if (updates.productGroups !== undefined) {
-      params.delete('group');
-      for (const g of updates.productGroups) params.append('group', g);
-    }
-    startTransition(() => {
-      router.push(`${pathname}?${params.toString()}`, { scroll: false });
+    setFiltersState(prev => {
+      if (!prev) return prev;
+      return { ...prev, ...updates };
     });
-  }, [router, pathname, searchParams, startTransition]);
+  }, []);
 
-  const hasUrlDates = searchParams.has('start') && searchParams.has('end');
-  const ready = hasUrlDates || !!bounds;
+  const ready = !!filters;
 
-  return { filters, setFilters, ready, bounds };
+  return {
+    filters: filters ?? {
+      startDate: '',
+      endDate: '',
+      customers: [],
+      types: [],
+      agents: [],
+      productGroups: [],
+    },
+    setFilters,
+    ready,
+    bounds,
+  };
 }

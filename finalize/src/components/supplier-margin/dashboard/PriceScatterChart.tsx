@@ -14,6 +14,7 @@ import {
   ZAxis,
 } from 'recharts';
 import { usePriceSpread } from '@/hooks/supplier-margin/useMarginData';
+import { useStableData } from '@/hooks/useStableData';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { DashboardFilters } from '@/hooks/supplier-margin/useDashboardFilters';
 
@@ -171,7 +172,8 @@ function MultiSelectCombo<T extends { key: string; label: string; sub?: string }
 type MarginView = 'all' | 'outliers';
 
 export function PriceScatterChart({ filters }: { filters: DashboardFilters }) {
-  const { data: raw, isLoading } = usePriceSpread(filters);
+  const { data: rawRaw } = usePriceSpread(filters);
+  const raw = useStableData(rawRaw);
   const [pinnedPoint, setPinnedPoint] = useState<ScatterPoint | null>(null);
   const [selectedSuppliers, setSelectedSuppliers] = useState<string[]>([]);
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
@@ -388,7 +390,7 @@ export function PriceScatterChart({ filters }: { filters: DashboardFilters }) {
         </div>
       </CardHeader>
       <CardContent>
-        {isLoading ? (
+        {!raw ? (
           <div className="h-[600px] flex items-center justify-center text-muted-foreground">Loading...</div>
         ) : filteredPoints.length === 0 ? (
           <div className="h-[600px] flex items-center justify-center text-muted-foreground">
@@ -441,6 +443,7 @@ export function PriceScatterChart({ filters }: { filters: DashboardFilters }) {
               {/* Hide hover tooltip when a point is pinned */}
               {!pinnedPoint && (
                 <Tooltip
+                  wrapperStyle={{ zIndex: 50 }}
                   content={({ active, payload }) => {
                     if (!active || !payload?.length) return null;
                     const p = payload[0].payload as ScatterPoint;
