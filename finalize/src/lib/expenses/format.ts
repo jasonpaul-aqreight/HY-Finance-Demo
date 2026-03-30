@@ -30,17 +30,19 @@ const TYPE_COLORS: Record<string, string> = {
 };
 
 const OPEX_SUBCATEGORY_COLORS: Record<string, string> = {
-  'Payroll': '#F97316',
-  'Electricity & Water': '#EAB308',
-  'Packaging Materials': '#22C55E',
-  'Fuel': '#EF4444',
-  'Rental': '#A855F7',
-  'Repair & Maintenance': '#06B6D4',
-  'Vehicle & Equipment Upkeep': '#EC4899',
-  'Depreciation': '#78716C',
-  'Insurance': '#0EA5E9',
-  'Finance Costs': '#F43F5E',
-  'Other OPEX': '#6B7280',
+  'People & Payroll': '#2563EB',
+  'Depreciation': '#E11D48',
+  'Property & Utilities': '#16A34A',
+  'Vehicle & Transport': '#D97706',
+  'Office & Supplies': '#7C3AED',
+  'Finance & Banking': '#0891B2',
+  'Insurance': '#DB2777',
+  'Other': '#EA580C',
+  'Equipment & IT': '#4F46E5',
+  'Professional Fees': '#0D9488',
+  'Marketing & Entertainment': '#B91C1C',
+  'Tax & Compliance': '#CA8A04',
+  'Repair & Maintenance': '#15803D',
 };
 
 // Distinct high-contrast palette for COGS account breakdown

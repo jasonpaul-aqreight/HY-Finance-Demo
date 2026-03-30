@@ -58,20 +58,20 @@ export function KpiCards({ filters }: { filters: DashboardFilters }) {
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
       <KpiCard
-        title="Gross Sales"
+        title="Est. Gross Sales"
         value={formatRM(current.revenue)}
         formula="IV + CS (excl. credit notes)"
       />
       <KpiCard
-        title="Purchase Cost"
+        title="Est. Cost of Sales"
         value={formatRM(current.cogs)}
         formula="Avg purchase price × sold qty"
       />
       <KpiCard
-        title="Gross Profit"
+        title="Est. Gross Profit"
         value={formatRM(current.profit)}
         valueColor={current.profit >= 0 ? 'text-emerald-600' : 'text-red-600'}
-        formula="Gross Sales − Purchase Cost"
+        formula="Est. Gross Sales − Est. Cost of Sales"
       />
       <KpiCard
         title="Overall Margin"

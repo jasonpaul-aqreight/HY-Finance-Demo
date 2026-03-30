@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import { useCostTrend } from '@/hooks/expenses/useCostData';
 import { useStableData } from '@/hooks/useStableData';
 import type { DashboardFilters, Granularity } from '@/hooks/expenses/useDashboardFilters';
@@ -65,9 +65,10 @@ function CustomTooltip({ active, payload, label }: {
 interface CostTrendChartProps {
   filters: DashboardFilters;
   setFilters: (updates: Partial<DashboardFilters>) => void;
+  onCategories?: (categories: string[]) => void;
 }
 
-export function CostTrendChart({ filters, setFilters }: CostTrendChartProps) {
+export function CostTrendChart({ filters, setFilters, onCategories }: CostTrendChartProps) {
   const { data: rawData } = useCostTrend(filters);
   const data = useStableData(rawData);
 
@@ -99,69 +100,64 @@ export function CostTrendChart({ filters, setFilters }: CostTrendChartProps) {
       .map(([cat]) => cat);
   }, [chartData]);
 
+  useEffect(() => {
+    onCategories?.(activeCategories);
+  }, [activeCategories, onCategories]);
+
   if (!data) {
     return (
-      <Card>
-        <CardHeader><CardTitle>Cost Trend</CardTitle></CardHeader>
-        <CardContent><div className="h-80 bg-muted animate-pulse rounded" /></CardContent>
-      </Card>
+      <div>
+        <div className="h-80 bg-muted animate-pulse rounded" />
+      </div>
     );
   }
 
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle>Cost Trend</CardTitle>
-            <p className="text-xs text-muted-foreground">Stacked by cost category</p>
-          </div>
-          <div className="flex border rounded-md overflow-hidden">
-            {(['daily', 'weekly', 'monthly'] as const).map((g) => (
-              <Button
-                key={g}
-                size="sm"
-                variant={filters.granularity === g ? 'default' : 'ghost'}
-                className="rounded-none border-0 text-xs px-3 h-7 capitalize"
-                onClick={() => setFilters({ granularity: g })}
-              >
-                {g}
-              </Button>
-            ))}
-          </div>
+    <div>
+      <div className="font-semibold text-sm pb-1">Cost Trend</div>
+      <div className="flex justify-center pb-2">
+        <div className="flex border rounded-md overflow-hidden">
+          {(['daily', 'weekly', 'monthly'] as const).map((g) => (
+            <Button
+              key={g}
+              size="sm"
+              variant={filters.granularity === g ? 'default' : 'ghost'}
+              className="rounded-none border-0 text-xs px-3 h-7 capitalize"
+              onClick={() => setFilters({ granularity: g })}
+            >
+              {g}
+            </Button>
+          ))}
         </div>
-      </CardHeader>
-      <CardContent>
-        <ResponsiveContainer width="100%" height={360}>
-          <BarChart data={chartData} margin={{ top: 8, right: 16, bottom: 8, left: 16 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-            <XAxis
-              dataKey="month"
-              tick={{ fontSize: 11 }}
-              tickLine={false}
-              interval="preserveStartEnd"
-              tickFormatter={(label: string) => formatXLabel(label, filters.granularity)}
+      </div>
+      <ResponsiveContainer width="100%" height={360}>
+        <BarChart data={chartData} margin={{ top: 8, right: 16, bottom: 8, left: 16 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+          <XAxis
+            dataKey="month"
+            tick={{ fontSize: 11 }}
+            tickLine={false}
+            interval="preserveStartEnd"
+            tickFormatter={(label: string) => formatXLabel(label, filters.granularity)}
+          />
+          <YAxis
+            tickFormatter={formatYAxis}
+            tick={{ fontSize: 11 }}
+            tickLine={false}
+            axisLine={false}
+          />
+          <Tooltip wrapperStyle={{ zIndex: 50 }} content={<CustomTooltip />} />
+          {activeCategories.map((cat, idx) => (
+            <Bar
+              key={cat}
+              dataKey={cat}
+              name={cat}
+              stackId="a"
+              fill={getCategoryColor(cat, filters.costType, idx)}
             />
-            <YAxis
-              tickFormatter={formatYAxis}
-              tick={{ fontSize: 11 }}
-              tickLine={false}
-              axisLine={false}
-            />
-            <Tooltip wrapperStyle={{ zIndex: 50 }} content={<CustomTooltip />} />
-            <Legend wrapperStyle={{ fontSize: 12 }} />
-            {activeCategories.map((cat, idx) => (
-              <Bar
-                key={cat}
-                dataKey={cat}
-                name={cat}
-                stackId="a"
-                fill={getCategoryColor(cat, filters.costType, idx)}
-              />
-            ))}
-          </BarChart>
-        </ResponsiveContainer>
-      </CardContent>
-    </Card>
+          ))}
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
   );
 }

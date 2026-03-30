@@ -27,10 +27,9 @@ export function CostCompositionChart({ filters }: { filters: DashboardFilters })
 
   if (!data) {
     return (
-      <Card>
-        <CardHeader><CardTitle>Cost Composition</CardTitle></CardHeader>
-        <CardContent><div className="h-64 bg-muted animate-pulse rounded" /></CardContent>
-      </Card>
+      <div>
+        <div className="h-64 bg-muted animate-pulse rounded" />
+      </div>
     );
   }
 
@@ -38,37 +37,31 @@ export function CostCompositionChart({ filters }: { filters: DashboardFilters })
   const total = pieData.reduce((s: number, d: { net_cost: number }) => s + d.net_cost, 0);
 
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle>Cost Composition</CardTitle>
-        <p className="text-sm text-muted-foreground">Total: {formatRM(total)}</p>
-      </CardHeader>
-      <CardContent>
-        <ResponsiveContainer width="100%" height={350}>
-          <PieChart>
-            <Pie
-              data={pieData}
-              cx="50%"
-              cy="50%"
-              innerRadius={60}
-              outerRadius={100}
-              dataKey="net_cost"
-              nameKey="category"
-              labelLine={false}
-              label={({ percent }: { percent?: number }) => `${((percent ?? 0) * 100).toFixed(1)}%`}
-            >
-              {pieData.map((entry: { category: string }, idx: number) => (
-                <Cell
-                  key={entry.category}
-                  fill={getCategoryColor(entry.category, filters.costType, idx)}
-                />
-              ))}
-            </Pie>
-            <Tooltip wrapperStyle={{ zIndex: 50 }} content={<CustomTooltip />} />
-            <Legend wrapperStyle={{ fontSize: 12 }} />
-          </PieChart>
-        </ResponsiveContainer>
-      </CardContent>
-    </Card>
+    <div>
+      <div className="font-semibold text-sm pb-2">Cost Composition</div>
+      <ResponsiveContainer width="100%" height={350}>
+        <PieChart>
+          <Pie
+            data={pieData}
+            cx="50%"
+            cy="50%"
+            innerRadius={60}
+            outerRadius={100}
+            dataKey="net_cost"
+            nameKey="category"
+            labelLine={false}
+            label={({ percent }: { percent?: number }) => `${((percent ?? 0) * 100).toFixed(1)}%`}
+          >
+            {pieData.map((entry: { category: string }, idx: number) => (
+              <Cell
+                key={entry.category}
+                fill={getCategoryColor(entry.category, filters.costType, idx)}
+              />
+            ))}
+          </Pie>
+          <Tooltip wrapperStyle={{ zIndex: 50 }} content={<CustomTooltip />} />
+        </PieChart>
+      </ResponsiveContainer>
+    </div>
   );
 }

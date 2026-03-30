@@ -4,11 +4,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useMarginDistribution } from '@/hooks/customer-margin/useMarginData';
 import { useStableData } from '@/hooks/useStableData';
 import type { MarginDashboardFilters } from '@/hooks/customer-margin/useDashboardFilters';
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 interface Props {
   filters: MarginDashboardFilters;
 }
+
+const BUCKET_ORDER = ['< 0%', '0-5%', '5-10%', '10-15%', '15-20%', '20-30%', '30%+'];
 
 const BUCKET_COLORS: Record<string, string> = {
   '< 0%': '#ef4444',
@@ -20,25 +22,16 @@ const BUCKET_COLORS: Record<string, string> = {
   '30%+': '#059669',
 };
 
-const RADIAN = Math.PI / 180;
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function renderLabel(props: any) {
-  const { cx, cy, midAngle, outerRadius, percent, bucket, count } = props;
-  if (percent < 0.03) return null;
-  const radius = outerRadius + 20;
-  const x = cx + radius * Math.cos(-midAngle * RADIAN);
-  const y = cy + radius * Math.sin(-midAngle * RADIAN);
-  return (
-    <text x={x} y={y} fill="currentColor" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" fontSize={11}>
-      {bucket} ({count})
-    </text>
-  );
-}
-
 export function MarginDistributionChart({ filters }: Props) {
   const { data: rawData } = useMarginDistribution(filters);
   const data = useStableData(rawData);
+
+  const chartData = BUCKET_ORDER.map((bucket) => {
+    const found = data?.find((d) => d.bucket === bucket);
+    return { bucket, count: found?.count ?? 0 };
+  });
+
+  const total = chartData.reduce((sum, d) => sum + d.count, 0);
 
   return (
     <Card>
@@ -50,25 +43,30 @@ export function MarginDistributionChart({ filters }: Props) {
           <div className="flex h-[320px] items-center justify-center text-muted-foreground">Loading...</div>
         ) : (
           <ResponsiveContainer width="100%" height={320}>
-            <PieChart>
-              <Pie
-                data={data ?? []}
-                cx="50%"
-                cy="50%"
-                innerRadius={55}
-                outerRadius={100}
-                dataKey="count"
-                nameKey="bucket"
-                labelLine={true}
-                label={renderLabel}
-              >
-                {(data ?? []).map((d, i) => (
-                  <Cell key={i} fill={BUCKET_COLORS[d.bucket] ?? '#6b7280'} />
+            <BarChart data={chartData} margin={{ top: 16, right: 12, left: -8, bottom: 4 }} barSize={36}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="bucket" tick={{ fontSize: 12 }} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
+              <Tooltip
+                wrapperStyle={{ zIndex: 50 }}
+                content={({ active, payload }) => {
+                  if (!active || !payload?.length) return null;
+                  const d = payload[0].payload;
+                  const pct = total > 0 ? ((d.count / total) * 100).toFixed(1) : '0';
+                  return (
+                    <div className="bg-background border rounded-lg shadow-lg p-3 text-sm">
+                      <p className="font-semibold">{d.bucket}</p>
+                      <p>{d.count} customers ({pct}%)</p>
+                    </div>
+                  );
+                }}
+              />
+              <Bar dataKey="count" radius={[4, 4, 0, 0]} label={{ position: 'top', fontSize: 11, fill: 'currentColor' }}>
+                {chartData.map((d) => (
+                  <Cell key={d.bucket} fill={BUCKET_COLORS[d.bucket] ?? '#6b7280'} />
                 ))}
-              </Pie>
-              <Tooltip wrapperStyle={{ zIndex: 50 }} formatter={(v) => [`${v} customers`, 'Count']} />
-              <Legend wrapperStyle={{ fontSize: 12 }} />
-            </PieChart>
+              </Bar>
+            </BarChart>
           </ResponsiveContainer>
         )}
       </CardContent>

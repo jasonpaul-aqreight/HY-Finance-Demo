@@ -1274,17 +1274,19 @@ export function getSupplierMarginDistributionV2(
       FROM supplier_items si
       JOIN item_sales ist ON si.ItemCode = ist.ItemCode
       JOIN item_total itp ON si.ItemCode = itp.ItemCode
+      JOIN creditor c ON si.CreditorCode = c.AccNo
+      WHERE c.IsActive = 'T'
       GROUP BY si.CreditorCode
-      HAVING rev >= 1000
     )
     SELECT
       CASE
-        WHEN (rev - cost) / NULLIF(rev, 0) * 100 < 0 THEN '< 0%'
-        WHEN (rev - cost) / NULLIF(rev, 0) * 100 < 5 THEN '0-5%'
-        WHEN (rev - cost) / NULLIF(rev, 0) * 100 < 10 THEN '5-10%'
-        WHEN (rev - cost) / NULLIF(rev, 0) * 100 < 15 THEN '10-15%'
-        WHEN (rev - cost) / NULLIF(rev, 0) * 100 < 20 THEN '15-20%'
-        WHEN (rev - cost) / NULLIF(rev, 0) * 100 < 30 THEN '20-30%'
+        WHEN rev IS NULL OR rev = 0 THEN '< 0%'
+        WHEN (rev - cost) / rev * 100 < 0 THEN '< 0%'
+        WHEN (rev - cost) / rev * 100 < 5 THEN '0-5%'
+        WHEN (rev - cost) / rev * 100 < 10 THEN '5-10%'
+        WHEN (rev - cost) / rev * 100 < 15 THEN '10-15%'
+        WHEN (rev - cost) / rev * 100 < 20 THEN '15-20%'
+        WHEN (rev - cost) / rev * 100 < 30 THEN '20-30%'
         ELSE '30%+'
       END AS bucket,
       COUNT(*) AS count

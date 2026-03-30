@@ -24,7 +24,6 @@ const MAX_SELECTED = 10;
 
 const GROUP_OPTIONS: { value: GroupByDimension; label: string }[] = [
   { value: 'customer', label: 'Customer' },
-  { value: 'customer-type', label: 'Customer Category' },
   { value: 'fruit', label: 'Fruit' },
   { value: 'agent', label: 'Sales Agent' },
   { value: 'outlet', label: 'Outlet' },
@@ -332,7 +331,15 @@ export function GroupBySection({ filters, setFilters }: GroupBySectionProps) {
                     className="text-xs h-6 px-2"
                     onClick={handleReset}
                   >
-                    Reset
+                    Top 10
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-xs h-6 px-2"
+                    onClick={() => setSelectedNames(new Set())}
+                  >
+                    Untick All
                   </Button>
                 </div>
                 <GroupByFilters

@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ChevronDownIcon, ChevronRightIcon } from 'lucide-react';
-import useSWR, { mutate } from 'swr';
+import useSWR, { mutate, useSWRConfig } from 'swr';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { useRole } from '@/components/layout/RoleProvider';
 
 const fetcher = (url: string) => fetch(url).then(r => r.json());
 
@@ -28,18 +29,18 @@ const DEFAULTS_V2: SettingsV2 = {
 // ─── Shared input ───────────────────────────────────────────────────────────
 
 function NumberInput({
-  label, value, onChange, suffix, min, max,
+  label, value, onChange, suffix, min, max, disabled,
 }: {
   label: string; value: number; onChange: (v: number) => void;
-  suffix?: string; min?: number; max?: number;
+  suffix?: string; min?: number; max?: number; disabled?: boolean;
 }) {
   return (
     <div>
       <label className="text-sm font-medium">{label}</label>
       <div className="mt-1 flex items-center gap-2">
         <input type="number" value={value} onChange={e => onChange(Number(e.target.value))}
-          min={min} max={max}
-          className="h-8 w-24 rounded-md border border-input bg-transparent px-2.5 text-sm" />
+          min={min} max={max} disabled={disabled}
+          className="h-8 w-24 rounded-md border border-input bg-transparent px-2.5 text-sm disabled:opacity-50 disabled:cursor-not-allowed" />
         {suffix && <span className="text-sm text-muted-foreground">{suffix}</span>}
       </div>
     </div>
@@ -204,6 +205,8 @@ interface SettingsDialogProps {
 }
 
 export function SettingsDialog({ open, onClose, onSaved }: SettingsDialogProps) {
+  const { isAdmin } = useRole();
+  const { cache } = useSWRConfig();
   const { data: serverSettings } = useSWR<Record<string, unknown>>(
     open ? '/api/payment/settings' : null,
     fetcher,
@@ -212,6 +215,18 @@ export function SettingsDialog({ open, onClose, onSaved }: SettingsDialogProps) 
   const [form, setForm] = useState<SettingsV2>(DEFAULTS_V2);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [fading, setFading] = useState(false);
+  const fadeTimer = useRef<ReturnType<typeof setTimeout>>();
+  const clearTimer = useRef<ReturnType<typeof setTimeout>>();
+
+  // Auto-dismiss success messages after 3 seconds with fade
+  useEffect(() => {
+    if (message?.type === 'success') {
+      fadeTimer.current = setTimeout(() => setFading(true), 3000);
+      clearTimer.current = setTimeout(() => { setMessage(null); setFading(false); }, 3500);
+    }
+    return () => { clearTimeout(fadeTimer.current); clearTimeout(clearTimer.current); };
+  }, [message]);
 
   useEffect(() => {
     if (serverSettings) {
@@ -234,7 +249,7 @@ export function SettingsDialog({ open, onClose, onSaved }: SettingsDialogProps) 
   }, [serverSettings]);
 
   // Reset message when dialog opens
-  useEffect(() => { if (open) setMessage(null); }, [open]);
+  useEffect(() => { if (open) { setMessage(null); setFading(false); } }, [open]);
 
   const weightSum =
     form.creditScoreWeights.utilization +
@@ -260,6 +275,12 @@ export function SettingsDialog({ open, onClose, onSaved }: SettingsDialogProps) 
       } else {
         setMessage({ type: 'success', text: 'Settings saved successfully' });
         mutate('/api/payment/settings');
+        // Revalidate all payment data caches so dashboard calculations refresh
+        for (const key of (cache as Map<string, unknown>).keys()) {
+          if (typeof key === 'string' && key.startsWith('/api/payment/')) {
+            mutate(key);
+          }
+        }
         onSaved?.();
       }
     } catch {
@@ -281,6 +302,12 @@ export function SettingsDialog({ open, onClose, onSaved }: SettingsDialogProps) 
           </p>
         </div>
 
+        {!isAdmin && (
+          <div className="rounded-md border border-yellow-300 bg-yellow-50 px-4 py-3 text-sm text-yellow-800">
+            You are viewing as a non-admin user. Only administrators can change these settings.
+          </div>
+        )}
+
         <div className="space-y-4">
           {/* ─── Section 1: Weights ─── */}
           <div className="rounded-lg border p-4">
@@ -291,25 +318,27 @@ export function SettingsDialog({ open, onClose, onSaved }: SettingsDialogProps) 
             <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-4">
               <NumberInput label="Credit Utilization" value={form.creditScoreWeights.utilization}
                 onChange={v => setForm(f => ({ ...f, creditScoreWeights: { ...f.creditScoreWeights, utilization: v } }))}
-                suffix="%" min={0} max={100} />
+                suffix="%" min={0} max={100} disabled={!isAdmin} />
               <NumberInput label="Overdue Days" value={form.creditScoreWeights.overdueDays}
                 onChange={v => setForm(f => ({ ...f, creditScoreWeights: { ...f.creditScoreWeights, overdueDays: v } }))}
-                suffix="%" min={0} max={100} />
+                suffix="%" min={0} max={100} disabled={!isAdmin} />
               <NumberInput label="Payment Timeliness" value={form.creditScoreWeights.timeliness}
                 onChange={v => setForm(f => ({ ...f, creditScoreWeights: { ...f.creditScoreWeights, timeliness: v } }))}
-                suffix="%" min={0} max={100} />
+                suffix="%" min={0} max={100} disabled={!isAdmin} />
               <NumberInput label="Double Breach" value={form.creditScoreWeights.doubleBreach}
                 onChange={v => setForm(f => ({ ...f, creditScoreWeights: { ...f.creditScoreWeights, doubleBreach: v } }))}
-                suffix="%" min={0} max={100} />
+                suffix="%" min={0} max={100} disabled={!isAdmin} />
             </div>
             <div className="mt-3 flex items-center justify-between">
               <p className={`text-sm font-medium ${weightSum === 100 ? 'text-emerald-600' : 'text-red-600'}`}>
                 Total: {weightSum}/100{weightSum !== 100 && ' — must equal 100'}
               </p>
+              {isAdmin && (
               <Button variant="outline" size="sm"
                 onClick={() => setForm(f => ({ ...f, creditScoreWeights: DEFAULTS_V2.creditScoreWeights }))}>
                 Reset to Defaults
               </Button>
+              )}
             </div>
           </div>
 
@@ -322,21 +351,23 @@ export function SettingsDialog({ open, onClose, onSaved }: SettingsDialogProps) 
             <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-4">
               <NumberInput label="Low Risk (score >=)" value={form.riskThresholds.low}
                 onChange={v => setForm(f => ({ ...f, riskThresholds: { ...f.riskThresholds, low: v } }))}
-                min={1} max={100} />
+                min={1} max={100} disabled={!isAdmin} />
               <NumberInput label="High Risk (score <=)" value={form.riskThresholds.high}
                 onChange={v => setForm(f => ({ ...f, riskThresholds: { ...f.riskThresholds, high: v } }))}
-                min={0} max={99} />
+                min={0} max={99} disabled={!isAdmin} />
             </div>
             {!thresholdsValid && (
               <p className="mt-2 text-sm font-medium text-red-600">Low Risk must be greater than High Risk</p>
             )}
             <RiskThresholdBar low={form.riskThresholds.low} high={form.riskThresholds.high} />
+            {isAdmin && (
             <div className="mt-3 flex justify-end">
               <Button variant="outline" size="sm"
                 onClick={() => setForm(f => ({ ...f, riskThresholds: DEFAULTS_V2.riskThresholds }))}>
                 Reset to Defaults
               </Button>
             </div>
+            )}
           </div>
 
           {/* ─── Section 3: How It Works ─── */}
@@ -346,15 +377,17 @@ export function SettingsDialog({ open, onClose, onSaved }: SettingsDialogProps) 
         {/* Footer */}
         <div className="flex items-center gap-3 border-t pt-3">
           {message && (
-            <p className={`flex-1 text-sm ${message.type === 'success' ? 'text-emerald-600' : 'text-red-600'}`}>
+            <p className={`flex-1 text-sm transition-opacity duration-500 ${fading ? 'opacity-0' : 'opacity-100'} ${message.type === 'success' ? 'text-emerald-600' : 'text-red-600'}`}>
               {message.text}
             </p>
           )}
           {!message && <div className="flex-1" />}
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button variant="outline" onClick={onClose}>{isAdmin ? 'Cancel' : 'Close'}</Button>
+          {isAdmin && (
           <Button onClick={handleSave} disabled={!isValid || saving}>
             {saving ? 'Saving...' : 'Save'}
           </Button>
+          )}
         </div>
       </DialogContent>
     </Dialog>

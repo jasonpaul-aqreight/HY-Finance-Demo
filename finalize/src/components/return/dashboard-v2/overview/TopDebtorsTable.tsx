@@ -11,7 +11,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { formatRM, formatCount } from '@/lib/format';
-import { CustomerProfileModal } from '@/components/profiles/CustomerProfileModal';
+import { CustomerProfileRevamp } from '@/components/profiles/CustomerProfileRevampPreview';
 
 // ─── Sort helpers ────────────────────────────────────────────────────────────
 
@@ -248,7 +248,7 @@ export function TopDebtorsTable() {
       </CardContent>
 
       {selectedCustomer && (
-        <CustomerProfileModal
+        <CustomerProfileRevamp
           open={!!selectedCustomer}
           onClose={() => setSelectedCustomer(null)}
           debtorCode={selectedCustomer.debtor_code}

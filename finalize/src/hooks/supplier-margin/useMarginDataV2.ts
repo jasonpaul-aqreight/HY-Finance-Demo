@@ -46,36 +46,36 @@ interface DimensionsResponse {
 
 export function useMarginSummaryV2(filters: DashboardFiltersV2) {
   const params = buildParams(filters);
-  return useSWR<MarginSummaryResponse>(`/api/supplier-margin/margin/v2/summary?${params}`, fetcher);
+  return useSWR<MarginSummaryResponse>(`/api/supplier-performance/margin/v2/summary?${params}`, fetcher);
 }
 
 export function useMarginTrendV2(filters: DashboardFiltersV2) {
   const params = buildParams(filters);
   params.set('granularity', filters.granularity);
   for (const s of filters.suppliers) params.append('supplier', s);
-  return useSWR<TrendRowV2[]>(`/api/supplier-margin/margin/v2/trend?${params}`, fetcher);
+  return useSWR<TrendRowV2[]>(`/api/supplier-performance/margin/v2/trend?${params}`, fetcher);
 }
 
 export function useTopBottomSuppliersV2(filters: DashboardFiltersV2) {
   const params = buildParams(filters);
-  return useSWR<TopBottomRowV2[]>(`/api/supplier-margin/margin/v2/top-bottom?${params}`, fetcher);
+  return useSWR<TopBottomRowV2[]>(`/api/supplier-performance/margin/v2/top-bottom?${params}`, fetcher);
 }
 
 export function useSupplierTableV2(filters: DashboardFiltersV2) {
   const params = buildParams(filters);
   for (const s of filters.suppliers) params.append('supplier', s);
-  return useSWR<SupplierTableRowV2[]>(`/api/supplier-margin/margin/v2/suppliers?${params}`, fetcher);
+  return useSWR<SupplierTableRowV2[]>(`/api/supplier-performance/margin/v2/suppliers?${params}`, fetcher);
 }
 
 export function useDimensionsV2() {
-  return useSWR<DimensionsResponse>('/api/supplier-margin/margin/v2/dimensions', fetcher, { revalidateOnFocus: false });
+  return useSWR<DimensionsResponse>('/api/supplier-performance/margin/v2/dimensions', fetcher, { revalidateOnFocus: false });
 }
 
 // ─── Item Price Comparison hooks ────────────────────────────────────────────
 
 export function useItemListV2(filters: DashboardFiltersV2) {
   const params = buildParams(filters);
-  return useSWR<ItemListRowV2[]>(`/api/supplier-margin/margin/v2/items?${params}`, fetcher);
+  return useSWR<ItemListRowV2[]>(`/api/supplier-performance/margin/v2/items?${params}`, fetcher);
 }
 
 interface ItemSummaryResponse {
@@ -86,7 +86,7 @@ interface ItemSummaryResponse {
 export function useItemSummaryV2(itemCode: string | null, filters: DashboardFiltersV2) {
   const params = buildParams(filters);
   if (itemCode) params.set('item_code', itemCode);
-  const key = itemCode ? `/api/supplier-margin/margin/v2/item-summary?${params}` : null;
+  const key = itemCode ? `/api/supplier-performance/margin/v2/item-summary?${params}` : null;
   return useSWR<ItemSummaryResponse>(key, fetcher);
 }
 
@@ -94,18 +94,18 @@ export function useItemTrendV2(itemCode: string | null, filters: DashboardFilter
   const params = buildParams(filters);
   if (itemCode) params.set('item_code', itemCode);
   params.set('granularity', granularity);
-  const key = itemCode ? `/api/supplier-margin/margin/v2/item-trend?${params}` : null;
+  const key = itemCode ? `/api/supplier-performance/margin/v2/item-trend?${params}` : null;
   return useSWR<ItemPriceMonthlyRowV2[]>(key, fetcher);
 }
 
 export function useSupplierItemsV2(creditorCode: string | null, filters: DashboardFiltersV2) {
   const params = buildParams(filters);
   if (creditorCode) params.set('creditor_code', creditorCode);
-  const key = creditorCode ? `/api/supplier-margin/margin/v2/supplier-items?${params}` : null;
+  const key = creditorCode ? `/api/supplier-performance/margin/v2/supplier-items?${params}` : null;
   return useSWR<SupplierItemRowV2[]>(key, fetcher);
 }
 
 export function useSupplierSparklinesV2(filters: DashboardFiltersV2) {
   const params = buildParams(filters);
-  return useSWR<SupplierSparklineRowV2[]>(`/api/supplier-margin/margin/v2/sparklines?${params}`, fetcher);
+  return useSWR<SupplierSparklineRowV2[]>(`/api/supplier-performance/margin/v2/sparklines?${params}`, fetcher);
 }

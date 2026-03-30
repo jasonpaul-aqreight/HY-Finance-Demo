@@ -11,15 +11,6 @@ import { CustomerMarginTable } from './CustomerMarginTable';
 import { CreditNoteImpactTable } from './CreditNoteImpactTable';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
-function SectionDivider({ title }: { title: string }) {
-  return (
-    <div className="flex items-center gap-3 pt-2">
-      <div className="h-px flex-1 bg-border" />
-      <span className="text-xs font-medium tracking-wider text-muted-foreground">{title}</span>
-      <div className="h-px flex-1 bg-border" />
-    </div>
-  );
-}
 
 export function MarginDashboardShell() {
   const { filters, setFilters, bounds } = useDashboardFilters();
@@ -31,15 +22,12 @@ export function MarginDashboardShell() {
       <FilterBar filters={filters} setFilters={setFilters} bounds={bounds} />
 
       {/* Overview */}
-      <SectionDivider title="Overview" />
       <KpiCards filters={filters} />
 
       {/* Margin Trends */}
-      <SectionDivider title="Margin Trends" />
       <MarginTrendChart filters={filters} />
 
       {/* Customer Rankings + Distribution */}
-      <SectionDivider title="Customer Rankings" />
       <div className="grid gap-4 lg:grid-cols-5">
         <div className="lg:col-span-3">
           <TopCustomersChart filters={filters} />

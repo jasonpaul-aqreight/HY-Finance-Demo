@@ -13,13 +13,13 @@ import { PriceScatterChart } from './PriceScatterChart';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
 export function DashboardShell() {
-  const { filters, ready } = useDashboardFilters();
+  const { filters, setFilters, ready, bounds } = useDashboardFilters();
   const [tab, setTab] = useState('analysis');
 
   return (
     <div className="min-h-screen bg-background">
       <main className="max-w-[1600px] mx-auto px-6 py-6 space-y-6">
-        <FilterBar />
+        <FilterBar filters={filters} setFilters={setFilters} bounds={bounds} />
 
         {!ready && (
           <div className="text-center text-muted-foreground py-12">Loading data range...</div>
@@ -47,7 +47,7 @@ export function DashboardShell() {
               <Tabs value={tab} onValueChange={setTab}>
                 <TabsList>
                   <TabsTrigger value="analysis">Supplier Analysis</TabsTrigger>
-                  <TabsTrigger value="item-pricing">Item Pricing</TabsTrigger>
+                  <TabsTrigger value="item-pricing">Price Comparison</TabsTrigger>
                 </TabsList>
                 <TabsContent value="analysis">
                   <SupplierTable filters={filters} />

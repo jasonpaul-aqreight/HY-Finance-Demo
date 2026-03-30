@@ -11,7 +11,7 @@ import type { MarginDashboardFilters } from '@/hooks/customer-margin/useDashboar
 import { formatRM, formatMarginPct, marginColor } from '@/lib/customer-margin/format';
 import { CustomerSparkline } from './CustomerSparkline';
 import { Download, ArrowUpDown, ChevronDown, Search, X } from 'lucide-react';
-import { CustomerProfileModal } from '@/components/profiles/CustomerProfileModal';
+import { CustomerProfileRevamp } from '@/components/profiles/CustomerProfileRevampPreview';
 
 interface Props {
   filters: MarginDashboardFilters;
@@ -266,12 +266,12 @@ export function CustomerMarginTable({ filters }: Props) {
       </CardContent>
 
       {selectedProfile && (
-        <CustomerProfileModal
+        <CustomerProfileRevamp
           open={!!selectedProfile}
           onClose={() => setSelectedProfile(null)}
           debtorCode={selectedProfile.debtor_code}
           companyName={selectedProfile.company_name}
-          defaultTab="sold-items"
+          defaultTab="sales"
           initialStartDate={filters.startDate}
           initialEndDate={filters.endDate}
         />

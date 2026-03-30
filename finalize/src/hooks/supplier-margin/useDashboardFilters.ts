@@ -18,7 +18,7 @@ const fetcher = (url: string) => fetch(url).then(r => r.json());
 
 export function useDashboardFilters() {
   const { data: bounds } = useSWR<{ min_date: string; max_date: string }>(
-    '/api/supplier-margin/margin/date-bounds',
+    '/api/supplier-performance/margin/date-bounds',
     fetcher,
     { revalidateOnFocus: false }
   );

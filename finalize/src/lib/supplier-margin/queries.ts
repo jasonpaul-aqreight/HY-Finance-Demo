@@ -287,13 +287,39 @@ export function getMarginSummary(start: string, end: string) {
 
   const { top, lowest } = fetchTopLowestSupplier(start, end);
 
-  // Active supplier count
+  // Active supplier count — must have matching sales (IV/CS) and be active creditor,
+  // consistent with the Supplier Table query
   const supplierCount = db.prepare(`
-    SELECT COUNT(DISTINCT pi.CreditorCode) AS cnt
-    FROM pi
-    WHERE pi.Cancelled = 'F'
-      AND DATE(pi.DocDate, '+8 hours') BETWEEN ? AND ?
-  `).get(start, end) as { cnt: number };
+    WITH supplier_items AS (
+      SELECT DISTINCT pi.CreditorCode, pd.ItemCode
+      FROM pi
+      JOIN pidtl pd ON pi.DocKey = pd.DocKey
+      JOIN item i ON pd.ItemCode = i.ItemCode
+      WHERE pi.Cancelled = 'F'
+        AND pd.ItemCode IS NOT NULL AND pd.ItemCode != ''
+        AND DATE(pi.DocDate, '+8 hours') BETWEEN ? AND ?
+    ),
+    sold_items AS (
+      SELECT DISTINCT ItemCode FROM (
+        SELECT ivd.ItemCode FROM iv
+        JOIN ivdtl ivd ON iv.DocKey = ivd.DocKey
+        WHERE iv.Cancelled = 'F'
+          AND ivd.ItemCode IS NOT NULL AND ivd.ItemCode != ''
+          AND DATE(iv.DocDate, '+8 hours') BETWEEN ? AND ?
+        UNION
+        SELECT csd.ItemCode FROM cs
+        JOIN csdtl csd ON cs.DocKey = csd.DocKey
+        WHERE cs.Cancelled = 'F'
+          AND csd.ItemCode IS NOT NULL AND csd.ItemCode != ''
+          AND DATE(cs.DocDate, '+8 hours') BETWEEN ? AND ?
+      )
+    )
+    SELECT COUNT(DISTINCT si.CreditorCode) AS cnt
+    FROM supplier_items si
+    JOIN sold_items sol ON si.ItemCode = sol.ItemCode
+    JOIN creditor c ON si.CreditorCode = c.AccNo
+    WHERE c.IsActive = 'T'
+  `).get(start, end, start, end, start, end) as { cnt: number };
 
   // Distinct items supplied count
   const itemsRow = db.prepare(`
@@ -862,6 +888,17 @@ export function getSupplierItems(
           AND DATE(cs.DocDate, '+8 hours') BETWEEN ? AND ?
         GROUP BY csd.ItemCode
       ) GROUP BY ItemCode
+    ),
+    item_total_purchased AS (
+      SELECT
+        pd.ItemCode,
+        SUM(pd.Qty) AS total_qty
+      FROM pi
+      JOIN pidtl pd ON pi.DocKey = pd.DocKey
+      WHERE pi.Cancelled = 'F'
+        AND pd.ItemCode IS NOT NULL AND pd.ItemCode != ''
+        AND DATE(pi.DocDate, '+8 hours') BETWEEN ? AND ?
+      GROUP BY pd.ItemCode
     )
     SELECT
       si.ItemCode AS item_code,
@@ -869,25 +906,34 @@ export function getSupplierItems(
       i.ItemGroup AS item_group,
       si.purchased_qty AS qty_purchased,
       ROUND(si.purchase_total / NULLIF(si.purchased_qty, 0), 2) AS avg_purchase_price,
-      COALESCE(ist.sold_qty, 0) AS qty_sold,
-      COALESCE(ist.revenue, 0) AS revenue,
-      ROUND(si.purchase_total / NULLIF(si.purchased_qty, 0) * COALESCE(ist.sold_qty, 0), 2) AS cogs,
+      ROUND(ist.sold_qty * si.purchased_qty / NULLIF(itp.total_qty, 0), 0) AS qty_sold,
+      ROUND(ist.revenue * si.purchased_qty / NULLIF(itp.total_qty, 0), 2) AS revenue,
+      ROUND(si.purchase_total * ist.sold_qty / NULLIF(itp.total_qty, 0), 2) AS cogs,
       ROUND(
-        (COALESCE(ist.revenue, 0) - si.purchase_total / NULLIF(si.purchased_qty, 0) * COALESCE(ist.sold_qty, 0))
-        / NULLIF(COALESCE(ist.revenue, 0), 0) * 100, 2
+        (ist.revenue * si.purchased_qty / NULLIF(itp.total_qty, 0)
+         - si.purchase_total * ist.sold_qty / NULLIF(itp.total_qty, 0))
+        / NULLIF(ist.revenue * si.purchased_qty / NULLIF(itp.total_qty, 0), 0) * 100, 2
       ) AS margin_pct
     FROM supplier_items si
     JOIN item i ON si.ItemCode = i.ItemCode
-    LEFT JOIN item_sales ist ON si.ItemCode = ist.ItemCode
+    JOIN item_sales ist ON si.ItemCode = ist.ItemCode
+    JOIN item_total_purchased itp ON si.ItemCode = itp.ItemCode
     ORDER BY revenue DESC
-  `).all(creditorCode, start, end, start, end, start, end) as SupplierItemRow[];
+  `).all(creditorCode, start, end, start, end, start, end, start, end) as SupplierItemRow[];
 }
 
 // ─── Supplier Item Price Trends (for profile sparklines) ────────────────────
 
+export interface SupplierItemPriceMonth {
+  month: string;
+  avg_price: number;
+  qty: number;
+}
+
 export interface SupplierItemPriceTrend {
   item_code: string;
-  prices: number[]; // 12 monthly avg prices, oldest first
+  prices: number[]; // monthly avg prices, oldest first
+  monthly: SupplierItemPriceMonth[]; // full monthly detail for popover
 }
 
 export function getSupplierItemPriceTrends(
@@ -901,7 +947,8 @@ export function getSupplierItemPriceTrends(
     SELECT
       pd.ItemCode AS item_code,
       strftime('%Y-%m', pi.DocDate, '+8 hours') AS month,
-      ROUND(SUM(pd.LocalSubTotal) / NULLIF(SUM(pd.Qty), 0), 2) AS avg_price
+      ROUND(SUM(pd.LocalSubTotal) / NULLIF(SUM(pd.Qty), 0), 2) AS avg_price,
+      ROUND(SUM(pd.Qty)) AS qty
     FROM pi
     JOIN pidtl pd ON pi.DocKey = pd.DocKey
     WHERE pi.Cancelled = 'F'
@@ -910,16 +957,18 @@ export function getSupplierItemPriceTrends(
       AND DATE(pi.DocDate, '+8 hours') BETWEEN ? AND ?
     GROUP BY pd.ItemCode, month
     ORDER BY pd.ItemCode, month
-  `).all(creditorCode, start, end) as { item_code: string; month: string; avg_price: number }[];
+  `).all(creditorCode, start, end) as { item_code: string; month: string; avg_price: number; qty: number }[];
 
   // Group by item_code
-  const map = new Map<string, number[]>();
+  const map = new Map<string, { prices: number[]; monthly: SupplierItemPriceMonth[] }>();
   for (const r of rows) {
-    if (!map.has(r.item_code)) map.set(r.item_code, []);
-    map.get(r.item_code)!.push(r.avg_price);
+    if (!map.has(r.item_code)) map.set(r.item_code, { prices: [], monthly: [] });
+    const entry = map.get(r.item_code)!;
+    entry.prices.push(r.avg_price);
+    entry.monthly.push({ month: r.month, avg_price: r.avg_price, qty: r.qty });
   }
 
-  return Array.from(map.entries()).map(([item_code, prices]) => ({ item_code, prices }));
+  return Array.from(map.entries()).map(([item_code, { prices, monthly }]) => ({ item_code, prices, monthly }));
 }
 
 // ─── Price Comparison (D1) ──────────────────────────────────────────────────
@@ -1100,6 +1149,9 @@ export function getPriceSpread(
 export interface ProcurementItemRow {
   item_code: string;
   item_description: string;
+  fruit_name: string | null;
+  fruit_country: string | null;
+  fruit_variant: string | null;
   supplier_count: number;
   total_qty: number;
   total_buy: number;
@@ -1114,17 +1166,21 @@ export function getItemListProcurement(
     SELECT
       pd.ItemCode AS item_code,
       COALESCE(i.Description, pd.ItemCode) AS item_description,
+      ifr.FruitName AS fruit_name,
+      ifr.FruitCountry AS fruit_country,
+      ifr.FruitVariant AS fruit_variant,
       COUNT(DISTINCT pi.CreditorCode) AS supplier_count,
       ROUND(SUM(pd.Qty), 2) AS total_qty,
       ROUND(SUM(pd.SubTotal), 2) AS total_buy
     FROM pi
     JOIN pidtl pd ON pi.DocKey = pd.DocKey
     LEFT JOIN item i ON pd.ItemCode = i.ItemCode
+    LEFT JOIN item_fruit ifr ON pd.ItemCode = ifr.ItemCode
     WHERE pi.Cancelled = 'F'
       AND pd.ItemCode IS NOT NULL AND pd.ItemCode != ''
       AND pd.Qty > 0
       AND DATE(pi.DocDate, '+8 hours') BETWEEN ? AND ?
-    GROUP BY pd.ItemCode, i.Description
+    GROUP BY pd.ItemCode, i.Description, ifr.FruitName, ifr.FruitCountry, ifr.FruitVariant
     HAVING COUNT(DISTINCT pi.CreditorCode) >= 1
     ORDER BY total_buy DESC
   `).all(start, end) as ProcurementItemRow[];
@@ -1274,8 +1330,21 @@ export function getItemProcurementSummary(
 export interface SupplierProfileSummary {
   is_active: boolean;
   items_supplied_count: number;
-  single_supplier_count: number;
-  single_supplier_items: string[];
+  single_supplier_count: number;    // count of sole-source fruit+variant pairs
+  total_variant_count: number;      // total unique fruit+variant pairs
+  single_supplier_items: string[];  // item codes belonging to sole-source variants
+}
+
+// Extract fruit+variant key from description: "MANDARIN CHINA LOKAM ..." → "MANDARIN CHINA LOKAM"
+function extractVariantKey(description: string): string {
+  const words = description.split(' ');
+  if (words.length < 3) return description;
+  const variantWords: string[] = [words[0], words[1]]; // fruit + country
+  for (let i = 2; i < words.length; i++) {
+    if (/^\d|^[XSML]{1,3}$|^PCS$|^KG$/i.test(words[i])) break;
+    variantWords.push(words[i]);
+  }
+  return variantWords.join(' ');
 }
 
 export function getSupplierProfileSummary(creditorCode: string, start: string, end: string): SupplierProfileSummary {
@@ -1285,42 +1354,383 @@ export function getSupplierProfileSummary(creditorCode: string, start: string, e
   const cred = db.prepare(`SELECT IsActive FROM creditor WHERE AccNo = ?`).get(creditorCode) as { IsActive: string } | undefined;
   const isActive = (cred?.IsActive ?? 'F') === 'T';
 
-  // Items supplied by this supplier in period
+  // Items supplied by this supplier in period that also have sales (matching Items Supplied table)
   const supplierItems = db.prepare(`
-    SELECT DISTINCT pd.ItemCode
+    WITH item_sales AS (
+      SELECT DISTINCT ItemCode FROM (
+        SELECT ivd.ItemCode FROM iv JOIN ivdtl ivd ON iv.DocKey = ivd.DocKey
+        WHERE iv.Cancelled = 'F' AND ivd.ItemCode IS NOT NULL AND ivd.ItemCode != ''
+          AND DATE(iv.DocDate, '+8 hours') BETWEEN ? AND ?
+        UNION
+        SELECT csd.ItemCode FROM cs JOIN csdtl csd ON cs.DocKey = csd.DocKey
+        WHERE cs.Cancelled = 'F' AND csd.ItemCode IS NOT NULL AND csd.ItemCode != ''
+          AND DATE(cs.DocDate, '+8 hours') BETWEEN ? AND ?
+      )
+    )
+    SELECT DISTINCT pd.ItemCode, i.Description
     FROM pi
     JOIN pidtl pd ON pi.DocKey = pd.DocKey
+    JOIN item i ON pd.ItemCode = i.ItemCode
+    JOIN item_sales ist ON pd.ItemCode = ist.ItemCode
     WHERE pi.Cancelled = 'F'
       AND pi.CreditorCode = ?
       AND pd.ItemCode IS NOT NULL AND pd.ItemCode != ''
       AND DATE(pi.DocDate, '+8 hours') BETWEEN ? AND ?
-  `).all(creditorCode, start, end) as { ItemCode: string }[];
-  const supplierItemCodes = supplierItems.map(r => r.ItemCode);
+  `).all(start, end, start, end, creditorCode, start, end) as { ItemCode: string; Description: string }[];
 
-  if (supplierItemCodes.length === 0) {
-    return { is_active: isActive, items_supplied_count: 0, single_supplier_count: 0, single_supplier_items: [] };
+  if (supplierItems.length === 0) {
+    return { is_active: isActive, items_supplied_count: 0, single_supplier_count: 0, total_variant_count: 0, single_supplier_items: [] };
   }
 
-  // Find which of those items have ONLY this supplier in the period
-  const placeholders = supplierItemCodes.map(() => '?').join(',');
-  const multiSupplierItems = db.prepare(`
-    SELECT DISTINCT pd.ItemCode
+  // Build variant key → item codes mapping for this supplier
+  const variantToItems = new Map<string, string[]>();
+  for (const { ItemCode, Description } of supplierItems) {
+    const vk = extractVariantKey(Description);
+    if (!variantToItems.has(vk)) variantToItems.set(vk, []);
+    variantToItems.get(vk)!.push(ItemCode);
+  }
+
+  // Get ALL purchases in period with descriptions to build variant → suppliers mapping
+  const allPurchases = db.prepare(`
+    SELECT DISTINCT pi.CreditorCode, i.Description
     FROM pi
     JOIN pidtl pd ON pi.DocKey = pd.DocKey
+    JOIN item i ON pd.ItemCode = i.ItemCode
     WHERE pi.Cancelled = 'F'
-      AND pd.ItemCode IN (${placeholders})
       AND pd.ItemCode IS NOT NULL AND pd.ItemCode != ''
-      AND pi.CreditorCode != ?
       AND DATE(pi.DocDate, '+8 hours') BETWEEN ? AND ?
-  `).all(...supplierItemCodes, creditorCode, start, end) as { ItemCode: string }[];
-  const multiSet = new Set(multiSupplierItems.map(r => r.ItemCode));
+  `).all(start, end) as { CreditorCode: string; Description: string }[];
 
-  const singleItems = supplierItemCodes.filter(code => !multiSet.has(code));
+  // Build variant key → set of suppliers
+  const variantSuppliers = new Map<string, Set<string>>();
+  for (const { CreditorCode, Description } of allPurchases) {
+    const vk = extractVariantKey(Description);
+    if (!variantSuppliers.has(vk)) variantSuppliers.set(vk, new Set());
+    variantSuppliers.get(vk)!.add(CreditorCode);
+  }
+
+  // Find sole-source variants (only this supplier provides that fruit+variant)
+  const soleVariants: string[] = [];
+  const soleItemCodes: string[] = [];
+  for (const [vk, itemCodes] of variantToItems) {
+    const suppliers = variantSuppliers.get(vk);
+    if (suppliers && suppliers.size === 1) {
+      soleVariants.push(vk);
+      soleItemCodes.push(...itemCodes);
+    }
+  }
 
   return {
     is_active: isActive,
-    items_supplied_count: supplierItemCodes.length,
-    single_supplier_count: singleItems.length,
-    single_supplier_items: singleItems,
+    items_supplied_count: supplierItems.length,
+    single_supplier_count: soleVariants.length,
+    total_variant_count: variantToItems.size,
+    single_supplier_items: soleItemCodes,
+  };
+}
+
+// ─── Supplier Details (contact, terms, etc.) ────────────────────────────────
+
+export interface SupplierDetails {
+  creditor_code: string;
+  company_name: string;
+  is_active: boolean;
+  creditor_type: string;
+  purchase_agent: string;
+  supplier_since: string;
+  pic: string;
+  phone: string;
+  mobile: string;
+  email: string;
+  payment_terms: string;
+  credit_limit: number;
+  currency: string;
+}
+
+export function getSupplierDetails(creditorCode: string): SupplierDetails | null {
+  const db = getDb();
+  const row = db.prepare(`
+    SELECT
+      c.AccNo, c.CompanyName, c.IsActive, c.CreditorType,
+      c.PurchaseAgent, c.CreatedTimeStamp, c.Attention,
+      c.Phone1, c.Mobile, c.EmailAddress,
+      c.DisplayTerm, c.CreditLimit, c.CurrencyCode,
+      ct.Description AS CreditorTypeDesc
+    FROM creditor c
+    LEFT JOIN creditor_type ct ON c.CreditorType = ct.CreditorType
+    WHERE c.AccNo = ?
+  `).get(creditorCode) as {
+    AccNo: string; CompanyName: string; IsActive: string; CreditorType: string;
+    PurchaseAgent: string; CreatedTimeStamp: string; Attention: string;
+    Phone1: string; Mobile: string; EmailAddress: string;
+    DisplayTerm: string; CreditLimit: number; CurrencyCode: string;
+    CreditorTypeDesc: string | null;
+  } | undefined;
+
+  if (!row) return null;
+
+  return {
+    creditor_code: row.AccNo,
+    company_name: row.CompanyName,
+    is_active: row.IsActive === 'T',
+    creditor_type: row.CreditorTypeDesc || row.CreditorType || '',
+    purchase_agent: row.PurchaseAgent || '',
+    supplier_since: row.CreatedTimeStamp ? row.CreatedTimeStamp.split(' ')[0] : '',
+    pic: row.Attention || '',
+    phone: row.Phone1 || '',
+    mobile: row.Mobile || '',
+    email: row.EmailAddress || '',
+    payment_terms: row.DisplayTerm || '',
+    credit_limit: row.CreditLimit ?? 0,
+    currency: row.CurrencyCode || 'MYR',
+  };
+}
+
+// ─── Supplier Performance (margin trend + top items) ────────────────────────
+
+export interface SupplierMarginTrendRow {
+  period: string;
+  purchase_cost: number;
+  attributed_revenue: number;
+  margin_pct: number | null;
+}
+
+export interface SupplierTopItemRow {
+  item: string;
+  profit: number;
+  margin_pct: number;
+}
+
+export interface SupplierPerformance {
+  margin_trend: SupplierMarginTrendRow[];
+  top_items: SupplierTopItemRow[];
+  total_purchase_cost: number;
+  attributed_revenue: number;
+  attributed_profit: number;
+  avg_margin: number;
+}
+
+export function getSupplierPerformance(creditorCode: string, start: string, end: string): SupplierPerformance {
+  const db = getDb();
+
+  // Monthly trend: purchase cost bars for ALL purchase months,
+  // margin line using Method 1 attribution (only months with matching sales)
+  const trendRows = db.prepare(`
+    WITH supplier_items AS (
+      SELECT
+        pd.ItemCode,
+        strftime('%Y-%m', datetime(pi.DocDate, '+8 hours')) AS period,
+        SUM(pd.Qty) AS purchased_qty,
+        SUM(pd.LocalSubTotal) AS purchase_total
+      FROM pi
+      JOIN pidtl pd ON pi.DocKey = pd.DocKey
+      WHERE pi.Cancelled = 'F'
+        AND pi.CreditorCode = ?
+        AND pd.ItemCode IS NOT NULL AND pd.ItemCode != ''
+        AND DATE(pi.DocDate, '+8 hours') BETWEEN ? AND ?
+      GROUP BY pd.ItemCode, period
+    ),
+    monthly_cost AS (
+      SELECT period, ROUND(SUM(purchase_total), 2) AS purchase_cost
+      FROM supplier_items
+      GROUP BY period
+    ),
+    item_sales AS (
+      SELECT ItemCode, period, SUM(revenue) AS revenue, SUM(sold_qty) AS sold_qty FROM (
+        SELECT
+          ivd.ItemCode,
+          strftime('%Y-%m', datetime(iv.DocDate, '+8 hours')) AS period,
+          SUM(ivd.LocalSubTotalExTax) AS revenue,
+          SUM(ivd.Qty) AS sold_qty
+        FROM iv
+        JOIN ivdtl ivd ON iv.DocKey = ivd.DocKey
+        WHERE iv.Cancelled = 'F'
+          AND ivd.ItemCode IS NOT NULL AND ivd.ItemCode != ''
+          AND DATE(iv.DocDate, '+8 hours') BETWEEN ? AND ?
+        GROUP BY ivd.ItemCode, period
+        UNION ALL
+        SELECT
+          csd.ItemCode,
+          strftime('%Y-%m', datetime(cs.DocDate, '+8 hours')) AS period,
+          SUM(csd.LocalSubTotalExTax) AS revenue,
+          SUM(csd.Qty) AS sold_qty
+        FROM cs
+        JOIN csdtl csd ON cs.DocKey = csd.DocKey
+        WHERE cs.Cancelled = 'F'
+          AND csd.ItemCode IS NOT NULL AND csd.ItemCode != ''
+          AND DATE(cs.DocDate, '+8 hours') BETWEEN ? AND ?
+        GROUP BY csd.ItemCode, period
+      ) GROUP BY ItemCode, period
+    ),
+    item_total_purchased AS (
+      SELECT
+        pd.ItemCode,
+        strftime('%Y-%m', datetime(pi.DocDate, '+8 hours')) AS period,
+        SUM(pd.Qty) AS total_qty
+      FROM pi
+      JOIN pidtl pd ON pi.DocKey = pd.DocKey
+      WHERE pi.Cancelled = 'F'
+        AND pd.ItemCode IS NOT NULL AND pd.ItemCode != ''
+        AND DATE(pi.DocDate, '+8 hours') BETWEEN ? AND ?
+      GROUP BY pd.ItemCode, period
+    ),
+    attributed_margin AS (
+      SELECT
+        si.period,
+        ROUND(SUM(ist.revenue * si.purchased_qty / NULLIF(itp.total_qty, 0)), 2) AS attributed_revenue,
+        ROUND(
+          CASE WHEN SUM(ist.revenue * si.purchased_qty / NULLIF(itp.total_qty, 0)) > 0
+            THEN (SUM(ist.revenue * si.purchased_qty / NULLIF(itp.total_qty, 0))
+                  - SUM(si.purchase_total * ist.sold_qty / NULLIF(itp.total_qty, 0)))
+                 / SUM(ist.revenue * si.purchased_qty / NULLIF(itp.total_qty, 0)) * 100
+            ELSE 0
+          END, 1
+        ) AS margin_pct
+      FROM supplier_items si
+      JOIN item_sales ist ON si.ItemCode = ist.ItemCode AND si.period = ist.period
+      JOIN item_total_purchased itp ON si.ItemCode = itp.ItemCode AND si.period = itp.period
+      GROUP BY si.period
+    )
+    SELECT
+      mc.period,
+      mc.purchase_cost,
+      COALESCE(am.attributed_revenue, 0) AS attributed_revenue,
+      am.margin_pct
+    FROM monthly_cost mc
+    LEFT JOIN attributed_margin am ON mc.period = am.period
+    ORDER BY mc.period
+  `).all(creditorCode, start, end, start, end, start, end, start, end) as SupplierMarginTrendRow[];
+
+  // Top 5 items by gross profit using attributed method (Method 1)
+  // Same math as getSupplierTable: full-period INNER JOIN with attribution
+  const topItems = db.prepare(`
+    WITH supplier_items AS (
+      SELECT
+        pd.ItemCode,
+        SUM(pd.Qty) AS purchased_qty,
+        SUM(pd.LocalSubTotal) AS purchase_total
+      FROM pi
+      JOIN pidtl pd ON pi.DocKey = pd.DocKey
+      WHERE pi.Cancelled = 'F'
+        AND pi.CreditorCode = ?
+        AND pd.ItemCode IS NOT NULL AND pd.ItemCode != ''
+        AND DATE(pi.DocDate, '+8 hours') BETWEEN ? AND ?
+      GROUP BY pd.ItemCode
+    ),
+    item_sales AS (
+      SELECT ItemCode, SUM(revenue) AS revenue, SUM(sold_qty) AS sold_qty FROM (
+        SELECT ivd.ItemCode, SUM(ivd.LocalSubTotalExTax) AS revenue, SUM(ivd.Qty) AS sold_qty
+        FROM iv JOIN ivdtl ivd ON iv.DocKey = ivd.DocKey
+        WHERE iv.Cancelled = 'F' AND ivd.ItemCode IS NOT NULL AND ivd.ItemCode != ''
+          AND DATE(iv.DocDate, '+8 hours') BETWEEN ? AND ?
+        GROUP BY ivd.ItemCode
+        UNION ALL
+        SELECT csd.ItemCode, SUM(csd.LocalSubTotalExTax) AS revenue, SUM(csd.Qty) AS sold_qty
+        FROM cs JOIN csdtl csd ON cs.DocKey = csd.DocKey
+        WHERE cs.Cancelled = 'F' AND csd.ItemCode IS NOT NULL AND csd.ItemCode != ''
+          AND DATE(cs.DocDate, '+8 hours') BETWEEN ? AND ?
+        GROUP BY csd.ItemCode
+      ) GROUP BY ItemCode
+    ),
+    item_total_purchased AS (
+      SELECT pd.ItemCode, SUM(pd.Qty) AS total_qty
+      FROM pi
+      JOIN pidtl pd ON pi.DocKey = pd.DocKey
+      WHERE pi.Cancelled = 'F'
+        AND pd.ItemCode IS NOT NULL AND pd.ItemCode != ''
+        AND DATE(pi.DocDate, '+8 hours') BETWEEN ? AND ?
+      GROUP BY pd.ItemCode
+    )
+    SELECT
+      i.Description AS item,
+      ROUND(
+        ist.revenue * si.purchased_qty / NULLIF(itp.total_qty, 0)
+        - si.purchase_total * ist.sold_qty / NULLIF(itp.total_qty, 0), 2
+      ) AS profit,
+      ROUND(
+        CASE WHEN ist.revenue * si.purchased_qty / NULLIF(itp.total_qty, 0) > 0
+          THEN (ist.revenue * si.purchased_qty / NULLIF(itp.total_qty, 0)
+                - si.purchase_total * ist.sold_qty / NULLIF(itp.total_qty, 0))
+               / (ist.revenue * si.purchased_qty / NULLIF(itp.total_qty, 0)) * 100
+          ELSE 0
+        END, 1
+      ) AS margin_pct
+    FROM supplier_items si
+    JOIN item i ON si.ItemCode = i.ItemCode
+    JOIN item_sales ist ON si.ItemCode = ist.ItemCode
+    JOIN item_total_purchased itp ON si.ItemCode = itp.ItemCode
+    ORDER BY profit DESC
+    LIMIT 5
+  `).all(creditorCode, start, end, start, end, start, end, start, end) as SupplierTopItemRow[];
+
+  // Overall KPIs using full-period attribution (Method 1)
+  // Same math as getSupplierTable: full-period INNER JOIN with attribution
+  const overallRow = db.prepare(`
+    WITH supplier_items AS (
+      SELECT
+        pd.ItemCode,
+        SUM(pd.Qty) AS purchased_qty,
+        SUM(pd.LocalSubTotal) AS purchase_total
+      FROM pi
+      JOIN pidtl pd ON pi.DocKey = pd.DocKey
+      WHERE pi.Cancelled = 'F'
+        AND pi.CreditorCode = ?
+        AND pd.ItemCode IS NOT NULL AND pd.ItemCode != ''
+        AND DATE(pi.DocDate, '+8 hours') BETWEEN ? AND ?
+      GROUP BY pd.ItemCode
+    ),
+    item_sales AS (
+      SELECT ItemCode, SUM(revenue) AS revenue, SUM(sold_qty) AS sold_qty FROM (
+        SELECT ivd.ItemCode, SUM(ivd.LocalSubTotalExTax) AS revenue, SUM(ivd.Qty) AS sold_qty
+        FROM iv JOIN ivdtl ivd ON iv.DocKey = ivd.DocKey
+        WHERE iv.Cancelled = 'F' AND ivd.ItemCode IS NOT NULL AND ivd.ItemCode != ''
+          AND DATE(iv.DocDate, '+8 hours') BETWEEN ? AND ?
+        GROUP BY ivd.ItemCode
+        UNION ALL
+        SELECT csd.ItemCode, SUM(csd.LocalSubTotalExTax) AS revenue, SUM(csd.Qty) AS sold_qty
+        FROM cs JOIN csdtl csd ON cs.DocKey = csd.DocKey
+        WHERE cs.Cancelled = 'F' AND csd.ItemCode IS NOT NULL AND csd.ItemCode != ''
+          AND DATE(cs.DocDate, '+8 hours') BETWEEN ? AND ?
+        GROUP BY csd.ItemCode
+      ) GROUP BY ItemCode
+    ),
+    item_total_purchased AS (
+      SELECT pd.ItemCode, SUM(pd.Qty) AS total_qty
+      FROM pi
+      JOIN pidtl pd ON pi.DocKey = pd.DocKey
+      WHERE pi.Cancelled = 'F'
+        AND pd.ItemCode IS NOT NULL AND pd.ItemCode != ''
+        AND DATE(pi.DocDate, '+8 hours') BETWEEN ? AND ?
+      GROUP BY pd.ItemCode
+    )
+    SELECT
+      ROUND(SUM(si.purchase_total), 2) AS total_purchase_cost,
+      ROUND(SUM(ist.revenue * si.purchased_qty / NULLIF(itp.total_qty, 0)), 2) AS attributed_revenue,
+      ROUND(
+        SUM(ist.revenue * si.purchased_qty / NULLIF(itp.total_qty, 0))
+        - SUM(si.purchase_total * ist.sold_qty / NULLIF(itp.total_qty, 0)), 2
+      ) AS attributed_profit,
+      ROUND(
+        (SUM(ist.revenue * si.purchased_qty / NULLIF(itp.total_qty, 0))
+         - SUM(si.purchase_total * ist.sold_qty / NULLIF(itp.total_qty, 0)))
+        / NULLIF(SUM(ist.revenue * si.purchased_qty / NULLIF(itp.total_qty, 0)), 0) * 100, 2
+      ) AS avg_margin
+    FROM supplier_items si
+    JOIN item_sales ist ON si.ItemCode = ist.ItemCode
+    JOIN item_total_purchased itp ON si.ItemCode = itp.ItemCode
+  `).get(creditorCode, start, end, start, end, start, end, start, end) as {
+    total_purchase_cost: number;
+    attributed_revenue: number;
+    attributed_profit: number;
+    avg_margin: number;
+  } | undefined;
+
+  return {
+    margin_trend: trendRows,
+    top_items: topItems,
+    total_purchase_cost: overallRow?.total_purchase_cost ?? 0,
+    attributed_revenue: overallRow?.attributed_revenue ?? 0,
+    attributed_profit: overallRow?.attributed_profit ?? 0,
+    avg_margin: overallRow?.avg_margin ?? 0,
   };
 }

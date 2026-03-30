@@ -10,7 +10,7 @@ import { useCreditHealthV2 } from '@/hooks/payment/usePaymentDataV2';
 import { useStableData } from '@/hooks/useStableData';
 import { formatRM } from '@/lib/payment/format';
 import { riskTierBgColor } from '@/lib/payment/credit-score-v2';
-import { CustomerProfileModal } from '@/components/profiles/CustomerProfileModal';
+import { CustomerProfileRevamp } from '@/components/profiles/CustomerProfileRevampPreview';
 import { SettingsDialog } from '@/components/payment/settings/SettingsDialog';
 
 type SortKey = 'debtor_code' | 'company_name' | 'debtor_type' | 'sales_agent' | 'credit_limit' | 'total_outstanding' | 'max_overdue_days' | 'aging_count' | 'utilization_pct' | 'credit_score' | 'risk_tier';
@@ -251,12 +251,12 @@ export default function CustomerTableV2() {
       </CardContent>
 
       {selectedCustomer && (
-        <CustomerProfileModal
+        <CustomerProfileRevamp
           open={!!selectedCustomer}
           onClose={() => setSelectedCustomer(null)}
           debtorCode={selectedCustomer.debtor_code}
           companyName={selectedCustomer.company_name}
-          defaultTab="payment"
+          defaultTab="outstanding"
         />
       )}
 

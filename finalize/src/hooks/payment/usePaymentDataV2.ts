@@ -105,6 +105,13 @@ export function useCustomerProfile(debtorCode: string | null) {
     debtor_type: string;
     sales_agent: string;
     avg_payment_days: number | null;
+    attention: string;
+    phone1: string;
+    mobile: string;
+    email_address: string;
+    area_code: string;
+    currency_code: string;
+    created_date: string | null;
     credit_limit: number;
     total_outstanding: number;
     utilization_pct: number | null;

@@ -12,7 +12,7 @@ export function useMarginSummary(filters: DashboardFilters) {
     start_date: filters.startDate,
     end_date: filters.endDate,
   });
-  return useSWR(`/api/supplier-margin/margin/summary?${params}`, fetcher);
+  return useSWR(`/api/supplier-performance/margin/summary?${params}`, fetcher);
 }
 
 export function useMarginTrend(filters: DashboardFilters) {
@@ -21,7 +21,7 @@ export function useMarginTrend(filters: DashboardFilters) {
     end_date: filters.endDate,
     granularity: filters.granularity,
   });
-  return useSWR(`/api/supplier-margin/margin/trend?${params}`, fetcher);
+  return useSWR(`/api/supplier-performance/margin/trend?${params}`, fetcher);
 }
 
 export function useSupplierTrend(filters: DashboardFilters) {
@@ -30,7 +30,7 @@ export function useSupplierTrend(filters: DashboardFilters) {
     end_date: filters.endDate,
     granularity: filters.granularity,
   });
-  return useSWR(`/api/supplier-margin/margin/supplier-trend?${params}`, fetcher);
+  return useSWR(`/api/supplier-performance/margin/supplier-trend?${params}`, fetcher);
 }
 
 export function useMarginByItemGroup(filters: DashboardFilters) {
@@ -39,7 +39,7 @@ export function useMarginByItemGroup(filters: DashboardFilters) {
     end_date: filters.endDate,
     granularity: filters.granularity,
   });
-  return useSWR(`/api/supplier-margin/margin/by-item-group?${params}`, fetcher);
+  return useSWR(`/api/supplier-performance/margin/by-item-group?${params}`, fetcher);
 }
 
 export function useSupplierTable(filters: DashboardFilters) {
@@ -49,7 +49,7 @@ export function useSupplierTable(filters: DashboardFilters) {
   });
   for (const s of filters.suppliers) params.append('supplier', s);
   for (const ig of filters.itemGroups) params.append('item_group', ig);
-  return useSWR(`/api/supplier-margin/margin/suppliers?${params}`, fetcher);
+  return useSWR(`/api/supplier-performance/margin/suppliers?${params}`, fetcher);
 }
 
 export function useSparklines(filters: DashboardFilters) {
@@ -60,7 +60,7 @@ export function useSparklines(filters: DashboardFilters) {
   for (const s of filters.suppliers) params.append('supplier', s);
   for (const ig of filters.itemGroups) params.append('item_group', ig);
   return useSWR<{ data: Record<string, number[]> }>(
-    `/api/supplier-margin/margin/sparklines?${params}`,
+    `/api/supplier-performance/margin/sparklines?${params}`,
     fetcher,
   );
 }
@@ -71,7 +71,7 @@ export function useSupplierItems(creditorCode: string | null, filters: Dashboard
     start_date: filters.startDate,
     end_date: filters.endDate,
   }) : null;
-  return useSWR(params ? `/api/supplier-margin/margin/supplier-items?${params}` : null, fetcher);
+  return useSWR(params ? `/api/supplier-performance/margin/supplier-items?${params}` : null, fetcher);
 }
 
 export function usePriceComparison(filters: DashboardFilters) {
@@ -80,7 +80,7 @@ export function usePriceComparison(filters: DashboardFilters) {
     end_date: filters.endDate,
     limit: '200',
   });
-  return useSWR(`/api/supplier-margin/margin/price-comparison?${params}`, fetcher);
+  return useSWR(`/api/supplier-performance/margin/price-comparison?${params}`, fetcher);
 }
 
 export function usePriceSpread(filters: DashboardFilters) {
@@ -90,11 +90,11 @@ export function usePriceSpread(filters: DashboardFilters) {
   });
   for (const s of filters.suppliers) params.append('supplier', s);
   for (const ig of filters.itemGroups) params.append('item_group', ig);
-  return useSWR(`/api/supplier-margin/margin/price-spread?${params}`, fetcher);
+  return useSWR(`/api/supplier-performance/margin/price-spread?${params}`, fetcher);
 }
 
 export function useDimensions() {
-  return useSWR('/api/supplier-margin/margin/dimensions', fetcher, { revalidateOnFocus: false });
+  return useSWR('/api/supplier-performance/margin/dimensions', fetcher, { revalidateOnFocus: false });
 }
 
 export function useTopBottomSuppliers(
@@ -110,7 +110,7 @@ export function useTopBottomSuppliers(
     order,
     sort_by: sortBy,
   });
-  return useSWR(`/api/supplier-margin/margin/v2/top-bottom?${params}`, fetcher);
+  return useSWR(`/api/supplier-performance/margin/v2/top-bottom?${params}`, fetcher);
 }
 
 export function useTopBottomItems(
@@ -126,7 +126,7 @@ export function useTopBottomItems(
     order,
     sort_by: sortBy,
   });
-  return useSWR(`/api/supplier-margin/margin/v2/top-bottom-items?${params}`, fetcher);
+  return useSWR(`/api/supplier-performance/margin/v2/top-bottom-items?${params}`, fetcher);
 }
 
 export function useSupplierMarginDistribution(filters: DashboardFilters) {
@@ -134,7 +134,7 @@ export function useSupplierMarginDistribution(filters: DashboardFilters) {
     start_date: filters.startDate,
     end_date: filters.endDate,
   });
-  return useSWR<Array<{ bucket: string; count: number }>>(`/api/supplier-margin/margin/distribution?${params}`, fetcher);
+  return useSWR<Array<{ bucket: string; count: number }>>(`/api/supplier-performance/margin/distribution?${params}`, fetcher);
 }
 
 export function useMarginDistribution(filters: DashboardFilters, entity: 'suppliers' | 'items' = 'suppliers') {
@@ -143,7 +143,51 @@ export function useMarginDistribution(filters: DashboardFilters, entity: 'suppli
     end_date: filters.endDate,
     entity,
   });
-  return useSWR<Array<{ bucket: string; count: number }>>(`/api/supplier-margin/margin/distribution?${params}`, fetcher);
+  return useSWR<Array<{ bucket: string; count: number }>>(`/api/supplier-performance/margin/distribution?${params}`, fetcher);
+}
+
+// Supplier details (contact, terms, etc.)
+export function useSupplierDetails(creditorCode: string | null) {
+  return useSWR<{
+    creditor_code: string;
+    company_name: string;
+    is_active: boolean;
+    creditor_type: string;
+    purchase_agent: string;
+    supplier_since: string;
+    pic: string;
+    phone: string;
+    mobile: string;
+    email: string;
+    payment_terms: string;
+    credit_limit: number;
+    currency: string;
+  }>(
+    creditorCode ? `/api/supplier-performance/margin/supplier-details?creditor_code=${encodeURIComponent(creditorCode)}` : null,
+    fetcher,
+    { revalidateOnFocus: false },
+  );
+}
+
+// Supplier performance (margin trend + top items)
+export function useSupplierPerformance(creditorCode: string | null, startDate: string, endDate: string) {
+  const params = creditorCode ? new URLSearchParams({
+    creditor_code: creditorCode,
+    start_date: startDate,
+    end_date: endDate,
+  }) : null;
+  return useSWR<{
+    margin_trend: Array<{ period: string; purchase_cost: number; attributed_revenue: number; margin_pct: number | null }>;
+    top_items: Array<{ item: string; profit: number; margin_pct: number }>;
+    total_purchase_cost: number;
+    attributed_revenue: number;
+    attributed_profit: number;
+    avg_margin: number;
+  }>(
+    params ? `/api/supplier-performance/margin/supplier-performance?${params}` : null,
+    fetcher,
+    { revalidateOnFocus: false },
+  );
 }
 
 // Supplier profile summary (isActive, single-supplier items)
@@ -155,10 +199,12 @@ export function useSupplierProfileSummary(creditorCode: string | null, startDate
   }) : null;
   return useSWR<{
     is_active: boolean;
+    items_supplied_count: number;
     single_supplier_count: number;
+    total_variant_count: number;
     single_supplier_items: string[];
   }>(
-    params ? `/api/supplier-margin/margin/supplier-profile-summary?${params}` : null,
+    params ? `/api/supplier-performance/margin/supplier-profile-summary?${params}` : null,
     fetcher,
     { revalidateOnFocus: false },
   );
@@ -171,8 +217,8 @@ export function useSupplierItemTrends(creditorCode: string | null, startDate: st
     start_date: startDate,
     end_date: endDate,
   }) : null;
-  return useSWR<{ data: { item_code: string; prices: number[] }[] }>(
-    params ? `/api/supplier-margin/margin/supplier-item-trends?${params}` : null,
+  return useSWR<{ data: { item_code: string; prices: number[]; monthly: { month: string; avg_price: number; qty: number }[] }[] }>(
+    params ? `/api/supplier-performance/margin/supplier-item-trends?${params}` : null,
     fetcher,
     { revalidateOnFocus: false },
   );
@@ -186,7 +232,7 @@ export function useProcurementItems(filters: DashboardFilters) {
     end_date: filters.endDate,
   });
   return useSWR<ProcurementItemRow[]>(
-    `/api/supplier-margin/margin/procurement/items?${params}`,
+    `/api/supplier-performance/margin/procurement/items?${params}`,
     fetcher
   );
 }
@@ -198,7 +244,7 @@ export function useProcurementSummary(itemCode: string | null, filters: Dashboar
   });
   if (itemCode) params.set('item_code', itemCode);
   const key = itemCode
-    ? `/api/supplier-margin/margin/procurement/item-summary?${params}`
+    ? `/api/supplier-performance/margin/procurement/item-summary?${params}`
     : null;
   return useSWR<ProcurementSummaryResponse>(key, fetcher);
 }
@@ -211,7 +257,7 @@ export function useProcurementTrend(itemCode: string | null, filters: DashboardF
   if (itemCode) params.set('item_code', itemCode);
   params.set('granularity', 'monthly');
   const key = itemCode
-    ? `/api/supplier-margin/margin/v2/item-trend?${params}`
+    ? `/api/supplier-performance/margin/v2/item-trend?${params}`
     : null;
   return useSWR<ItemPriceMonthlyRowV2[]>(key, fetcher);
 }

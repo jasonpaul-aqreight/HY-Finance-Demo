@@ -12,8 +12,8 @@ import { BSStatementTableV3 } from './BSStatementTableV3';
 
 function SectionHeader({ title }: { title: string }) {
   return (
-    <div className="border-b-2 border-border pb-2 mt-10 mb-6">
-      <h2 className="text-lg font-bold text-foreground">{title}</h2>
+    <div className="rounded-md bg-primary/5 border border-primary/10 px-4 py-2.5 mt-10 mb-6">
+      <h2 className="text-base font-semibold tracking-tight text-foreground">{title}</h2>
     </div>
   );
 }

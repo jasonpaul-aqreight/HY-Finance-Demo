@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { ArrowLeftIcon, ChevronDownIcon, ChevronRightIcon } from 'lucide-react';
-import useSWR, { mutate } from 'swr';
+import useSWR, { mutate, useSWRConfig } from 'swr';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { useRole } from '@/components/layout/RoleProvider';
 
 const fetcher = (url: string) => fetch(url).then(r => r.json());
 
@@ -35,6 +36,7 @@ function NumberInput({
   suffix,
   min,
   max,
+  disabled,
 }: {
   label: string;
   value: number;
@@ -42,6 +44,7 @@ function NumberInput({
   suffix?: string;
   min?: number;
   max?: number;
+  disabled?: boolean;
 }) {
   return (
     <div>
@@ -53,7 +56,8 @@ function NumberInput({
           onChange={e => onChange(Number(e.target.value))}
           min={min}
           max={max}
-          className="h-8 w-24 rounded-md border border-input bg-transparent px-2.5 text-sm"
+          disabled={disabled}
+          className="h-8 w-24 rounded-md border border-input bg-transparent px-2.5 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
         />
         {suffix && <span className="text-sm text-muted-foreground">{suffix}</span>}
       </div>
@@ -323,6 +327,8 @@ function HowItWorks() {
 // ─── Main component ─────────────────────────────────────────────────────────
 
 export default function SettingsForm() {
+  const { isAdmin } = useRole();
+  const { cache } = useSWRConfig();
   const { data: serverSettings, isLoading } = useSWR<Record<string, unknown>>(
     '/api/payment/settings',
     fetcher,
@@ -331,6 +337,18 @@ export default function SettingsForm() {
   const [form, setForm] = useState<SettingsV2>(DEFAULTS_V2);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [fading, setFading] = useState(false);
+  const fadeTimer = useRef<ReturnType<typeof setTimeout>>();
+  const clearTimer = useRef<ReturnType<typeof setTimeout>>();
+
+  // Auto-dismiss success messages after 3 seconds with fade
+  useEffect(() => {
+    if (message?.type === 'success') {
+      fadeTimer.current = setTimeout(() => setFading(true), 3000);
+      clearTimer.current = setTimeout(() => { setMessage(null); setFading(false); }, 3500);
+    }
+    return () => { clearTimeout(fadeTimer.current); clearTimeout(clearTimer.current); };
+  }, [message]);
 
   useEffect(() => {
     if (serverSettings) {
@@ -376,6 +394,12 @@ export default function SettingsForm() {
       } else {
         setMessage({ type: 'success', text: 'Settings saved successfully' });
         mutate('/api/payment/settings');
+        // Revalidate all payment data caches so dashboard calculations refresh
+        for (const key of (cache as Map<string, unknown>).keys()) {
+          if (typeof key === 'string' && key.startsWith('/api/payment/')) {
+            mutate(key);
+          }
+        }
       }
     } catch {
       setMessage({ type: 'error', text: 'Network error' });
@@ -407,6 +431,12 @@ export default function SettingsForm() {
         — so your team knows who needs attention.
       </p>
 
+      {!isAdmin && (
+        <div className="mb-4 rounded-md border border-yellow-300 bg-yellow-50 px-4 py-3 text-sm text-yellow-800">
+          You are viewing as a non-admin user. Only administrators can change these settings.
+        </div>
+      )}
+
       <div className="space-y-4">
         {/* ─── Section 1: Credit Health Score Weights ─── */}
         <Card>
@@ -418,25 +448,27 @@ export default function SettingsForm() {
             <div className="grid grid-cols-2 gap-x-6 gap-y-5">
               <NumberInput label="Credit Utilization" value={form.creditScoreWeights.utilization}
                 onChange={v => setForm(f => ({ ...f, creditScoreWeights: { ...f.creditScoreWeights, utilization: v } }))}
-                suffix="%" min={0} max={100} />
+                suffix="%" min={0} max={100} disabled={!isAdmin} />
               <NumberInput label="Overdue Days" value={form.creditScoreWeights.overdueDays}
                 onChange={v => setForm(f => ({ ...f, creditScoreWeights: { ...f.creditScoreWeights, overdueDays: v } }))}
-                suffix="%" min={0} max={100} />
+                suffix="%" min={0} max={100} disabled={!isAdmin} />
               <NumberInput label="Payment Timeliness" value={form.creditScoreWeights.timeliness}
                 onChange={v => setForm(f => ({ ...f, creditScoreWeights: { ...f.creditScoreWeights, timeliness: v } }))}
-                suffix="%" min={0} max={100} />
+                suffix="%" min={0} max={100} disabled={!isAdmin} />
               <NumberInput label="Double Breach" value={form.creditScoreWeights.doubleBreach}
                 onChange={v => setForm(f => ({ ...f, creditScoreWeights: { ...f.creditScoreWeights, doubleBreach: v } }))}
-                suffix="%" min={0} max={100} />
+                suffix="%" min={0} max={100} disabled={!isAdmin} />
             </div>
             <div className="mt-3 flex items-center justify-between">
               <p className={`text-sm font-medium ${weightSum === 100 ? 'text-emerald-600' : 'text-red-600'}`}>
                 Total: {weightSum}/100{weightSum !== 100 && ' — must equal 100'}
               </p>
+              {isAdmin && (
               <Button variant="outline" size="sm"
                 onClick={() => setForm(f => ({ ...f, creditScoreWeights: DEFAULTS_V2.creditScoreWeights }))}>
                 Reset to Defaults
               </Button>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -451,10 +483,10 @@ export default function SettingsForm() {
             <div className="grid grid-cols-2 gap-x-6 gap-y-5">
               <NumberInput label="Low Risk (score >=)" value={form.riskThresholds.low}
                 onChange={v => setForm(f => ({ ...f, riskThresholds: { ...f.riskThresholds, low: v } }))}
-                min={1} max={100} />
+                min={1} max={100} disabled={!isAdmin} />
               <NumberInput label="High Risk (score <=)" value={form.riskThresholds.high}
                 onChange={v => setForm(f => ({ ...f, riskThresholds: { ...f.riskThresholds, high: v } }))}
-                min={0} max={99} />
+                min={0} max={99} disabled={!isAdmin} />
             </div>
             {!thresholdsValid && (
               <p className="mt-2 text-sm font-medium text-red-600">
@@ -462,12 +494,14 @@ export default function SettingsForm() {
               </p>
             )}
             <RiskThresholdBar low={form.riskThresholds.low} high={form.riskThresholds.high} />
+            {isAdmin && (
             <div className="mt-3 flex justify-end">
               <Button variant="outline" size="sm"
                 onClick={() => setForm(f => ({ ...f, riskThresholds: DEFAULTS_V2.riskThresholds }))}>
                 Reset to Defaults
               </Button>
             </div>
+            )}
           </CardContent>
         </Card>
 
@@ -476,9 +510,10 @@ export default function SettingsForm() {
       </div>
 
       {/* Sticky bottom bar */}
+      {isAdmin && (
       <div className="sticky bottom-0 mt-6 flex items-center gap-3 border-t bg-background py-4">
         {message && (
-          <p className={`flex-1 text-sm ${message.type === 'success' ? 'text-emerald-600' : 'text-red-600'}`}>
+          <p className={`flex-1 text-sm transition-opacity duration-500 ${fading ? 'opacity-0' : 'opacity-100'} ${message.type === 'success' ? 'text-emerald-600' : 'text-red-600'}`}>
             {message.text}
           </p>
         )}
@@ -487,6 +522,7 @@ export default function SettingsForm() {
           {saving ? 'Saving...' : 'Save'}
         </Button>
       </div>
+      )}
     </div>
   );
 }

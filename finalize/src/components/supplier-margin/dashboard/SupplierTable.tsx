@@ -15,7 +15,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatRM, marginColor } from '@/lib/supplier-margin/format';
-import { Search, ChevronDown, X } from 'lucide-react';
+import { Search, ChevronDown, X, Info } from 'lucide-react';
 import { SupplierProfileModal } from '@/components/profiles/SupplierProfileModal';
 
 interface SupplierRow {
@@ -137,7 +137,7 @@ function SupplierCombobox({
 /* ── CSV export ────────────────────────────────────────────────────────────── */
 
 function exportCsv(rows: SupplierRow[]) {
-  const headers = ['Supplier Code','Supplier Name','Type','Revenue','Purchase Cost','Profit','Trend','Margin %','Items'];
+  const headers = ['Supplier Code','Supplier Name','Type','Est. Revenue','Est. Cost of Sales','Est. Profit','Trend','Margin %','Items'];
   const lines = rows.map(r => [
     r.creditor_code,
     `"${r.company_name}"`,
@@ -226,6 +226,10 @@ export function SupplierTable({ filters }: { filters: DashboardFilters }) {
         <div className="flex items-center justify-between">
           <div>
             <CardTitle>Supplier Analysis</CardTitle>
+            <p className="flex items-start gap-1.5 text-xs text-foreground/70 mt-1">
+              <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+              <span className="flex flex-col gap-0.5"><span><strong>Est.</strong> = Estimated — the system does not track which supplier's stock was sold to which customer, so revenue, cost of sales, and profit are split based on each supplier's share of total purchases.</span><span>Qty Purchased, Avg Purchase / Unit, and Total Spend use actual data from purchase invoices.</span></span>
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-64">
@@ -254,9 +258,9 @@ export function SupplierTable({ filters }: { filters: DashboardFilters }) {
                 <SortHeader col="company_name" label="Supplier Name" />
                 <TableHead>Type</TableHead>
                 <SortHeader col="items_supplied" label="Items" />
-                <SortHeader col="attributed_revenue" label="Revenue" />
-                <SortHeader col="attributed_cogs" label="Purchase Cost" />
-                <SortHeader col="attributed_profit" label="Profit" />
+                <SortHeader col="attributed_revenue" label="Est. Revenue" />
+                <SortHeader col="attributed_cogs" label="Est. Cost of Sales" />
+                <SortHeader col="attributed_profit" label="Est. Profit" />
                 <TableHead className="w-[130px]">Trend</TableHead>
                 <SortHeader col="margin_pct" label="Margin %" />
               </TableRow>
@@ -325,6 +329,7 @@ export function SupplierTable({ filters }: { filters: DashboardFilters }) {
           companyName={profileSupplier.company_name}
           initialStartDate={filters.startDate}
           initialEndDate={filters.endDate}
+          initialView="items"
           supplierMetrics={{
             attributed_revenue: profileSupplier.attributed_revenue,
             attributed_cogs: profileSupplier.attributed_cogs,

@@ -60,11 +60,11 @@ function MultiSelectCombo<T extends { key: string; label: string; sub?: string }
   }, []);
 
   const filtered = useMemo(() => {
-    if (!search) return items.slice(0, 80);
+    if (!search) return items;
     const q = search.toLowerCase();
     return items.filter(
       (i) => i.key.toLowerCase().includes(q) || i.label.toLowerCase().includes(q)
-    ).slice(0, 80);
+    );
   }, [items, search]);
 
   const toggle = useCallback((key: string) => {
@@ -407,7 +407,7 @@ export function PriceScatterChart({ filters }: { filters: DashboardFilters }) {
                 domain={[0, maxPrice]}
                 tickFormatter={(v: number) => `RM${Math.round(v)}`}
                 tick={{ fontSize: 10 }}
-                label={{ value: 'Avg Purchase Price (RM)', position: 'insideBottom', offset: -10, fontSize: 11, fill: '#6b7280' }}
+                label={{ value: 'Avg Purchase / Unit (RM)', position: 'insideBottom', offset: -10, fontSize: 11, fill: '#6b7280' }}
               />
               <YAxis
                 type="number"

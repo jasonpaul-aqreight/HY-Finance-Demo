@@ -403,6 +403,14 @@ export interface CustomerProfileData {
   debtor_type: string;
   sales_agent: string;
   avg_payment_days: number | null;
+  // Contact / general fields
+  attention: string;
+  phone1: string;
+  mobile: string;
+  email_address: string;
+  area_code: string;
+  currency_code: string;
+  created_date: string | null;
   // Credit health metrics (always included)
   credit_limit: number;
   total_outstanding: number;
@@ -430,12 +438,21 @@ export function getCustomerProfile(debtorCode: string): CustomerProfileData {
       COALESCE(DebtorType, '') AS debtor_type,
       COALESCE(SalesAgent, '') AS sales_agent,
       COALESCE(CreditLimit, 0) AS credit_limit,
-      COALESCE(OverdueLimit, 0) AS overdue_limit
+      COALESCE(OverdueLimit, 0) AS overdue_limit,
+      COALESCE(Attention, '') AS attention,
+      COALESCE(Phone1, '') AS phone1,
+      COALESCE(Mobile, '') AS mobile,
+      COALESCE(EmailAddress, '') AS email_address,
+      COALESCE(AreaCode, '') AS area_code,
+      COALESCE(CurrencyCode, 'MYR') AS currency_code,
+      CreatedTimeStamp AS created_date
     FROM debtor
     WHERE DebtorCode = ?
   `).get(debtorCode) as {
     display_term: string; is_active: string; debtor_type: string; sales_agent: string;
     credit_limit: number; overdue_limit: number;
+    attention: string; phone1: string; mobile: string; email_address: string;
+    area_code: string; currency_code: string; created_date: string | null;
   } | undefined;
 
   // Outstanding invoices
@@ -508,6 +525,13 @@ export function getCustomerProfile(debtorCode: string): CustomerProfileData {
     debtor_type: debtor?.debtor_type ?? '',
     sales_agent: debtor?.sales_agent ?? '',
     avg_payment_days: timeliness?.avg_days != null ? Math.round(timeliness.avg_days) : null,
+    attention: debtor?.attention ?? '',
+    phone1: debtor?.phone1 ?? '',
+    mobile: debtor?.mobile ?? '',
+    email_address: debtor?.email_address ?? '',
+    area_code: debtor?.area_code ?? '',
+    currency_code: debtor?.currency_code ?? 'MYR',
+    created_date: debtor?.created_date ?? null,
     credit_limit: creditLimit,
     total_outstanding: invoiceStats.total_outstanding,
     utilization_pct: utilPct != null ? Math.round(utilPct * 10) / 10 : null,

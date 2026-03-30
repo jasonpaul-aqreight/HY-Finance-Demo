@@ -12,7 +12,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { formatRM, formatCount } from '@/lib/format';
 import type { GroupByDimension, GroupByRow } from '@/lib/sales/types';
-import { CustomerProfileModal } from '@/components/profiles/CustomerProfileModal';
+import { CustomerProfileRevamp } from '@/components/profiles/CustomerProfileRevampPreview';
 
 interface Column {
   key: string;
@@ -212,12 +212,12 @@ export function GroupByTable({ data, group, selectedNames, onToggle, maxSelected
       </div>
 
       {selectedCustomer && (
-        <CustomerProfileModal
+        <CustomerProfileRevamp
           open={!!selectedCustomer}
           onClose={() => setSelectedCustomer(null)}
           debtorCode={selectedCustomer.code}
           companyName={selectedCustomer.name}
-          defaultTab="sold-items"
+          defaultTab="sales"
           initialStartDate={startDate}
           initialEndDate={endDate}
         />

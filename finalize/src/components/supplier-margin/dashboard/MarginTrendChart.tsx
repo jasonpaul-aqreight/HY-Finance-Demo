@@ -22,6 +22,13 @@ const COLORS = {
   margin: '#ef4444',
 };
 
+function formatMonth(ym: string) {
+  if (!ym || !ym.includes('-')) return ym;
+  const [y, m] = ym.split('-');
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${months[parseInt(m, 10) - 1]} ${y.slice(2)}`;
+}
+
 function formatYAxis(v: number) {
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
   if (v >= 1_000) return `${(v / 1_000).toFixed(0)}K`;
@@ -69,7 +76,7 @@ export function MarginTrendChart({ filters }: { filters: DashboardFilters }) {
       <CardHeader className="pb-2">
         <CardTitle>Profitability Trend</CardTitle>
         <p className="text-xs text-muted-foreground">
-          Gross Profit (bars) with Margin % overlay (line)
+          Est. Gross Profit (bars) with Margin % overlay (line)
         </p>
       </CardHeader>
       <CardContent>
@@ -78,6 +85,7 @@ export function MarginTrendChart({ filters }: { filters: DashboardFilters }) {
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
             <XAxis
               dataKey="period"
+              tickFormatter={formatMonth}
               tick={{ fontSize: 11 }}
               tickLine={false}
               interval="preserveStartEnd"
@@ -101,7 +109,7 @@ export function MarginTrendChart({ filters }: { filters: DashboardFilters }) {
             <Tooltip wrapperStyle={{ zIndex: 50 }} content={<CustomTooltip />} />
             <Legend wrapperStyle={{ fontSize: 12 }} />
 
-            <Bar yAxisId="left" dataKey="profit" name="Gross Profit" fill={COLORS.grossProfit} />
+            <Bar yAxisId="left" dataKey="profit" name="Est. Gross Profit" fill={COLORS.grossProfit} />
             <Line
               yAxisId="right"
               type="monotone"

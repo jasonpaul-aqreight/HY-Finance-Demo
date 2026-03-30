@@ -5,6 +5,7 @@ import { SidebarProvider } from "@/components/layout/SidebarProvider";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { ScrollPreserver } from "@/components/layout/ScrollPreserver";
 import { SWRProvider } from "@/components/layout/SWRProvider";
+import { RoleProvider } from "@/components/layout/RoleProvider";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -33,6 +34,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <SWRProvider>
+          <RoleProvider>
           <TooltipProvider>
             <SidebarProvider>
               <div className="flex h-screen">
@@ -43,6 +45,7 @@ export default function RootLayout({
               </div>
             </SidebarProvider>
           </TooltipProvider>
+          </RoleProvider>
         </SWRProvider>
       </body>
     </html>

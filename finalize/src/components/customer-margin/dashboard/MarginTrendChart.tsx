@@ -32,6 +32,13 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
   );
 }
 
+function formatMonth(ym: string) {
+  if (!ym || !ym.includes('-')) return ym;
+  const [y, m] = ym.split('-');
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${months[parseInt(m, 10) - 1]} ${y.slice(2)}`;
+}
+
 export function MarginTrendChart({ filters }: Props) {
   const { data: rawData } = useMarginTrend(filters);
   const data = useStableData(rawData);
@@ -48,7 +55,7 @@ export function MarginTrendChart({ filters }: Props) {
           <ResponsiveContainer width="100%" height={360}>
             <ComposedChart data={data ?? []}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-              <XAxis dataKey="period" tick={{ fontSize: 11 }} />
+              <XAxis dataKey="period" tickFormatter={formatMonth} tick={{ fontSize: 11 }} />
               <YAxis
                 yAxisId="left"
                 tickFormatter={v => `${(v / 1_000_000).toFixed(1)}M`}

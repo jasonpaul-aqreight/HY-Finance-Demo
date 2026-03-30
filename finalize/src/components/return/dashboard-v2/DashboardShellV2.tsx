@@ -10,19 +10,12 @@ import { TopDebtorsTable } from './overview/TopDebtorsTable';
 import { SettlementBreakdown } from './refunds/SettlementBreakdown';
 import { ProductBarChart } from './products/ProductBarChart';
 
-function SectionHeader({ title, subtitle }: { title: string; subtitle: string }) {
+function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
-    <div className="relative">
-      <div className="absolute inset-0 flex items-center" aria-hidden="true">
-        <div className="w-full border-t border-border" />
-      </div>
-      <div className="relative flex items-center gap-3">
-        <span className="bg-background pr-3">
-          <h2 className="text-base font-semibold tracking-tight text-foreground">{title}</h2>
-        </span>
-        <span className="rounded-full border border-border bg-background px-2.5 py-0.5 text-xs font-medium text-foreground">
-          {subtitle}
-        </span>
+    <div className="rounded-md bg-primary/5 border border-primary/10 px-4 py-2.5">
+      <div className="flex items-baseline gap-3">
+        <h2 className="text-base font-semibold tracking-tight text-foreground">{title}</h2>
+        {subtitle && <span className="text-xs font-medium text-foreground/50">{subtitle}</span>}
       </div>
     </div>
   );
@@ -64,7 +57,7 @@ export function DashboardShellV2() {
 
       {/* ═══ Section 2: Outstanding Position (as of today) ═══ */}
       <div className="mt-10">
-        <SectionHeader title="Outstanding Position" subtitle="As of today" />
+        <SectionHeader title="Unresolved Returns" subtitle="Accumulated from beginning to now" />
       </div>
 
       <div className="mt-4">
