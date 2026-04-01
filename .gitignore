@@ -13,12 +13,11 @@ node_modules/
 out/
 build/
 
-# ─── Data files (CSVs and SQLite databases) ──────────────────────────────────
-data/*.csv
-data/*.db
-data/*.db-shm
-data/*.db-wal
-data/settings.json
+# ─── Data files ──────────────────────────────────────────────────────────────
+*.csv
+*.db
+*.db-shm
+*.db-wal
 
 # ─── Testing ─────────────────────────────────────────────────────────────────
 coverage/
