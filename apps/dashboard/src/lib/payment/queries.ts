@@ -315,7 +315,7 @@ export async function getCollectionTrend(startMonth: string, endMonth: string, f
         SELECT AVG(pay."DocDate"::date - inv."DocDate"::date)::float AS avg_days
         FROM dbo."ARInvoice" inv
         JOIN dbo."ARPaymentKnockOff" ko
-          ON ko."KnockOffDocKey" = inv."DocKey" AND ko."KnockOffDocType" = 'IV'
+          ON ko."KnockOffDocKey" = inv."DocKey" AND ko."KnockOffDocType" = 'RI'
         JOIN dbo."ARPayment" pay ON ko."DocKey" = pay."DocKey"
         WHERE inv."Cancelled" = 'F' AND pay."Cancelled" = 'F'
           AND inv."DebtorCode" = $1
