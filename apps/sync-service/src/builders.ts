@@ -389,7 +389,8 @@ async function buildArCustomerSnapshot(source: Pool, ctx: BuilderContext): Promi
     payment_speed AS (
       SELECT
         inv."DebtorCode",
-        AVG(pay."DocDate"::date - inv."DocDate"::date) AS avg_payment_days
+        AVG(pay."DocDate"::date - inv."DocDate"::date) AS avg_payment_days,
+        AVG(pay."DocDate"::date - inv."DueDate"::date) AS avg_days_late
       FROM dbo."ARInvoice" inv
       JOIN dbo."ARPaymentKnockOff" ko
         ON ko."KnockOffDocKey" = inv."DocKey" AND ko."KnockOffDocType" = 'RI'
@@ -416,6 +417,7 @@ async function buildArCustomerSnapshot(source: Pool, ctx: BuilderContext): Promi
         THEN ROUND((COALESCE(car.total_outstanding, 0) / d."CreditLimit" * 100)::numeric, 2)
         ELSE NULL END AS utilization_pct,
       ps.avg_payment_days,
+      ps.avg_days_late,
       d."Attention" AS attention,
       COALESCE(d."Phone1", '') AS phone1,
       COALESCE(d."Mobile", '') AS mobile,
@@ -443,6 +445,7 @@ async function buildArCustomerSnapshot(source: Pool, ctx: BuilderContext): Promi
     const overdueAmt = Number(row.overdue_amount) || 0;
     const maxOverdueDays = Number(row.max_overdue_days) || 0;
     const avgPayDays = row.avg_payment_days != null ? Number(row.avg_payment_days) : null;
+    const avgDaysLate = row.avg_days_late != null ? Number(row.avg_days_late) : null;
 
     // Utilization score: max(0, 100 - utilization%)
     const utilPct = creditLimit > 0 ? (outstanding / creditLimit) * 100 : 0;
@@ -456,13 +459,13 @@ async function buildArCustomerSnapshot(source: Pool, ctx: BuilderContext): Promi
       : maxOverdueDays <= 120 ? 20
       : 0;
 
-    // Timeliness score: step-ladder based on avg days late
-    const timeScore = avgPayDays == null ? 0
-      : avgPayDays <= 0 ? 100
-      : avgPayDays <= 7 ? 80
-      : avgPayDays <= 14 ? 60
-      : avgPayDays <= 30 ? 40
-      : avgPayDays <= 60 ? 20
+    // Timeliness score: step-ladder based on avg days late (payment_date - due_date)
+    const timeScore = avgDaysLate == null ? 0
+      : avgDaysLate <= 0 ? 100
+      : avgDaysLate <= 7 ? 80
+      : avgDaysLate <= 14 ? 60
+      : avgDaysLate <= 30 ? 40
+      : avgDaysLate <= 60 ? 20
       : 0;
 
     // Double breach: both over credit AND overdue

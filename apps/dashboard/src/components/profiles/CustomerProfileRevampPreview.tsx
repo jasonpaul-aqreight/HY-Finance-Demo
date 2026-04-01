@@ -133,15 +133,16 @@ export function CustomerProfileRevamp({ open, onClose, debtorCode, companyName, 
   const { data: profile, isLoading: profileLoading } = useCustomerProfile(debtorCode);
   const { data: invoices } = useCustomerInvoices(debtorCode);
   const { data: returnSummary } = useCustomerReturnSummary(debtorCode);
-  const { data: returnTrend } = useCustomerReturnTrend(debtorCode, trendStart, trendEnd);
-  const { data: monthlyData } = useCustomerMonthly(debtorCode, trendStart, trendEnd);
+  const { data: returnTrend, isLoading: returnTrendLoading, isValidating: returnTrendValidating } = useCustomerReturnTrend(debtorCode, trendStart, trendEnd);
+  const { data: monthlyData, isLoading: monthlyLoading, isValidating: monthlyValidating } = useCustomerMonthly(debtorCode, trendStart, trendEnd);
   const { data: returnDetails } = useCustomerReturnDetailsAll(debtorCode);
-  const { data: rawProductsData } = useCustomerProducts(debtorCode, salesStart, salesEnd);
+  const { data: rawProductsData, isLoading: productsInitialLoading, isValidating: productsValidating } = useCustomerProducts(debtorCode, salesStart, salesEnd);
   const productsData = useStableData(rawProductsData);
+  const productsLoading = productsInitialLoading || (productsValidating && rawProductsData === undefined);
 
   const startMonth = toYearMonth(trendStart);
   const endMonth = toYearMonth(trendEnd);
-  const { data: collectionTrendRes } = useSWR<{ data: any[]; avg_pay_days: number | null }>(
+  const { data: collectionTrendRes, isLoading: collectionLoading, isValidating: collectionValidating } = useSWR<{ data: any[]; avg_pay_days: number | null }>(
     `/api/payment/collection-trend?customer=${encodeURIComponent(debtorCode)}&start_month=${startMonth}&end_month=${endMonth}`,
     fetcher, { revalidateOnFocus: false },
   );
@@ -257,6 +258,7 @@ export function CustomerProfileRevamp({ open, onClose, debtorCode, companyName, 
               outstandingCount={outstandingCount} unsettledCount={unsettledCount}
               trendStart={trendStart} trendEnd={trendEnd} setTrendStart={setTrendStart}
               setTrendEnd={setTrendEnd} setActiveView={setActiveView}
+              monthlyLoading={monthlyLoading || monthlyValidating} collectionLoading={collectionLoading || collectionValidating} returnTrendLoading={returnTrendLoading || returnTrendValidating}
             />
           ) : activeView === 'outstanding' ? (
             <TableLogView title="Outstanding Invoices" onBack={() => setActiveView('profile')} searchPlaceholder="Search Doc No..." search={invoiceSearch} onSearchChange={setInvoiceSearch}>
@@ -271,7 +273,7 @@ export function CustomerProfileRevamp({ open, onClose, debtorCode, companyName, 
               <div className="mb-4">
                 <DateRangeSection label="Date Range" startDate={salesStart} endDate={salesEnd} onStartDateChange={setSalesStart} onEndDateChange={setSalesEnd} showPresets showRangeSummary={false} />
               </div>
-              <SalesTransactionsTable products={productsData} search={salesSearch} />
+              <SalesTransactionsTable products={productsData} search={salesSearch} isLoading={productsLoading} />
             </TableLogView>
           )}
         </div>
@@ -287,6 +289,7 @@ function ProfileView({
   profile, agingBuckets, totalOutstanding, overdueAmount, returnDonutData, returnSummary,
   returnTrend, monthlyData, collectionTrend, salesKpis, collectionKpis, returnKpis,
   scopedAvgPayDays, outstandingCount, unsettledCount, trendStart, trendEnd, setTrendStart, setTrendEnd, setActiveView,
+  monthlyLoading, collectionLoading, returnTrendLoading,
 }: {
   profile: any; agingBuckets: any[]; totalOutstanding: number; overdueAmount: number;
   returnDonutData: any[]; returnSummary: any; returnTrend: any; monthlyData: any;
@@ -295,6 +298,7 @@ function ProfileView({
   outstandingCount: number; unsettledCount: number;
   trendStart: string; trendEnd: string; setTrendStart: (d: string) => void;
   setTrendEnd: (d: string) => void; setActiveView: (view: ActiveView) => void;
+  monthlyLoading?: boolean; collectionLoading?: boolean; returnTrendLoading?: boolean;
 }) {
   return (
     <div className="px-6 py-5 space-y-8">
@@ -402,7 +406,7 @@ function ProfileView({
               <KpiCard label="Avg Margin" value={`${salesKpis.avgMargin.toFixed(1)}%`} />
               <KpiCard label="COGS" value={formatRM(salesKpis.cogs)} />
             </div>
-            <SalesMarginChart data={monthlyData} />
+            <SalesMarginChart data={monthlyData} isLoading={monthlyLoading} />
           </CardContent></Card>
 
           {/* Payment */}
@@ -413,7 +417,7 @@ function ProfileView({
               <KpiCard label="Rate" value={`${collectionKpis.rate.toFixed(1)}%`} />
               <KpiCard label="Avg Pay Days" value={`${scopedAvgPayDays ?? '—'}`} />
             </div>
-            <PaymentTrendChart data={collectionTrend} />
+            <PaymentTrendChart data={collectionTrend} isLoading={collectionLoading} />
           </CardContent></Card>
 
           {/* Returns */}
@@ -423,7 +427,7 @@ function ProfileView({
               <KpiCard label="Total Returns" value={formatRM(returnKpis.totalValue)} />
               <KpiCard label="Count" value={String(returnKpis.totalCount)} />
             </div>
-            <ReturnTrendChart data={returnTrend} />
+            <ReturnTrendChart data={returnTrend} isLoading={returnTrendLoading} />
           </CardContent></Card>
         </div>
       </section>
@@ -594,7 +598,17 @@ function ReturnsDonut({ data }: { data: any[] }) {
 // TREND CHARTS (compact for 2x2 grid)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function SalesMarginChart({ data }: { data: any }) {
+function LoadingSpinner() {
+  return (
+    <div className="flex items-center justify-center py-8 gap-2">
+      <div className="h-5 w-5 animate-spin rounded-full border-2 border-foreground/20 border-t-foreground/60" />
+      <span className="text-sm text-foreground/60">Loading data...</span>
+    </div>
+  );
+}
+
+function SalesMarginChart({ data, isLoading }: { data: any; isLoading?: boolean }) {
+  if (isLoading) return <LoadingSpinner />;
   if (!data || !Array.isArray(data) || data.length === 0) return <div className="text-sm text-foreground/60 text-center py-8">No data</div>;
   return (
     <ResponsiveContainer width="100%" height={220}>
@@ -611,7 +625,8 @@ function SalesMarginChart({ data }: { data: any }) {
   );
 }
 
-function PaymentTrendChart({ data }: { data: any }) {
+function PaymentTrendChart({ data, isLoading }: { data: any; isLoading?: boolean }) {
+  if (isLoading) return <LoadingSpinner />;
   if (!data || !Array.isArray(data) || data.length === 0) return <div className="text-sm text-foreground/60 text-center py-8">No data</div>;
   const chartData = data.map((row: any) => ({ ...row, collection_rate: row.total_invoiced > 0 ? Math.round((row.total_collected / row.total_invoiced) * 1000) / 10 : 0 }));
   return (
@@ -631,7 +646,8 @@ function PaymentTrendChart({ data }: { data: any }) {
   );
 }
 
-function ReturnTrendChart({ data }: { data: any }) {
+function ReturnTrendChart({ data, isLoading }: { data: any; isLoading?: boolean }) {
+  if (isLoading) return <LoadingSpinner />;
   if (!data || !Array.isArray(data) || data.length === 0) return <div className="text-sm text-foreground/60 text-center py-8">No data</div>;
   return (
     <ResponsiveContainer width="100%" height={220}>
@@ -784,7 +800,7 @@ function ReturnRecordsTable({ records, search = '' }: { records: any; search?: s
 
 type SalesSortKey = 'item_code' | 'description' | 'qty_sold' | 'revenue' | 'cost' | 'margin_pct';
 
-function SalesTransactionsTable({ products, search = '' }: { products: any; search?: string }) {
+function SalesTransactionsTable({ products, search = '', isLoading }: { products: any; search?: string; isLoading?: boolean }) {
   const items = products?.data ?? products ?? [];
   const [sortKey, setSortKey] = useState<SalesSortKey>('revenue');
   const [sortAsc, setSortAsc] = useState(false);
@@ -806,6 +822,7 @@ function SalesTransactionsTable({ products, search = '' }: { products: any; sear
       {label}<SortIcon active={sortKey === col} asc={sortAsc} />
     </th>
   );
+  if (isLoading || products === undefined) return <LoadingSpinner />;
   if (rows.length === 0) return <div className="text-sm text-foreground/60 text-center py-8">No sales transactions</div>;
   return (
     <div className="rounded-lg border overflow-hidden">
