@@ -98,7 +98,7 @@ export function computeCreditScoreV2(
   input: CreditScoreV2Input,
   weights: CreditScoreV2Weights = DEFAULT_WEIGHTS,
   thresholds: RiskThresholds = DEFAULT_THRESHOLDS,
-  neutralScore: number = 0,
+  neutralScore: number = 50,
 ): CreditScoreV2Result {
   const util = utilizationComponent(input.creditUtilizationPct, input.hasCreditLimit, neutralScore);
   const overdue = overdueComponent(input.oldestOverdueDays);

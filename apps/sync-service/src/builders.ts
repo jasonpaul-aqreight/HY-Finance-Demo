@@ -412,8 +412,11 @@ async function buildArCustomerSnapshot(source: Pool, ctx: BuilderContext): Promi
       SELECT
         inv."DebtorCode",
         AVG(pay."DocDate"::date - inv."DocDate"::date) AS avg_payment_days,
-        AVG(CASE WHEN pay."DocDate" >= (NOW() - INTERVAL '12 months')
-              THEN pay."DocDate"::date - inv."DueDate"::date END) AS avg_days_late
+        COALESCE(
+          AVG(CASE WHEN pay."DocDate" >= (NOW() - INTERVAL '12 months')
+                THEN pay."DocDate"::date - inv."DueDate"::date END),
+          AVG(pay."DocDate"::date - inv."DueDate"::date)
+        ) AS avg_days_late
       FROM dbo."ARInvoice" inv
       JOIN dbo."ARPaymentKnockOff" ko
         ON ko."KnockOffDocKey" = inv."DocKey" AND ko."KnockOffDocType" = 'RI'
@@ -470,8 +473,9 @@ async function buildArCustomerSnapshot(source: Pool, ctx: BuilderContext): Promi
     const avgDaysLate = row.avg_days_late != null ? Number(row.avg_days_late) : null;
 
     // Utilization score: max(0, 100 - utilization%)
+    // No credit limit set → neutral score (50), not punished for admin gap
     const utilPct = creditLimit > 0 ? (outstanding / creditLimit) * 100 : 0;
-    const utilScore = creditLimit > 0 ? Math.max(0, Math.round(100 - utilPct)) : 0;
+    const utilScore = creditLimit > 0 ? Math.max(0, Math.round(100 - utilPct)) : 50;
 
     // Overdue days score: step-ladder thresholds
     const odScore = maxOverdueDays <= 0 ? 100
@@ -482,7 +486,8 @@ async function buildArCustomerSnapshot(source: Pool, ctx: BuilderContext): Promi
       : 0;
 
     // Timeliness score: step-ladder based on avg days late (payment_date - due_date)
-    const timeScore = avgDaysLate == null ? 0
+    // NULL means no payment history at all → neutral score (50)
+    const timeScore = avgDaysLate == null ? 50
       : avgDaysLate <= 0 ? 100
       : avgDaysLate <= 7 ? 80
       : avgDaysLate <= 14 ? 60
