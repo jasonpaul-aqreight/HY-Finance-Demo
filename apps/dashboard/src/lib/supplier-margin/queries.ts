@@ -150,6 +150,7 @@ async function fetchMarginPeriod(start: string, end: string): Promise<{ revenue:
       COALESCE(SUM(m.purchase_total), 0)::float AS cogs
     FROM pc_supplier_margin m
     WHERE m.month BETWEEN $1 AND $2
+      AND m.is_active = 'T'
   `, [startMonth, endMonth]);
   return rows[0];
 }
@@ -172,6 +173,7 @@ async function fetchTopLowestSupplier(start: string, end: string): Promise<{ top
       )::float AS margin_pct
     FROM pc_supplier_margin m
     WHERE m.month BETWEEN $1 AND $2
+      AND m.is_active = 'T'
     GROUP BY m.creditor_code, m.creditor_name
     HAVING SUM(m.sales_revenue) >= $3
     ORDER BY margin_pct DESC
@@ -210,6 +212,7 @@ export async function getMarginSummary(start: string, end: string) {
     FROM pc_supplier_margin m
     WHERE m.month BETWEEN $1 AND $2
       AND m.sales_revenue > 0
+      AND m.is_active = 'T'
   `, [startMonth, endMonth]);
   const supplierCount = supplierCountResult.rows[0] as { cnt: number };
 
@@ -219,6 +222,7 @@ export async function getMarginSummary(start: string, end: string) {
     FROM pc_supplier_margin m
     WHERE m.month BETWEEN $1 AND $2
       AND m.purchase_qty > 0
+      AND m.is_active = 'T'
   `, [startMonth, endMonth]);
   const itemsRow = itemsResult.rows[0] as { cnt: number };
 
@@ -273,6 +277,7 @@ export async function getMarginTrend(
       )::float AS margin_pct
     FROM pc_supplier_margin m
     WHERE m.month BETWEEN $1 AND $2
+      AND m.is_active = 'T'
     GROUP BY ${pExpr}
     ORDER BY ${pExpr} ASC
   `, [startMonth, endMonth]);
@@ -296,6 +301,7 @@ export async function getSupplierTrend(
     SELECT m.creditor_code AS creditorcode
     FROM pc_supplier_margin m
     WHERE m.month BETWEEN $1 AND $2
+      AND m.is_active = 'T'
     GROUP BY m.creditor_code
     ORDER BY SUM(m.sales_revenue) DESC
     LIMIT 10
@@ -320,6 +326,7 @@ export async function getSupplierTrend(
       ROUND((SUM(m.sales_revenue) - SUM(m.purchase_total))::numeric, 2)::float AS profit
     FROM pc_supplier_margin m
     WHERE m.month BETWEEN $1 AND $2
+      AND m.is_active = 'T'
       AND m.creditor_code IN (${codeParams})
     GROUP BY ${pExpr}, m.creditor_code, m.creditor_name
     ORDER BY ${pExpr} ASC
@@ -351,6 +358,7 @@ export async function getMarginByItemGroup(
       )::float AS margin_pct
     FROM pc_supplier_margin m
     WHERE m.month BETWEEN $1 AND $2
+      AND m.is_active = 'T'
     GROUP BY COALESCE(m.item_group, 'UNGROUPED'), ${pExpr}
     ORDER BY ${pExpr} ASC, revenue DESC
   `, [startMonth, endMonth]);
@@ -409,6 +417,7 @@ export async function getSupplierTable(
       COUNT(DISTINCT m.item_code)::int AS items_supplied
     FROM pc_supplier_margin m
     WHERE m.month BETWEEN $1 AND $2
+      AND m.is_active = 'T'
       ${supplierFilter}
       ${itemGroupFilter}
     GROUP BY m.creditor_code, m.creditor_name, m.creditor_type
@@ -464,6 +473,7 @@ export async function getSupplierSparklines(
       )::float AS margin_pct
     FROM pc_supplier_margin m
     WHERE m.month BETWEEN $1 AND $2
+      AND m.is_active = 'T'
       ${supplierFilter}
       ${itemGroupFilter}
     GROUP BY m.creditor_code, m.month
@@ -500,6 +510,7 @@ export async function getSupplierItems(
     FROM pc_supplier_margin m
     WHERE m.creditor_code = $1
       AND m.month BETWEEN $2 AND $3
+      AND m.is_active = 'T'
     GROUP BY m.item_code, m.item_description, m.item_group
     ORDER BY revenue DESC
   `, [creditorCode, startMonth, endMonth]);
@@ -538,6 +549,7 @@ export async function getSupplierItemPriceTrends(
     FROM pc_supplier_margin m
     WHERE m.creditor_code = $1
       AND m.month BETWEEN $2 AND $3
+      AND m.is_active = 'T'
       AND m.purchase_qty > 0
     ORDER BY m.item_code, m.month
   `, [creditorCode, startMonth, endMonth]);
@@ -584,6 +596,7 @@ export async function getPriceComparison(
       ROUND(SUM(m.sales_revenue)::numeric, 2)::float AS revenue
     FROM pc_supplier_margin m
     WHERE m.month BETWEEN $1 AND $2
+      AND m.is_active = 'T'
     GROUP BY m.item_code, m.item_description, m.item_group, m.creditor_code, m.creditor_name
     HAVING SUM(m.sales_revenue) > 0
     ORDER BY revenue DESC
@@ -639,6 +652,7 @@ export async function getPriceSpread(
         STRING_AGG(DISTINCT m.creditor_code, ',') AS supplier_codes
       FROM pc_supplier_margin m
       WHERE m.month BETWEEN $1 AND $2
+        AND m.is_active = 'T'
         ${supplierFilter}
         ${itemGroupFilter}
       GROUP BY m.item_code
@@ -693,6 +707,7 @@ export async function getItemListProcurement(
     FROM pc_supplier_margin m
     LEFT JOIN product p ON m.item_code = p.itemcode
     WHERE m.month BETWEEN $1 AND $2
+      AND m.is_active = 'T'
       AND m.purchase_qty > 0
     GROUP BY m.item_code
     HAVING COUNT(DISTINCT m.creditor_code) >= 1
@@ -744,6 +759,7 @@ export async function getItemProcurementSummary(
     FROM pc_supplier_margin m
     WHERE m.item_code = $1
       AND m.month BETWEEN $2 AND $3
+      AND m.is_active = 'T'
       AND m.purchase_qty > 0
     GROUP BY m.creditor_code, m.creditor_name
     ORDER BY avg_price ASC
@@ -763,6 +779,7 @@ export async function getItemProcurementSummary(
     FROM pc_supplier_margin m
     WHERE m.item_code = $1
       AND m.month BETWEEN $2 AND $3
+      AND m.is_active = 'T'
       AND m.purchase_qty > 0
     ORDER BY m.creditor_code, m.month DESC
   `, [itemCode, startMonth, endMonth]);
@@ -879,6 +896,7 @@ export async function getSupplierProfileSummary(creditorCode: string, start: str
     SELECT DISTINCT m.creditor_code, m.item_description AS description
     FROM pc_supplier_margin m
     WHERE m.month BETWEEN $1 AND $2
+      AND m.is_active = 'T'
       AND m.purchase_qty > 0
   `, [startMonth, endMonth]);
   const allPurchases = allPurchasesResult.rows as { creditor_code: string; description: string }[];

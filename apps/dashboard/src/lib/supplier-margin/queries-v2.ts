@@ -218,6 +218,7 @@ async function fetchMarginPeriodV2(
       COALESCE(SUM(m.purchase_total), 0)::float AS cogs
     FROM pc_supplier_margin m
     WHERE m.month BETWEEN $1 AND $2
+      AND m.is_active = 'T'
       ${stFilter.sql}
       ${igFilter.sql}
   `, params);
@@ -313,6 +314,7 @@ export async function getMarginTrendV2(
       ROUND((SUM(m.sales_revenue) - SUM(m.purchase_total))::numeric, 2)::float AS profit
     FROM pc_supplier_margin m
     WHERE m.month BETWEEN $1 AND $2
+      AND m.is_active = 'T'
       ${stFilter.sql}
       ${supFilter.sql}
       ${igFilter.sql}
@@ -359,6 +361,7 @@ export async function getTopBottomSuppliersV2(
       ROUND((SUM(m.sales_revenue) - SUM(m.purchase_total))::numeric, 2)::float AS profit
     FROM pc_supplier_margin m
     WHERE m.month BETWEEN $1 AND $2
+      AND m.is_active = 'T'
       ${stFilter.sql}
       ${igFilter.sql}
     GROUP BY m.creditor_code, m.creditor_name
@@ -406,6 +409,7 @@ export async function getTopBottomItemsV2(
       ROUND((SUM(m.sales_revenue) - SUM(m.purchase_total))::numeric, 2)::float AS profit
     FROM pc_supplier_margin m
     WHERE m.month BETWEEN $1 AND $2
+      AND m.is_active = 'T'
       ${stFilter.sql}
       ${igFilter.sql}
     GROUP BY m.item_code, m.item_description, m.item_group
@@ -453,6 +457,7 @@ export async function getSupplierTableV2(
       )::float AS margin_pct
     FROM pc_supplier_margin m
     WHERE m.month BETWEEN $1 AND $2
+      AND m.is_active = 'T'
       ${stFilter.sql}
       ${supFilter.sql}
       ${igFilter.sql}
@@ -490,6 +495,7 @@ export async function getItemListV2(
       ROUND(SUM(m.purchase_total)::numeric, 2)::float AS total_buy
     FROM pc_supplier_margin m
     WHERE m.month BETWEEN $1 AND $2
+      AND m.is_active = 'T'
       AND m.purchase_qty > 0
       ${stFilter.sql}
       ${igFilter.sql}
@@ -518,6 +524,7 @@ export async function getItemSellPriceV2(
     FROM pc_supplier_margin m
     WHERE m.item_code = $1
       AND m.month BETWEEN $2 AND $3
+      AND m.is_active = 'T'
       AND m.sales_qty > 0
   `, [itemCode, startMonth, endMonth]);
 
@@ -556,6 +563,7 @@ export async function getItemSupplierSummaryV2(
     FROM pc_supplier_margin m
     WHERE m.item_code = $2
       AND m.month BETWEEN $3 AND $4
+      AND m.is_active = 'T'
       AND m.purchase_qty > 0
     GROUP BY m.creditor_code, m.creditor_name
     ORDER BY total_buy DESC
@@ -584,6 +592,7 @@ export async function getItemPriceMonthlyV2(
     FROM pc_supplier_margin m
     WHERE m.item_code = $1
       AND m.month BETWEEN $2 AND $3
+      AND m.is_active = 'T'
       AND m.purchase_qty > 0
     ORDER BY m.month ASC
   `, [itemCode, startMonth, endMonth]);
@@ -633,6 +642,7 @@ export async function getSupplierItemsV2(
     FROM pc_supplier_margin m
     WHERE m.creditor_code = $1
       AND m.month BETWEEN $2 AND $3
+      AND m.is_active = 'T'
       AND m.purchase_qty > 0
       ${igFilter.sql}
     GROUP BY m.item_code
@@ -671,6 +681,7 @@ export async function getSupplierSparklinesV2(
       )::float AS margin_pct
     FROM pc_supplier_margin m
     WHERE m.month BETWEEN $1 AND $2
+      AND m.is_active = 'T'
       ${stFilter.sql}
       ${igFilter.sql}
     GROUP BY m.creditor_code, m.month
@@ -712,6 +723,7 @@ export async function getSupplierMarginDistributionV2(
         SUM(m.purchase_total)::float AS cost
       FROM pc_supplier_margin m
       WHERE m.month BETWEEN $1 AND $2
+        AND m.is_active = 'T'
         ${stFilter.sql}
         ${igFilter.sql}
       GROUP BY m.creditor_code
@@ -774,6 +786,7 @@ export async function getItemMarginDistributionV2(
         SUM(m.purchase_total)::float AS cost
       FROM pc_supplier_margin m
       WHERE m.month BETWEEN $1 AND $2
+        AND m.is_active = 'T'
         ${stFilter.sql}
         ${igFilter.sql}
       GROUP BY m.item_code

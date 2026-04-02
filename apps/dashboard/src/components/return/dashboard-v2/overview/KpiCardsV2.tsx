@@ -79,8 +79,8 @@ export function KpiCardsV2({ filters }: { filters: V2Filters }) {
 
   if (!data) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        {Array.from({ length: 5 }).map((_, i) => <SkeletonCard key={i} />)}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)}
       </div>
     );
   }
@@ -88,7 +88,7 @@ export function KpiCardsV2({ filters }: { filters: V2Filters }) {
   const returnRatePct = data.return_rate_pct ?? 0;
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
       <KpiCard
         title="Total Returns"
         value={formatRM(data.total_return_value)}
@@ -112,11 +112,6 @@ export function KpiCardsV2({ filters }: { filters: V2Filters }) {
         value={`${returnRatePct.toFixed(1)}%`}
         valueColor={returnRatePct > 5 ? 'text-red-600' : returnRatePct > 2 ? 'text-amber-600' : 'text-emerald-600'}
         subtitle="return value ÷ total sales"
-      />
-      <KpiCard
-        title="Return Records"
-        value={formatCount(data.return_count)}
-        subtitle="total return credit notes in period"
       />
     </div>
   );

@@ -1,3 +1,4 @@
+import { queryRds } from '../postgres';
 import { getPool } from './db';
 import { toMonth } from './date-utils';
 import type { GroupByDimension, GroupByRow } from './types';
@@ -50,25 +51,75 @@ async function getByCustomerType(startMonth: string, endMonth: string): Promise<
 
 // ─── Group-by: Sales Agent ──────────────────────────────────────────────────
 
-async function getByAgent(startMonth: string, endMonth: string): Promise<GroupByRow[]> {
-  const pool = getPool();
-  const { rows } = await pool.query(`
+interface AgentDistinctCustomerRow {
+  name: string;
+  unique_customers: number;
+}
+
+async function getAgentDistinctCustomerCounts(start: string, end: string): Promise<Map<string, number>> {
+  const rows = await queryRds<AgentDistinctCustomerRow>(`
+    WITH sales AS (
+      SELECT
+        ("DocDate" + INTERVAL '8 hours')::date AS doc_date,
+        "DebtorCode",
+        COALESCE("SalesAgent", '(Unassigned)') AS name
+      FROM dbo."IV"
+      WHERE "Cancelled" = 'F'
+
+      UNION ALL
+
+      SELECT
+        ("DocDate" + INTERVAL '8 hours')::date AS doc_date,
+        "DebtorCode",
+        COALESCE("SalesAgent", '(Unassigned)') AS name
+      FROM dbo."CS"
+      WHERE "Cancelled" = 'F'
+
+      UNION ALL
+
+      SELECT
+        ("DocDate" + INTERVAL '8 hours')::date AS doc_date,
+        "DebtorCode",
+        COALESCE("SalesAgent", '(Unassigned)') AS name
+      FROM dbo."CN"
+      WHERE "Cancelled" = 'F'
+    )
     SELECT
-      dimension_key AS name,
-      MAX(dimension_label) AS description,
-      MAX(is_active) AS is_active,
-      COALESCE(SUM(invoice_sales), 0)::float AS invoice_sales,
-      COALESCE(SUM(cash_sales), 0)::float AS cash_sales,
-      COALESCE(SUM(credit_notes), 0)::float AS credit_notes,
-      COALESCE(SUM(total_sales), 0)::float AS total_sales,
-      COALESCE(SUM(doc_count), 0)::int AS doc_count,
-      COALESCE(SUM(customer_count), 0)::int AS unique_customers
-    FROM pc_sales_by_outlet
-    WHERE dimension = 'agent' AND month BETWEEN $1 AND $2
-    GROUP BY dimension_key
-    ORDER BY total_sales DESC
-  `, [startMonth, endMonth]);
-  return rows;
+      name,
+      COUNT(DISTINCT "DebtorCode")::int AS unique_customers
+    FROM sales
+    WHERE doc_date BETWEEN $1 AND $2
+    GROUP BY name
+  `, [start, end]);
+
+  return new Map(rows.map((row) => [row.name, row.unique_customers]));
+}
+
+async function getByAgent(startMonth: string, endMonth: string, start: string, end: string): Promise<GroupByRow[]> {
+  const pool = getPool();
+  const [{ rows }, distinctCustomerCounts] = await Promise.all([
+    pool.query(`
+      SELECT
+        dimension_key AS name,
+        MAX(dimension_label) AS description,
+        MAX(is_active) AS is_active,
+        COALESCE(SUM(invoice_sales), 0)::float AS invoice_sales,
+        COALESCE(SUM(cash_sales), 0)::float AS cash_sales,
+        COALESCE(SUM(credit_notes), 0)::float AS credit_notes,
+        COALESCE(SUM(total_sales), 0)::float AS total_sales,
+        COALESCE(SUM(doc_count), 0)::int AS doc_count
+      FROM pc_sales_by_outlet
+      WHERE dimension = 'agent' AND month BETWEEN $1 AND $2
+      GROUP BY dimension_key
+      ORDER BY total_sales DESC
+    `, [startMonth, endMonth]),
+    getAgentDistinctCustomerCounts(start, end),
+  ]);
+
+  return rows.map((row) => ({
+    ...row,
+    unique_customers: distinctCustomerCounts.get(String(row.name)) ?? 0,
+  }));
 }
 
 // ─── Group-by: Outlet ───────────────────────────────────────────────────────
@@ -126,7 +177,7 @@ export async function getGroupByData(
   switch (group) {
     case 'customer':       return getByCustomer(startMonth, endMonth);
     case 'customer-type':  return getByCustomerType(startMonth, endMonth);
-    case 'agent':          return getByAgent(startMonth, endMonth);
+    case 'agent':          return getByAgent(startMonth, endMonth, start, end);
     case 'outlet':         return getByOutlet(startMonth, endMonth);
     case 'fruit':          return getByFruit(startMonth, endMonth);
   }

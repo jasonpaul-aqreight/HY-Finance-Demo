@@ -30,7 +30,7 @@ The Hoi-Yong Finance dashboard currently runs on 7 separate SQLite databases (on
 │  │  (public)   │  │ (internal)   │  │  DB: hoiyong  │ │
 │  └──────┬──────┘  └──────┬───────┘  └───────┬───────┘ │
 │         │                │                   │         │
-│         └────────────────┴─── reads/writes ──┘         │
+│         └────────────────┴─── reads ──┘         │
 │                                                         │
 └─────────────────────────────────────────────────────────┘
 
