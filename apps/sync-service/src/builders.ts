@@ -723,6 +723,8 @@ async function buildReturnProducts(source: Pool, ctx: BuilderContext): Promise<B
     WHERE (cn."Cancelled" = 'F' OR cn."Cancelled" IS NULL)
       AND cn."CNType" = 'RETURN'
       AND dtl."ItemCode" IS NOT NULL AND dtl."ItemCode" != ''
+      AND dtl."ItemCode" NOT LIKE 'ZZ-ZZ-ZBKT%'
+      AND dtl."ItemCode" NOT LIKE 'ZZ-ZZ-ZZPL%'
     GROUP BY ${mytMonth('cn')}, dtl."ItemCode", dtl."Description"
     ORDER BY month, item_code
   `);

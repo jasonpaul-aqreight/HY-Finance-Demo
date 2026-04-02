@@ -316,6 +316,7 @@ export async function getReturnProducts(start: string, end: string, dimension: R
     WHERE month BETWEEN $1 AND $2
       AND item_code IS NOT NULL AND item_code != ''
       AND item_code NOT LIKE 'ZZ-ZZ-ZBKT%'
+      AND item_code NOT LIKE 'ZZ-ZZ-ZZPL%'
       ${cfg.filter}
     GROUP BY ${cfg.groupBy}
     ORDER BY ${orderBy} DESC
