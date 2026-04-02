@@ -34,10 +34,18 @@ export type SyncStatus = 'idle' | 'running';
 
 let currentStatus: SyncStatus = 'idle';
 let currentProgress: string = '';
+let currentStepsCompleted: number = 0;
+let currentTotalSteps: number = 0;
 let lastResult: SyncResult | null = null;
 
 export function getSyncStatus() {
-  return { status: currentStatus, progress: currentProgress, lastResult };
+  return {
+    status: currentStatus,
+    progress: currentProgress,
+    stepsCompleted: currentStepsCompleted,
+    totalSteps: currentTotalSteps,
+    lastResult,
+  };
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────
@@ -76,7 +84,8 @@ async function loadCreditScoreConfig(target: PoolClient): Promise<BuilderContext
 export async function runFullSync(
   sourcePool: Pool,
   targetPool: Pool,
-  _dataDir: string
+  _dataDir: string,
+  triggerType: 'manual' | 'scheduled' = 'manual'
 ): Promise<SyncResult> {
   if (currentStatus === 'running') {
     throw new Error('Sync already in progress');
@@ -93,6 +102,8 @@ export async function runFullSync(
 
   const totalSteps = LOOKUP_MAPPINGS.length + 1 + PC_BUILDERS.length; // lookups + product transform + builders
   let stepsCompleted = 0;
+  currentTotalSteps = totalSteps;
+  currentStepsCompleted = 0;
 
   const targetClient = await targetPool.connect();
 
@@ -100,9 +111,9 @@ export async function runFullSync(
     // ── Create sync job record ────────────────────────────────────────
     const jobRow = await targetClient.query(
       `INSERT INTO sync_job (status, trigger_type, started_at, tables_total)
-       VALUES ('running', 'manual', NOW(), $1)
+       VALUES ('running', $2, NOW(), $1)
        RETURNING id`,
-      [totalSteps]
+      [totalSteps, triggerType]
     );
     jobId = jobRow.rows[0].id;
 
@@ -129,6 +140,7 @@ export async function runFullSync(
       const tDuration = Date.now() - tStart;
       lookupResults.push({ table: mapping.target, rows, durationMs: tDuration });
       stepsCompleted++;
+      currentStepsCompleted = stepsCompleted;
 
       await targetClient.query(
         `INSERT INTO sync_log (job_id, level, table_name, phase, message, rows_affected, duration_ms)
@@ -152,6 +164,7 @@ export async function runFullSync(
       durationMs: Date.now() - tStart,
     });
     stepsCompleted++;
+    currentStepsCompleted = stepsCompleted;
 
     // ══ Phase 2: Build pre-computed tables ═════════════════════════════
     // Each builder runs inside a SAVEPOINT so individual failures
@@ -189,6 +202,7 @@ export async function runFullSync(
         const tDuration = Date.now() - tStart;
         builderResults.push({ table: builder.table, rows: insertedRows, durationMs: tDuration });
         stepsCompleted++;
+        currentStepsCompleted = stepsCompleted;
 
         await targetClient.query(
           `INSERT INTO sync_log (job_id, level, table_name, phase, message, rows_affected, duration_ms)
@@ -205,6 +219,7 @@ export async function runFullSync(
         const tDuration = Date.now() - tStart;
         builderResults.push({ table: builder.table, rows: 0, durationMs: tDuration });
         stepsCompleted++;
+        currentStepsCompleted = stepsCompleted;
 
         await targetClient.query(
           `INSERT INTO sync_log (job_id, level, table_name, phase, message, duration_ms)
@@ -300,6 +315,8 @@ export async function runFullSync(
   } finally {
     currentStatus = 'idle';
     currentProgress = '';
+    currentStepsCompleted = 0;
+    currentTotalSteps = 0;
     targetClient.release();
   }
 }

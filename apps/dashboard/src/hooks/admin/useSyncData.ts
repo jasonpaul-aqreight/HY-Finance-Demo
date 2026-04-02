@@ -9,6 +9,8 @@ const fetcher = (url: string) =>
 export interface SyncStatus {
   status: 'idle' | 'running';
   progress: string;
+  stepsCompleted: number;
+  totalSteps: number;
   lastResult: SyncResult | null;
 }
 

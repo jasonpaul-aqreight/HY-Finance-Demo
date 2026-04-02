@@ -51,7 +51,7 @@ function scheduleSync(cronExpression: string) {
   scheduledTask = cron.schedule(cronExpression, async () => {
     console.log(`[CRON] Starting scheduled sync at ${new Date().toISOString()}`);
     try {
-      const result = await runFullSync(sourcePool, targetPool, DATA_DIR);
+      const result = await runFullSync(sourcePool, targetPool, DATA_DIR, 'scheduled');
       console.log(`[CRON] Sync completed: ${result.totalRows} rows in ${result.durationMs}ms`);
     } catch (err) {
       console.error('[CRON] Sync failed:', err);
