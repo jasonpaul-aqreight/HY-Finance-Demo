@@ -9,6 +9,9 @@ import type { ItemSellPriceV2 } from './queries-v2';
 // sales_revenue and sales_qty are attributed proportionally to each supplier's purchase share.
 // attributed_cogs = purchase_total × (item_sold_qty / total_item_purchase_qty).
 // purchase_total and purchase_qty remain raw (unattributed) for price analysis.
+// Non-product items (ZZ-ZZ%) are excluded at sync level; filter below is a safety net.
+
+const NON_PRODUCT_FILTER = `AND m.item_code NOT LIKE 'ZZ-ZZ%'`;
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -154,6 +157,7 @@ async function fetchMarginPeriod(start: string, end: string): Promise<{ revenue:
     FROM pc_supplier_margin m
     WHERE m.month BETWEEN $1 AND $2
       AND m.is_active = 'T'
+      ${NON_PRODUCT_FILTER}
   `, [startMonth, endMonth]);
   return rows[0];
 }
@@ -177,6 +181,7 @@ async function fetchTopLowestSupplier(start: string, end: string): Promise<{ top
     FROM pc_supplier_margin m
     WHERE m.month BETWEEN $1 AND $2
       AND m.is_active = 'T'
+      ${NON_PRODUCT_FILTER}
     GROUP BY m.creditor_code, m.creditor_name
     HAVING SUM(m.sales_revenue) >= $3
     ORDER BY margin_pct DESC
@@ -216,6 +221,7 @@ export async function getMarginSummary(start: string, end: string) {
     WHERE m.month BETWEEN $1 AND $2
       AND m.purchase_qty > 0
       AND m.is_active = 'T'
+      ${NON_PRODUCT_FILTER}
   `, [startMonth, endMonth]);
   const supplierCount = supplierCountResult.rows[0] as { cnt: number };
 
@@ -226,6 +232,7 @@ export async function getMarginSummary(start: string, end: string) {
     WHERE m.month BETWEEN $1 AND $2
       AND m.purchase_qty > 0
       AND m.is_active = 'T'
+      ${NON_PRODUCT_FILTER}
   `, [startMonth, endMonth]);
   const itemsRow = itemsResult.rows[0] as { cnt: number };
 
@@ -421,6 +428,7 @@ export async function getSupplierTable(
     FROM pc_supplier_margin m
     WHERE m.month BETWEEN $1 AND $2
       AND m.is_active = 'T'
+      ${NON_PRODUCT_FILTER}
       ${supplierFilter}
       ${itemGroupFilter}
     GROUP BY m.creditor_code, m.creditor_name, m.creditor_type
@@ -879,6 +887,7 @@ export async function getSupplierProfileSummary(creditorCode: string, start: str
       AND m.month BETWEEN $2 AND $3
       AND m.purchase_qty > 0
       AND m.sales_revenue > 0
+      ${NON_PRODUCT_FILTER}
   `, [creditorCode, startMonth, endMonth]);
   const supplierItems = supplierItemsResult.rows as { itemcode: string; description: string }[];
 
@@ -901,6 +910,7 @@ export async function getSupplierProfileSummary(creditorCode: string, start: str
     WHERE m.month BETWEEN $1 AND $2
       AND m.is_active = 'T'
       AND m.purchase_qty > 0
+      ${NON_PRODUCT_FILTER}
   `, [startMonth, endMonth]);
   const allPurchases = allPurchasesResult.rows as { creditor_code: string; description: string }[];
 
@@ -1033,6 +1043,7 @@ export async function getSupplierPerformance(creditorCode: string, start: string
     FROM pc_supplier_margin m
     WHERE m.creditor_code = $1
       AND m.month BETWEEN $2 AND $3
+      ${NON_PRODUCT_FILTER}
     GROUP BY m.month
     ORDER BY m.month
   `, [creditorCode, startMonth, endMonth]);
@@ -1050,6 +1061,7 @@ export async function getSupplierPerformance(creditorCode: string, start: string
     FROM pc_supplier_margin m
     WHERE m.creditor_code = $1
       AND m.month BETWEEN $2 AND $3
+      ${NON_PRODUCT_FILTER}
     GROUP BY m.item_code, m.item_description
     HAVING SUM(m.sales_revenue) > 0
     ORDER BY profit DESC
@@ -1070,6 +1082,7 @@ export async function getSupplierPerformance(creditorCode: string, start: string
     FROM pc_supplier_margin m
     WHERE m.creditor_code = $1
       AND m.month BETWEEN $2 AND $3
+      ${NON_PRODUCT_FILTER}
   `, [creditorCode, startMonth, endMonth]);
 
   const overallRow = overallResult.rows[0] as {

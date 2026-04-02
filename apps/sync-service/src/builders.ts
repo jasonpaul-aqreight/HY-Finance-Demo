@@ -977,6 +977,7 @@ async function buildSupplierMargin(source: Pool, ctx: BuilderContext): Promise<B
       JOIN dbo."PI" h ON d."DocKey" = h."DocKey"
       WHERE h."Cancelled" = 'F'
         AND d."ItemCode" IS NOT NULL AND d."ItemCode" != ''
+        AND d."ItemCode" NOT LIKE 'ZZ-ZZ%'
       GROUP BY ${mytMonth('h')}, h."CreditorCode", d."ItemCode"
     ),
     sales AS (
@@ -988,6 +989,7 @@ async function buildSupplierMargin(source: Pool, ctx: BuilderContext): Promise<B
       FROM dbo."IVDTL" d
       JOIN dbo."IV" h ON d."DocKey" = h."DocKey"
       WHERE h."Cancelled" = 'F'
+        AND d."ItemCode" NOT LIKE 'ZZ-ZZ%'
       GROUP BY TO_CHAR(h."DocDate" + INTERVAL '8 hours', 'YYYY-MM'), d."ItemCode"
 
       UNION ALL
@@ -1000,6 +1002,7 @@ async function buildSupplierMargin(source: Pool, ctx: BuilderContext): Promise<B
       FROM dbo."CSDTL" d
       JOIN dbo."CS" h ON d."DocKey" = h."DocKey"
       WHERE h."Cancelled" = 'F'
+        AND d."ItemCode" NOT LIKE 'ZZ-ZZ%'
       GROUP BY TO_CHAR(h."DocDate" + INTERVAL '8 hours', 'YYYY-MM'), d."ItemCode"
     ),
     sales_agg AS (
