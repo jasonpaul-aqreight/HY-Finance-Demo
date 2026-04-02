@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import useSWR from 'swr';
 import {
   Dialog,
@@ -35,6 +35,8 @@ import { useCustomerProfile, useCustomerInvoices } from '@/hooks/payment/usePaym
 import { useCustomerReturnSummary, useCustomerReturnTrend, useCustomerReturnDetailsAll } from '@/hooks/return/useCreditDataV2';
 import { useCustomerMonthly, useCustomerProducts } from '@/hooks/customer-margin/useMarginData';
 import { useStableData } from '@/hooks/useStableData';
+import { TablePagination, type PageSize } from '@/components/ui/table-pagination';
+import { exportToExcel } from '@/lib/export-excel';
 import {
   format as fmtDate,
   subMonths,
@@ -128,6 +130,8 @@ export function CustomerProfileRevamp({ open, onClose, debtorCode, companyName, 
   const [invoiceSearch, setInvoiceSearch] = useState('');
   const [returnSearch, setReturnSearch] = useState('');
   const [salesSearch, setSalesSearch] = useState('');
+  const [salesPage, setSalesPage] = useState(1);
+  const [salesPageSize, setSalesPageSize] = useState<import('@/components/ui/table-pagination').PageSize>(25);
 
   // Data hooks
   const { data: profile, isLoading: profileLoading, error: profileError } = useCustomerProfile(debtorCode);
@@ -136,7 +140,7 @@ export function CustomerProfileRevamp({ open, onClose, debtorCode, companyName, 
   const { data: returnTrend, isLoading: returnTrendLoading, isValidating: returnTrendValidating, error: returnTrendError } = useCustomerReturnTrend(debtorCode, trendStart, trendEnd);
   const { data: monthlyData, isLoading: monthlyLoading, isValidating: monthlyValidating, error: monthlyError } = useCustomerMonthly(debtorCode, trendStart, trendEnd);
   const { data: returnDetails, isLoading: returnDetailsLoading, error: returnDetailsError } = useCustomerReturnDetailsAll(debtorCode);
-  const { data: rawProductsData, isLoading: productsInitialLoading, isValidating: productsValidating, error: productsError } = useCustomerProducts(debtorCode, salesStart, salesEnd);
+  const { data: rawProductsData, isLoading: productsInitialLoading, isValidating: productsValidating, error: productsError } = useCustomerProducts(debtorCode, salesStart, salesEnd, salesPage, salesPageSize);
   const productsData = useStableData(rawProductsData);
   const productsLoading = productsInitialLoading || (productsValidating && rawProductsData === undefined);
 
@@ -285,7 +289,7 @@ export function CustomerProfileRevamp({ open, onClose, debtorCode, companyName, 
               <div className="mb-4">
                 <DateRangeSection label="Date Range" startDate={salesStart} endDate={salesEnd} onStartDateChange={setSalesStart} onEndDateChange={setSalesEnd} showPresets showRangeSummary={false} />
               </div>
-              <SalesTransactionsTable products={productsData} search={salesSearch} isLoading={productsLoading} error={productsError} />
+              <SalesTransactionsTable products={productsData} search={salesSearch} isLoading={productsLoading} error={productsError} page={salesPage} pageSize={salesPageSize} onPageChange={setSalesPage} onPageSizeChange={setSalesPageSize} />
             </TableLogView>
           )}
         </div>
@@ -836,23 +840,57 @@ function ReturnRecordsTable({ records, search = '', isLoading, error }: { record
 
 type SalesSortKey = 'item_code' | 'description' | 'qty_sold' | 'revenue' | 'cost' | 'margin_pct';
 
-function SalesTransactionsTable({ products, search = '', isLoading, error }: { products: any; search?: string; isLoading?: boolean; error?: any }) {
-  const items = products?.data ?? products ?? [];
+function SalesTransactionsTable({ products, search = '', isLoading, error, page, pageSize, onPageChange, onPageSizeChange }: {
+  products: any; search?: string; isLoading?: boolean; error?: any;
+  page: number; pageSize: PageSize; onPageChange: (p: number) => void; onPageSizeChange: (s: PageSize) => void;
+}) {
+  const rows = products?.rows ?? [];
+  const total = products?.total ?? 0;
   const [sortKey, setSortKey] = useState<SalesSortKey>('revenue');
   const [sortAsc, setSortAsc] = useState(false);
-  const rows = useMemo(() => {
-    if (!Array.isArray(items)) return [];
-    const filtered = search ? items.filter((item: any) => (item.item_code ?? '').toLowerCase().includes(search.toLowerCase())) : items;
+  const tableRef = useRef<HTMLDivElement>(null);
+  const lockedHeight = useRef<number | undefined>(undefined);
+
+  const sorted = useMemo(() => {
+    if (!Array.isArray(rows)) return [];
+    const filtered = search ? rows.filter((item: any) => (item.item_code ?? '').toLowerCase().includes(search.toLowerCase())) : rows;
     return [...filtered].sort((a, b) => {
       const av = a[sortKey] ?? ''; const bv = b[sortKey] ?? '';
       if (typeof av === 'number' && typeof bv === 'number') return sortAsc ? av - bv : bv - av;
       return sortAsc ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
     });
-  }, [items, sortKey, sortAsc, search]);
+  }, [rows, sortKey, sortAsc, search]);
+
+  useEffect(() => {
+    const el = tableRef.current;
+    if (el && sorted.length > 0) {
+      lockedHeight.current = el.offsetHeight;
+    }
+  }, [sorted.length > 0, pageSize]);
+
   function handleSort(key: SalesSortKey) {
     if (sortKey === key) setSortAsc(!sortAsc);
     else { setSortKey(key); setSortAsc(key === 'item_code' || key === 'description'); }
   }
+
+  function handleExportExcel() {
+    exportToExcel('sales-transactions', [
+      { header: 'Item Code', key: 'item_code', width: 30 },
+      { header: 'Description', key: 'description', width: 40 },
+      { header: 'Qty Sold', key: 'qty_sold', width: 12 },
+      { header: 'Revenue (RM)', key: 'revenue', width: 16 },
+      { header: 'Cost (RM)', key: 'cost', width: 16 },
+      { header: 'Margin %', key: 'margin_pct', width: 12 },
+    ], sorted.map((item: any) => ({
+      item_code: item.item_code,
+      description: item.description,
+      qty_sold: item.qty_sold ?? 0,
+      revenue: item.revenue,
+      cost: item.cost,
+      margin_pct: item.margin_pct ?? 0,
+    })));
+  }
+
   const TH = ({ col, label, align }: { col: SalesSortKey; label: string; align?: 'right' }) => (
     <th className={`px-3 py-2.5 cursor-pointer select-none hover:bg-muted/50 text-xs font-semibold text-foreground ${align === 'right' ? 'text-right' : 'text-left'}`} onClick={() => handleSort(col)}>
       {label}<SortIcon active={sortKey === col} asc={sortAsc} />
@@ -860,31 +898,45 @@ function SalesTransactionsTable({ products, search = '', isLoading, error }: { p
   );
   if (isLoading || products === undefined) return <LoadingSpinner />;
   if (error) return <ErrorMessage message="Failed to load sales transactions" />;
-  if (rows.length === 0) return <div className="text-sm text-foreground/60 text-center py-8">No sales transactions</div>;
+  if (sorted.length === 0 && total === 0) return <div className="text-sm text-foreground/60 text-center py-8">No sales transactions</div>;
   return (
-    <div className="rounded-lg border overflow-hidden">
-      <table className="w-full text-sm">
-        <thead><tr className="border-b bg-muted/30">
-          <TH col="item_code" label="Item Code" /><TH col="description" label="Description" />
-          <TH col="qty_sold" label="Qty Sold" align="right" /><TH col="revenue" label="Revenue (RM)" align="right" />
-          <TH col="cost" label="Cost (RM)" align="right" /><TH col="margin_pct" label="Margin %" align="right" />
-        </tr></thead>
-        <tbody>{rows.map((item: any, i: number) => {
-          const margin = item.margin_pct ?? 0;
-          const mc = margin >= 20 ? 'text-emerald-600' : margin >= 10 ? 'text-amber-600' : 'text-red-600';
-          return (
-            <tr key={item.item_code ?? i} className="border-b last:border-0 hover:bg-muted/20">
-              <td className="px-3 py-2.5 font-mono text-xs whitespace-nowrap">{item.item_code}</td>
-              <td className="px-3 py-2.5 truncate">{item.description}</td>
-              <td className="px-3 py-2.5 text-right tabular-nums">{(item.qty_sold ?? 0).toLocaleString()}</td>
-              <td className="px-3 py-2.5 text-right tabular-nums">{formatRM(item.revenue)}</td>
-              <td className="px-3 py-2.5 text-right tabular-nums">{formatRM(item.cost)}</td>
-              <td className={`px-3 py-2.5 text-right tabular-nums font-medium ${mc}`}>{margin.toFixed(1)}%</td>
-            </tr>
-          );
-        })}</tbody>
-      </table>
-      <div className="px-3 py-2.5 bg-muted/30 text-xs text-foreground/70 border-t">Showing {rows.length} item{rows.length !== 1 ? 's' : ''}</div>
+    <div ref={tableRef} style={{ minHeight: lockedHeight.current }}>
+      <div className="flex justify-end mb-2">
+        <button onClick={handleExportExcel} className="text-xs text-blue-600 hover:text-blue-800 hover:underline cursor-pointer">
+          Export Excel
+        </button>
+      </div>
+      <div className="rounded-lg border overflow-hidden">
+        <table className="w-full text-sm">
+          <thead><tr className="border-b bg-muted/30">
+            <TH col="item_code" label="Item Code" /><TH col="description" label="Description" />
+            <TH col="qty_sold" label="Qty Sold" align="right" /><TH col="revenue" label="Revenue (RM)" align="right" />
+            <TH col="cost" label="Cost (RM)" align="right" /><TH col="margin_pct" label="Margin %" align="right" />
+          </tr></thead>
+          <tbody>{sorted.map((item: any, i: number) => {
+            const margin = item.margin_pct ?? 0;
+            const mc = margin >= 20 ? 'text-emerald-600' : margin >= 10 ? 'text-amber-600' : 'text-red-600';
+            return (
+              <tr key={item.item_code ?? i} className="border-b last:border-0 hover:bg-muted/20">
+                <td className="px-3 py-2.5 font-mono text-xs whitespace-nowrap">{item.item_code}</td>
+                <td className="px-3 py-2.5 truncate">{item.description}</td>
+                <td className="px-3 py-2.5 text-right tabular-nums">{(item.qty_sold ?? 0).toLocaleString()}</td>
+                <td className="px-3 py-2.5 text-right tabular-nums">{formatRM(item.revenue)}</td>
+                <td className="px-3 py-2.5 text-right tabular-nums">{formatRM(item.cost)}</td>
+                <td className={`px-3 py-2.5 text-right tabular-nums font-medium ${mc}`}>{margin.toFixed(1)}%</td>
+              </tr>
+            );
+          })}</tbody>
+        </table>
+      </div>
+      <TablePagination
+        page={page}
+        pageSize={pageSize}
+        total={total}
+        onPageChange={onPageChange}
+        onPageSizeChange={onPageSizeChange}
+        noun="items"
+      />
     </div>
   );
 }

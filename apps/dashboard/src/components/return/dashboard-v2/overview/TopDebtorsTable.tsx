@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { useAllCustomerReturnsAll } from '@/hooks/return/useCreditDataV2';
 import { useStableData } from '@/hooks/useStableData';
 import type { TopDebtorRow } from '@/lib/return/queries-v2';
@@ -10,7 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
+import { TablePagination, type PageSize } from '@/components/ui/table-pagination';
 import { formatRM, formatCount } from '@/lib/format';
+import { exportToExcel } from '@/lib/export-excel';
 import { CustomerProfileRevamp } from '@/components/profiles/CustomerProfileRevampPreview';
 
 // ─── Sort helpers ────────────────────────────────────────────────────────────
@@ -18,7 +20,6 @@ import { CustomerProfileRevamp } from '@/components/profiles/CustomerProfileReva
 type SortKey = 'debtor_code' | 'company_name' | 'return_count' | 'total_return_value' | 'total_knocked_off' | 'total_refunded' | 'unresolved';
 type SortDir = 'asc' | 'desc';
 
-const PAGE_SIZE = 20;
 
 function sortData(data: TopDebtorRow[], key: SortKey, dir: SortDir): TopDebtorRow[] {
   return [...data].sort((a, b) => {
@@ -64,9 +65,12 @@ export function TopDebtorsTable({ initialStartDate, initialEndDate }: { initialS
   const [sortKey, setSortKey] = useState<SortKey>('unresolved');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<PageSize>(25);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('outstanding');
   const [selectedCustomer, setSelectedCustomer] = useState<TopDebtorRow | null>(null);
+  const tableRef = useRef<HTMLDivElement>(null);
+  const lockedHeight = useRef<number | undefined>(undefined);
 
   const textColumns: SortKey[] = ['debtor_code', 'company_name'];
 
@@ -97,8 +101,34 @@ export function TopDebtorsTable({ initialStartDate, initialEndDate }: { initialS
     return sortData(filtered, sortKey, sortDir);
   }, [filtered, sortKey, sortDir]);
 
-  const totalPages = Math.ceil(sorted.length / PAGE_SIZE);
-  const paged = sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const paged = sorted.slice((page - 1) * pageSize, page * pageSize);
+
+  useEffect(() => {
+    const el = tableRef.current;
+    if (el && paged.length > 0) {
+      lockedHeight.current = el.offsetHeight;
+    }
+  }, [paged.length > 0, pageSize]);
+
+  function handleExportExcel() {
+    exportToExcel('customer-returns', [
+      { header: 'Code', key: 'debtor_code', width: 14 },
+      { header: 'Customer', key: 'company_name', width: 30 },
+      { header: 'Returns', key: 'return_count', width: 10 },
+      { header: 'Total Value', key: 'total_return_value', width: 16 },
+      { header: 'Knocked Off', key: 'total_knocked_off', width: 16 },
+      { header: 'Refunded', key: 'total_refunded', width: 16 },
+      { header: 'Unresolved', key: 'unresolved', width: 16 },
+    ], sorted.map(r => ({
+      debtor_code: r.debtor_code,
+      company_name: r.company_name,
+      return_count: r.return_count,
+      total_return_value: r.total_return_value,
+      total_knocked_off: r.total_knocked_off,
+      total_refunded: r.total_refunded,
+      unresolved: r.unresolved,
+    })));
+  }
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) {
@@ -150,6 +180,9 @@ export function TopDebtorsTable({ initialStartDate, initialEndDate }: { initialS
               onChange={e => { setSearch(e.target.value); setPage(1); }}
               className="h-7 w-48 rounded-md border border-input bg-transparent px-2 text-sm"
             />
+            <Button variant="outline" size="sm" onClick={handleExportExcel}>
+              Export Excel
+            </Button>
             <Select
               value={statusFilter}
               onValueChange={val => { setStatusFilter(val as StatusFilter); setPage(1); }}
@@ -172,7 +205,7 @@ export function TopDebtorsTable({ initialStartDate, initialEndDate }: { initialS
             {search ? 'No matching customers found.' : 'No outstanding returns.'}
           </p>
         ) : (
-          <>
+          <div ref={tableRef} style={{ minHeight: lockedHeight.current }}>
             <div className="border-t">
               <Table>
                 <TableHeader>
@@ -217,36 +250,15 @@ export function TopDebtorsTable({ initialStartDate, initialEndDate }: { initialS
               </Table>
             </div>
 
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between px-4 py-3 border-t">
-                <p className="text-xs text-muted-foreground">
-                  Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, sorted.length)} of {formatCount(sorted.length)}
-                </p>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => { setPage(p => p - 1); }}
-                    disabled={page === 1}
-                  >
-                    Prev
-                  </Button>
-                  <span className="text-xs text-muted-foreground">
-                    Page {page} of {totalPages}
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => { setPage(p => p + 1); }}
-                    disabled={page === totalPages}
-                  >
-                    Next
-                  </Button>
-                </div>
-              </div>
-            )}
-          </>
+            <TablePagination
+              page={page}
+              pageSize={pageSize}
+              total={sorted.length}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+              noun="customers"
+            />
+          </div>
         )}
       </CardContent>
 

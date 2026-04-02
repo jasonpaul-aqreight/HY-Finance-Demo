@@ -1,15 +1,17 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { SettingsIcon } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, CardAction } from '@/components/ui/card';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { TablePagination, type PageSize } from '@/components/ui/table-pagination';
 import { useCreditHealthV2 } from '@/hooks/payment/usePaymentDataV2';
 import { useStableData } from '@/hooks/useStableData';
 import { formatRM } from '@/lib/payment/format';
 import { riskTierBgColor } from '@/lib/payment/credit-score-v2';
+import { exportToExcel } from '@/lib/export-excel';
 import { CustomerProfileRevamp } from '@/components/profiles/CustomerProfileRevampPreview';
 import { SettingsDialog } from '@/components/payment/settings/SettingsForm';
 
@@ -32,9 +34,19 @@ export default function CustomerTableV2({ initialStartDate, initialEndDate }: { 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [riskFilter, setRiskFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
+  const [pageSize, setPageSize] = useState<PageSize>(25);
+  const tableRef = useRef<HTMLDivElement>(null);
+  const lockedHeight = useRef<number | undefined>(undefined);
 
-  const { data: rawData } = useCreditHealthV2(sort, order, page, search, riskFilter, categoryFilter);
+  const { data: rawData } = useCreditHealthV2(sort, order, page, search, riskFilter, categoryFilter, pageSize);
   const data = useStableData(rawData);
+
+  useEffect(() => {
+    const el = tableRef.current;
+    if (el && data && data.rows?.length > 0) {
+      lockedHeight.current = el.offsetHeight;
+    }
+  }, [data && data.rows?.length > 0, pageSize]);
 
   const textColumns: SortKey[] = ['debtor_code', 'company_name', 'debtor_type', 'sales_agent', 'risk_tier'];
   const handleSort = useCallback((key: SortKey) => {
@@ -47,27 +59,36 @@ export default function CustomerTableV2({ initialStartDate, initialEndDate }: { 
     setPage(1);
   }, [sort]);
 
-  const handleExportCSV = useCallback(() => {
+  const handleExport = useCallback(() => {
     if (!data?.rows) return;
-    const headers = ['Code', 'Name', 'Category', 'Agent', 'Credit Limit', 'Outstanding', 'Oldest Due', 'Max Overdue Days', 'Aging Count', 'Credit Util %', 'Credit Health Score', 'Risk Level'];
-    const csvRows = data.rows.map(r =>
-      [
-        r.debtor_code, `"${r.company_name}"`, r.debtor_type, r.sales_agent,
-        r.credit_limit, r.total_outstanding, r.oldest_due ?? '',
-        r.max_overdue_days, r.aging_count, r.utilization_pct ?? '', r.credit_score, r.risk_tier,
-      ].join(',')
-    );
-    const csv = [headers.join(','), ...csvRows].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'customer-credit-health-v2.csv';
-    a.click();
-    URL.revokeObjectURL(url);
+    exportToExcel('customer-credit-health', [
+      { header: 'Code', key: 'debtor_code', width: 14 },
+      { header: 'Name', key: 'company_name', width: 30 },
+      { header: 'Category', key: 'debtor_type', width: 16 },
+      { header: 'Agent', key: 'sales_agent', width: 14 },
+      { header: 'Credit Limit', key: 'credit_limit', width: 16 },
+      { header: 'Outstanding', key: 'total_outstanding', width: 16 },
+      { header: 'Oldest Due', key: 'oldest_due', width: 14 },
+      { header: 'Max Overdue Days', key: 'max_overdue_days', width: 16 },
+      { header: 'Aging Count', key: 'aging_count', width: 12 },
+      { header: 'Credit Util %', key: 'utilization_pct', width: 14 },
+      { header: 'Credit Health Score', key: 'credit_score', width: 18 },
+      { header: 'Risk Level', key: 'risk_tier', width: 12 },
+    ], data.rows.map(r => ({
+      debtor_code: r.debtor_code,
+      company_name: r.company_name,
+      debtor_type: r.debtor_type,
+      sales_agent: r.sales_agent,
+      credit_limit: r.credit_limit,
+      total_outstanding: r.total_outstanding,
+      oldest_due: r.oldest_due ?? '',
+      max_overdue_days: r.max_overdue_days,
+      aging_count: r.aging_count,
+      utilization_pct: r.utilization_pct ?? '',
+      credit_score: r.credit_score,
+      risk_tier: r.risk_tier,
+    })));
   }, [data]);
-
-  const totalPages = data ? Math.ceil(data.total / 20) : 0;
 
   return (
     <Card>
@@ -123,8 +144,8 @@ export default function CustomerTableV2({ initialStartDate, initialEndDate }: { 
               <SettingsIcon className="size-3.5 mr-1.5" />
               Score &amp; Risk
             </Button>
-            <Button variant="outline" size="sm" onClick={handleExportCSV}>
-              Export CSV
+            <Button variant="outline" size="sm" onClick={handleExport}>
+              Export Excel
             </Button>
           </div>
         </CardAction>
@@ -133,7 +154,7 @@ export default function CustomerTableV2({ initialStartDate, initialEndDate }: { 
         {!data ? (
           <div className="h-[400px] animate-pulse rounded bg-muted" />
         ) : (
-          <>
+          <div ref={tableRef} style={{ minHeight: lockedHeight.current }}>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -222,31 +243,15 @@ export default function CustomerTableV2({ initialStartDate, initialEndDate }: { 
               </TableBody>
             </Table>
 
-            {/* Pagination */}
-            <div className="mt-4 flex items-center justify-between text-sm">
-              <p className="text-muted-foreground">
-                Showing {((page - 1) * 20) + 1}–{Math.min(page * 20, data?.total ?? 0)} of {data?.total ?? 0} customers
-              </p>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={page <= 1}
-                  onClick={() => setPage(p => p - 1)}
-                >
-                  Previous
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={page >= totalPages}
-                  onClick={() => setPage(p => p + 1)}
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
-          </>
+            <TablePagination
+              page={page}
+              pageSize={pageSize}
+              total={data?.total ?? 0}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+              noun="customers"
+            />
+          </div>
         )}
       </CardContent>
 

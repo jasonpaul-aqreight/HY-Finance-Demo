@@ -2,7 +2,9 @@
 
 import { useV3BSComparison } from '@/hooks/pnl/usePLDataV3';
 import { useStableData } from '@/hooks/useStableData';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { exportToExcel } from '@/lib/export-excel';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
@@ -69,6 +71,20 @@ export function BSStatementTableV3({ fy }: Props) {
   const pCP = findBalance(prior.items, 'CP');
   const pRE = findBalance(prior.items, 'RE');
 
+  function handleExportExcel() {
+    exportToExcel('balance-sheet', [
+      { header: 'Description', key: 'label', width: 28 },
+      { header: 'Current', key: 'current', width: 16 },
+      { header: 'Prior', key: 'prior', width: 16 },
+      { header: 'Change', key: 'change', width: 16 },
+    ], lineItems.filter(i => i.type !== 'header').map(i => ({
+      label: i.label,
+      current: i.current,
+      prior: i.prior,
+      change: i.current - i.prior,
+    })));
+  }
+
   const lineItems: BSLineItem[] = [
     { label: 'Fixed Assets', type: 'detail', current: cFA, prior: pFA },
     { label: 'Other Assets', type: 'detail', current: cOA, prior: pOA },
@@ -90,6 +106,11 @@ export function BSStatementTableV3({ fy }: Props) {
 
   return (
     <Card className="rounded-xl ring-1 ring-foreground/10 h-full">
+      <CardHeader className="flex-row items-center justify-end pb-0 pt-2 px-4">
+        <Button variant="outline" size="sm" onClick={handleExportExcel}>
+          Export Excel
+        </Button>
+      </CardHeader>
       <CardContent className="p-0 overflow-x-auto">
         <Table>
           <TableHeader>

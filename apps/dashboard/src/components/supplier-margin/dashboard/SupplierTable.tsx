@@ -14,7 +14,9 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { TablePagination, type PageSize } from '@/components/ui/table-pagination';
 import { formatRM, marginColor } from '@/lib/supplier-margin/format';
+import { exportToExcel } from '@/lib/export-excel';
 import { Search, ChevronDown, X, Info } from 'lucide-react';
 import { SupplierProfileModal } from '@/components/profiles/SupplierProfileModal';
 
@@ -34,8 +36,6 @@ interface SupplierRow {
 }
 
 type SortKey = 'company_name' | 'attributed_revenue' | 'attributed_cogs' | 'attributed_profit' | 'margin_pct' | 'items_supplied';
-
-const PAGE_SIZE = 20;
 
 /* ── Combobox multi-select ─────────────────────────────────────────────────── */
 
@@ -134,27 +134,28 @@ function SupplierCombobox({
   );
 }
 
-/* ── CSV export ────────────────────────────────────────────────────────────── */
+/* ── Excel export ─────────────────────────────────────────────────────────── */
 
-function exportCsv(rows: SupplierRow[]) {
-  const headers = ['Supplier Code','Supplier Name','Type','Est. Revenue','Est. Cost of Sales','Est. Profit','Trend','Margin %','Items'];
-  const lines = rows.map(r => [
-    r.creditor_code,
-    `"${r.company_name}"`,
-    r.supplier_type ?? '',
-    r.attributed_revenue.toFixed(2),
-    r.attributed_cogs.toFixed(2),
-    r.attributed_profit.toFixed(2),
-    r.trend ?? '',
-    r.margin_pct != null ? r.margin_pct.toFixed(2) : '',
-    r.items_supplied,
-  ].join(','));
-  const csv = [headers.join(','), ...lines].join('\n');
-  const blob = new Blob([csv], { type: 'text/csv' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'supplier-margin-data.csv';
-  a.click();
+function handleExportExcel(rows: SupplierRow[]) {
+  exportToExcel('supplier-margin-data', [
+    { header: 'Supplier Code', key: 'creditor_code', width: 14 },
+    { header: 'Supplier Name', key: 'company_name', width: 30 },
+    { header: 'Type', key: 'supplier_type', width: 16 },
+    { header: 'Items', key: 'items_supplied', width: 10 },
+    { header: 'Est. Revenue', key: 'attributed_revenue', width: 16 },
+    { header: 'Est. Cost of Sales', key: 'attributed_cogs', width: 18 },
+    { header: 'Est. Profit', key: 'attributed_profit', width: 16 },
+    { header: 'Margin %', key: 'margin_pct', width: 12 },
+  ], rows.map(r => ({
+    creditor_code: r.creditor_code,
+    company_name: r.company_name,
+    supplier_type: r.supplier_type ?? '',
+    items_supplied: r.items_supplied,
+    attributed_revenue: r.attributed_revenue,
+    attributed_cogs: r.attributed_cogs,
+    attributed_profit: r.attributed_profit,
+    margin_pct: r.margin_pct != null ? r.margin_pct : '',
+  })));
 }
 
 /* ── Main table ────────────────────────────────────────────────────────────── */
@@ -165,9 +166,12 @@ export function SupplierTable({ filters }: { filters: DashboardFilters }) {
   const sparklines: Record<string, number[]> = sparklineData?.data ?? {};
   const [sortKey, setSortKey] = useState<SortKey>('attributed_revenue');
   const [sortAsc, setSortAsc] = useState(false);
-  const [page, setPage] = useState(0);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<PageSize>(25);
   const [selectedSuppliers, setSelectedSuppliers] = useState<string[]>([]);
   const [profileSupplier, setProfileSupplier] = useState<SupplierRow | null>(null);
+  const tableRef = useRef<HTMLDivElement>(null);
+  const lockedHeight = useRef<number | undefined>(undefined);
 
   const rows: SupplierRow[] = data?.data ?? [];
 
@@ -187,13 +191,20 @@ export function SupplierTable({ filters }: { filters: DashboardFilters }) {
     });
   }, [filtered, sortKey, sortAsc]);
 
-  const totalPages = Math.ceil(sorted.length / PAGE_SIZE);
-  const pageRows = sorted.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  const pageRows = sorted.slice((page - 1) * pageSize, page * pageSize);
+
+  // Lock container height to prevent layout jump during page transitions
+  useEffect(() => {
+    const el = tableRef.current;
+    if (el && pageRows.length > 0) {
+      lockedHeight.current = el.offsetHeight;
+    }
+  }, [pageRows.length > 0, pageSize]);
 
   function handleSort(key: SortKey) {
     if (sortKey === key) setSortAsc(!sortAsc);
     else { setSortKey(key); setSortAsc(false); }
-    setPage(0);
+    setPage(1);
   }
 
   function SortHeader({ col, label }: { col: SortKey; label: string }) {
@@ -235,21 +246,22 @@ export function SupplierTable({ filters }: { filters: DashboardFilters }) {
             <div className="w-64">
               <SupplierCombobox
                 selected={selectedSuppliers}
-                onChange={v => { setSelectedSuppliers(v); setPage(0); }}
+                onChange={v => { setSelectedSuppliers(v); setPage(1); }}
               />
             </div>
             {selectedSuppliers.length > 0 && (
-              <Button variant="ghost" size="sm" onClick={() => { setSelectedSuppliers([]); setPage(0); }}>
+              <Button variant="ghost" size="sm" onClick={() => { setSelectedSuppliers([]); setPage(1); }}>
                 <X className="size-3" /> Clear
               </Button>
             )}
-            <Button size="sm" variant="outline" onClick={() => exportCsv(sorted)}>
-              Export CSV
+            <Button size="sm" variant="outline" onClick={() => handleExportExcel(sorted)}>
+              Export Excel
             </Button>
           </div>
         </div>
       </CardHeader>
       <CardContent className="p-0">
+        <div ref={tableRef} style={{ minHeight: lockedHeight.current }}>
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
@@ -304,21 +316,15 @@ export function SupplierTable({ filters }: { filters: DashboardFilters }) {
           </Table>
         </div>
 
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t">
-            <span className="text-sm text-muted-foreground">
-              {sorted.length} suppliers · page {page + 1} of {totalPages}
-            </span>
-            <div className="flex gap-2">
-              <Button size="sm" variant="outline" disabled={page === 0} onClick={() => setPage(p => p - 1)}>
-                Prev
-              </Button>
-              <Button size="sm" variant="outline" disabled={page === totalPages - 1} onClick={() => setPage(p => p + 1)}>
-                Next
-              </Button>
-            </div>
-          </div>
-        )}
+        <TablePagination
+          page={page}
+          pageSize={pageSize}
+          total={sorted.length}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+          noun="suppliers"
+        />
+        </div>
       </CardContent>
 
       {profileSupplier && (

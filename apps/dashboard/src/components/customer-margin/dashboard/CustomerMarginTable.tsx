@@ -5,11 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
+import { TablePagination, type PageSize } from '@/components/ui/table-pagination';
 import { useCustomerMargins, useCustomerMonthly, useFilterCustomers } from '@/hooks/customer-margin/useMarginData';
 import { useStableData } from '@/hooks/useStableData';
 import type { MarginDashboardFilters } from '@/hooks/customer-margin/useDashboardFilters';
 import { formatRM, formatMarginPct, marginColor } from '@/lib/customer-margin/format';
 import { CustomerSparkline } from './CustomerSparkline';
+import { exportToExcel } from '@/lib/export-excel';
 import { Download, ArrowUpDown, ChevronDown, Search, X } from 'lucide-react';
 import { CustomerProfileRevamp } from '@/components/profiles/CustomerProfileRevampPreview';
 
@@ -128,10 +130,20 @@ export function CustomerMarginTable({ filters }: Props) {
   const [selectedProfile, setSelectedProfile] = useState<{
     debtor_code: string; company_name: string;
   } | null>(null);
-  const limit = 20;
+  const [pageSize, setPageSize] = useState<PageSize>(25);
+  const tableRef = useRef<HTMLDivElement>(null);
+  const lockedHeight = useRef<number | undefined>(undefined);
 
-  const { data: rawData } = useCustomerMargins(filters, sort, order, page, limit, selectedCustomers);
+  const { data: rawData } = useCustomerMargins(filters, sort, order, page, pageSize, selectedCustomers);
   const data = useStableData(rawData);
+
+  // Lock container height to prevent layout jump during page transitions
+  useEffect(() => {
+    const el = tableRef.current;
+    if (el && data && data.rows.length > 0) {
+      lockedHeight.current = el.offsetHeight;
+    }
+  }, [data && data.rows.length > 0, pageSize]);
 
   const toggleSort = useCallback((col: string) => {
     if (sort === col) {
@@ -143,25 +155,26 @@ export function CustomerMarginTable({ filters }: Props) {
     setPage(1);
   }, [sort]);
 
-  const exportCsv = useCallback(() => {
+  const handleExport = useCallback(() => {
     if (!data?.rows) return;
-    const headers = ['Code', 'Name', 'Type', 'Revenue', 'COGS', 'Gross Profit', 'Margin %', 'Trend'];
-    const lines = data.rows.map(r =>
-      [r.debtor_code, r.company_name ?? '', r.debtor_type ?? '',
-       r.revenue, r.cogs, r.gross_profit, r.margin_pct,
-       (r as { trend?: string }).trend ?? ''].join(',')
-    );
-    const csv = [headers.join(','), ...lines].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'customer_margins.csv';
-    a.click();
-    URL.revokeObjectURL(url);
+    exportToExcel('customer_margins', [
+      { header: 'Code', key: 'debtor_code', width: 14 },
+      { header: 'Name', key: 'company_name', width: 30 },
+      { header: 'Type', key: 'debtor_type', width: 16 },
+      { header: 'Revenue', key: 'revenue', width: 16 },
+      { header: 'COGS', key: 'cogs', width: 16 },
+      { header: 'Gross Profit', key: 'gross_profit', width: 16 },
+      { header: 'Margin %', key: 'margin_pct', width: 12 },
+    ], data.rows.map(r => ({
+      debtor_code: r.debtor_code,
+      company_name: r.company_name ?? '',
+      debtor_type: r.debtor_type ?? '',
+      revenue: r.revenue,
+      cogs: r.cogs,
+      gross_profit: r.gross_profit,
+      margin_pct: r.margin_pct,
+    })));
   }, [data]);
-
-  const totalPages = Math.ceil((data?.total ?? 0) / limit);
 
   const SortHeader = ({ col, children }: { col: string; children: React.ReactNode }) => (
     <TableHead>
@@ -193,8 +206,8 @@ export function CustomerMarginTable({ filters }: Props) {
               <X className="size-3" /> Clear
             </Button>
           )}
-          <Button variant="outline" size="xs" onClick={exportCsv}>
-            <Download className="size-3" /> CSV
+          <Button variant="outline" size="xs" onClick={handleExport}>
+            <Download className="size-3" /> Excel
           </Button>
         </div>
       </CardHeader>
@@ -202,7 +215,7 @@ export function CustomerMarginTable({ filters }: Props) {
         {!data ? (
           <div className="flex h-40 items-center justify-center text-muted-foreground">Loading...</div>
         ) : (
-          <>
+          <div ref={tableRef} style={{ minHeight: lockedHeight.current }}>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -247,21 +260,15 @@ export function CustomerMarginTable({ filters }: Props) {
               </TableBody>
             </Table>
 
-            <div className="mt-3 flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">
-                {data?.total ?? 0} customers total
-              </span>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="xs" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>
-                  Prev
-                </Button>
-                <span className="text-muted-foreground">Page {page} of {totalPages}</span>
-                <Button variant="outline" size="xs" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>
-                  Next
-                </Button>
-              </div>
-            </div>
-          </>
+            <TablePagination
+              page={page}
+              pageSize={pageSize}
+              total={data?.total ?? 0}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+              noun="customers"
+            />
+          </div>
         )}
       </CardContent>
 

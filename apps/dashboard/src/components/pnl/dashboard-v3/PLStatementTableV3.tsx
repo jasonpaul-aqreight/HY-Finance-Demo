@@ -3,7 +3,9 @@
 import React, { useState } from 'react';
 import { useV3Statement } from '@/hooks/pnl/usePLDataV3';
 import { useStableData } from '@/hooks/useStableData';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { exportToExcel } from '@/lib/export-excel';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
@@ -78,6 +80,34 @@ export function PLStatementTableV3({ fy }: Props) {
 
   const months = data.months ?? [];
 
+  function handleExportExcel() {
+    if (!data) return;
+    const cols = [
+      { header: 'Account', key: 'account', width: 30 },
+      ...months.map(m => ({ header: m.label.split(' ')[0], key: String(m.period), width: 14 })),
+      { header: 'YTD', key: 'ytd', width: 16 },
+      { header: 'Prior YTD', key: 'prior_ytd', width: 16 },
+    ];
+    const rows: Record<string, unknown>[] = [];
+    for (const group of data.groups) {
+      // Group subtotal row
+      const subtotalRow: Record<string, unknown> = { account: group.acc_type_name };
+      group.subtotal.monthly.forEach((v, i) => { subtotalRow[String(months[i]?.period)] = v; });
+      subtotalRow.ytd = group.subtotal.ytd;
+      subtotalRow.prior_ytd = group.subtotal.prior_ytd;
+      rows.push(subtotalRow);
+      // Account detail rows
+      for (const acc of group.accounts) {
+        const row: Record<string, unknown> = { account: `  ${acc.description}` };
+        acc.monthly.forEach((v, i) => { row[String(months[i]?.period)] = v; });
+        row.ytd = acc.ytd;
+        row.prior_ytd = acc.prior_ytd;
+        rows.push(row);
+      }
+    }
+    exportToExcel('profit-and-loss', cols, rows);
+  }
+
   function toggleGroup(accType: string) {
     setExpanded(prev => ({ ...prev, [accType]: !prev[accType] }));
   }
@@ -134,6 +164,11 @@ export function PLStatementTableV3({ fy }: Props) {
 
   return (
     <Card className="rounded-xl ring-1 ring-foreground/10">
+      <CardHeader className="flex-row items-center justify-end pb-0 pt-2 px-4">
+        <Button variant="outline" size="sm" onClick={handleExportExcel}>
+          Export Excel
+        </Button>
+      </CardHeader>
       <CardContent className="p-0 overflow-x-auto">
         <Table>
           <TableHeader>

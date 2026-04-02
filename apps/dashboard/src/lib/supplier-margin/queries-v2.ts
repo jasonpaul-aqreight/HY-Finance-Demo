@@ -368,7 +368,7 @@ export async function getTopBottomSuppliersV2(
       ${stFilter.sql}
       ${igFilter.sql}
     GROUP BY m.creditor_code, m.creditor_name
-    ORDER BY ${sortBy === 'margin_pct' ? 'margin_pct' : 'profit'} ${order === 'asc' ? 'ASC' : 'DESC'}
+    ORDER BY ${sortBy === 'margin_pct' ? 'margin_pct' : 'profit'} ${order === 'asc' ? 'ASC' : 'DESC'} NULLS LAST
     LIMIT $${limitIdx}
   `, params);
   return rows as TopBottomRowV2[];
@@ -416,7 +416,7 @@ export async function getTopBottomItemsV2(
       ${stFilter.sql}
       ${igFilter.sql}
     GROUP BY m.item_code, m.item_description, m.item_group
-    ORDER BY ${sortBy === 'margin_pct' ? 'margin_pct' : 'profit'} ${order === 'asc' ? 'ASC' : 'DESC'}
+    ORDER BY ${sortBy === 'margin_pct' ? 'margin_pct' : 'profit'} ${order === 'asc' ? 'ASC' : 'DESC'} NULLS LAST
     LIMIT $${limitIdx}
   `, params);
   return rows as TopBottomItemRowV2[];

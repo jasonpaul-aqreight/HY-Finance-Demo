@@ -90,9 +90,10 @@ export function useCreditHealthV2(
   search: string,
   riskFilter = '',
   categoryFilter = '',
+  pageSize = 25,
 ) {
   return useSWR<{ rows: CreditHealthV2Row[]; total: number }>(
-    `/api/payment/v2/credit-health?sort=${sort}&order=${order}&page=${page}&page_size=20&search=${encodeURIComponent(search)}&risk=${encodeURIComponent(riskFilter)}&category=${encodeURIComponent(categoryFilter)}`,
+    `/api/payment/v2/credit-health?sort=${sort}&order=${order}&page=${page}&page_size=${pageSize}&search=${encodeURIComponent(search)}&risk=${encodeURIComponent(riskFilter)}&category=${encodeURIComponent(categoryFilter)}`,
     fetcher,
     { revalidateOnFocus: false },
   );

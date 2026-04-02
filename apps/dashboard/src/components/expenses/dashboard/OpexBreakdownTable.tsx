@@ -9,6 +9,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatRM } from '@/lib/format';
+import { exportToExcel } from '@/lib/export-excel';
 
 interface Row {
   category: string;
@@ -25,26 +26,26 @@ interface GroupedCategory {
 
 import { CATEGORY_ORDER } from '@/lib/shared/expense-categories';
 
-function exportCsv(groups: GroupedCategory[], total: number) {
-  const headers = ['Category', 'Account No', 'Account Name', 'Net Cost (RM)', '% of OPEX'];
-  const lines: string[] = [];
+function handleExportExcel(groups: GroupedCategory[], total: number) {
+  const rows: Record<string, unknown>[] = [];
   for (const g of groups) {
     for (const r of g.rows) {
-      lines.push([
-        `"${r.category}"`,
-        r.acc_no,
-        `"${r.account_name}"`,
-        r.net_cost.toFixed(2),
-        total > 0 ? ((r.net_cost / total) * 100).toFixed(2) : '0',
-      ].join(','));
+      rows.push({
+        category: r.category,
+        acc_no: r.acc_no,
+        account_name: r.account_name,
+        net_cost: r.net_cost,
+        pct_of_opex: total > 0 ? Math.round((r.net_cost / total) * 10000) / 100 : 0,
+      });
     }
   }
-  const csv = [headers.join(','), ...lines].join('\n');
-  const blob = new Blob([csv], { type: 'text/csv' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'opex-breakdown.csv';
-  a.click();
+  exportToExcel('opex-breakdown', [
+    { header: 'Category', key: 'category', width: 24 },
+    { header: 'Account No', key: 'acc_no', width: 14 },
+    { header: 'Account Name', key: 'account_name', width: 30 },
+    { header: 'Net Cost (RM)', key: 'net_cost', width: 16 },
+    { header: '% of OPEX', key: 'pct_of_opex', width: 12 },
+  ], rows);
 }
 
 export function OpexBreakdownTable({ filters }: { filters: DashboardFilters }) {
@@ -91,8 +92,8 @@ export function OpexBreakdownTable({ filters }: { filters: DashboardFilters }) {
     <Card>
       <CardHeader className="pb-2 flex-row items-center justify-between">
         <CardTitle>OPEX Breakdown</CardTitle>
-        <Button size="sm" variant="outline" onClick={() => exportCsv(groups, total)}>
-          Export CSV
+        <Button size="sm" variant="outline" onClick={() => handleExportExcel(groups, total)}>
+          Export Excel
         </Button>
       </CardHeader>
       <CardContent className="p-0">

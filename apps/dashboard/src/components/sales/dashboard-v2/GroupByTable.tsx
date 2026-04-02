@@ -10,7 +10,10 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Button } from '@/components/ui/button';
+import { TablePagination, type PageSize } from '@/components/ui/table-pagination';
 import { formatRM, formatCount } from '@/lib/format';
+import { exportToExcel } from '@/lib/export-excel';
 import type { GroupByDimension, GroupByRow } from '@/lib/sales/types';
 import { CustomerProfileRevamp } from '@/components/profiles/CustomerProfileRevampPreview';
 
@@ -100,6 +103,8 @@ export function GroupByTable({ data, group, selectedNames, onToggle, maxSelected
   const columns = useMemo(() => getColumns(group), [group]);
   const [sortKey, setSortKey] = useState('total_sales');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<PageSize>(25);
   const [selectedCustomer, setSelectedCustomer] = useState<{ code: string; name: string } | null>(null);
 
   const isCustomerGroup = group === 'customer';
@@ -117,6 +122,8 @@ export function GroupByTable({ data, group, selectedNames, onToggle, maxSelected
     });
   }, [data, sortKey, sortDir]);
 
+  const paged = sorted.slice((page - 1) * pageSize, page * pageSize);
+
   function handleSort(key: string) {
     if (sortKey === key) {
       setSortDir(d => d === 'desc' ? 'asc' : 'desc');
@@ -124,6 +131,7 @@ export function GroupByTable({ data, group, selectedNames, onToggle, maxSelected
       setSortKey(key);
       setSortDir('desc');
     }
+    setPage(1);
   }
 
   const sortIndicator = (key: string) => {
@@ -141,10 +149,32 @@ export function GroupByTable({ data, group, selectedNames, onToggle, maxSelected
     if (el && data.length > 0) {
       lockedHeight.current = el.offsetHeight;
     }
-  }, [data.length > 0]); // only recalculate when data goes from empty→populated
+  }, [data.length > 0, pageSize]);
+
+  function handleExportExcel() {
+    exportToExcel(`sales-by-${group}`, columns.map(c => ({
+      header: c.label,
+      key: c.key,
+      width: c.key === 'name' ? 30 : 16,
+    })), sorted.map(row => {
+      const obj: Record<string, unknown> = {};
+      for (const col of columns) {
+        obj[col.key] = row[col.key] ?? '';
+      }
+      return obj;
+    }));
+  }
+
+  // Reset page when data/group changes
+  useEffect(() => { setPage(1); }, [group, data.length]);
 
   return (
     <>
+      <div className="flex justify-end mb-2">
+        <Button variant="outline" size="sm" onClick={handleExportExcel}>
+          Export Excel
+        </Button>
+      </div>
       <div
         ref={containerRef}
         className="border rounded-lg overflow-auto max-h-[500px]"
@@ -166,7 +196,7 @@ export function GroupByTable({ data, group, selectedNames, onToggle, maxSelected
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sorted.map((row, i) => {
+            {paged.map((row, i) => {
               const key = rowKey(row, group);
               const isChecked = selectedNames.has(key);
               const isDisabled = !isChecked && selectedNames.size >= maxSelected;
@@ -210,6 +240,14 @@ export function GroupByTable({ data, group, selectedNames, onToggle, maxSelected
           </TableBody>
         </Table>
       </div>
+      <TablePagination
+        page={page}
+        pageSize={pageSize}
+        total={sorted.length}
+        onPageChange={setPage}
+        onPageSizeChange={setPageSize}
+        noun="rows"
+      />
 
       {selectedCustomer && (
         <CustomerProfileRevamp

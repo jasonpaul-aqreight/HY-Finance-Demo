@@ -361,7 +361,40 @@ export async function getCustomerMonthly(code: string, start: string, end: strin
 
 // ─── 4b. Customer Product Breakdown (RDS drill-down) ────────────────────────
 
-export async function getCustomerProducts(code: string, start: string, end: string): Promise<ProductRow[]> {
+export async function getCustomerProducts(
+  code: string, start: string, end: string,
+  page = 1, limit = 25,
+): Promise<{ rows: ProductRow[]; total: number }> {
+  const offset = (page - 1) * limit;
+
+  const countResult = await queryRds<{ total: number }>(`
+    WITH lines AS (
+      SELECT dtl."ItemCode" AS item_code
+      FROM dbo."IVDTL" dtl
+      JOIN dbo."IV" h ON h."DocKey" = dtl."DocKey"
+      WHERE h."Cancelled" = 'F'
+        AND h."DebtorCode" = $1
+        AND (h."DocDate" + INTERVAL '8 hours')::date BETWEEN $2::date AND $3::date
+      UNION ALL
+      SELECT dtl."ItemCode" AS item_code
+      FROM dbo."CSDTL" dtl
+      JOIN dbo."CS" h ON h."DocKey" = dtl."DocKey"
+      WHERE h."Cancelled" = 'F'
+        AND h."DebtorCode" = $1
+        AND (h."DocDate" + INTERVAL '8 hours')::date BETWEEN $2::date AND $3::date
+      UNION ALL
+      SELECT dtl."ItemCode" AS item_code
+      FROM dbo."CNDTL" dtl
+      JOIN dbo."CN" h ON h."DocKey" = dtl."DocKey"
+      WHERE h."Cancelled" = 'F'
+        AND h."DebtorCode" = $1
+        AND (h."DocDate" + INTERVAL '8 hours')::date BETWEEN $2::date AND $3::date
+    )
+    SELECT COUNT(DISTINCT item_code)::integer AS total FROM lines
+  `, [code, start, end]);
+
+  const total = countResult[0]?.total ?? 0;
+
   const rows = await queryRds<{
     item_code: string;
     description: string;
@@ -379,6 +412,20 @@ export async function getCustomerProducts(code: string, start: string, end: stri
         COALESCE(dtl."LocalTotalCost", 0) AS cost
       FROM dbo."IVDTL" dtl
       JOIN dbo."IV" h ON h."DocKey" = dtl."DocKey"
+      WHERE h."Cancelled" = 'F'
+        AND h."DebtorCode" = $1
+        AND (h."DocDate" + INTERVAL '8 hours')::date BETWEEN $2::date AND $3::date
+
+      UNION ALL
+
+      SELECT
+        dtl."ItemCode" AS item_code,
+        dtl."Description" AS description,
+        dtl."Qty" AS qty,
+        dtl."LocalSubTotal" AS revenue,
+        COALESCE(dtl."LocalTotalCost", 0) AS cost
+      FROM dbo."CSDTL" dtl
+      JOIN dbo."CS" h ON h."DocKey" = dtl."DocKey"
       WHERE h."Cancelled" = 'F'
         AND h."DebtorCode" = $1
         AND (h."DocDate" + INTERVAL '8 hours')::date BETWEEN $2::date AND $3::date
@@ -408,13 +455,16 @@ export async function getCustomerProducts(code: string, start: string, end: stri
     LEFT JOIN dbo."Item" i ON i."ItemCode" = l.item_code
     GROUP BY l.item_code
     ORDER BY revenue DESC
-    LIMIT 50
-  `, [code, start, end]);
+    LIMIT $4 OFFSET $5
+  `, [code, start, end, limit, offset]);
 
-  return rows.map(r => ({
-    ...r,
-    margin_pct: r.revenue !== 0 ? Math.round(((r.revenue - r.cost) / r.revenue) * 10000) / 100 : 0,
-  }));
+  return {
+    total,
+    rows: rows.map(r => ({
+      ...r,
+      margin_pct: r.revenue !== 0 ? Math.round(((r.revenue - r.cost) / r.revenue) * 10000) / 100 : 0,
+    })),
+  };
 }
 
 // ─── 5. Margin by Customer Type ──────────────────────────────────────────────

@@ -9,6 +9,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatRM } from '@/lib/format';
+import { exportToExcel } from '@/lib/export-excel';
 
 type SortKey = 'acc_no' | 'account_name' | 'net_cost';
 
@@ -18,20 +19,18 @@ interface Row {
   net_cost: number;
 }
 
-function exportCsv(rows: Row[], total: number) {
-  const headers = ['Account No', 'Account Name', 'Net Cost (RM)', '% of COGS'];
-  const lines = rows.map(r => [
-    r.acc_no,
-    `"${r.account_name}"`,
-    r.net_cost.toFixed(2),  // negative sign preserved for contra accounts
-    total > 0 ? ((r.net_cost / total) * 100).toFixed(2) : '0',
-  ].join(','));
-  const csv = [headers.join(','), ...lines].join('\n');
-  const blob = new Blob([csv], { type: 'text/csv' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'cogs-breakdown.csv';
-  a.click();
+function handleExportExcel(rows: Row[], total: number) {
+  exportToExcel('cogs-breakdown', [
+    { header: 'Account No', key: 'acc_no', width: 14 },
+    { header: 'Account Name', key: 'account_name', width: 30 },
+    { header: 'Net Cost (RM)', key: 'net_cost', width: 16 },
+    { header: '% of COGS', key: 'pct_of_cogs', width: 12 },
+  ], rows.map(r => ({
+    acc_no: r.acc_no,
+    account_name: r.account_name,
+    net_cost: r.net_cost,
+    pct_of_cogs: total > 0 ? Math.round((r.net_cost / total) * 10000) / 100 : 0,
+  })));
 }
 
 export function CogsBreakdownTable({ filters }: { filters: DashboardFilters }) {
@@ -84,8 +83,8 @@ export function CogsBreakdownTable({ filters }: { filters: DashboardFilters }) {
     <Card>
       <CardHeader className="pb-2 flex-row items-center justify-between">
         <CardTitle>COGS Breakdown</CardTitle>
-        <Button size="sm" variant="outline" onClick={() => exportCsv(sorted, total)}>
-          Export CSV
+        <Button size="sm" variant="outline" onClick={() => handleExportExcel(sorted, total)}>
+          Export Excel
         </Button>
       </CardHeader>
       <CardContent className="p-0">

@@ -52,9 +52,15 @@ export function useCustomerMargins(
   );
 }
 
-export function useCustomerProducts(code: string | null, startDate: string, endDate: string) {
-  const params = new URLSearchParams({ date_from: startDate, date_to: endDate });
-  return useSWR<{ data: ProductRow[] }>(
+export function useCustomerProducts(
+  code: string | null, startDate: string, endDate: string,
+  page = 1, limit = 25,
+) {
+  const params = new URLSearchParams({
+    date_from: startDate, date_to: endDate,
+    page: String(page), limit: String(limit),
+  });
+  return useSWR<{ rows: ProductRow[]; total: number }>(
     code ? `/api/customer-margin/margin/customers/${encodeURIComponent(code)}/products?${params}` : null,
     fetcher
   );

@@ -14,7 +14,10 @@ export async function GET(
     const defaults = defaultFullRange();
     const start = searchParams.get('date_from') || defaults.start;
     const end = searchParams.get('date_to') || defaults.end;
-    return NextResponse.json({ data: await getCustomerProducts(code, start, end) });
+    const page = parseInt(searchParams.get('page') ?? '1', 10) || 1;
+    const limit = parseInt(searchParams.get('limit') ?? '25', 10) || 25;
+    const result = await getCustomerProducts(code, start, end, page, limit);
+    return NextResponse.json(result);
   } catch (err) {
     console.error('Customer products error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
