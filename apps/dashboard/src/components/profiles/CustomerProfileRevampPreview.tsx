@@ -183,8 +183,7 @@ export function CustomerProfileRevamp({ open, onClose, debtorCode, companyName, 
     if (!monthlyData || !Array.isArray(monthlyData)) return { revenue: 0, cogs: 0, avgMargin: 0 };
     const revenue = monthlyData.reduce((s: number, m: any) => s + (m.revenue ?? 0), 0);
     const cogs = monthlyData.reduce((s: number, m: any) => s + (m.cogs ?? 0), 0);
-    const margins = monthlyData.filter((m: any) => m.margin_pct != null);
-    const avgMargin = margins.length > 0 ? margins.reduce((s: number, m: any) => s + m.margin_pct, 0) / margins.length : 0;
+    const avgMargin = revenue > 0 ? ((revenue - cogs) / revenue) * 100 : 0;
     return { revenue, cogs, avgMargin };
   }, [monthlyData]);
 

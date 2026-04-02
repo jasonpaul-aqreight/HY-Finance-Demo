@@ -377,9 +377,9 @@ export async function getCustomerProducts(
         AND (h."DocDate" + INTERVAL '8 hours')::date BETWEEN $2::date AND $3::date
       UNION ALL
       SELECT dtl."ItemCode" AS item_code
-      FROM dbo."CSDTL" dtl
-      JOIN dbo."CS" h ON h."DocKey" = dtl."DocKey"
-      WHERE h."Cancelled" = 'F'
+      FROM dbo."DNDTL" dtl
+      JOIN dbo."DN" h ON h."DocKey" = dtl."DocKey"
+      WHERE (h."Cancelled" = 'F' OR h."Cancelled" IS NULL)
         AND h."DebtorCode" = $1
         AND (h."DocDate" + INTERVAL '8 hours')::date BETWEEN $2::date AND $3::date
       UNION ALL
@@ -409,7 +409,7 @@ export async function getCustomerProducts(
         dtl."Description" AS description,
         dtl."Qty" AS qty,
         dtl."LocalSubTotal" AS revenue,
-        COALESCE(dtl."LocalTotalCost", 0) AS cost
+        CASE WHEN dtl."LocalTotalCost" >= 0 THEN dtl."LocalTotalCost" ELSE 0 END AS cost
       FROM dbo."IVDTL" dtl
       JOIN dbo."IV" h ON h."DocKey" = dtl."DocKey"
       WHERE h."Cancelled" = 'F'
@@ -423,10 +423,10 @@ export async function getCustomerProducts(
         dtl."Description" AS description,
         dtl."Qty" AS qty,
         dtl."LocalSubTotal" AS revenue,
-        COALESCE(dtl."LocalTotalCost", 0) AS cost
-      FROM dbo."CSDTL" dtl
-      JOIN dbo."CS" h ON h."DocKey" = dtl."DocKey"
-      WHERE h."Cancelled" = 'F'
+        CASE WHEN dtl."LocalTotalCost" >= 0 THEN dtl."LocalTotalCost" ELSE 0 END AS cost
+      FROM dbo."DNDTL" dtl
+      JOIN dbo."DN" h ON h."DocKey" = dtl."DocKey"
+      WHERE (h."Cancelled" = 'F' OR h."Cancelled" IS NULL)
         AND h."DebtorCode" = $1
         AND (h."DocDate" + INTERVAL '8 hours')::date BETWEEN $2::date AND $3::date
 
