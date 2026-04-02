@@ -346,7 +346,9 @@ export async function getCollectionTrend(startMonth: string, endMonth: string, f
       month,
       COALESCE(invoiced, 0)::float AS total_invoiced,
       COALESCE(collected, 0)::float AS total_collected,
-      customer_count::int AS customer_count
+      customer_count::int AS customer_count,
+      COALESCE(invoice_count, 0)::int AS invoice_count,
+      COALESCE(payment_count, 0)::int AS payment_count
     FROM pc_ar_monthly
     WHERE month BETWEEN $1 AND $2
     ORDER BY month
@@ -356,13 +358,13 @@ export async function getCollectionTrend(startMonth: string, endMonth: string, f
 
   return {
     data: months.map(m => {
-      const row = monthMap.get(m) as { total_invoiced: number; total_collected: number } | undefined;
+      const row = monthMap.get(m) as { total_invoiced: number; total_collected: number; invoice_count: number; payment_count: number } | undefined;
       return {
         month: m,
         total_collected: row?.total_collected ?? 0,
-        payment_count: 0,
+        payment_count: row?.payment_count ?? 0,
         total_invoiced: row?.total_invoiced ?? 0,
-        invoice_count: 0,
+        invoice_count: row?.invoice_count ?? 0,
       };
     }),
     avg_pay_days: null,
@@ -420,6 +422,7 @@ export async function getCreditUtilization(filters: Filters = {}): Promise<Credi
       ROUND(SUM(s.total_outstanding)::numeric, 2)::float AS total_outstanding
     FROM pc_ar_customer_snapshot s
     WHERE s.snapshot_date = $1 AND s.is_active = 'T'
+      AND s.company_name NOT ILIKE 'CASH DEBT%' AND s.company_name NOT ILIKE 'CASH SALES%'
       ${where}
     GROUP BY category
   `, [latest.d, ...params]);
@@ -447,6 +450,7 @@ export async function getKpis(refDate: string, filters: Filters = {}): Promise<K
       ROUND(SUM(s.overdue_amount)::numeric, 2)::float AS overdue_amount
     FROM pc_ar_customer_snapshot s
     WHERE s.snapshot_date = $1 AND s.total_outstanding > 0
+      AND s.company_name NOT ILIKE 'CASH DEBT%' AND s.company_name NOT ILIKE 'CASH SALES%'
       ${where}
   `, [latest.d, ...params])).rows[0] as { total_outstanding: number; overdue_amount: number };
 
@@ -457,6 +461,7 @@ export async function getKpis(refDate: string, filters: Filters = {}): Promise<K
     WHERE s.snapshot_date = $1
       AND s.credit_limit > 0
       AND s.total_outstanding > s.credit_limit
+      AND s.company_name NOT ILIKE 'CASH DEBT%' AND s.company_name NOT ILIKE 'CASH SALES%'
       ${where}
   `, [latest.d, ...params])).rows[0] as { cnt: number };
 
@@ -543,6 +548,7 @@ export async function getCreditHealthTable(
     FROM pc_ar_customer_snapshot s
     WHERE s.snapshot_date = $1
       AND (s.is_active = 'T' OR s.total_outstanding > 0)
+      AND s.company_name NOT ILIKE 'CASH DEBT%' AND s.company_name NOT ILIKE 'CASH SALES%'
       ${where}
   `, [latest.d, ...params])).rows.map((r: {
     debtor_code: string; company_name: string; debtor_type: string; sales_agent: string;

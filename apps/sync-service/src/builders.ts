@@ -291,7 +291,11 @@ async function buildSalesByFruit(source: Pool, ctx: BuilderContext): Promise<Bui
 
 async function buildArMonthly(source: Pool): Promise<BuildResult> {
   const result = await source.query(`
-    WITH monthly AS (
+    WITH non_customer AS (
+      SELECT "AccNo" FROM dbo."Debtor"
+      WHERE "CompanyName" ILIKE 'CASH DEBT%' OR "CompanyName" ILIKE 'CASH SALES%'
+    ),
+    monthly AS (
       SELECT
         ${mytMonth('a')} AS month,
         SUM(a."LocalNetTotal") AS invoiced,
@@ -304,6 +308,7 @@ async function buildArMonthly(source: Pool): Promise<BuildResult> {
         0 AS payment_count
       FROM dbo."ARInvoice" a
       WHERE a."Cancelled" = 'F'
+        AND a."DebtorCode" NOT IN (SELECT "AccNo" FROM non_customer)
       GROUP BY ${mytMonth('a')}
 
       UNION ALL
@@ -314,6 +319,7 @@ async function buildArMonthly(source: Pool): Promise<BuildResult> {
         0, COUNT(*)::int
       FROM dbo."ARPayment" p
       WHERE p."Cancelled" = 'F'
+        AND p."DebtorCode" NOT IN (SELECT "AccNo" FROM non_customer)
       GROUP BY ${mytMonth('p')}
 
       UNION ALL
@@ -324,6 +330,7 @@ async function buildArMonthly(source: Pool): Promise<BuildResult> {
         0, 0
       FROM dbo."ARCN" c
       WHERE c."Cancelled" = 'F'
+        AND c."DebtorCode" NOT IN (SELECT "AccNo" FROM non_customer)
       GROUP BY ${mytMonth('c')}
 
       UNION ALL
@@ -334,6 +341,7 @@ async function buildArMonthly(source: Pool): Promise<BuildResult> {
         0, 0
       FROM dbo."ARRefund" r
       WHERE r."Cancelled" = 'F'
+        AND r."DebtorCode" NOT IN (SELECT "AccNo" FROM non_customer)
       GROUP BY ${mytMonth('r')}
 
       UNION ALL
@@ -383,7 +391,11 @@ async function buildArCustomerSnapshot(source: Pool, ctx: BuilderContext): Promi
 
   // Step 1: Get raw per-customer AR metrics from RDS
   const rawResult = await source.query(`
-    WITH open_invoices AS (
+    WITH non_customer AS (
+      SELECT "AccNo" FROM dbo."Debtor"
+      WHERE "CompanyName" ILIKE 'CASH DEBT%' OR "CompanyName" ILIKE 'CASH SALES%'
+    ),
+    open_invoices AS (
       SELECT
         a."DebtorCode",
         a."DocKey",
@@ -395,6 +407,7 @@ async function buildArCustomerSnapshot(source: Pool, ctx: BuilderContext): Promi
         a."SalesAgent"
       FROM dbo."ARInvoice" a
       WHERE a."Cancelled" = 'F'
+        AND a."DebtorCode" NOT IN (SELECT "AccNo" FROM non_customer)
     ),
     customer_ar AS (
       SELECT
@@ -422,6 +435,7 @@ async function buildArCustomerSnapshot(source: Pool, ctx: BuilderContext): Promi
         ON ko."KnockOffDocKey" = inv."DocKey" AND ko."KnockOffDocType" = 'RI'
       JOIN dbo."ARPayment" pay ON ko."DocKey" = pay."DocKey"
       WHERE inv."Cancelled" = 'F' AND pay."Cancelled" = 'F'
+        AND inv."DebtorCode" NOT IN (SELECT "AccNo" FROM non_customer)
       GROUP BY inv."DebtorCode"
     )
     SELECT
@@ -537,6 +551,8 @@ async function buildArAgingHistory(source: Pool, ctx: BuilderContext): Promise<B
       FROM dbo."ARInvoice" a
       LEFT JOIN dbo."Debtor" d ON a."DebtorCode" = d."AccNo"
       WHERE a."Cancelled" = 'F' AND a."Outstanding" > 0
+        AND d."CompanyName" NOT ILIKE 'CASH DEBT%'
+        AND d."CompanyName" NOT ILIKE 'CASH SALES%'
     ),
     bucketed AS (
       SELECT *,
