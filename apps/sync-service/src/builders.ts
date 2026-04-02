@@ -886,22 +886,7 @@ async function buildCustomerMarginByProduct(source: Pool): Promise<BuildResult> 
       LEFT JOIN dbo."Item" i ON d."ItemCode" = i."ItemCode"
       LEFT JOIN dbo."ItemGroup" ig ON i."ItemGroup" = ig."ItemGroup"
       WHERE h."Cancelled" = 'F'
-      GROUP BY ${mytMonth('h')}, h."DebtorCode", i."ItemGroup", ig."Description"
-    ),
-    cs_lines AS (
-      SELECT
-        ${mytMonth('h')} AS month,
-        h."DebtorCode" AS debtor_code,
-        COALESCE(NULLIF(i."ItemGroup", ''), 'Unclassified') AS item_group,
-        ig."Description" AS item_group_desc,
-        SUM(d."LocalSubTotal") AS revenue,
-        SUM(d."LocalTotalCost") AS cogs,
-        SUM(d."Qty") AS qty_sold
-      FROM dbo."CSDTL" d
-      JOIN dbo."CS" h ON d."DocKey" = h."DocKey"
-      LEFT JOIN dbo."Item" i ON d."ItemCode" = i."ItemCode"
-      LEFT JOIN dbo."ItemGroup" ig ON i."ItemGroup" = ig."ItemGroup"
-      WHERE h."Cancelled" = 'F'
+        AND d."ItemCode" IS NOT NULL AND d."ItemCode" != ''
       GROUP BY ${mytMonth('h')}, h."DebtorCode", i."ItemGroup", ig."Description"
     ),
     cn_lines AS (
@@ -911,13 +896,14 @@ async function buildCustomerMarginByProduct(source: Pool): Promise<BuildResult> 
         COALESCE(NULLIF(i."ItemGroup", ''), 'Unclassified') AS item_group,
         ig."Description" AS item_group_desc,
         -SUM(d."LocalSubTotal") AS revenue,
-        -SUM(CASE WHEN (d."UnitCost" * d."Qty") >= 0 THEN (d."UnitCost" * d."Qty") ELSE 0 END) AS cogs,
+        -SUM(d."UnitCost" * d."Qty") AS cogs,
         -SUM(d."Qty") AS qty_sold
       FROM dbo."CNDTL" d
       JOIN dbo."CN" h ON d."DocKey" = h."DocKey"
       LEFT JOIN dbo."Item" i ON d."ItemCode" = i."ItemCode"
       LEFT JOIN dbo."ItemGroup" ig ON i."ItemGroup" = ig."ItemGroup"
       WHERE h."Cancelled" = 'F'
+        AND d."ItemCode" IS NOT NULL AND d."ItemCode" != ''
       GROUP BY ${mytMonth('h')}, h."DebtorCode", i."ItemGroup", ig."Description"
     ),
     dn_lines AS (
@@ -934,12 +920,11 @@ async function buildCustomerMarginByProduct(source: Pool): Promise<BuildResult> 
       LEFT JOIN dbo."Item" i ON d."ItemCode" = i."ItemCode"
       LEFT JOIN dbo."ItemGroup" ig ON i."ItemGroup" = ig."ItemGroup"
       WHERE (h."Cancelled" = 'F' OR h."Cancelled" IS NULL)
+        AND d."ItemCode" IS NOT NULL AND d."ItemCode" != ''
       GROUP BY ${mytMonth('h')}, h."DebtorCode", i."ItemGroup", ig."Description"
     ),
     combined AS (
       SELECT * FROM iv_lines
-      UNION ALL
-      SELECT * FROM cs_lines
       UNION ALL
       SELECT * FROM cn_lines
       UNION ALL
