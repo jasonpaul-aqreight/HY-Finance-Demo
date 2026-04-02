@@ -1,6 +1,8 @@
 import { getPool, queryRds } from '../postgres';
 import { getRefDate } from './queries';
 import { daysInMonth } from './date-utils';
+import { computeCreditScoreV2 } from './credit-score-v2';
+import { getSettingsV2 } from './settings';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -212,7 +214,9 @@ export async function getCreditHealthTableV2(
   const { rows: [latest] } = await pool.query(`SELECT MAX(snapshot_date) AS d FROM pc_ar_customer_snapshot`);
   if (!latest?.d) return { rows: [], total: 0 };
 
-  let rows: CreditHealthV2Row[] = (await pool.query(`
+  // Fetch raw inputs and recalculate scores using current settings
+  const settings = await getSettingsV2();
+  const rawRows = (await pool.query(`
     SELECT
       debtor_code,
       COALESCE(company_name, '') AS company_name,
@@ -220,17 +224,54 @@ export async function getCreditHealthTableV2(
       COALESCE(sales_agent, '') AS sales_agent,
       COALESCE(credit_limit, 0)::float AS credit_limit,
       COALESCE(total_outstanding, 0)::float AS total_outstanding,
+      COALESCE(overdue_limit, 0)::float AS overdue_limit,
+      COALESCE(overdue_amount, 0)::float AS overdue_amount,
       oldest_due_date AS oldest_due,
       COALESCE(max_overdue_days, 0)::int AS max_overdue_days,
       COALESCE(invoice_count, 0)::int AS aging_count,
       utilization_pct::float AS utilization_pct,
-      COALESCE(risk_tier, 'moderate') AS risk_tier,
-      COALESCE(credit_score, 50)::float AS credit_score
+      avg_days_late::float AS avg_days_late
     FROM pc_ar_customer_snapshot
     WHERE snapshot_date = $1 AND (is_active = 'T' OR is_active IS NULL)
       AND company_name NOT ILIKE 'CASH DEBT%'
       AND company_name NOT ILIKE 'CASH SALES%'
   `, [latest.d])).rows;
+
+  // Recalculate credit_score and risk_tier from current settings
+  let rows: CreditHealthV2Row[] = rawRows.map((r: Record<string, unknown>) => {
+    const creditLimit = Number(r.credit_limit) || 0;
+    const totalOutstanding = Number(r.total_outstanding) || 0;
+    const overdueLimit = Number(r.overdue_limit) || 0;
+    const overdueAmt = Number(r.overdue_amount) || 0;
+
+    const result = computeCreditScoreV2(
+      {
+        creditUtilizationPct: r.utilization_pct != null ? Number(r.utilization_pct) : null,
+        hasCreditLimit: creditLimit > 0,
+        oldestOverdueDays: Number(r.max_overdue_days) || 0,
+        avgDaysLate: r.avg_days_late != null ? Number(r.avg_days_late) : null,
+        creditLimitBreached: creditLimit > 0 && totalOutstanding > creditLimit,
+        overdueLimitBreached: overdueLimit > 0 && overdueAmt > overdueLimit,
+      },
+      settings.creditScoreWeights,
+      settings.riskThresholds,
+    );
+
+    return {
+      debtor_code: r.debtor_code as string,
+      company_name: r.company_name as string,
+      debtor_type: r.debtor_type as string,
+      sales_agent: r.sales_agent as string,
+      credit_limit: creditLimit,
+      total_outstanding: totalOutstanding,
+      oldest_due: r.oldest_due as string | null,
+      max_overdue_days: Number(r.max_overdue_days) || 0,
+      aging_count: Number(r.aging_count) || 0,
+      utilization_pct: r.utilization_pct != null ? Number(r.utilization_pct) : null,
+      credit_score: result.score,
+      risk_tier: result.riskTier,
+    };
+  });
 
   // Filter by search
   if (search) {
@@ -325,6 +366,29 @@ export async function getCustomerProfile(debtorCode: string): Promise<CustomerPr
     WHERE debtorcode = $1
   `, [debtorCode])).rows[0] as Record<string, unknown> | undefined;
 
+  // Recalculate credit score from current settings
+  const creditLimit = Number(snapshot?.credit_limit ?? debtor?.credit_limit ?? 0);
+  const totalOutstanding = Number(snapshot?.total_outstanding ?? 0);
+  const overdueLimit = Number(snapshot?.overdue_limit ?? 0);
+  const overdueAmt = Number(snapshot?.overdue_amount ?? 0);
+  const maxOverdueDays = Number(snapshot?.max_overdue_days ?? 0);
+  const utilPct = snapshot?.utilization_pct != null ? Number(snapshot.utilization_pct) : null;
+  const avgDaysLate = snapshot?.avg_days_late != null ? Number(snapshot.avg_days_late) : null;
+
+  const settings = await getSettingsV2();
+  const scoreResult = computeCreditScoreV2(
+    {
+      creditUtilizationPct: utilPct,
+      hasCreditLimit: creditLimit > 0,
+      oldestOverdueDays: maxOverdueDays,
+      avgDaysLate,
+      creditLimitBreached: creditLimit > 0 && totalOutstanding > creditLimit,
+      overdueLimitBreached: overdueLimit > 0 && overdueAmt > overdueLimit,
+    },
+    settings.creditScoreWeights,
+    settings.riskThresholds,
+  );
+
   return {
     display_term: (snapshot?.display_term ?? debtor?.display_term ?? '') as string,
     is_active: ((snapshot?.is_active ?? debtor?.is_active ?? 'F') as string) === 'T',
@@ -338,13 +402,13 @@ export async function getCustomerProfile(debtorCode: string): Promise<CustomerPr
     area_code: (snapshot?.area_code ?? debtor?.area_code ?? '') as string,
     currency_code: (snapshot?.currency_code ?? debtor?.currency_code ?? 'MYR') as string,
     created_date: (snapshot?.created_timestamp ?? debtor?.created_date ?? null) as string | null,
-    credit_limit: Number(snapshot?.credit_limit ?? debtor?.credit_limit ?? 0),
-    total_outstanding: Number(snapshot?.total_outstanding ?? 0),
-    utilization_pct: snapshot?.utilization_pct != null ? Math.round(Number(snapshot.utilization_pct) * 10) / 10 : null,
+    credit_limit: creditLimit,
+    total_outstanding: totalOutstanding,
+    utilization_pct: utilPct != null ? Math.round(utilPct * 10) / 10 : null,
     aging_count: Number(snapshot?.invoice_count ?? 0),
     oldest_due: (snapshot?.oldest_due_date ?? null) as string | null,
-    max_overdue_days: Number(snapshot?.max_overdue_days ?? 0),
-    credit_score: Number(snapshot?.credit_score ?? 50),
-    risk_tier: (snapshot?.risk_tier ?? 'moderate') as string,
+    max_overdue_days: maxOverdueDays,
+    credit_score: scoreResult.score,
+    risk_tier: scoreResult.riskTier,
   };
 }
