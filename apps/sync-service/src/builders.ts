@@ -1004,6 +1004,12 @@ async function buildSupplierMargin(source: Pool, ctx: BuilderContext): Promise<B
       SELECT month, item_code, SUM(sales_qty) AS sales_qty, SUM(sales_revenue) AS sales_revenue
       FROM sales
       GROUP BY month, item_code
+    ),
+    -- Per-month purchase totals per item (attribution denominator)
+    item_total_purchase AS (
+      SELECT month, item_code, SUM(purchase_qty) AS total_purchase_qty
+      FROM purchase
+      GROUP BY month, item_code
     )
     SELECT
       p.month,
@@ -1019,10 +1025,14 @@ async function buildSupplierMargin(source: Pool, ctx: BuilderContext): Promise<B
       CASE WHEN COALESCE(p.purchase_qty, 0) > 0
         THEN ROUND((p.purchase_total / p.purchase_qty)::numeric, 4)
         ELSE 0 END AS avg_unit_cost,
-      COALESCE(sa.sales_qty, 0) AS sales_qty,
-      COALESCE(sa.sales_revenue, 0) AS sales_revenue
+      -- Attributed sales: weighted by supplier's share of item purchases
+      COALESCE(sa.sales_qty * p.purchase_qty / NULLIF(itp.total_purchase_qty, 0), 0) AS sales_qty,
+      COALESCE(sa.sales_revenue * p.purchase_qty / NULLIF(itp.total_purchase_qty, 0), 0) AS sales_revenue,
+      -- Attributed COGS: supplier's purchase cost scaled by sold/purchased ratio
+      COALESCE(p.purchase_total * sa.sales_qty / NULLIF(itp.total_purchase_qty, 0), 0) AS attributed_cogs
     FROM purchase p
     LEFT JOIN sales_agg sa ON p.item_code = sa.item_code AND p.month = sa.month
+    LEFT JOIN item_total_purchase itp ON p.item_code = itp.item_code AND p.month = itp.month
     LEFT JOIN dbo."Creditor" cr ON p.creditor_code = cr."AccNo"
     LEFT JOIN dbo."Item" i ON p.item_code = i."ItemCode"
     ORDER BY p.month, p.creditor_code, p.item_code
@@ -1038,7 +1048,7 @@ async function buildSupplierMargin(source: Pool, ctx: BuilderContext): Promise<B
     'month', 'creditor_code', 'creditor_name', 'creditor_type', 'is_active',
     'item_code', 'item_description', 'item_group', 'fruit_name',
     'purchase_qty', 'purchase_total', 'avg_unit_cost',
-    'sales_qty', 'sales_revenue',
+    'sales_qty', 'sales_revenue', 'attributed_cogs',
   ];
 
   return { rows: enrichedRows, columns };

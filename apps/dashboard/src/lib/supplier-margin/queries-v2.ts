@@ -3,7 +3,10 @@ import { getPreviousPeriod } from './date-utils';
 
 // ─── Note ────────────────────────────────────────────────────────────────────
 // Phase 3: All queries read from pc_supplier_margin pre-computed table.
-// Margin = sales_revenue - purchase_total (per supplier-item-month row).
+// Margin = sales_revenue - attributed_cogs (per supplier-item-month row).
+// sales_revenue and sales_qty are attributed proportionally to each supplier's purchase share.
+// attributed_cogs = purchase_total × (item_sold_qty / total_item_purchase_qty).
+// purchase_total and purchase_qty remain raw (unattributed) for price analysis.
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -215,7 +218,7 @@ async function fetchMarginPeriodV2(
   const { rows } = await pool.query(`
     SELECT
       COALESCE(SUM(m.sales_revenue), 0)::float AS revenue,
-      COALESCE(SUM(m.purchase_total), 0)::float AS cogs
+      COALESCE(SUM(m.attributed_cogs), 0)::float AS cogs
     FROM pc_supplier_margin m
     WHERE m.month BETWEEN $1 AND $2
       AND m.is_active = 'T'
@@ -307,11 +310,11 @@ export async function getMarginTrendV2(
       ${pExpr} AS period,
       ${selectSupplier}
       ROUND(
-        ((SUM(m.sales_revenue) - SUM(m.purchase_total))
+        ((SUM(m.sales_revenue) - SUM(m.attributed_cogs))
         / NULLIF(SUM(m.sales_revenue), 0) * 100)::numeric, 2
       )::float AS margin_pct,
       ROUND(SUM(m.sales_revenue)::numeric, 2)::float AS revenue,
-      ROUND((SUM(m.sales_revenue) - SUM(m.purchase_total))::numeric, 2)::float AS profit
+      ROUND((SUM(m.sales_revenue) - SUM(m.attributed_cogs))::numeric, 2)::float AS profit
     FROM pc_supplier_margin m
     WHERE m.month BETWEEN $1 AND $2
       AND m.is_active = 'T'
@@ -354,11 +357,11 @@ export async function getTopBottomSuppliersV2(
       m.creditor_code,
       m.creditor_name AS company_name,
       ROUND(
-        ((SUM(m.sales_revenue) - SUM(m.purchase_total))
+        ((SUM(m.sales_revenue) - SUM(m.attributed_cogs))
         / NULLIF(SUM(m.sales_revenue), 0) * 100)::numeric, 2
       )::float AS margin_pct,
       ROUND(SUM(m.sales_revenue)::numeric, 2)::float AS revenue,
-      ROUND((SUM(m.sales_revenue) - SUM(m.purchase_total))::numeric, 2)::float AS profit
+      ROUND((SUM(m.sales_revenue) - SUM(m.attributed_cogs))::numeric, 2)::float AS profit
     FROM pc_supplier_margin m
     WHERE m.month BETWEEN $1 AND $2
       AND m.is_active = 'T'
@@ -402,11 +405,11 @@ export async function getTopBottomItemsV2(
       m.item_description AS item_name,
       m.item_group,
       ROUND(
-        ((SUM(m.sales_revenue) - SUM(m.purchase_total))
+        ((SUM(m.sales_revenue) - SUM(m.attributed_cogs))
         / NULLIF(SUM(m.sales_revenue), 0) * 100)::numeric, 2
       )::float AS margin_pct,
       ROUND(SUM(m.sales_revenue)::numeric, 2)::float AS revenue,
-      ROUND((SUM(m.sales_revenue) - SUM(m.purchase_total))::numeric, 2)::float AS profit
+      ROUND((SUM(m.sales_revenue) - SUM(m.attributed_cogs))::numeric, 2)::float AS profit
     FROM pc_supplier_margin m
     WHERE m.month BETWEEN $1 AND $2
       AND m.is_active = 'T'
@@ -449,10 +452,10 @@ export async function getSupplierTableV2(
       m.creditor_type AS supplier_type,
       COUNT(DISTINCT m.item_code)::int AS item_count,
       ROUND(SUM(m.sales_revenue)::numeric, 2)::float AS revenue,
-      ROUND(SUM(m.purchase_total)::numeric, 2)::float AS cogs,
-      ROUND((SUM(m.sales_revenue) - SUM(m.purchase_total))::numeric, 2)::float AS gross_profit,
+      ROUND(SUM(m.attributed_cogs)::numeric, 2)::float AS cogs,
+      ROUND((SUM(m.sales_revenue) - SUM(m.attributed_cogs))::numeric, 2)::float AS gross_profit,
       ROUND(
-        ((SUM(m.sales_revenue) - SUM(m.purchase_total))
+        ((SUM(m.sales_revenue) - SUM(m.attributed_cogs))
         / NULLIF(SUM(m.sales_revenue), 0) * 100)::numeric, 2
       )::float AS margin_pct
     FROM pc_supplier_margin m
@@ -636,7 +639,7 @@ export async function getSupplierItemsV2(
       ROUND(SUM(m.purchase_qty)::numeric, 2)::float AS total_qty,
       ROUND(SUM(m.purchase_total)::numeric, 2)::float AS total_cost,
       ROUND(
-        ((SUM(m.sales_revenue) - SUM(m.purchase_total))
+        ((SUM(m.sales_revenue) - SUM(m.attributed_cogs))
         / NULLIF(SUM(m.sales_revenue), 0) * 100)::numeric, 2
       )::float AS margin_pct
     FROM pc_supplier_margin m
@@ -676,7 +679,7 @@ export async function getSupplierSparklinesV2(
       m.creditor_code,
       m.month AS year_month,
       ROUND(
-        ((SUM(m.sales_revenue) - SUM(m.purchase_total))
+        ((SUM(m.sales_revenue) - SUM(m.attributed_cogs))
         / NULLIF(SUM(m.sales_revenue), 0) * 100)::numeric, 2
       )::float AS margin_pct
     FROM pc_supplier_margin m
@@ -720,7 +723,7 @@ export async function getSupplierMarginDistributionV2(
       SELECT
         m.creditor_code,
         SUM(m.sales_revenue)::float AS rev,
-        SUM(m.purchase_total)::float AS cost
+        SUM(m.attributed_cogs)::float AS cost
       FROM pc_supplier_margin m
       WHERE m.month BETWEEN $1 AND $2
         AND m.is_active = 'T'
@@ -783,7 +786,7 @@ export async function getItemMarginDistributionV2(
       SELECT
         m.item_code,
         SUM(m.sales_revenue)::float AS rev,
-        SUM(m.purchase_total)::float AS cost
+        SUM(m.attributed_cogs)::float AS cost
       FROM pc_supplier_margin m
       WHERE m.month BETWEEN $1 AND $2
         AND m.is_active = 'T'
