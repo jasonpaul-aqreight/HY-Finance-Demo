@@ -88,7 +88,7 @@ async function buildSalesByCustomer(source: Pool): Promise<BuildResult> {
       SELECT 'CN' AS src, "DocDate", "DebtorCode", "LocalNetTotal" FROM dbo."CN" WHERE "Cancelled" = 'F'
     )
     SELECT
-      ${MYT_MONTH} AS month,
+      ${MYT_DATE} AS doc_date,
       c."DebtorCode" AS debtor_code,
       d."CompanyName" AS company_name,
       d."DebtorType" AS debtor_type,
@@ -101,10 +101,8 @@ async function buildSalesByCustomer(source: Pool): Promise<BuildResult> {
       COUNT(*) AS doc_count
     FROM combined c
     LEFT JOIN dbo."Debtor" d ON c."DebtorCode" = d."AccNo"
-    WHERE d."CompanyName" NOT ILIKE 'CASH DEBT%'
-      AND d."CompanyName" NOT ILIKE 'CASH SALES%'
-    GROUP BY ${MYT_MONTH}, c."DebtorCode", d."CompanyName", d."DebtorType", d."SalesAgent"
-    ORDER BY month, debtor_code
+    GROUP BY ${MYT_DATE}, c."DebtorCode", d."CompanyName", d."DebtorType", d."SalesAgent"
+    ORDER BY doc_date, debtor_code
   `);
   return { rows: result.rows, columns: result.fields.map(f => f.name) };
 }
@@ -123,13 +121,11 @@ async function buildSalesByOutlet(source: Pool): Promise<BuildResult> {
       SELECT s.*, d."DebtorType"
       FROM sales s
       LEFT JOIN dbo."Debtor" d ON s."DebtorCode" = d."AccNo"
-      WHERE d."CompanyName" NOT ILIKE 'CASH DEBT%'
-        AND d."CompanyName" NOT ILIKE 'CASH SALES%'
     )
 
     -- By DebtorType
     SELECT
-      ${MYT_MONTH} AS month,
+      ${MYT_DATE} AS doc_date,
       'type' AS dimension,
       COALESCE(e."DebtorType", '(Uncategorized)') AS dimension_key,
       dt."Description" AS dimension_label,
@@ -143,13 +139,13 @@ async function buildSalesByOutlet(source: Pool): Promise<BuildResult> {
       COUNT(DISTINCT e."DebtorCode") AS customer_count
     FROM enriched e
     LEFT JOIN dbo."DebtorType" dt ON e."DebtorType" = dt."DebtorType"
-    GROUP BY ${MYT_MONTH}, e."DebtorType", dt."Description", dt."IsActive"
+    GROUP BY ${MYT_DATE}, e."DebtorType", dt."Description", dt."IsActive"
 
     UNION ALL
 
     -- By SalesAgent
     SELECT
-      ${MYT_MONTH} AS month,
+      ${MYT_DATE} AS doc_date,
       'agent' AS dimension,
       COALESCE(e."SalesAgent", '(Unassigned)') AS dimension_key,
       sa."Description" AS dimension_label,
@@ -163,13 +159,13 @@ async function buildSalesByOutlet(source: Pool): Promise<BuildResult> {
       COUNT(DISTINCT e."DebtorCode")
     FROM enriched e
     LEFT JOIN dbo."SalesAgent" sa ON e."SalesAgent" = sa."SalesAgent"
-    GROUP BY ${MYT_MONTH}, e."SalesAgent", sa."Description", sa."IsActive"
+    GROUP BY ${MYT_DATE}, e."SalesAgent", sa."Description", sa."IsActive"
 
     UNION ALL
 
     -- By SalesLocation (location)
     SELECT
-      ${MYT_MONTH} AS month,
+      ${MYT_DATE} AS doc_date,
       'location' AS dimension,
       COALESCE(e."SalesLocation", '(Unassigned)') AS dimension_key,
       COALESCE(e."SalesLocation", '(Unassigned)') AS dimension_label,
@@ -182,9 +178,9 @@ async function buildSalesByOutlet(source: Pool): Promise<BuildResult> {
       COUNT(*),
       COUNT(DISTINCT e."DebtorCode")
     FROM enriched e
-    GROUP BY ${MYT_MONTH}, e."SalesLocation"
+    GROUP BY ${MYT_DATE}, e."SalesLocation"
 
-    ORDER BY month, dimension, dimension_key
+    ORDER BY doc_date, dimension, dimension_key
   `);
   return { rows: result.rows, columns: result.fields.map(f => f.name) };
 }
@@ -230,18 +226,18 @@ async function buildSalesByFruit(source: Pool, ctx: BuilderContext): Promise<Bui
     SELECT
       src,
       "ItemCode" AS item_code,
-      TO_CHAR("DocDate" + INTERVAL '8 hours', 'YYYY-MM') AS month,
+      ("DocDate" + INTERVAL '8 hours')::date AS doc_date,
       subtotal,
       "Qty" AS qty
     FROM sales_lines
   `);
 
   // Step 3: Aggregate in memory using local fruit mapping
-  const aggKey = (month: string, name: string, country: string, variant: string) =>
-    `${month}|${name}|${country}|${variant}`;
+  const aggKey = (docDate: string, name: string, country: string, variant: string) =>
+    `${docDate}|${name}|${country}|${variant}`;
 
   const agg = new Map<string, {
-    month: string; fruit_name: string; fruit_country: string; fruit_variant: string;
+    doc_date: string; fruit_name: string; fruit_country: string; fruit_variant: string;
     invoice_sales: number; cash_sales: number; credit_notes: number;
     total_sales: number; total_qty: number; doc_count: number;
   }>();
@@ -260,12 +256,16 @@ async function buildSalesByFruit(source: Pool, ctx: BuilderContext): Promise<Bui
     } else {
       fruit = fruitMap.get(code) ?? { name: '(Unknown)', country: '(Unknown)', variant: '(Unknown)' };
     }
-    const key = aggKey(row.month, fruit.name, fruit.country, fruit.variant);
+    // doc_date comes back as a Date object from pg — format to YYYY-MM-DD string
+    const docDateStr = row.doc_date instanceof Date
+      ? row.doc_date.toISOString().slice(0, 10)
+      : String(row.doc_date);
+    const key = aggKey(docDateStr, fruit.name, fruit.country, fruit.variant);
 
     let bucket = agg.get(key);
     if (!bucket) {
       bucket = {
-        month: row.month, fruit_name: fruit.name, fruit_country: fruit.country, fruit_variant: fruit.variant,
+        doc_date: docDateStr, fruit_name: fruit.name, fruit_country: fruit.country, fruit_variant: fruit.variant,
         invoice_sales: 0, cash_sales: 0, credit_notes: 0,
         total_sales: 0, total_qty: 0, doc_count: 0,
       };
@@ -292,11 +292,11 @@ async function buildSalesByFruit(source: Pool, ctx: BuilderContext): Promise<Bui
   }
 
   const rows = Array.from(agg.values()).sort((a, b) =>
-    a.month.localeCompare(b.month) || a.fruit_name.localeCompare(b.fruit_name)
+    a.doc_date.localeCompare(b.doc_date) || a.fruit_name.localeCompare(b.fruit_name)
   );
 
   const columns = [
-    'month', 'fruit_name', 'fruit_country', 'fruit_variant',
+    'doc_date', 'fruit_name', 'fruit_country', 'fruit_variant',
     'invoice_sales', 'cash_sales', 'credit_notes',
     'total_sales', 'total_qty', 'doc_count',
   ];

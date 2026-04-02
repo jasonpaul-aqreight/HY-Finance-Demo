@@ -1,13 +1,12 @@
 import { queryRds } from '../postgres';
 import { getPool } from './db';
-import { toMonth } from './date-utils';
 import type { GroupByDimension, GroupByRow } from './types';
 
 export type { GroupByDimension, GroupByRow } from './types';
 
 // ─── Group-by: Customer ─────────────────────────────────────────────────────
 
-async function getByCustomer(startMonth: string, endMonth: string): Promise<GroupByRow[]> {
+async function getByCustomer(start: string, end: string): Promise<GroupByRow[]> {
   const pool = getPool();
   const { rows } = await pool.query(`
     SELECT
@@ -20,16 +19,16 @@ async function getByCustomer(startMonth: string, endMonth: string): Promise<Grou
       COALESCE(SUM(total_sales), 0)::float AS total_sales,
       COALESCE(SUM(doc_count), 0)::int AS doc_count
     FROM pc_sales_by_customer
-    WHERE month BETWEEN $1 AND $2
+    WHERE doc_date BETWEEN $1 AND $2
     GROUP BY debtor_code
     ORDER BY total_sales DESC
-  `, [startMonth, endMonth]);
+  `, [start, end]);
   return rows;
 }
 
 // ─── Group-by: Customer Type ────────────────────────────────────────────────
 
-async function getByCustomerType(startMonth: string, endMonth: string): Promise<GroupByRow[]> {
+async function getByCustomerType(start: string, end: string): Promise<GroupByRow[]> {
   const pool = getPool();
   const { rows } = await pool.query(`
     SELECT
@@ -42,10 +41,10 @@ async function getByCustomerType(startMonth: string, endMonth: string): Promise<
       COALESCE(SUM(total_sales), 0)::float AS total_sales,
       COALESCE(SUM(doc_count), 0)::int AS doc_count
     FROM pc_sales_by_outlet
-    WHERE dimension = 'type' AND month BETWEEN $1 AND $2
+    WHERE dimension = 'type' AND doc_date BETWEEN $1 AND $2
     GROUP BY dimension_key
     ORDER BY total_sales DESC
-  `, [startMonth, endMonth]);
+  `, [start, end]);
   return rows;
 }
 
@@ -95,7 +94,7 @@ async function getAgentDistinctCustomerCounts(start: string, end: string): Promi
   return new Map(rows.map((row) => [row.name, row.unique_customers]));
 }
 
-async function getByAgent(startMonth: string, endMonth: string, start: string, end: string): Promise<GroupByRow[]> {
+async function getByAgent(start: string, end: string): Promise<GroupByRow[]> {
   const pool = getPool();
   const [{ rows }, distinctCustomerCounts] = await Promise.all([
     pool.query(`
@@ -109,10 +108,10 @@ async function getByAgent(startMonth: string, endMonth: string, start: string, e
         COALESCE(SUM(total_sales), 0)::float AS total_sales,
         COALESCE(SUM(doc_count), 0)::int AS doc_count
       FROM pc_sales_by_outlet
-      WHERE dimension = 'agent' AND month BETWEEN $1 AND $2
+      WHERE dimension = 'agent' AND doc_date BETWEEN $1 AND $2
       GROUP BY dimension_key
       ORDER BY total_sales DESC
-    `, [startMonth, endMonth]),
+    `, [start, end]),
     getAgentDistinctCustomerCounts(start, end),
   ]);
 
@@ -124,7 +123,7 @@ async function getByAgent(startMonth: string, endMonth: string, start: string, e
 
 // ─── Group-by: Outlet ───────────────────────────────────────────────────────
 
-async function getByOutlet(startMonth: string, endMonth: string): Promise<GroupByRow[]> {
+async function getByOutlet(start: string, end: string): Promise<GroupByRow[]> {
   const pool = getPool();
   const { rows } = await pool.query(`
     SELECT
@@ -135,16 +134,16 @@ async function getByOutlet(startMonth: string, endMonth: string): Promise<GroupB
       COALESCE(SUM(total_sales), 0)::float AS total_sales,
       COALESCE(SUM(doc_count), 0)::int AS doc_count
     FROM pc_sales_by_outlet
-    WHERE dimension = 'location' AND month BETWEEN $1 AND $2
+    WHERE dimension = 'location' AND doc_date BETWEEN $1 AND $2
     GROUP BY dimension_key
     ORDER BY total_sales DESC
-  `, [startMonth, endMonth]);
+  `, [start, end]);
   return rows;
 }
 
 // ─── Group-by: Fruit (granular: Name + Country + Variant) ─────────────────
 
-async function getByFruit(startMonth: string, endMonth: string): Promise<GroupByRow[]> {
+async function getByFruit(start: string, end: string): Promise<GroupByRow[]> {
   const pool = getPool();
   const { rows } = await pool.query(`
     SELECT
@@ -158,10 +157,10 @@ async function getByFruit(startMonth: string, endMonth: string): Promise<GroupBy
       COALESCE(SUM(total_qty), 0)::float AS qty_sold,
       COALESCE(SUM(doc_count), 0)::int AS doc_count
     FROM pc_sales_by_fruit
-    WHERE month BETWEEN $1 AND $2
+    WHERE doc_date BETWEEN $1 AND $2
     GROUP BY fruit_name, fruit_country, fruit_variant
     ORDER BY total_sales DESC
-  `, [startMonth, endMonth]);
+  `, [start, end]);
   return rows;
 }
 
@@ -172,14 +171,12 @@ export async function getGroupByData(
   start: string,
   end: string,
 ): Promise<GroupByRow[]> {
-  const startMonth = toMonth(start);
-  const endMonth = toMonth(end);
   switch (group) {
-    case 'customer':       return getByCustomer(startMonth, endMonth);
-    case 'customer-type':  return getByCustomerType(startMonth, endMonth);
-    case 'agent':          return getByAgent(startMonth, endMonth, start, end);
-    case 'outlet':         return getByOutlet(startMonth, endMonth);
-    case 'fruit':          return getByFruit(startMonth, endMonth);
+    case 'customer':       return getByCustomer(start, end);
+    case 'customer-type':  return getByCustomerType(start, end);
+    case 'agent':          return getByAgent(start, end);
+    case 'outlet':         return getByOutlet(start, end);
+    case 'fruit':          return getByFruit(start, end);
   }
 }
 
@@ -203,8 +200,8 @@ export async function getCustomerSalesSummary(debtorCode: string, start: string,
       COALESCE(SUM(total_sales), 0)::float AS total_sales,
       COALESCE(SUM(doc_count), 0)::int AS doc_count
     FROM pc_sales_by_customer
-    WHERE debtor_code = $1 AND month BETWEEN $2 AND $3
-  `, [debtorCode, toMonth(start), toMonth(end)]);
+    WHERE debtor_code = $1 AND doc_date BETWEEN $2 AND $3
+  `, [debtorCode, start, end]);
   return rows[0];
 }
 
@@ -220,14 +217,15 @@ export async function getCustomerSalesTrend(debtorCode: string, start: string, e
   const pool = getPool();
   const { rows } = await pool.query(`
     SELECT
-      month,
-      invoice_sales::float AS invoice_sales,
-      cash_sales::float AS cash_sales,
-      credit_notes::float AS credit_notes,
-      total_sales::float AS total_sales
+      TO_CHAR(doc_date, 'YYYY-MM') AS month,
+      SUM(invoice_sales)::float AS invoice_sales,
+      SUM(cash_sales)::float AS cash_sales,
+      SUM(credit_notes)::float AS credit_notes,
+      SUM(total_sales)::float AS total_sales
     FROM pc_sales_by_customer
-    WHERE debtor_code = $1 AND month BETWEEN $2 AND $3
+    WHERE debtor_code = $1 AND doc_date BETWEEN $2 AND $3
+    GROUP BY TO_CHAR(doc_date, 'YYYY-MM')
     ORDER BY month
-  `, [debtorCode, toMonth(start), toMonth(end)]);
+  `, [debtorCode, start, end]);
   return rows;
 }
