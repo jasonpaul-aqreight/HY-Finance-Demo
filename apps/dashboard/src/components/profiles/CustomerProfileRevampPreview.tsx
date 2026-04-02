@@ -130,19 +130,19 @@ export function CustomerProfileRevamp({ open, onClose, debtorCode, companyName, 
   const [salesSearch, setSalesSearch] = useState('');
 
   // Data hooks
-  const { data: profile, isLoading: profileLoading } = useCustomerProfile(debtorCode);
-  const { data: invoices } = useCustomerInvoices(debtorCode);
+  const { data: profile, isLoading: profileLoading, error: profileError } = useCustomerProfile(debtorCode);
+  const { data: invoices, isLoading: invoicesLoading, error: invoicesError } = useCustomerInvoices(debtorCode);
   const { data: returnSummary } = useCustomerReturnSummary(debtorCode);
-  const { data: returnTrend, isLoading: returnTrendLoading, isValidating: returnTrendValidating } = useCustomerReturnTrend(debtorCode, trendStart, trendEnd);
-  const { data: monthlyData, isLoading: monthlyLoading, isValidating: monthlyValidating } = useCustomerMonthly(debtorCode, trendStart, trendEnd);
-  const { data: returnDetails } = useCustomerReturnDetailsAll(debtorCode);
-  const { data: rawProductsData, isLoading: productsInitialLoading, isValidating: productsValidating } = useCustomerProducts(debtorCode, salesStart, salesEnd);
+  const { data: returnTrend, isLoading: returnTrendLoading, isValidating: returnTrendValidating, error: returnTrendError } = useCustomerReturnTrend(debtorCode, trendStart, trendEnd);
+  const { data: monthlyData, isLoading: monthlyLoading, isValidating: monthlyValidating, error: monthlyError } = useCustomerMonthly(debtorCode, trendStart, trendEnd);
+  const { data: returnDetails, isLoading: returnDetailsLoading, error: returnDetailsError } = useCustomerReturnDetailsAll(debtorCode);
+  const { data: rawProductsData, isLoading: productsInitialLoading, isValidating: productsValidating, error: productsError } = useCustomerProducts(debtorCode, salesStart, salesEnd);
   const productsData = useStableData(rawProductsData);
   const productsLoading = productsInitialLoading || (productsValidating && rawProductsData === undefined);
 
   const startMonth = toYearMonth(trendStart);
   const endMonth = toYearMonth(trendEnd);
-  const { data: collectionTrendRes, isLoading: collectionLoading, isValidating: collectionValidating } = useSWR<{ data: any[]; avg_pay_days: number | null }>(
+  const { data: collectionTrendRes, isLoading: collectionLoading, isValidating: collectionValidating, error: collectionError } = useSWR<{ data: any[]; avg_pay_days: number | null }>(
     `/api/payment/collection-trend?customer=${encodeURIComponent(debtorCode)}&start_month=${startMonth}&end_month=${endMonth}`,
     fetcher, { revalidateOnFocus: false },
   );
@@ -212,7 +212,17 @@ export function CustomerProfileRevamp({ open, onClose, debtorCode, companyName, 
     return (
       <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
         <DialogContent className="sm:max-w-[90vw] h-[90vh] overflow-y-auto" showCloseButton>
-          <div className="flex items-center justify-center h-full"><div className="animate-pulse text-foreground/60">Loading profile...</div></div>
+          <div className="flex items-center justify-center h-full"><LoadingSpinner /></div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  if (profileError) {
+    return (
+      <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+        <DialogContent className="sm:max-w-[90vw] h-[90vh] overflow-y-auto" showCloseButton>
+          <div className="flex items-center justify-center h-full"><ErrorMessage message="Failed to load customer profile" /></div>
         </DialogContent>
       </Dialog>
     );
@@ -259,21 +269,23 @@ export function CustomerProfileRevamp({ open, onClose, debtorCode, companyName, 
               trendStart={trendStart} trendEnd={trendEnd} setTrendStart={setTrendStart}
               setTrendEnd={setTrendEnd} setActiveView={setActiveView}
               monthlyLoading={monthlyLoading || monthlyValidating} collectionLoading={collectionLoading || collectionValidating} returnTrendLoading={returnTrendLoading || returnTrendValidating}
+              invoicesLoading={invoicesLoading} returnDetailsLoading={returnDetailsLoading}
+              monthlyError={monthlyError} collectionError={collectionError} returnTrendError={returnTrendError} invoicesError={invoicesError} returnDetailsError={returnDetailsError}
             />
           ) : activeView === 'outstanding' ? (
             <TableLogView title="Outstanding Invoices" onBack={() => setActiveView('profile')} searchPlaceholder="Search Doc No..." search={invoiceSearch} onSearchChange={setInvoiceSearch}>
-              <OutstandingTable invoices={invoices} search={invoiceSearch} />
+              <OutstandingTable invoices={invoices} search={invoiceSearch} isLoading={invoicesLoading} error={invoicesError} />
             </TableLogView>
           ) : activeView === 'returns' ? (
             <TableLogView title="Return Records" onBack={() => setActiveView('profile')} searchPlaceholder="Search Doc No..." search={returnSearch} onSearchChange={setReturnSearch}>
-              <ReturnRecordsTable records={returnDetails} search={returnSearch} />
+              <ReturnRecordsTable records={returnDetails} search={returnSearch} isLoading={returnDetailsLoading} error={returnDetailsError} />
             </TableLogView>
           ) : (
             <TableLogView title="Sales Transactions" onBack={() => setActiveView('profile')} searchPlaceholder="Search Item Code..." search={salesSearch} onSearchChange={setSalesSearch}>
               <div className="mb-4">
                 <DateRangeSection label="Date Range" startDate={salesStart} endDate={salesEnd} onStartDateChange={setSalesStart} onEndDateChange={setSalesEnd} showPresets showRangeSummary={false} />
               </div>
-              <SalesTransactionsTable products={productsData} search={salesSearch} isLoading={productsLoading} />
+              <SalesTransactionsTable products={productsData} search={salesSearch} isLoading={productsLoading} error={productsError} />
             </TableLogView>
           )}
         </div>
@@ -290,6 +302,8 @@ function ProfileView({
   returnTrend, monthlyData, collectionTrend, salesKpis, collectionKpis, returnKpis,
   scopedAvgPayDays, outstandingCount, unsettledCount, trendStart, trendEnd, setTrendStart, setTrendEnd, setActiveView,
   monthlyLoading, collectionLoading, returnTrendLoading,
+  invoicesLoading, returnDetailsLoading,
+  monthlyError, collectionError, returnTrendError, invoicesError, returnDetailsError,
 }: {
   profile: any; agingBuckets: any[]; totalOutstanding: number; overdueAmount: number;
   returnDonutData: any[]; returnSummary: any; returnTrend: any; monthlyData: any;
@@ -299,6 +313,8 @@ function ProfileView({
   trendStart: string; trendEnd: string; setTrendStart: (d: string) => void;
   setTrendEnd: (d: string) => void; setActiveView: (view: ActiveView) => void;
   monthlyLoading?: boolean; collectionLoading?: boolean; returnTrendLoading?: boolean;
+  invoicesLoading?: boolean; returnDetailsLoading?: boolean;
+  monthlyError?: any; collectionError?: any; returnTrendError?: any; invoicesError?: any; returnDetailsError?: any;
 }) {
   return (
     <div className="px-6 py-5 space-y-8">
@@ -373,7 +389,7 @@ function ProfileView({
           {/* Outstanding Invoices */}
           <Card><CardContent className="pt-2">
             <p className="text-sm font-bold text-foreground mb-3 text-center">Outstanding Invoices</p>
-            <AgingStackedBar buckets={agingBuckets} total={totalOutstanding} />
+            <AgingStackedBar buckets={agingBuckets} total={totalOutstanding} isLoading={invoicesLoading} error={invoicesError} />
             <div className="mt-4 text-center">
               {overdueAmount > 0 && <div className="text-base font-bold text-red-600">Overdue: {formatRM(overdueAmount)}</div>}
               {overdueAmount === 0 && <div className="text-base font-bold text-emerald-600">No Overdue</div>}
@@ -383,7 +399,7 @@ function ProfileView({
           {/* Returns */}
           <Card><CardContent className="flex flex-col items-center pt-2">
             <p className="text-sm font-bold text-foreground mb-3">Returns</p>
-            <ReturnsDonut data={returnDonutData} />
+            <ReturnsDonut data={returnDonutData} isLoading={returnDetailsLoading} error={returnDetailsError} />
             <div className="mt-3 text-center text-sm">
               <div className="text-foreground/70">Unsettled: <span className="font-bold text-red-600">{formatRM(returnSummary?.unresolved)}</span></div>
             </div>
@@ -406,7 +422,7 @@ function ProfileView({
               <KpiCard label="Avg Margin" value={`${salesKpis.avgMargin.toFixed(1)}%`} />
               <KpiCard label="COGS" value={formatRM(salesKpis.cogs)} />
             </div>
-            <SalesMarginChart data={monthlyData} isLoading={monthlyLoading} />
+            <SalesMarginChart data={monthlyData} isLoading={monthlyLoading} error={monthlyError} />
           </CardContent></Card>
 
           {/* Payment */}
@@ -417,7 +433,7 @@ function ProfileView({
               <KpiCard label="Rate" value={`${collectionKpis.rate.toFixed(1)}%`} />
               <KpiCard label="Avg Pay Days" value={`${scopedAvgPayDays ?? '—'}`} />
             </div>
-            <PaymentTrendChart data={collectionTrend} isLoading={collectionLoading} />
+            <PaymentTrendChart data={collectionTrend} isLoading={collectionLoading} error={collectionError} />
           </CardContent></Card>
 
           {/* Returns */}
@@ -427,7 +443,7 @@ function ProfileView({
               <KpiCard label="Total Returns" value={formatRM(returnKpis.totalValue)} />
               <KpiCard label="Count" value={String(returnKpis.totalCount)} />
             </div>
-            <ReturnTrendChart data={returnTrend} isLoading={returnTrendLoading} />
+            <ReturnTrendChart data={returnTrend} isLoading={returnTrendLoading} error={returnTrendError} />
           </CardContent></Card>
         </div>
       </section>
@@ -537,7 +553,9 @@ function CreditUtilizationDonut({ utilPct }: { utilPct: number }) {
   );
 }
 
-function AgingStackedBar({ buckets, total }: { buckets: any[]; total: number }) {
+function AgingStackedBar({ buckets, total, isLoading, error }: { buckets: any[]; total: number; isLoading?: boolean; error?: any }) {
+  if (isLoading) return <LoadingSpinner />;
+  if (error) return <ErrorMessage message="Failed to load invoice data" />;
   if (total === 0) return <div className="text-sm text-foreground/60 text-center py-6">No outstanding invoices</div>;
   return (
     <div className="space-y-2">
@@ -562,7 +580,9 @@ function AgingStackedBar({ buckets, total }: { buckets: any[]; total: number }) 
   );
 }
 
-function ReturnsDonut({ data }: { data: any[] }) {
+function ReturnsDonut({ data, isLoading, error }: { data: any[]; isLoading?: boolean; error?: any }) {
+  if (isLoading) return <LoadingSpinner />;
+  if (error) return <ErrorMessage message="Failed to load return data" />;
   const total = data.reduce((s, d) => s + d.value, 0);
   if (total === 0) return <div className="text-sm text-foreground/60 text-center py-6">No returns</div>;
   const unsettled = data.find(d => d.name === 'Unsettled')?.value ?? 0;
@@ -607,8 +627,18 @@ function LoadingSpinner() {
   );
 }
 
-function SalesMarginChart({ data, isLoading }: { data: any; isLoading?: boolean }) {
+function ErrorMessage({ message }: { message: string }) {
+  return (
+    <div className="flex items-center justify-center py-8 gap-2">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-red-500"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+      <span className="text-sm text-red-600 font-medium">{message}</span>
+    </div>
+  );
+}
+
+function SalesMarginChart({ data, isLoading, error }: { data: any; isLoading?: boolean; error?: any }) {
   if (isLoading) return <LoadingSpinner />;
+  if (error) return <ErrorMessage message="Failed to load sales data" />;
   if (!data || !Array.isArray(data) || data.length === 0) return <div className="text-sm text-foreground/60 text-center py-8">No data</div>;
   return (
     <ResponsiveContainer width="100%" height={220}>
@@ -625,8 +655,9 @@ function SalesMarginChart({ data, isLoading }: { data: any; isLoading?: boolean 
   );
 }
 
-function PaymentTrendChart({ data, isLoading }: { data: any; isLoading?: boolean }) {
+function PaymentTrendChart({ data, isLoading, error }: { data: any; isLoading?: boolean; error?: any }) {
   if (isLoading) return <LoadingSpinner />;
+  if (error) return <ErrorMessage message="Failed to load payment data" />;
   if (!data || !Array.isArray(data) || data.length === 0) return <div className="text-sm text-foreground/60 text-center py-8">No data</div>;
   const chartData = data.map((row: any) => ({ ...row, collection_rate: row.total_invoiced > 0 ? Math.round((row.total_collected / row.total_invoiced) * 1000) / 10 : 0 }));
   return (
@@ -646,8 +677,9 @@ function PaymentTrendChart({ data, isLoading }: { data: any; isLoading?: boolean
   );
 }
 
-function ReturnTrendChart({ data, isLoading }: { data: any; isLoading?: boolean }) {
+function ReturnTrendChart({ data, isLoading, error }: { data: any; isLoading?: boolean; error?: any }) {
   if (isLoading) return <LoadingSpinner />;
+  if (error) return <ErrorMessage message="Failed to load return trend" />;
   if (!data || !Array.isArray(data) || data.length === 0) return <div className="text-sm text-foreground/60 text-center py-8">No data</div>;
   return (
     <ResponsiveContainer width="100%" height={220}>
@@ -695,7 +727,7 @@ function LogButton({ icon, label, badge, badgeColor, onClick, borderTop }: {
 
 type InvoiceSortKey = 'doc_no' | 'doc_date' | 'due_date' | 'total' | 'outstanding' | 'days_overdue';
 
-function OutstandingTable({ invoices, search = '' }: { invoices: any; search?: string }) {
+function OutstandingTable({ invoices, search = '', isLoading, error }: { invoices: any; search?: string; isLoading?: boolean; error?: any }) {
   const [sortKey, setSortKey] = useState<InvoiceSortKey>('days_overdue');
   const [sortAsc, setSortAsc] = useState(false);
   const rows = useMemo(() => {
@@ -716,6 +748,8 @@ function OutstandingTable({ invoices, search = '' }: { invoices: any; search?: s
       {label}<SortIcon active={sortKey === col} asc={sortAsc} />
     </th>
   );
+  if (isLoading || invoices === undefined) return <LoadingSpinner />;
+  if (error) return <ErrorMessage message="Failed to load outstanding invoices" />;
   if (rows.length === 0) return <div className="text-sm text-foreground/60 text-center py-8">No outstanding invoices</div>;
   return (
     <div className="rounded-lg border overflow-hidden">
@@ -745,7 +779,7 @@ function OutstandingTable({ invoices, search = '' }: { invoices: any; search?: s
 
 type ReturnSortKey = 'doc_no' | 'doc_date' | 'net_total' | 'knocked_off' | 'refunded' | 'unresolved' | 'reason';
 
-function ReturnRecordsTable({ records, search = '' }: { records: any; search?: string }) {
+function ReturnRecordsTable({ records, search = '', isLoading, error }: { records: any; search?: string; isLoading?: boolean; error?: any }) {
   const [sortKey, setSortKey] = useState<ReturnSortKey>('doc_date');
   const [sortAsc, setSortAsc] = useState(false);
   const rows = useMemo(() => {
@@ -766,6 +800,8 @@ function ReturnRecordsTable({ records, search = '' }: { records: any; search?: s
       {label}<SortIcon active={sortKey === col} asc={sortAsc} />
     </th>
   );
+  if (isLoading || records === undefined) return <LoadingSpinner />;
+  if (error) return <ErrorMessage message="Failed to load return records" />;
   if (rows.length === 0) return <div className="text-sm text-foreground/60 text-center py-8">No return records</div>;
   return (
     <div className="rounded-lg border overflow-hidden">
@@ -800,7 +836,7 @@ function ReturnRecordsTable({ records, search = '' }: { records: any; search?: s
 
 type SalesSortKey = 'item_code' | 'description' | 'qty_sold' | 'revenue' | 'cost' | 'margin_pct';
 
-function SalesTransactionsTable({ products, search = '', isLoading }: { products: any; search?: string; isLoading?: boolean }) {
+function SalesTransactionsTable({ products, search = '', isLoading, error }: { products: any; search?: string; isLoading?: boolean; error?: any }) {
   const items = products?.data ?? products ?? [];
   const [sortKey, setSortKey] = useState<SalesSortKey>('revenue');
   const [sortAsc, setSortAsc] = useState(false);
@@ -823,6 +859,7 @@ function SalesTransactionsTable({ products, search = '', isLoading }: { products
     </th>
   );
   if (isLoading || products === undefined) return <LoadingSpinner />;
+  if (error) return <ErrorMessage message="Failed to load sales transactions" />;
   if (rows.length === 0) return <div className="text-sm text-foreground/60 text-center py-8">No sales transactions</div>;
   return (
     <div className="rounded-lg border overflow-hidden">
