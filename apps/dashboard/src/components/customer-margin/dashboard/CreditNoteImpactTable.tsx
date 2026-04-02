@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
@@ -10,21 +10,53 @@ import { useStableData } from '@/hooks/useStableData';
 import type { MarginDashboardFilters } from '@/hooks/customer-margin/useDashboardFilters';
 import { formatRM, formatMarginPct } from '@/lib/customer-margin/format';
 import { exportToExcel } from '@/lib/export-excel';
+import { Download, ArrowUpDown, Search, X } from 'lucide-react';
 
 interface Props {
   filters: MarginDashboardFilters;
 }
+
+type SortCol = 'company_name' | 'iv_revenue' | 'cn_revenue' | 'return_rate_pct' | 'margin_before' | 'margin_after' | 'margin_lost';
 
 export function CreditNoteImpactTable({ filters }: Props) {
   const { data: rawData } = useCreditNoteImpact(filters);
   const data = useStableData(rawData);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<PageSize>(25);
+  const [sort, setSort] = useState<SortCol>('margin_lost');
+  const [order, setOrder] = useState<'asc' | 'desc'>('desc');
+  const [search, setSearch] = useState('');
   const tableRef = useRef<HTMLDivElement>(null);
   const lockedHeight = useRef<number | undefined>(undefined);
 
   const allRows = data ?? [];
-  const pagedRows = allRows.slice((page - 1) * pageSize, page * pageSize);
+
+  // Filter by search
+  const filtered = useMemo(() => {
+    if (!search.trim()) return allRows;
+    const q = search.toLowerCase();
+    return allRows.filter(r =>
+      (r.company_name ?? '').toLowerCase().includes(q) ||
+      r.debtor_code.toLowerCase().includes(q)
+    );
+  }, [allRows, search]);
+
+  // Sort client-side
+  const sorted = useMemo(() => {
+    const rows = [...filtered];
+    rows.sort((a, b) => {
+      let av: string | number = a[sort] ?? '';
+      let bv: string | number = b[sort] ?? '';
+      if (typeof av === 'string') av = av.toLowerCase();
+      if (typeof bv === 'string') bv = bv.toLowerCase();
+      if (av < bv) return order === 'asc' ? -1 : 1;
+      if (av > bv) return order === 'asc' ? 1 : -1;
+      return 0;
+    });
+    return rows;
+  }, [filtered, sort, order]);
+
+  const pagedRows = sorted.slice((page - 1) * pageSize, page * pageSize);
 
   useEffect(() => {
     const el = tableRef.current;
@@ -32,6 +64,16 @@ export function CreditNoteImpactTable({ filters }: Props) {
       lockedHeight.current = el.offsetHeight;
     }
   }, [pagedRows.length > 0, pageSize]);
+
+  const toggleSort = useCallback((col: SortCol) => {
+    if (sort === col) {
+      setOrder(o => o === 'desc' ? 'asc' : 'desc');
+    } else {
+      setSort(col);
+      setOrder('desc');
+    }
+    setPage(1);
+  }, [sort]);
 
   function handleExportExcel() {
     exportToExcel('credit-note-impact', [
@@ -42,7 +84,7 @@ export function CreditNoteImpactTable({ filters }: Props) {
       { header: 'Margin Before', key: 'margin_before', width: 14 },
       { header: 'Margin After', key: 'margin_after', width: 14 },
       { header: 'Margin Lost', key: 'margin_lost', width: 14 },
-    ], allRows.map(r => ({
+    ], sorted.map(r => ({
       company_name: r.company_name ?? r.debtor_code,
       iv_revenue: r.iv_revenue,
       cn_revenue: r.cn_revenue,
@@ -53,13 +95,48 @@ export function CreditNoteImpactTable({ filters }: Props) {
     })));
   }
 
+  const SortHeader = ({ col, children, className }: { col: SortCol; children: React.ReactNode; className?: string }) => (
+    <TableHead className={className}>
+      <button onClick={() => toggleSort(col)} className="flex items-center gap-1">
+        {children}
+        <ArrowUpDown className="size-3 text-muted-foreground" />
+        {sort === col && <span className="text-xs">{order === 'desc' ? '↓' : '↑'}</span>}
+      </button>
+    </TableHead>
+  );
+
   return (
     <Card>
       <CardHeader className="flex-row items-center justify-between">
-        <CardTitle>Credit Note Impact on Margins</CardTitle>
-        <Button variant="outline" size="sm" onClick={handleExportExcel}>
-          Export Excel
-        </Button>
+        <div>
+          <CardTitle>Credit Note Impact on Margins</CardTitle>
+          <p className="mt-1 text-sm text-foreground/70">
+            Shows how credit notes affect each customer's margin — identify customers where returns erode profitability
+            or where returned low-margin products actually improve overall margin.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="relative w-56">
+            <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+            <input
+              value={search}
+              onChange={e => { setSearch(e.target.value); setPage(1); }}
+              placeholder="Search customer or code..."
+              className="h-8 w-full rounded-lg border border-input bg-transparent pl-8 pr-8 text-sm outline-none focus:ring-1 focus:ring-ring"
+            />
+            {search && (
+              <button
+                onClick={() => { setSearch(''); setPage(1); }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="size-3.5" />
+              </button>
+            )}
+          </div>
+          <Button variant="outline" size="xs" onClick={handleExportExcel}>
+            <Download className="size-3" /> Excel
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         {!data ? (
@@ -69,13 +146,13 @@ export function CreditNoteImpactTable({ filters }: Props) {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Customer</TableHead>
-                  <TableHead className="text-right">IV Revenue</TableHead>
-                  <TableHead className="text-right">CN Amount</TableHead>
-                  <TableHead className="text-right">Return Rate</TableHead>
-                  <TableHead className="text-right">Margin Before</TableHead>
-                  <TableHead className="text-right">Margin After</TableHead>
-                  <TableHead className="text-right">Margin Lost</TableHead>
+                  <SortHeader col="company_name">Customer</SortHeader>
+                  <SortHeader col="iv_revenue" className="text-right">IV Revenue</SortHeader>
+                  <SortHeader col="cn_revenue" className="text-right">CN Amount</SortHeader>
+                  <SortHeader col="return_rate_pct" className="text-right">Return Rate</SortHeader>
+                  <SortHeader col="margin_before" className="text-right">Margin Before</SortHeader>
+                  <SortHeader col="margin_after" className="text-right">Margin After</SortHeader>
+                  <SortHeader col="margin_lost" className="text-right">Margin Lost</SortHeader>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -102,7 +179,7 @@ export function CreditNoteImpactTable({ filters }: Props) {
             <TablePagination
               page={page}
               pageSize={pageSize}
-              total={allRows.length}
+              total={sorted.length}
               onPageChange={setPage}
               onPageSizeChange={setPageSize}
               noun="customers"
