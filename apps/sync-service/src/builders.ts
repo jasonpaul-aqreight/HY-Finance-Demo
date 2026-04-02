@@ -101,6 +101,8 @@ async function buildSalesByCustomer(source: Pool): Promise<BuildResult> {
       COUNT(*) AS doc_count
     FROM combined c
     LEFT JOIN dbo."Debtor" d ON c."DebtorCode" = d."AccNo"
+    WHERE d."CompanyName" NOT ILIKE 'CASH DEBT%'
+      AND d."CompanyName" NOT ILIKE 'CASH SALES%'
     GROUP BY ${MYT_MONTH}, c."DebtorCode", d."CompanyName", d."DebtorType", d."SalesAgent"
     ORDER BY month, debtor_code
   `);
@@ -121,6 +123,8 @@ async function buildSalesByOutlet(source: Pool): Promise<BuildResult> {
       SELECT s.*, d."DebtorType"
       FROM sales s
       LEFT JOIN dbo."Debtor" d ON s."DebtorCode" = d."AccNo"
+      WHERE d."CompanyName" NOT ILIKE 'CASH DEBT%'
+        AND d."CompanyName" NOT ILIKE 'CASH SALES%'
     )
 
     -- By DebtorType
@@ -661,6 +665,8 @@ async function buildReturnByCustomer(source: Pool): Promise<BuildResult> {
     LEFT JOIN dbo."Debtor" d ON cn."DebtorCode" = d."AccNo"
     WHERE (cn."Cancelled" = 'F' OR cn."Cancelled" IS NULL)
       AND cn."CNType" = 'RETURN'
+      AND d."CompanyName" NOT ILIKE 'CASH DEBT%'
+      AND d."CompanyName" NOT ILIKE 'CASH SALES%'
     GROUP BY ${mytMonth('cn')}, cn."DebtorCode", d."CompanyName"
     ORDER BY month, debtor_code
   `);
@@ -807,6 +813,8 @@ async function buildCustomerMargin(source: Pool): Promise<BuildResult> {
       MAX(c.dn_count) AS dn_count
     FROM combined c
     LEFT JOIN dbo."Debtor" d ON c.debtor_code = d."AccNo"
+    WHERE d."CompanyName" NOT ILIKE 'CASH DEBT%'
+      AND d."CompanyName" NOT ILIKE 'CASH SALES%'
     GROUP BY c.month, c.debtor_code, d."CompanyName", d."DebtorType", d."SalesAgent", d."IsActive"
     ORDER BY month, debtor_code
   `);
@@ -889,14 +897,17 @@ async function buildCustomerMarginByProduct(source: Pool): Promise<BuildResult> 
       SELECT * FROM dn_lines
     )
     SELECT
-      month, debtor_code, item_group,
+      month, c.debtor_code, item_group,
       MAX(item_group_desc) AS item_group_desc,
       COALESCE(SUM(revenue), 0) AS revenue,
       COALESCE(SUM(cogs), 0) AS cogs,
       COALESCE(SUM(qty_sold), 0) AS qty_sold
-    FROM combined
-    GROUP BY month, debtor_code, item_group
-    ORDER BY month, debtor_code, item_group
+    FROM combined c
+    JOIN dbo."Debtor" d ON c.debtor_code = d."AccNo"
+    WHERE d."CompanyName" NOT ILIKE 'CASH DEBT%'
+      AND d."CompanyName" NOT ILIKE 'CASH SALES%'
+    GROUP BY month, c.debtor_code, item_group
+    ORDER BY month, c.debtor_code, item_group
   `);
   return { rows: result.rows, columns: result.fields.map(f => f.name) };
 }
