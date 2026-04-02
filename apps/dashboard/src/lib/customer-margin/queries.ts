@@ -370,20 +370,43 @@ export async function getCustomerProducts(code: string, start: string, end: stri
     revenue: number;
     cost: number;
   }>(`
+    WITH lines AS (
+      SELECT
+        dtl."ItemCode" AS item_code,
+        dtl."Description" AS description,
+        dtl."Qty" AS qty,
+        dtl."LocalSubTotal" AS revenue,
+        COALESCE(dtl."LocalTotalCost", 0) AS cost
+      FROM dbo."IVDTL" dtl
+      JOIN dbo."IV" h ON h."DocKey" = dtl."DocKey"
+      WHERE h."Cancelled" = 'F'
+        AND h."DebtorCode" = $1
+        AND (h."DocDate" + INTERVAL '8 hours')::date BETWEEN $2::date AND $3::date
+
+      UNION ALL
+
+      SELECT
+        dtl."ItemCode" AS item_code,
+        dtl."Description" AS description,
+        -dtl."Qty" AS qty,
+        -dtl."LocalSubTotal" AS revenue,
+        -(dtl."Qty" * COALESCE(dtl."UnitCost", 0)) AS cost
+      FROM dbo."CNDTL" dtl
+      JOIN dbo."CN" h ON h."DocKey" = dtl."DocKey"
+      WHERE h."Cancelled" = 'F'
+        AND h."DebtorCode" = $1
+        AND (h."DocDate" + INTERVAL '8 hours')::date BETWEEN $2::date AND $3::date
+    )
     SELECT
-      dtl."ItemCode" AS item_code,
-      MIN(dtl."Description") AS description,
+      l.item_code,
+      MIN(l.description) AS description,
       MIN(i."ItemGroup") AS product_group,
-      SUM(dtl."Qty") AS qty_sold,
-      ROUND(SUM(dtl."LocalSubTotal")::numeric, 2)::float AS revenue,
-      ROUND(SUM(COALESCE(dtl."LocalTotalCost", 0))::numeric, 2)::float AS cost
-    FROM dbo."IVDTL" dtl
-    JOIN dbo."IV" h ON h."DocKey" = dtl."DocKey"
-    LEFT JOIN dbo."Item" i ON i."ItemCode" = dtl."ItemCode"
-    WHERE h."Cancelled" = 'F'
-      AND h."DebtorCode" = $1
-      AND (h."DocDate" + INTERVAL '8 hours')::date BETWEEN $2::date AND $3::date
-    GROUP BY dtl."ItemCode"
+      SUM(l.qty)::integer AS qty_sold,
+      ROUND(SUM(l.revenue)::numeric, 2)::float AS revenue,
+      ROUND(SUM(l.cost)::numeric, 2)::float AS cost
+    FROM lines l
+    LEFT JOIN dbo."Item" i ON i."ItemCode" = l.item_code
+    GROUP BY l.item_code
     ORDER BY revenue DESC
     LIMIT 50
   `, [code, start, end]);
