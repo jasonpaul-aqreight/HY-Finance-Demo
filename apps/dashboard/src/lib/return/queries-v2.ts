@@ -244,6 +244,7 @@ export async function getCustomerReturnDetailsAll(debtorCode: string): Promise<C
     LEFT JOIN dbo."ARCN" arcn
       ON arcn."SourceKey" = cn."DocKey" AND arcn."SourceType" = 'CN' AND arcn."Cancelled" = 'F'
     WHERE cn."Cancelled" = 'F'
+      AND cn."CNType" = 'RETURN'
       AND cn."DebtorCode" = $1
     ORDER BY cn."DocDate" DESC
   `, [debtorCode]);
@@ -265,6 +266,7 @@ export async function getCustomerReturnDetails(debtorCode: string, start: string
     LEFT JOIN dbo."ARCN" arcn
       ON arcn."SourceKey" = cn."DocKey" AND arcn."SourceType" = 'CN' AND arcn."Cancelled" = 'F'
     WHERE cn."Cancelled" = 'F'
+      AND cn."CNType" = 'RETURN'
       AND cn."DebtorCode" = $1
       AND (cn."DocDate" + INTERVAL '8 hours')::date BETWEEN $2::date AND $3::date
     ORDER BY cn."DocDate" DESC

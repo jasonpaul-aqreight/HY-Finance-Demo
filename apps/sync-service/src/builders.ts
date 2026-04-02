@@ -412,13 +412,13 @@ async function buildArCustomerSnapshot(source: Pool, ctx: BuilderContext): Promi
       SELECT
         inv."DebtorCode",
         AVG(pay."DocDate"::date - inv."DocDate"::date) AS avg_payment_days,
-        AVG(pay."DocDate"::date - inv."DueDate"::date) AS avg_days_late
+        AVG(CASE WHEN pay."DocDate" >= (NOW() - INTERVAL '12 months')
+              THEN pay."DocDate"::date - inv."DueDate"::date END) AS avg_days_late
       FROM dbo."ARInvoice" inv
       JOIN dbo."ARPaymentKnockOff" ko
         ON ko."KnockOffDocKey" = inv."DocKey" AND ko."KnockOffDocType" = 'RI'
       JOIN dbo."ARPayment" pay ON ko."DocKey" = pay."DocKey"
       WHERE inv."Cancelled" = 'F' AND pay."Cancelled" = 'F'
-        AND pay."DocDate" >= (NOW() - INTERVAL '12 months')
       GROUP BY inv."DebtorCode"
     )
     SELECT
