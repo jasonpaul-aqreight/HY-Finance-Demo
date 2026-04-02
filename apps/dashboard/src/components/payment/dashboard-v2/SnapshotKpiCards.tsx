@@ -1,26 +1,43 @@
 'use client';
 
 import { Card, CardContent } from '@/components/ui/card';
+import { HelpCircle } from 'lucide-react';
 import { useKpisV2 } from '@/hooks/payment/usePaymentDataV2';
 import { useStableData } from '@/hooks/useStableData';
 import { formatRM, formatCount } from '@/lib/payment/format';
 import type { DashboardFiltersV2 } from '@/hooks/payment/useDashboardFiltersV2';
+
+function InfoTooltip({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="relative group">
+      <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/60 cursor-help" />
+      <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1 z-[100] hidden group-hover:block w-max max-w-xs bg-background border rounded-lg shadow-lg p-3 space-y-2 text-sm text-foreground">
+        {children}
+      </span>
+    </span>
+  );
+}
 
 function KpiCard({
   title,
   value,
   subtitle,
   colorClass,
+  extra,
 }: {
   title: string;
   value: string;
   subtitle?: string;
   colorClass?: string;
+  extra?: React.ReactNode;
 }) {
   return (
-    <Card>
+    <Card className={extra ? 'overflow-visible' : undefined}>
       <CardContent className="pt-4">
-        <p className="text-xs text-muted-foreground">{title}</p>
+        <div className="text-xs text-muted-foreground flex items-center gap-1">
+          {title}
+          {extra}
+        </div>
         <p className={`mt-1 text-2xl font-semibold ${colorClass ?? ''}`}>{value}</p>
         {subtitle && <p className="mt-0.5 text-xs text-muted-foreground">{subtitle}</p>}
       </CardContent>
@@ -61,18 +78,33 @@ export default function SnapshotKpiCards({ filters }: SnapshotKpiCardsProps) {
         title="Total Outstanding"
         value={formatRM(data.total_outstanding)}
         colorClass="text-orange-600"
+        extra={
+          <InfoTooltip>
+            <p>Total unpaid invoice amount across all customers. This is the sum of remaining balances on all open invoices.</p>
+          </InfoTooltip>
+        }
       />
       <KpiCard
         title="Overdue Amount"
         value={formatRM(data.overdue_amount)}
         subtitle={`${overduePctStr} of total · ${formatCount(data.overdue_customers)} customers`}
         colorClass="text-red-600"
+        extra={
+          <InfoTooltip>
+            <p>Total outstanding amount on invoices that have passed their due date. Overdue % shows how much of the total outstanding is past due.</p>
+          </InfoTooltip>
+        }
       />
       <KpiCard
         title="Credit Limit Breaches"
         value={formatCount(data.credit_limit_breaches)}
         subtitle="customers over limit"
         colorClass={data.credit_limit_breaches > 0 ? 'text-red-600' : 'text-emerald-600'}
+        extra={
+          <InfoTooltip>
+            <p>Number of active customers whose total outstanding exceeds their assigned credit limit.</p>
+          </InfoTooltip>
+        }
       />
     </div>
   );

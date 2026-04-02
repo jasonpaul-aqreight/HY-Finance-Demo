@@ -11,6 +11,7 @@ export async function GET() {
         MIN(month) || '-01' AS min_date,
         MAX(month) || '-01' AS max_date
       FROM pc_ar_monthly
+      WHERE invoiced > 0
     `);
 
     return NextResponse.json({

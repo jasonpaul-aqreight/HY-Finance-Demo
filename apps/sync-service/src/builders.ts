@@ -298,7 +298,10 @@ async function buildArMonthly(source: Pool): Promise<BuildResult> {
         0::numeric AS collected,
         0::numeric AS cn_applied,
         0::numeric AS refunded,
-        COUNT(DISTINCT a."DebtorCode") AS customer_count
+        0::numeric AS contra,
+        COUNT(DISTINCT a."DebtorCode") AS customer_count,
+        COUNT(*)::int AS invoice_count,
+        0 AS payment_count
       FROM dbo."ARInvoice" a
       WHERE a."Cancelled" = 'F'
       GROUP BY ${mytMonth('a')}
@@ -307,7 +310,8 @@ async function buildArMonthly(source: Pool): Promise<BuildResult> {
 
       SELECT
         ${mytMonth('p')} AS month,
-        0, SUM(p."LocalPaymentAmt"), 0, 0, 0
+        0, SUM(p."LocalPaymentAmt"), 0, 0, 0, 0,
+        0, COUNT(*)::int
       FROM dbo."ARPayment" p
       WHERE p."Cancelled" = 'F'
       GROUP BY ${mytMonth('p')}
@@ -316,7 +320,8 @@ async function buildArMonthly(source: Pool): Promise<BuildResult> {
 
       SELECT
         ${mytMonth('c')} AS month,
-        0, 0, SUM(c."LocalNetTotal"), 0, 0
+        0, 0, SUM(c."LocalNetTotal"), 0, 0, 0,
+        0, 0
       FROM dbo."ARCN" c
       WHERE c."Cancelled" = 'F'
       GROUP BY ${mytMonth('c')}
@@ -325,10 +330,21 @@ async function buildArMonthly(source: Pool): Promise<BuildResult> {
 
       SELECT
         ${mytMonth('r')} AS month,
-        0, 0, 0, SUM(r."LocalPaymentAmt"), 0
+        0, 0, 0, SUM(r."LocalPaymentAmt"), 0, 0,
+        0, 0
       FROM dbo."ARRefund" r
       WHERE r."Cancelled" = 'F'
       GROUP BY ${mytMonth('r')}
+
+      UNION ALL
+
+      SELECT
+        TO_CHAR(ko."GainLossDate", 'YYYY-MM') AS month,
+        0, 0, 0, 0, SUM(ko."Amount"), 0,
+        0, 0
+      FROM dbo."ARContraKnockOff" ko
+      WHERE ko."GainLossDate" IS NOT NULL
+      GROUP BY TO_CHAR(ko."GainLossDate", 'YYYY-MM')
     ),
     agg AS (
       SELECT
@@ -337,7 +353,10 @@ async function buildArMonthly(source: Pool): Promise<BuildResult> {
         SUM(collected) AS collected,
         SUM(cn_applied) AS cn_applied,
         SUM(refunded) AS refunded,
-        GREATEST(MAX(customer_count), 0) AS customer_count
+        SUM(contra) AS contra,
+        GREATEST(MAX(customer_count), 0) AS customer_count,
+        SUM(invoice_count) AS invoice_count,
+        SUM(payment_count) AS payment_count
       FROM monthly
       GROUP BY month
     )
@@ -347,9 +366,12 @@ async function buildArMonthly(source: Pool): Promise<BuildResult> {
       COALESCE(collected, 0) AS collected,
       COALESCE(cn_applied, 0) AS cn_applied,
       COALESCE(refunded, 0) AS refunded,
-      COALESCE(SUM(invoiced - collected - cn_applied - refunded) OVER (ORDER BY month), 0) AS total_outstanding,
+      COALESCE(contra, 0) AS contra,
+      COALESCE(SUM(invoiced - collected - cn_applied - refunded - contra) OVER (ORDER BY month), 0) AS total_outstanding,
       COALESCE(SUM(invoiced) OVER (ORDER BY month), 0) AS total_billed,
-      customer_count
+      customer_count,
+      invoice_count,
+      payment_count
     FROM agg
     ORDER BY month
   `);
@@ -811,7 +833,7 @@ async function buildCustomerMarginByProduct(source: Pool): Promise<BuildResult> 
         COALESCE(NULLIF(i."ItemGroup", ''), 'Unclassified') AS item_group,
         ig."Description" AS item_group_desc,
         -SUM(d."LocalSubTotal") AS revenue,
-        -SUM(CASE WHEN d."LocalTotalCost" >= 0 THEN d."LocalTotalCost" ELSE 0 END) AS cogs,
+        -SUM(CASE WHEN (d."UnitCost" * d."Qty") >= 0 THEN (d."UnitCost" * d."Qty") ELSE 0 END) AS cogs,
         -SUM(d."Qty") AS qty_sold
       FROM dbo."CNDTL" d
       JOIN dbo."CN" h ON d."DocKey" = h."DocKey"
@@ -911,6 +933,7 @@ async function buildSupplierMargin(source: Pool): Promise<BuildResult> {
       p.creditor_code,
       cr."CompanyName" AS creditor_name,
       cr."CreditorType" AS creditor_type,
+      COALESCE(cr."IsActive", 'T') AS is_active,
       p.item_code,
       i."Description" AS item_description,
       i."ItemGroup" AS item_group,

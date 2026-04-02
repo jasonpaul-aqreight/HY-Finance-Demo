@@ -4,6 +4,7 @@ import { useReturnOverview } from '@/hooks/return/useCreditDataV2';
 import { useStableData } from '@/hooks/useStableData';
 import type { V2Filters } from '@/hooks/return/useDashboardFiltersV2';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { HelpCircle } from 'lucide-react';
 import { formatRM, formatCount } from '@/lib/format';
 
 interface KpiCardProps {
@@ -48,14 +49,12 @@ function SkeletonCard() {
 function ReconFormulaTooltip() {
   return (
     <span className="relative group">
-      <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-muted text-[10px] font-bold cursor-help">
-        i
-      </span>
+      <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/60 cursor-help" />
       <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1 z-[100] hidden group-hover:block w-max bg-background border rounded-lg shadow-lg p-3 space-y-2">
-        <p className="font-mono text-xs bg-muted/50 rounded px-2 py-1">
+        <p className="font-mono text-sm bg-muted/50 rounded px-2 py-1">
           Unresolved = NetTotal - KnockOffAmt - RefundAmt
         </p>
-        <div className="space-y-1 text-xs">
+        <div className="space-y-1 text-sm">
           <div className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
             <span>= 0 → Settled</span>
