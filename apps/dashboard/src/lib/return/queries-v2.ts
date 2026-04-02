@@ -287,17 +287,17 @@ export async function getReturnProducts(start: string, end: string, dimension: R
     fruit: {
       select: `COALESCE(fruit_name, 'OTHERS') AS name`,
       groupBy: `COALESCE(fruit_name, 'OTHERS')`,
-      filter: `AND item_code NOT LIKE 'ZZ-ZZ-%' AND item_code NOT LIKE 'XX-ZZ-%'`,
+      filter: `AND item_code NOT LIKE 'ZZ-%' AND item_code NOT LIKE 'XX-%' AND item_code NOT LIKE 'RE-%'`,
     },
     variant: {
       select: `COALESCE(fruit_name, 'OTHERS') || ' — ' || COALESCE(fruit_variant, 'OTHERS') AS name`,
       groupBy: `COALESCE(fruit_name, 'OTHERS'), COALESCE(fruit_variant, 'OTHERS')`,
-      filter: `AND item_code NOT LIKE 'ZZ-ZZ-%' AND item_code NOT LIKE 'XX-ZZ-%'`,
+      filter: `AND item_code NOT LIKE 'ZZ-%' AND item_code NOT LIKE 'XX-%' AND item_code NOT LIKE 'RE-%'`,
     },
     country: {
       select: `COALESCE(fruit_country, '(Unknown)') AS name`,
       groupBy: `COALESCE(fruit_country, '(Unknown)')`,
-      filter: '',
+      filter: `AND item_code NOT LIKE 'ZZ-%' AND item_code NOT LIKE 'XX-%' AND item_code NOT LIKE 'RE-%'`,
     },
   };
 
@@ -307,11 +307,11 @@ export async function getReturnProducts(start: string, end: string, dimension: R
   const { rows } = await pool.query(`
     SELECT
       ${cfg.select},
-      COALESCE(SUM(line_count), 0)::int AS cn_count,
+      COALESCE(SUM(cn_count), 0)::int AS cn_count,
       COALESCE(SUM(total_qty), 0)::float AS total_qty,
       COALESCE(SUM(total_amount), 0)::float AS total_value,
-      COALESCE(SUM(goods_return_count), 0)::float AS goods_returned_qty,
-      COALESCE(SUM(credit_only_count), 0)::float AS credit_only_qty
+      COALESCE(SUM(goods_returned_qty), 0)::float AS goods_returned_qty,
+      COALESCE(SUM(credit_only_qty), 0)::float AS credit_only_qty
     FROM pc_return_products
     WHERE month BETWEEN $1 AND $2
       AND item_code IS NOT NULL AND item_code != ''
@@ -339,14 +339,13 @@ export async function getRefundSummary(start: string, end: string): Promise<Refu
     WHERE month BETWEEN $1 AND $2
   `, [startMonth, endMonth]);
 
-  // Refund count: sum of months where refund_total > 0 is not available as a count,
-  // so we approximate from the data or query RDS for exact count
-  const { rows: [refundCountRow] } = await pool.query(`
+  // Actual refund transaction count from RDS
+  const [refundCountRow] = await queryRds<{ cnt: number }>(`
     SELECT COUNT(*)::int AS cnt
-    FROM pc_return_monthly
-    WHERE month BETWEEN $1 AND $2
-      AND refund_total > 0
-  `, [startMonth, endMonth]);
+    FROM dbo."ARRefund"
+    WHERE ("Cancelled" = 'F' OR "Cancelled" IS NULL)
+      AND ("DocDate" + INTERVAL '8 hours')::date BETWEEN $1::date AND $2::date
+  `, [start, end]);
 
   const total = row.total_return_value || 1; // avoid div by zero
   return {
@@ -432,12 +431,12 @@ export async function getCustomerReturnTrend(debtorCode: string, startDate: stri
 }
 
 export async function getReturnDateBounds(): Promise<{ min_date: string; max_date: string }> {
-  const pool = getPool();
-  const { rows } = await pool.query(`
+  const [row] = await queryRds<{ min_date: string; max_date: string }>(`
     SELECT
-      MIN(month) || '-01' AS min_date,
-      MAX(month) || '-01' AS max_date
-    FROM pc_return_monthly
-  `);
-  return rows[0];
+      MIN(("DocDate" + INTERVAL '8 hours')::date)::text AS min_date,
+      MAX(("DocDate" + INTERVAL '8 hours')::date)::text AS max_date
+    FROM dbo."CN"
+    WHERE ("Cancelled" = 'F' OR "Cancelled" IS NULL) AND "CNType" = 'RETURN'
+  `, []);
+  return row;
 }

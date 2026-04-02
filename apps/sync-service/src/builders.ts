@@ -206,22 +206,26 @@ async function buildSalesByFruit(source: Pool, ctx: BuilderContext): Promise<Bui
   }
 
   // Step 2: Query RDS for raw line items with src type for invoice/cash/cn breakdown
+  // Exclude: empty ItemCode with zero amount (comment lines), rental items, packing materials
   const result = await source.query(`
     WITH sales_lines AS (
       SELECT 'IV' AS src, d."ItemCode", d."LocalSubTotal" AS subtotal, d."Qty", h."DocDate"
       FROM dbo."IVDTL" d
       JOIN dbo."IV" h ON d."DocKey" = h."DocKey"
       WHERE h."Cancelled" = 'F'
+        AND NOT (COALESCE(d."ItemCode", '') = '' AND COALESCE(d."LocalSubTotal", 0) = 0)
       UNION ALL
       SELECT 'CS' AS src, d."ItemCode", d."LocalSubTotal", d."Qty", h."DocDate"
       FROM dbo."CSDTL" d
       JOIN dbo."CS" h ON d."DocKey" = h."DocKey"
       WHERE h."Cancelled" = 'F'
+        AND NOT (COALESCE(d."ItemCode", '') = '' AND COALESCE(d."LocalSubTotal", 0) = 0)
       UNION ALL
       SELECT 'CN' AS src, d."ItemCode", d."LocalSubTotal", d."Qty", h."DocDate"
       FROM dbo."CNDTL" d
       JOIN dbo."CN" h ON d."DocKey" = h."DocKey"
       WHERE h."Cancelled" = 'F'
+        AND NOT (COALESCE(d."ItemCode", '') = '' AND COALESCE(d."LocalSubTotal", 0) = 0)
     )
     SELECT
       src,
@@ -243,7 +247,19 @@ async function buildSalesByFruit(source: Pool, ctx: BuilderContext): Promise<Bui
   }>();
 
   for (const row of result.rows) {
-    const fruit = fruitMap.get(row.item_code) ?? { name: '(Unknown)', country: '(Unknown)', variant: '(Unknown)' };
+    const code = row.item_code || '';
+    // Skip packing materials and misc non-product items
+    if (code.startsWith('XX-') || code.startsWith('ZZ-')) continue;
+    // Skip rental items
+    if (code.startsWith('RE-')) continue;
+
+    // Items with no ItemCode but have a monetary amount → UNCATEGORIZED
+    let fruit: { name: string; country: string; variant: string };
+    if (!code) {
+      fruit = { name: 'UNCATEGORIZED', country: 'UNCATEGORIZED', variant: 'UNCATEGORIZED' };
+    } else {
+      fruit = fruitMap.get(code) ?? { name: '(Unknown)', country: '(Unknown)', variant: '(Unknown)' };
+    }
     const key = aggKey(row.month, fruit.name, fruit.country, fruit.variant);
 
     let bucket = agg.get(key);
@@ -636,8 +652,11 @@ async function buildReturnMonthly(source: Pool): Promise<BuildResult> {
     FROM dbo."CN" cn
     LEFT JOIN dbo."ARCN" arcn
       ON arcn."SourceKey" = cn."DocKey" AND arcn."SourceType" = 'CN' AND arcn."Cancelled" = 'F'
+    LEFT JOIN dbo."Debtor" d ON cn."DebtorCode" = d."AccNo"
     WHERE (cn."Cancelled" = 'F' OR cn."Cancelled" IS NULL)
       AND cn."CNType" = 'RETURN'
+      AND d."CompanyName" NOT ILIKE 'CASH DEBT%'
+      AND d."CompanyName" NOT ILIKE 'CASH SALES%'
     GROUP BY ${mytMonth('cn')}
     ORDER BY month
   `);
@@ -673,30 +692,60 @@ async function buildReturnByCustomer(source: Pool): Promise<BuildResult> {
   return { rows: result.rows, columns: result.fields.map(f => f.name) };
 }
 
-async function buildReturnProducts(source: Pool): Promise<BuildResult> {
+async function buildReturnProducts(source: Pool, ctx: BuilderContext): Promise<BuildResult> {
+  if (!ctx.targetClient) throw new Error('buildReturnProducts requires targetClient in context');
+
+  // Load fruit mapping from local product table (benefits from Tier-2 description parsing)
+  const { rows: products } = await ctx.targetClient.query(
+    `SELECT itemcode, fruitname, fruitcountry, fruitvariant FROM product`
+  );
+  const fruitMap = new Map<string, { name: string | null; country: string | null; variant: string | null }>();
+  for (const p of products) {
+    fruitMap.set(p.itemcode, {
+      name: p.fruitname || null,
+      country: p.fruitcountry || null,
+      variant: p.fruitvariant || null,
+    });
+  }
+
   const result = await source.query(`
     SELECT
       ${mytMonth('cn')} AS month,
       dtl."ItemCode" AS item_code,
-      MIN(COALESCE(i."Description", dtl."Description")) AS item_description,
-      MIN(NULLIF(TRIM(SPLIT_PART(i."UDF_BoC", '->', 1)), '')) AS fruit_name,
-      MIN(NULLIF(TRIM(SPLIT_PART(i."UDF_BoC", '->', 2)), '')) AS fruit_country,
-      MIN(NULLIF(TRIM(SPLIT_PART(i."UDF_BoC", '->', 3)), '')) AS fruit_variant,
-      COUNT(*) AS line_count,
+      dtl."Description" AS item_description,
+      COUNT(DISTINCT dtl."DocKey") AS cn_count,
       COALESCE(SUM(dtl."Qty"), 0) AS total_qty,
       COALESCE(SUM(dtl."LocalSubTotal"), 0) AS total_amount,
-      COUNT(CASE WHEN dtl."GoodsReturn" = 'T' THEN 1 END) AS goods_return_count,
-      COUNT(CASE WHEN COALESCE(dtl."GoodsReturn", 'F') = 'F' THEN 1 END) AS credit_only_count
+      COALESCE(SUM(CASE WHEN dtl."GoodsReturn" = 'T' THEN dtl."Qty" ELSE 0 END), 0) AS goods_returned_qty,
+      COALESCE(SUM(CASE WHEN COALESCE(dtl."GoodsReturn", 'F') = 'F' THEN dtl."Qty" ELSE 0 END), 0) AS credit_only_qty
     FROM dbo."CNDTL" dtl
     JOIN dbo."CN" cn ON dtl."DocKey" = cn."DocKey"
-    LEFT JOIN dbo."Item" i ON dtl."ItemCode" = i."ItemCode"
     WHERE (cn."Cancelled" = 'F' OR cn."Cancelled" IS NULL)
       AND cn."CNType" = 'RETURN'
       AND dtl."ItemCode" IS NOT NULL AND dtl."ItemCode" != ''
-    GROUP BY ${mytMonth('cn')}, dtl."ItemCode"
+    GROUP BY ${mytMonth('cn')}, dtl."ItemCode", dtl."Description"
     ORDER BY month, item_code
   `);
-  return { rows: result.rows, columns: result.fields.map(f => f.name) };
+
+  // Enrich with fruit columns from local product table
+  const enrichedRows = result.rows.map(row => {
+    const fruit = fruitMap.get(row.item_code as string);
+    return {
+      ...row,
+      fruit_name: fruit?.name || null,
+      fruit_country: fruit?.country || null,
+      fruit_variant: fruit?.variant || null,
+    };
+  });
+
+  const columns = [
+    'month', 'item_code', 'item_description',
+    'fruit_name', 'fruit_country', 'fruit_variant',
+    'cn_count', 'total_qty', 'total_amount',
+    'goods_returned_qty', 'credit_only_qty',
+  ];
+
+  return { rows: enrichedRows, columns };
 }
 
 async function buildReturnAging(source: Pool, ctx: BuilderContext): Promise<BuildResult> {
@@ -917,7 +966,18 @@ async function buildCustomerMarginByProduct(source: Pool): Promise<BuildResult> 
 // SUPPLIER MARGIN (1 builder)
 // ════════════════════════════════════════════════════════════════════════════
 
-async function buildSupplierMargin(source: Pool): Promise<BuildResult> {
+async function buildSupplierMargin(source: Pool, ctx: BuilderContext): Promise<BuildResult> {
+  if (!ctx.targetClient) throw new Error('buildSupplierMargin requires targetClient in context');
+
+  // Load fruit mapping from local product table (benefits from Tier-2 description parsing)
+  const { rows: products } = await ctx.targetClient.query(
+    `SELECT itemcode, fruitname FROM product`
+  );
+  const fruitMap = new Map<string, string | null>();
+  for (const p of products) {
+    fruitMap.set(p.itemcode, p.fruitname || null);
+  }
+
   const result = await source.query(`
     WITH purchase AS (
       SELECT
@@ -969,7 +1029,6 @@ async function buildSupplierMargin(source: Pool): Promise<BuildResult> {
       p.item_code,
       i."Description" AS item_description,
       i."ItemGroup" AS item_group,
-      NULLIF(TRIM(SPLIT_PART(i."UDF_BoC", '->', 1)), '') AS fruit_name,
       COALESCE(p.purchase_qty, 0) AS purchase_qty,
       COALESCE(p.purchase_total, 0) AS purchase_total,
       CASE WHEN COALESCE(p.purchase_qty, 0) > 0
@@ -983,7 +1042,21 @@ async function buildSupplierMargin(source: Pool): Promise<BuildResult> {
     LEFT JOIN dbo."Item" i ON p.item_code = i."ItemCode"
     ORDER BY p.month, p.creditor_code, p.item_code
   `);
-  return { rows: result.rows, columns: result.fields.map(f => f.name) };
+
+  // Enrich with fruit_name from local product table
+  const enrichedRows = result.rows.map(row => ({
+    ...row,
+    fruit_name: fruitMap.get(row.item_code as string) ?? null,
+  }));
+
+  const columns = [
+    'month', 'creditor_code', 'creditor_name', 'creditor_type', 'is_active',
+    'item_code', 'item_description', 'item_group', 'fruit_name',
+    'purchase_qty', 'purchase_total', 'avg_unit_cost',
+    'sales_qty', 'sales_revenue',
+  ];
+
+  return { rows: enrichedRows, columns };
 }
 
 

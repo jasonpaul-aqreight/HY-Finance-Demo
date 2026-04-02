@@ -191,8 +191,32 @@ function parseDescription(
  * Update product table with parsed fruit columns.
  * Tier 1: UDF_BoC  →  Tier 2: Description + lookup tables
  */
+/**
+ * Normalize a value from UDF_BoC against canonical names + aliases.
+ * Returns the canonical name if found, otherwise the original value.
+ */
+function normalizeFruit(value: string | null, lookups: LookupSets): string | null {
+  if (!value) return null;
+  const upper = value.toUpperCase().trim();
+  // Check if it's already a canonical fruit name
+  if (lookups.fruits.includes(upper)) return upper;
+  // Check aliases
+  const canonical = lookups.fruitAliases.get(upper);
+  if (canonical) return canonical;
+  return upper; // keep as-is if not found (will still show in data)
+}
+
+function normalizeCountry(value: string | null, lookups: LookupSets): string | null {
+  if (!value) return null;
+  const upper = value.toUpperCase().trim();
+  if (lookups.countries.includes(upper)) return upper;
+  const canonical = lookups.countryAliases.get(upper);
+  if (canonical) return canonical;
+  return upper;
+}
+
 export async function transformProducts(client: PoolClient): Promise<number> {
-  // Load lookup tables for tier-2 fallback
+  // Load lookup tables for tier-2 fallback and tier-1 normalization
   const lookups = await loadLookups(client);
 
   const { rows } = await client.query(
@@ -203,8 +227,16 @@ export async function transformProducts(client: PoolClient): Promise<number> {
 
   let updated = 0;
   for (const row of rows) {
-    // Tier 1: Try UDF_BoC first
+    // Tier 1: Try UDF_BoC first, then normalize against ref tables
     let parsed = parseUdfBoC(row.udf_boc);
+    if (parsed.fruitName) {
+      parsed.fruitName = normalizeFruit(parsed.fruitName, lookups);
+      parsed.fruitCountry = normalizeCountry(parsed.fruitCountry, lookups);
+      // Normalize variant against known variants
+      if (parsed.fruitName && parsed.fruitVariant) {
+        parsed.fruitVariant = parsed.fruitVariant.toUpperCase().trim();
+      }
+    }
 
     // Tier 2: Fall back to Description if UDF_BoC didn't yield a fruit name
     if (!parsed.fruitName) {
