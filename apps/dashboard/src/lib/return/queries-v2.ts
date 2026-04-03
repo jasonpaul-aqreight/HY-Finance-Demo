@@ -234,18 +234,21 @@ export async function getCustomerReturnDetailsAll(debtorCode: string): Promise<C
       cn."DocKey" AS doc_key,
       cn."DocNo" AS doc_no,
       (cn."DocDate" + INTERVAL '8 hours')::date::text AS doc_date,
-      cn."LocalNetTotal" AS net_total,
+      COALESCE(arcn."LocalNetTotal", cn."LocalNetTotal") AS net_total,
       COALESCE(arcn."KnockOffAmt", 0)::float AS knocked_off,
       COALESCE(arcn."RefundAmt", 0)::float AS refunded,
-      (cn."LocalNetTotal" - COALESCE(arcn."KnockOffAmt", 0) - COALESCE(arcn."RefundAmt", 0)) AS unresolved,
+      (COALESCE(arcn."LocalNetTotal", cn."LocalNetTotal") - COALESCE(arcn."KnockOffAmt", 0) - COALESCE(arcn."RefundAmt", 0)) AS unresolved,
       COALESCE(cn."Reason", '') AS reason,
       COALESCE(cn."OurInvoiceNo", '') AS our_invoice_no
     FROM dbo."CN" cn
     LEFT JOIN dbo."ARCN" arcn
       ON arcn."SourceKey" = cn."DocKey" AND arcn."SourceType" = 'CN' AND arcn."Cancelled" = 'F'
+    LEFT JOIN dbo."Debtor" d ON cn."DebtorCode" = d."AccNo"
     WHERE cn."Cancelled" = 'F'
       AND cn."CNType" = 'RETURN'
       AND cn."DebtorCode" = $1
+      AND d."CompanyName" NOT ILIKE 'CASH DEBT%'
+      AND d."CompanyName" NOT ILIKE 'CASH SALES%'
     ORDER BY cn."DocDate" DESC
   `, [debtorCode]);
 }
@@ -256,18 +259,21 @@ export async function getCustomerReturnDetails(debtorCode: string, start: string
       cn."DocKey" AS doc_key,
       cn."DocNo" AS doc_no,
       (cn."DocDate" + INTERVAL '8 hours')::date::text AS doc_date,
-      cn."LocalNetTotal" AS net_total,
+      COALESCE(arcn."LocalNetTotal", cn."LocalNetTotal") AS net_total,
       COALESCE(arcn."KnockOffAmt", 0)::float AS knocked_off,
       COALESCE(arcn."RefundAmt", 0)::float AS refunded,
-      (cn."LocalNetTotal" - COALESCE(arcn."KnockOffAmt", 0) - COALESCE(arcn."RefundAmt", 0)) AS unresolved,
+      (COALESCE(arcn."LocalNetTotal", cn."LocalNetTotal") - COALESCE(arcn."KnockOffAmt", 0) - COALESCE(arcn."RefundAmt", 0)) AS unresolved,
       COALESCE(cn."Reason", '') AS reason,
       COALESCE(cn."OurInvoiceNo", '') AS our_invoice_no
     FROM dbo."CN" cn
     LEFT JOIN dbo."ARCN" arcn
       ON arcn."SourceKey" = cn."DocKey" AND arcn."SourceType" = 'CN' AND arcn."Cancelled" = 'F'
+    LEFT JOIN dbo."Debtor" d ON cn."DebtorCode" = d."AccNo"
     WHERE cn."Cancelled" = 'F'
       AND cn."CNType" = 'RETURN'
       AND cn."DebtorCode" = $1
+      AND d."CompanyName" NOT ILIKE 'CASH DEBT%'
+      AND d."CompanyName" NOT ILIKE 'CASH SALES%'
       AND (cn."DocDate" + INTERVAL '8 hours')::date BETWEEN $2::date AND $3::date
     ORDER BY cn."DocDate" DESC
   `, [debtorCode, start, end]);

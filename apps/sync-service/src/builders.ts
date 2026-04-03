@@ -636,17 +636,17 @@ async function buildReturnMonthly(source: Pool): Promise<BuildResult> {
     SELECT
       ${mytMonth('cn')} AS month,
       COUNT(*) AS cn_count,
-      COALESCE(SUM(cn."LocalNetTotal"), 0) AS cn_total,
+      COALESCE(SUM(COALESCE(arcn."LocalNetTotal", cn."LocalNetTotal")), 0) AS cn_total,
       COALESCE(SUM(arcn."KnockOffAmt"), 0) AS knock_off_total,
       COALESCE(SUM(arcn."RefundAmt"), 0) AS refund_total,
       COALESCE(SUM(
-        cn."LocalNetTotal" - COALESCE(arcn."KnockOffAmt", 0) - COALESCE(arcn."RefundAmt", 0)
+        COALESCE(arcn."LocalNetTotal", cn."LocalNetTotal") - COALESCE(arcn."KnockOffAmt", 0) - COALESCE(arcn."RefundAmt", 0)
       ), 0) AS unresolved_total,
       COUNT(CASE WHEN COALESCE(arcn."KnockOffAmt", 0) + COALESCE(arcn."RefundAmt", 0)
-                      >= cn."LocalNetTotal" THEN 1 END) AS reconciled_count,
+                      >= COALESCE(arcn."LocalNetTotal", cn."LocalNetTotal") THEN 1 END) AS reconciled_count,
       COUNT(CASE WHEN COALESCE(arcn."KnockOffAmt", 0) + COALESCE(arcn."RefundAmt", 0) > 0
                   AND COALESCE(arcn."KnockOffAmt", 0) + COALESCE(arcn."RefundAmt", 0)
-                      < cn."LocalNetTotal" THEN 1 END) AS partial_count,
+                      < COALESCE(arcn."LocalNetTotal", cn."LocalNetTotal") THEN 1 END) AS partial_count,
       COUNT(CASE WHEN COALESCE(arcn."KnockOffAmt", 0) + COALESCE(arcn."RefundAmt", 0)
                       = 0 THEN 1 END) AS outstanding_count
     FROM dbo."CN" cn
@@ -670,11 +670,11 @@ async function buildReturnByCustomer(source: Pool): Promise<BuildResult> {
       cn."DebtorCode" AS debtor_code,
       d."CompanyName" AS company_name,
       COUNT(*) AS cn_count,
-      COALESCE(SUM(cn."LocalNetTotal"), 0) AS cn_total,
+      COALESCE(SUM(COALESCE(arcn."LocalNetTotal", cn."LocalNetTotal")), 0) AS cn_total,
       COALESCE(SUM(arcn."KnockOffAmt"), 0) AS knock_off_total,
       COALESCE(SUM(arcn."RefundAmt"), 0) AS refund_total,
       COALESCE(SUM(
-        cn."LocalNetTotal" - COALESCE(arcn."KnockOffAmt", 0) - COALESCE(arcn."RefundAmt", 0)
+        COALESCE(arcn."LocalNetTotal", cn."LocalNetTotal") - COALESCE(arcn."KnockOffAmt", 0) - COALESCE(arcn."RefundAmt", 0)
       ), 0) AS unresolved,
       COUNT(CASE WHEN COALESCE(arcn."KnockOffAmt", 0) + COALESCE(arcn."RefundAmt", 0)
                       = 0 THEN 1 END) AS outstanding_count
@@ -757,7 +757,7 @@ async function buildReturnAging(source: Pool, ctx: BuilderContext): Promise<Buil
     WITH unresolved AS (
       SELECT
         cn."DocDate",
-        cn."LocalNetTotal",
+        COALESCE(arcn."LocalNetTotal", cn."LocalNetTotal") AS net_total,
         COALESCE(arcn."KnockOffAmt", 0) + COALESCE(arcn."RefundAmt", 0) AS resolved_amt
       FROM dbo."CN" cn
       LEFT JOIN dbo."ARCN" arcn
@@ -766,9 +766,9 @@ async function buildReturnAging(source: Pool, ctx: BuilderContext): Promise<Buil
         AND cn."CNType" = 'RETURN'
     ),
     open_cn AS (
-      SELECT "DocDate", "LocalNetTotal" - resolved_amt AS outstanding
+      SELECT "DocDate", net_total - resolved_amt AS outstanding
       FROM unresolved
-      WHERE "LocalNetTotal" - resolved_amt > 0.01
+      WHERE net_total - resolved_amt > 0.01
     )
     SELECT
       CASE
@@ -972,7 +972,10 @@ async function buildSupplierMargin(source: Pool, ctx: BuilderContext): Promise<B
         h."CreditorCode" AS creditor_code,
         d."ItemCode" AS item_code,
         SUM(d."Qty") AS purchase_qty,
-        SUM(d."LocalSubTotal") AS purchase_total
+        SUM(d."LocalSubTotal") AS purchase_total,
+        MIN(d."UnitPrice") AS min_unit_price,
+        MAX(d."UnitPrice") AS max_unit_price,
+        (ARRAY_AGG(d."UnitPrice" ORDER BY h."DocDate" DESC, d."DocKey" DESC))[1] AS last_unit_price
       FROM dbo."PIDTL" d
       JOIN dbo."PI" h ON d."DocKey" = h."DocKey"
       WHERE h."Cancelled" = 'F'
@@ -1030,6 +1033,9 @@ async function buildSupplierMargin(source: Pool, ctx: BuilderContext): Promise<B
       CASE WHEN COALESCE(p.purchase_qty, 0) > 0
         THEN ROUND((p.purchase_total / p.purchase_qty)::numeric, 4)
         ELSE 0 END AS avg_unit_cost,
+      p.min_unit_price,
+      p.max_unit_price,
+      p.last_unit_price,
       -- Attributed sales: weighted by supplier's share of item purchases
       COALESCE(sa.sales_qty * p.purchase_qty / NULLIF(itp.total_purchase_qty, 0), 0) AS sales_qty,
       COALESCE(sa.sales_revenue * p.purchase_qty / NULLIF(itp.total_purchase_qty, 0), 0) AS sales_revenue,
@@ -1053,6 +1059,7 @@ async function buildSupplierMargin(source: Pool, ctx: BuilderContext): Promise<B
     'month', 'creditor_code', 'creditor_name', 'creditor_type', 'is_active',
     'item_code', 'item_description', 'item_group', 'fruit_name',
     'purchase_qty', 'purchase_total', 'avg_unit_cost',
+    'min_unit_price', 'max_unit_price', 'last_unit_price',
     'sales_qty', 'sales_revenue', 'attributed_cogs',
   ];
 
