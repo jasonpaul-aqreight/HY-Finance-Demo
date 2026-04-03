@@ -757,13 +757,13 @@ export async function getItemProcurementSummary(
   const startMonth = start.substring(0, 7);
   const endMonth = end.substring(0, 7);
 
-  // 1. Per-supplier aggregate stats
+  // 1. Per-supplier aggregate stats (use min/max_unit_price for line-item granularity)
   const summaryResult = await pool.query(`
     SELECT
       m.creditor_code,
       m.creditor_name,
-      ROUND(MIN(m.avg_unit_cost)::numeric, 2)::float AS min_price,
-      ROUND(MAX(m.avg_unit_cost)::numeric, 2)::float AS max_price,
+      ROUND(MIN(m.min_unit_price)::numeric, 2)::float AS min_price,
+      ROUND(MAX(m.max_unit_price)::numeric, 2)::float AS max_price,
       ROUND((SUM(m.purchase_total) / NULLIF(SUM(m.purchase_qty), 0))::numeric, 2)::float AS avg_price,
       ROUND(SUM(m.purchase_qty)::numeric, 2)::float AS total_qty,
       ROUND(SUM(m.purchase_total)::numeric, 2)::float AS total_buy
@@ -781,11 +781,11 @@ export async function getItemProcurementSummary(
     total_qty: number; total_buy: number;
   }>;
 
-  // 2. Latest purchase price per supplier (most recent month with data)
+  // 2. Latest purchase price per supplier (most recent month's last transaction price)
   const latestResult = await pool.query(`
     SELECT DISTINCT ON (m.creditor_code)
       m.creditor_code,
-      m.avg_unit_cost::float AS latest_price,
+      m.last_unit_price::float AS latest_price,
       m.month || '-01' AS latest_date
     FROM pc_supplier_margin m
     WHERE m.item_code = $1
@@ -885,6 +885,7 @@ export async function getSupplierProfileSummary(creditorCode: string, start: str
     FROM pc_supplier_margin m
     WHERE m.creditor_code = $1
       AND m.month BETWEEN $2 AND $3
+      AND m.is_active = 'T'
       AND m.purchase_qty > 0
       AND m.sales_revenue > 0
       ${NON_PRODUCT_FILTER}
@@ -1043,6 +1044,7 @@ export async function getSupplierPerformance(creditorCode: string, start: string
     FROM pc_supplier_margin m
     WHERE m.creditor_code = $1
       AND m.month BETWEEN $2 AND $3
+      AND m.is_active = 'T'
       ${NON_PRODUCT_FILTER}
     GROUP BY m.month
     ORDER BY m.month
@@ -1061,6 +1063,7 @@ export async function getSupplierPerformance(creditorCode: string, start: string
     FROM pc_supplier_margin m
     WHERE m.creditor_code = $1
       AND m.month BETWEEN $2 AND $3
+      AND m.is_active = 'T'
       ${NON_PRODUCT_FILTER}
     GROUP BY m.item_code, m.item_description
     HAVING SUM(m.sales_revenue) > 0
@@ -1082,6 +1085,7 @@ export async function getSupplierPerformance(creditorCode: string, start: string
     FROM pc_supplier_margin m
     WHERE m.creditor_code = $1
       AND m.month BETWEEN $2 AND $3
+      AND m.is_active = 'T'
       ${NON_PRODUCT_FILTER}
   `, [creditorCode, startMonth, endMonth]);
 
