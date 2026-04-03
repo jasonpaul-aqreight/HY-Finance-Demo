@@ -1,4 +1,4 @@
-import { getPool } from '../postgres';
+import { getPool, getRdsPool } from '../postgres';
 import { getPreviousPeriod } from './date-utils';
 
 // ─── Note ────────────────────────────────────────────────────────────────────
@@ -508,31 +508,64 @@ export async function getItemListV2(
   return rows as ItemListRowV2[];
 }
 
-// ─── Item Sell Price (from pc_supplier_margin sales data) ──────────────────
+// ─── Item Sell Price (all from RDS raw line items for accuracy) ──────────────
+// Pre-computed table uses attributed sales (proportional to supplier purchase share),
+// which distorts avg when total_purchases < total_sales for an item.
+// RDS gives true transaction-level avg/min/max.
 
 export async function getItemSellPriceV2(
   itemCode: string,
   start: string,
   end: string
 ): Promise<ItemSellPriceV2> {
-  const pool = getPool();
-  const startMonth = start.substring(0, 7);
-  const endMonth = end.substring(0, 7);
+  const rds = getRdsPool();
 
-  const { rows } = await pool.query(`
-    SELECT
-      ROUND((SUM(m.sales_revenue) / NULLIF(SUM(m.sales_qty), 0))::numeric, 2)::float AS avg_sell_price,
-      ROUND(MIN(CASE WHEN m.sales_qty > 0 THEN m.sales_revenue / NULLIF(m.sales_qty, 0) END)::numeric, 2)::float AS min_sell_price,
-      ROUND(MAX(CASE WHEN m.sales_qty > 0 THEN m.sales_revenue / NULLIF(m.sales_qty, 0) END)::numeric, 2)::float AS max_sell_price
-    FROM pc_supplier_margin m
-    WHERE m.item_code = $1
-      AND m.month BETWEEN $2 AND $3
-      AND m.is_active = 'T'
-      AND m.sales_qty > 0
-  `, [itemCode, startMonth, endMonth]);
+  try {
+    const { rows } = await rds.query(`
+      SELECT
+        ROUND((SUM("SubTotalExTax") / NULLIF(SUM("Qty"), 0))::numeric, 2)::float AS avg_sell_price,
+        ROUND(MIN("UnitPrice")::numeric, 2)::float AS min_sell_price,
+        ROUND(MAX("UnitPrice")::numeric, 2)::float AS max_sell_price
+      FROM (
+        SELECT d."LocalSubTotalExTax" AS "SubTotalExTax", d."Qty", d."UnitPrice"
+        FROM dbo."IVDTL" d
+        JOIN dbo."IV" h ON d."DocKey" = h."DocKey"
+        WHERE h."Cancelled" = 'F'
+          AND d."ItemCode" = $1
+          AND d."Qty" > 0 AND d."UnitPrice" > 0
+          AND DATE(h."DocDate" + INTERVAL '8 hours') BETWEEN $2 AND $3
+        UNION ALL
+        SELECT d."LocalSubTotalExTax", d."Qty", d."UnitPrice"
+        FROM dbo."CSDTL" d
+        JOIN dbo."CS" h ON d."DocKey" = h."DocKey"
+        WHERE h."Cancelled" = 'F'
+          AND d."ItemCode" = $1
+          AND d."Qty" > 0 AND d."UnitPrice" > 0
+          AND DATE(h."DocDate" + INTERVAL '8 hours') BETWEEN $2 AND $3
+      ) combined
+    `, [itemCode, start, end]);
 
-  const row = rows[0] as ItemSellPriceV2 | undefined;
-  return row ?? { avg_sell_price: null, min_sell_price: null, max_sell_price: null };
+    const row = rows[0] as ItemSellPriceV2 | undefined;
+    return row ?? { avg_sell_price: null, min_sell_price: null, max_sell_price: null };
+  } catch {
+    // RDS unavailable — fall back to pre-computed table
+    const pool = getPool();
+    const startMonth = start.substring(0, 7);
+    const endMonth = end.substring(0, 7);
+    const { rows } = await pool.query(`
+      SELECT
+        ROUND((SUM(m.sales_revenue) / NULLIF(SUM(m.sales_qty), 0))::numeric, 2)::float AS avg_sell_price,
+        ROUND((SUM(m.sales_revenue) / NULLIF(SUM(m.sales_qty), 0))::numeric, 2)::float AS min_sell_price,
+        ROUND((SUM(m.sales_revenue) / NULLIF(SUM(m.sales_qty), 0))::numeric, 2)::float AS max_sell_price
+      FROM pc_supplier_margin m
+      WHERE m.item_code = $1
+        AND m.month BETWEEN $2 AND $3
+        AND m.is_active = 'T'
+        AND m.sales_qty > 0
+    `, [itemCode, startMonth, endMonth]);
+    const row = rows[0] as ItemSellPriceV2 | undefined;
+    return row ?? { avg_sell_price: null, min_sell_price: null, max_sell_price: null };
+  }
 }
 
 // ─── Item Supplier Summary (per-supplier stats for one item) ────────────────
@@ -553,8 +586,8 @@ export async function getItemSupplierSummaryV2(
     SELECT
       m.creditor_code,
       m.creditor_name,
-      ROUND(MIN(m.avg_unit_cost)::numeric, 2)::float AS min_price,
-      ROUND(MAX(m.avg_unit_cost)::numeric, 2)::float AS max_price,
+      ROUND(MIN(m.min_unit_price)::numeric, 2)::float AS min_price,
+      ROUND(MAX(m.max_unit_price)::numeric, 2)::float AS max_price,
       ROUND((SUM(m.purchase_total) / NULLIF(SUM(m.purchase_qty), 0))::numeric, 2)::float AS avg_price,
       ROUND(SUM(m.purchase_qty)::numeric, 2)::float AS total_qty,
       ROUND(SUM(m.purchase_total)::numeric, 2)::float AS total_buy,
