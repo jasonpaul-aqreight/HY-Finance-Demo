@@ -178,30 +178,27 @@ function buildProductFilter(
   const params: unknown[] = [filters.start.substring(0, 7), filters.end.substring(0, 7)];
   let idx = startIdx + 2;
 
-  // Build debtor_code subquery if customer/type/agent filters are present
-  const needsDebtorSubquery = filters.customers?.length || filters.types?.length || filters.agents?.length;
-  if (needsDebtorSubquery) {
-    const subClauses: string[] = [`month BETWEEN $${1} AND $${2}`]; // reuse same month params
-    if (filters.customers?.length) {
-      const placeholders = filters.customers.map((_, i) => `$${idx + i}`).join(',');
-      subClauses.push(`debtor_code IN (${placeholders})`);
-      params.push(...filters.customers);
-      idx += filters.customers.length;
-    }
-    if (filters.types?.length) {
-      const placeholders = filters.types.map((_, i) => `$${idx + i}`).join(',');
-      subClauses.push(`debtor_type IN (${placeholders})`);
-      params.push(...filters.types);
-      idx += filters.types.length;
-    }
-    if (filters.agents?.length) {
-      const placeholders = filters.agents.map((_, i) => `$${idx + i}`).join(',');
-      subClauses.push(`sales_agent IN (${placeholders})`);
-      params.push(...filters.agents);
-      idx += filters.agents.length;
-    }
-    clauses.push(`${alias}.debtor_code IN (SELECT DISTINCT debtor_code FROM pc_customer_margin WHERE ${subClauses.join(' AND ')})`);
+  // Always filter to active customers; optionally add customer/type/agent filters
+  const subClauses: string[] = [`is_active = 'T'`, `month BETWEEN $${1} AND $${2}`];
+  if (filters.customers?.length) {
+    const placeholders = filters.customers.map((_, i) => `$${idx + i}`).join(',');
+    subClauses.push(`debtor_code IN (${placeholders})`);
+    params.push(...filters.customers);
+    idx += filters.customers.length;
   }
+  if (filters.types?.length) {
+    const placeholders = filters.types.map((_, i) => `$${idx + i}`).join(',');
+    subClauses.push(`debtor_type IN (${placeholders})`);
+    params.push(...filters.types);
+    idx += filters.types.length;
+  }
+  if (filters.agents?.length) {
+    const placeholders = filters.agents.map((_, i) => `$${idx + i}`).join(',');
+    subClauses.push(`sales_agent IN (${placeholders})`);
+    params.push(...filters.agents);
+    idx += filters.agents.length;
+  }
+  clauses.push(`${alias}.debtor_code IN (SELECT DISTINCT debtor_code FROM pc_customer_margin WHERE ${subClauses.join(' AND ')})`);
 
   if (filters.productGroups?.length) {
     const placeholders = filters.productGroups.map((_, i) => `$${idx + i}`).join(',');
