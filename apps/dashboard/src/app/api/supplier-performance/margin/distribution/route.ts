@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSupplierMarginDistributionV2, getItemMarginDistributionV2 } from '@/lib/supplier-margin/queries-v2';
+import { getSupplierMarginDistributionV2, getItemMarginDistributionV2 } from '@/lib/supplier-margin/queries';
 
 export const dynamic = 'force-dynamic';
 

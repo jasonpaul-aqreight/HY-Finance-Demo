@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getMultiYearPL } from '@/lib/pnl/queries-v3';
+import { getMultiYearPL } from '@/lib/pnl/queries';
 
 export async function GET() {
   const data = await getMultiYearPL();

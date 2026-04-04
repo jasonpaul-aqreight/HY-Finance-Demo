@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getV3PLKpis } from '@/lib/pnl/queries-v3';
+import { getV3PLKpis } from '@/lib/pnl/queries';
 
 export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;

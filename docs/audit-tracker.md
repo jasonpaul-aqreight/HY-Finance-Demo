@@ -31,28 +31,33 @@ Each module is one session. Compare old vs new query-by-query, document findings
 
 **Total: 11 modules, ~119 function pairs**
 
-## Phase 3: Risk-Rated Findings Report
+## Phase 3: Risk-Rated Findings Report — DONE
 
-Generated after all modules are audited. Categories:
-- **CRITICAL** — Missing filter or wrong aggregation (changes numbers)
-- **MEDIUM** — Structural difference that could affect results
-- **LOW** — Cosmetic / naming only
+**Report:** [`docs/audit-findings-report.md`](audit-findings-report.md)
+**Completed:** 2026-04-04
+
+Summary: 1 CRITICAL (resolved), 8 MEDIUM (all resolved/accepted), 1 LOW (accepted), 8 improvements noted. **Production-ready.**
 
 ## Phase 4: Query File Consolidation (post-audit)
 
-**Prerequisite:** All 5 audit sessions complete and findings resolved.
+**Prerequisite:** All 5 audit sessions complete and findings resolved. (**Done**)
 
 **Goal:** Merge v1/v2/v3 query files into a single `queries.ts` per module + rewire API routes.
 
-| Module | Current Files | Target | Complexity |
-|--------|--------------|--------|------------|
-| Supplier Margin | queries.ts (v1) + queries-v2.ts | Single queries.ts | High — UI calls both v1 (11 endpoints) and v2 (2 endpoints) |
-| Payment | queries.ts (v1) + queries-v2.ts | Single queries.ts | High — UI calls both v1 (aging, collection) and v2 (KPIs, credit) |
-| PnL | queries.ts (v1) + queries-v2.ts + queries-v3.ts | Single queries.ts | Medium — v3 is primary, v1 only used for types |
-| Return | queries-v2.ts only | Rename to queries.ts | Low — no v1 exists |
-| Sales | queries-v2.ts only | Rename to queries.ts | Low — single file already |
+| # | Module | Current Files | Target | Complexity | Import Updates | Status |
+|---|--------|--------------|--------|------------|----------------|--------|
+| 1 | Return | ~~queries-v2.ts~~ → queries.ts | Rename | Trivial | 13 files | DONE (2026-04-04) |
+| 2 | Sales | ~~queries-v2.ts~~ → queries.ts | Rename | Trivial | 2 files | DONE (2026-04-04) |
+| 3 | Payment | ~~queries-v2.ts~~ merged into queries.ts | Single queries.ts | Low | 6 files | DONE (2026-04-04) |
+| 4 | Supplier Margin | ~~queries-v2.ts~~ merged into queries.ts | Single queries.ts | Moderate | 9 files (2 had dual imports merged) | DONE (2026-04-04) |
+| 5 | PnL | ~~queries-v2.ts~~ + ~~queries-v3.ts~~ merged into queries.ts | Single queries.ts | High | 7 files (v3→queries) | DONE (2026-04-04) |
 
-**Status:** NOT STARTED — begins after Phase 3
+### Consolidation Notes
+
+All 3 remaining modules consolidated in one session (2026-04-04):
+- **Payment:** v2 content appended to v1, cross-dependency on `getRefDate` resolved naturally. 6 import updates, 2 dual-import merges.
+- **Supplier Margin:** v2 content appended to v1, duplicate `Granularity`/`periodExpr` kept only in v1 section, v2 filter helpers added. `getRdsPool` import added. 9 import updates.
+- **PnL:** Most complex — v2 private helpers renamed (`queryPLRawV2`, `aggregatePLV2`) to avoid conflicts with v1's PascalCase versions. V3 functions inlined directly (cross-file refs resolved to local calls). 7 import updates. `types/pnl-v2.ts` kept as external type file (unchanged).
 
 ## Known Risk Patterns to Check Every Query
 
@@ -73,12 +78,12 @@ Generated after all modules are audited. Categories:
 | 2 | 2026-04-03 | Customer Margin (16 fn) | **1 MEDIUM (FIXED)**: M1 — `buildProductFilter` missing `is_active='T'` filter — `getMarginByProductGroup` and `getProductCustomerMatrix` included inactive customers (209 debtors, RM 25.6M lifetime, ~RM 330K in 2025). Fixed by adding always-on `is_active='T'` subquery against `pc_customer_margin` in `buildProductFilter`. Verified via API: inactive customer 300-S030 (RM 167K) correctly excluded. **2 cleared (improvements)**: `getCustomerProducts` now includes DN+CN (old was IV-only); pagination added. **13 cleared**: KPI, trend, customer list, monthly, type breakdown, CN impact, distribution, 4 filter lookups, data quality, date bounds — all structurally equivalent. |
 | 3 | 2026-04-03 | Payment v1 + v2 (15 fn) | **0 CRITICAL. 2 MEDIUM (dormant)**: M1 — `getAgingBuckets` combined filter (type+agent) fallback uses customer-level `max_overdue_days` bucketing instead of invoice-level; M2 — `getCollectionTrend` aggregate path ignores dimension filters. Both dormant: V2 dashboard (sole UI) calls these endpoints without filters. **1 MEDIUM (informational)**: M3 — V1 `getCreditHealthTable` approximates component scores, hardcodes cn_frequency=50. V2 recalculates correctly. **1 LOW**: L1 — V1 `getCreditUtilization` missing `is_active IS NULL` fallback. **11 cleared**: getRefDate, getDimensions, getAgingBucketsByDimension, getDsoTrend (v1+v2), getKpis (v1+v2), getCreditUtilizationV2, getCreditHealthTableV2, getCustomerInvoices, getCustomerProfile — all structurally equivalent with CASH exclusion improvements. |
 | 4 | 2026-04-03 | PnL v1 + v2 + v3 (23 fn) | **0 CRITICAL. 0 MEDIUM. 0 LOW.** Cleanest module — all 23 functions structurally equivalent. Migration from SQLite raw tables (`pbalance`/`gl_mast`/`obalance`) to PostgreSQL pre-computed tables (`pc_pnl_period`/`pc_opening_balance`/`gl_account`) executed with high fidelity. **1 improvement noted**: `getV2Health` replaced hardcoded `PeriodNo BETWEEN 24255 AND ?` with dynamic `MIN(period_no)` query — eliminates magic number. SQL dialect differences (strftime→EXTRACT, `?`→`$N`, additional GROUP BY columns for PG strict mode) verified as non-impactful. P&L formula (SL+SA−CO±OI−EP−TX), CreditAsPositive sign logic, BS snapshot aggregation, expense category grouping, YoY growth%, and all derived calculations match exactly. |
-| 5 | 2026-04-03 | Return v2 + Sales v2 + Expenses (31 fn) | **0 CRITICAL. 2 MEDIUM (informational). 0 LOW.** M1: Return `getCustomerReturnDetailsAll`/`getCustomerReturnDetails` reversed join direction — queries CN→ARCN instead of ARCN→CN; net_total sourced from CN instead of ARCN; no data impact (1:1 RETURN correspondence), CN-as-source is more correct. M2: Expenses `getCostTrendByType` accepts daily/weekly granularity but silently returns monthly data (pc_expense_monthly limitation). **8 improvements noted**: Return — broader ZZ/XX/RE non-product exclusion filters, date-range-scoped customer trend (was hardcoded last 12 months). Expenses — 6 V1 queries now correctly filter `acc_type IN ('CO','EP')` (old included ALL GL account types in total_costs, inflating denominators for COGS%/OPEX% calculations). Sales v2 cleanest — all 7 query functions (3 exported + 4 private) structurally equivalent. |
+| 5 | 2026-04-03 | Return v2 + Sales v2 + Expenses (31 fn) |
+| 6 | 2026-04-04 | Phase 3 report + Phase 4 trivial renames | Phase 3 findings report generated (`docs/audit-findings-report.md`). Return + Sales renamed from queries-v2.ts → queries.ts + 15 import updates. TypeScript clean. | **0 CRITICAL. 2 MEDIUM (informational). 0 LOW.**
+| 7 | 2026-04-04 | Phase 4 consolidation (Payment + Supplier Margin + PnL) | All 3 remaining modules consolidated: queries-v2.ts (and queries-v3.ts for PnL) merged into single queries.ts per module. 22 import updates across API routes, hooks, and components. `tsc --noEmit` clean. | No findings — consolidation only (no query logic changes). M1: Return `getCustomerReturnDetailsAll`/`getCustomerReturnDetails` reversed join direction — queries CN→ARCN instead of ARCN→CN; net_total sourced from CN instead of ARCN; no data impact (1:1 RETURN correspondence), CN-as-source is more correct. M2: Expenses `getCostTrendByType` accepts daily/weekly granularity but silently returns monthly data (pc_expense_monthly limitation). **8 improvements noted**: Return — broader ZZ/XX/RE non-product exclusion filters, date-range-scoped customer trend (was hardcoded last 12 months). Expenses — 6 V1 queries now correctly filter `acc_type IN ('CO','EP')` (old included ALL GL account types in total_costs, inflating denominators for COGS%/OPEX% calculations). Sales v2 cleanest — all 7 query functions (3 exported + 4 private) structurally equivalent. |
 
 ---
 
-## How to Resume
+## Status
 
-1. Load `/bmad-agent-analyst` (Mary)
-2. Say: "Resume audit — load `docs/audit-tracker.md`"
-3. Mary picks up the next NOT STARTED module
+**All phases complete.** The audit (Phases 1–3) and consolidation (Phase 4) are done. Every module now has a single `queries.ts` file. The codebase passes `tsc --noEmit` with zero errors.

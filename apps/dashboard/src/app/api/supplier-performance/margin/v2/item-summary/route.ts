@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getItemSupplierSummaryV2, getItemSellPriceV2 } from '@/lib/supplier-margin/queries-v2';
+import { getItemSupplierSummaryV2, getItemSellPriceV2 } from '@/lib/supplier-margin/queries';
 
 export const dynamic = 'force-dynamic';
 

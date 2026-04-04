@@ -7,7 +7,7 @@ import type {
   CreditUtilizationRow,
   DsoTrendRow,
   CreditHealthV2Row,
-} from '@/lib/payment/queries-v2';
+} from '@/lib/payment/queries';
 import type { SettingsV2 } from '@/lib/payment/settings';
 
 const fetcher = (url: string) => fetch(url).then(r => r.json());

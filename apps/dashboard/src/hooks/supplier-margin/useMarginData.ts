@@ -2,8 +2,7 @@
 
 import useSWR from 'swr';
 import type { DashboardFilters } from './useDashboardFilters';
-import type { ProcurementItemRow, ProcurementSummaryResponse } from '@/lib/supplier-margin/queries';
-import type { ItemPriceMonthlyRowV2 } from '@/lib/supplier-margin/queries-v2';
+import type { ProcurementItemRow, ProcurementSummaryResponse, ItemPriceMonthlyRowV2 } from '@/lib/supplier-margin/queries';
 
 const fetcher = (url: string) => fetch(url).then(r => r.json());
 

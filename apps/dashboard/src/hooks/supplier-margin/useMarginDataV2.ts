@@ -12,7 +12,7 @@ import type {
   ItemPriceMonthlyRowV2,
   SupplierItemRowV2,
   SupplierSparklineRowV2,
-} from '@/lib/supplier-margin/queries-v2';
+} from '@/lib/supplier-margin/queries';
 
 const fetcher = (url: string) => fetch(url).then(r => r.json());
 

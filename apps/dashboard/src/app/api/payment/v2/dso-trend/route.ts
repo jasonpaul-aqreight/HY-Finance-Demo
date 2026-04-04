@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDsoTrendV2 } from '@/lib/payment/queries-v2';
-import { getRefDate } from '@/lib/payment/queries';
+import { getDsoTrendV2, getRefDate } from '@/lib/payment/queries';
 import { getMonthsBack, monthStart, monthEnd } from '@/lib/payment/date-utils';
 
 export const dynamic = 'force-dynamic';

@@ -29,8 +29,7 @@ import {
   useProcurementTrend,
 } from '@/hooks/supplier-margin/useMarginData';
 import { formatRM } from '@/lib/supplier-margin/format';
-import type { ProcurementItemRow } from '@/lib/supplier-margin/queries';
-import type { ItemPriceMonthlyRowV2 } from '@/lib/supplier-margin/queries-v2';
+import type { ProcurementItemRow, ItemPriceMonthlyRowV2 } from '@/lib/supplier-margin/queries';
 
 // ─── Color palette for supplier lines ────────────────────────────────────────
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCustomerProfile } from '@/lib/payment/queries-v2';
+import { getCustomerProfile } from '@/lib/payment/queries';
 
 export const dynamic = 'force-dynamic';
 

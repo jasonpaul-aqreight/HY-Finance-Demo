@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCreditHealthTableV2 } from '@/lib/payment/queries-v2';
+import { getCreditHealthTableV2 } from '@/lib/payment/queries';
 
 export const dynamic = 'force-dynamic';
 

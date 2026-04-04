@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getCreditUtilizationV2 } from '@/lib/payment/queries-v2';
+import { getCreditUtilizationV2 } from '@/lib/payment/queries';
 
 export const dynamic = 'force-dynamic';
 
