@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getReturnProducts } from '@/lib/return/queries-v2';
-import type { ReturnProductDimension, ReturnProductMetric } from '@/lib/return/queries-v2';
+import { getReturnProducts } from '@/lib/return/queries';
+import type { ReturnProductDimension, ReturnProductMetric } from '@/lib/return/queries';
 import { defaultDateRange } from '@/lib/return/date-utils';
 
 export const dynamic = 'force-dynamic';

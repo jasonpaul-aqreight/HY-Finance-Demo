@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   getGroupByData,
   type GroupByDimension,
-} from '@/lib/sales/queries-v2';
+} from '@/lib/sales/queries';
 
 const VALID_GROUPS: GroupByDimension[] = ['customer', 'customer-type', 'agent', 'outlet', 'fruit'];
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCustomerReturnDetails, getCustomerReturnDetailsAll } from '@/lib/return/queries-v2';
+import { getCustomerReturnDetails, getCustomerReturnDetailsAll } from '@/lib/return/queries';
 import { defaultDateRange } from '@/lib/return/date-utils';
 
 export const dynamic = 'force-dynamic';

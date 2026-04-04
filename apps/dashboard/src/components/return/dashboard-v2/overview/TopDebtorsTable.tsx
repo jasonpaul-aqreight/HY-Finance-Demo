@@ -3,7 +3,7 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { useAllCustomerReturnsAll } from '@/hooks/return/useCreditDataV2';
 import { useStableData } from '@/hooks/useStableData';
-import type { TopDebtorRow } from '@/lib/return/queries-v2';
+import type { TopDebtorRow } from '@/lib/return/queries';
 import { Card, CardContent, CardHeader, CardTitle, CardAction } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';

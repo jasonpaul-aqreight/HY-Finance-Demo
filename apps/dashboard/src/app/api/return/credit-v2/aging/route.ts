@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getReturnAging } from '@/lib/return/queries-v2';
+import { getReturnAging } from '@/lib/return/queries';
 
 export const dynamic = 'force-dynamic';
 

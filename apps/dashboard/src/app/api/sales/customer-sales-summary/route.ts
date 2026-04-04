@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCustomerSalesSummary, getCustomerSalesTrend } from '@/lib/sales/queries-v2';
+import { getCustomerSalesSummary, getCustomerSalesTrend } from '@/lib/sales/queries';
 
 export const dynamic = 'force-dynamic';
 

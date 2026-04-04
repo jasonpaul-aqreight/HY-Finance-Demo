@@ -13,7 +13,7 @@ import type {
   ReturnProductMetric,
   RefundSummary,
   RefundLogRow,
-} from '@/lib/return/queries-v2';
+} from '@/lib/return/queries';
 
 const fetcher = (url: string) => fetch(url).then(r => r.json());
 

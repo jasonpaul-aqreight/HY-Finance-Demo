@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCustomerReturnTrend } from '@/lib/return/queries-v2';
+import { getCustomerReturnTrend } from '@/lib/return/queries';
 
 export const dynamic = 'force-dynamic';
 

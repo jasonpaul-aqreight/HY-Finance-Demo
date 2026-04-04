@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getRefundSummary, getRefundLog } from '@/lib/return/queries-v2';
+import { getRefundSummary, getRefundLog } from '@/lib/return/queries';
 import { defaultDateRange } from '@/lib/return/date-utils';
 
 export const dynamic = 'force-dynamic';

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useReturnProducts } from '@/hooks/return/useCreditDataV2';
 import { useStableData } from '@/hooks/useStableData';
-import type { ReturnProductDimension, ReturnProductMetric } from '@/lib/return/queries-v2';
+import type { ReturnProductDimension, ReturnProductMetric } from '@/lib/return/queries';
 import type { V2Filters } from '@/hooks/return/useDashboardFiltersV2';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
