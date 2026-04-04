@@ -555,8 +555,8 @@ export async function getItemSellPriceV2(
     const { rows } = await pool.query(`
       SELECT
         ROUND((SUM(m.sales_revenue) / NULLIF(SUM(m.sales_qty), 0))::numeric, 2)::float AS avg_sell_price,
-        ROUND((SUM(m.sales_revenue) / NULLIF(SUM(m.sales_qty), 0))::numeric, 2)::float AS min_sell_price,
-        ROUND((SUM(m.sales_revenue) / NULLIF(SUM(m.sales_qty), 0))::numeric, 2)::float AS max_sell_price
+        NULL::float AS min_sell_price,
+        NULL::float AS max_sell_price
       FROM pc_supplier_margin m
       WHERE m.item_code = $1
         AND m.month BETWEEN $2 AND $3
