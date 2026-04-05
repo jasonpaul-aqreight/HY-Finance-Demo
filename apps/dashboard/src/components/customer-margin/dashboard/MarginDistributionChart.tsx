@@ -34,15 +34,15 @@ export function MarginDistributionChart({ filters }: Props) {
   const total = chartData.reduce((sum, d) => sum + d.count, 0);
 
   return (
-    <Card>
+    <Card className="h-full flex flex-col">
       <CardHeader>
         <CardTitle>Customer Margin Distribution</CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex-1">
         {!data ? (
-          <div className="flex h-[320px] items-center justify-center text-muted-foreground">Loading...</div>
+          <div className="flex h-[360px] items-center justify-center text-muted-foreground">Loading...</div>
         ) : (
-          <ResponsiveContainer width="100%" height={320}>
+          <ResponsiveContainer width="100%" height={360}>
             <BarChart data={chartData} margin={{ top: 16, right: 12, left: -8, bottom: 4 }} barSize={36}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="bucket" tick={{ fontSize: 12 }} />

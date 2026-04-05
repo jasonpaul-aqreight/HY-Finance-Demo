@@ -38,7 +38,7 @@ export function SupplierMarginDistributionChart({ filters }: { filters: Dashboar
   const total = chartData.reduce((sum, d) => sum + d.count, 0);
 
   return (
-    <Card>
+    <Card className="h-full flex flex-col">
       <CardHeader className="flex flex-row items-center justify-between gap-2 px-4">
         <CardTitle className="whitespace-nowrap shrink-0">{entityLabel} Margin Distribution</CardTitle>
         <div className="flex rounded-md border overflow-hidden">
@@ -60,13 +60,13 @@ export function SupplierMarginDistributionChart({ filters }: { filters: Dashboar
           </Button>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex-1">
         {!data ? (
-          <div className="flex h-[320px] items-center justify-center text-muted-foreground">Loading...</div>
+          <div className="flex h-[360px] items-center justify-center text-muted-foreground">Loading...</div>
         ) : !data || data.length === 0 ? (
-          <div className="flex h-[320px] items-center justify-center text-muted-foreground">No data</div>
+          <div className="flex h-[360px] items-center justify-center text-muted-foreground">No data</div>
         ) : (
-          <ResponsiveContainer width="100%" height={320}>
+          <ResponsiveContainer width="100%" height={360}>
             <BarChart data={chartData} margin={{ top: 16, right: 12, left: -8, bottom: 4 }} barSize={36}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="bucket" tick={{ fontSize: 12 }} />

@@ -37,14 +37,14 @@ export function TopCustomersChart({ filters }: Props) {
 
   const chartData = metric === 'profit'
     ? (profitData?.rows ?? []).map(r => ({
-        name: (r.company_name ?? r.debtor_code).slice(0, 35),
+        name: (r.company_name ?? r.debtor_code).slice(0, 50),
         value: r.gross_profit,
       }))
     : (marginData?.rows ?? [])
         .filter(r => r.revenue >= 10000)
         .slice(0, 10)
         .map(r => ({
-          name: (r.company_name ?? r.debtor_code).slice(0, 35),
+          name: (r.company_name ?? r.debtor_code).slice(0, 50),
           value: r.margin_pct,
         }));
 
@@ -111,7 +111,7 @@ export function TopCustomersChart({ filters }: Props) {
                 tickFormatter={v => metric === 'profit' ? formatRM(v) : `${v}%`}
                 tick={{ fontSize: 10 }}
               />
-              <YAxis type="category" dataKey="name" width={200} tick={{ fontSize: 11 }} />
+              <YAxis type="category" dataKey="name" width={280} tick={{ fontSize: 12 }} />
               <Tooltip
                 wrapperStyle={{ zIndex: 50 }}
                 formatter={(v) => metric === 'profit' ? formatRM(Number(v)) : `${Number(v).toFixed(1)}%`}

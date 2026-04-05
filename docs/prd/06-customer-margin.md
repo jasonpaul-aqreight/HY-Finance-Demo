@@ -29,8 +29,8 @@ The page follows a single continuous scroll with components in this order:
 |-----|---------|----------------------|
 | 1 | **Date Range Filter** — start/end month pickers | Full width |
 | 2 | **KPI Cards** — 5 summary cards | 5 across on desktop, 2–3 columns on tablet, stacked on mobile |
-| 3 | **Profitability Trend Chart** — monthly bars + margin % line | Full width |
-| 4 | **Top Customers Chart** (left, 60%) + **Margin Distribution Chart** (right, 40%) | Side-by-side on large screens; stacked on small |
+| 3 | **Profitability Trend Chart** (left, 60%) + **Margin Distribution Chart** (right, 40%) | Side-by-side on large screens; stacked on small |
+| 4 | **Top Customers Chart** | Full width |
 | 5 | **Tabbed Section** — "Customer Analysis" tab and "Credit Note Impact" tab | Full width, height-locked container to prevent layout shift when switching tabs |
 
 ---
@@ -114,7 +114,7 @@ Five cards in a single responsive row. All show the full date range totals.
 
 ### 5.2 Top Customers Chart
 
-- **Position:** Left side of a two-column section (60% width on large screens)
+- **Position:** Full width, standalone row below the Trend + Distribution row
 - **Chart type:** Horizontal bar chart
 - **Height:** Fixed at 320px
 
@@ -136,13 +136,13 @@ Five cards in a single responsive row. All show the full date range totals.
 - Gross Profit mode: Green palette (10 graduated shades)
 - Margin % mode: Purple palette (10 graduated shades)
 
-**Display:** Customer names truncated to 35 characters. Sorted by selected metric and direction.
+**Display:** Customer names truncated to 50 characters. Y-axis width: 280px, font size 12px. Sorted by selected metric and direction.
 
 ### 5.3 Margin Distribution Chart
 
-- **Position:** Right side of the two-column section (40% width on large screens)
+- **Position:** Right side of the Trend + Distribution row (40% width on large screens)
 - **Chart type:** Vertical bar chart with predefined buckets
-- **Height:** Fixed at 320px
+- **Height:** Matches Profitability Trend card height (360px container, card stretches to fill row)
 - **Minimum revenue threshold:** Only customers with > RM 1,000 revenue are included (reduces noise from near-zero accounts)
 
 **Buckets and colors:**

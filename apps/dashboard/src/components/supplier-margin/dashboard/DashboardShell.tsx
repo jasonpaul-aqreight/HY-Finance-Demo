@@ -28,17 +28,18 @@ export function DashboardShell() {
         {ready && (
           <>
             <KpiCards filters={filters} />
-            <MarginTrendChart filters={filters} />
-
-            {/* Top 10 + Distribution side by side */}
+            {/* Margin Trends + Distribution */}
             <div className="grid gap-4 lg:grid-cols-5">
               <div className="lg:col-span-3">
-                <TopBottomChart filters={filters} />
+                <MarginTrendChart filters={filters} />
               </div>
               <div className="lg:col-span-2">
                 <SupplierMarginDistributionChart filters={filters} />
               </div>
             </div>
+
+            {/* Top/Bottom Suppliers — full width */}
+            <TopBottomChart filters={filters} />
 
             {/* Purchase vs Selling Price — standalone, full width */}
             <PriceScatterChart filters={filters} />

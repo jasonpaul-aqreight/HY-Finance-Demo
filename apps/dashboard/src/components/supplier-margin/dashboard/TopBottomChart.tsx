@@ -32,7 +32,7 @@ const MARGIN_COLORS = [
   '#7c3aed', '#6d28d9', '#5b21b6', '#4c1d95', '#3b0764',
 ];
 
-function truncate(name: string, max = 35) {
+function truncate(name: string, max = 50) {
   return name.length > max ? name.slice(0, max) + '...' : name;
 }
 
@@ -156,7 +156,7 @@ export function TopBottomChart({ filters }: { filters: DashboardFilters }) {
                 tickFormatter={v => metric === 'profit' ? formatRM(v) : `${v}%`}
                 tick={{ fontSize: 10 }}
               />
-              <YAxis type="category" dataKey="name" width={200} tick={{ fontSize: 11 }} />
+              <YAxis type="category" dataKey="name" width={280} tick={{ fontSize: 12 }} />
               <Tooltip
                 wrapperStyle={{ zIndex: 50 }}
                 content={({ active, payload }) => {

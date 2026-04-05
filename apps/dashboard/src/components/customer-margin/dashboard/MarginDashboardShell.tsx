@@ -24,18 +24,18 @@ export function MarginDashboardShell() {
       {/* Overview */}
       <KpiCards filters={filters} />
 
-      {/* Margin Trends */}
-      <MarginTrendChart filters={filters} />
-
-      {/* Customer Rankings + Distribution */}
+      {/* Margin Trends + Distribution */}
       <div className="grid gap-4 lg:grid-cols-5">
         <div className="lg:col-span-3">
-          <TopCustomersChart filters={filters} />
+          <MarginTrendChart filters={filters} />
         </div>
         <div className="lg:col-span-2">
           <MarginDistributionChart filters={filters} />
         </div>
       </div>
+
+      {/* Top Customers — full width */}
+      <TopCustomersChart filters={filters} />
 
       {/* Customer Analysis & Credit Note Impact */}
       <div className="pt-2">

@@ -33,8 +33,8 @@ The page follows a single continuous scroll with components in this order:
 |-----|---------|----------------------|
 | 1 | **Filter Bar** — date range picker inside a bordered card | Full width |
 | 2 | **KPI Cards** — 5 summary cards | 2 columns small, 3 columns medium, 5 columns extra-large |
-| 3 | **Profitability Trend Chart** — monthly bars + margin % line | Full width |
-| 4 | **Top/Bottom Chart** (left, 3/5 width) + **Margin Distribution Chart** (right, 2/5 width) | Side-by-side on large screens; stacked on small |
+| 3 | **Profitability Trend Chart** (left, 3/5 width) + **Margin Distribution Chart** (right, 2/5 width) | Side-by-side on large screens; stacked on small |
+| 4 | **Top/Bottom Chart** | Full width |
 | 5 | **Purchase vs Selling Price Scatter Chart** | Full width |
 | 6 | **Tabbed Section** — "Supplier Analysis" tab and "Price Comparison" tab | Full width |
 
@@ -139,7 +139,7 @@ Five cards in a single responsive row (2 columns on small screens, 5 on extra-la
 
 ### 5.2 Top/Bottom Suppliers or Items (Horizontal Bar Chart)
 
-- **Position:** Left column (3/5 width on large screens)
+- **Position:** Full width, standalone row below the Trend + Distribution row
 - **Title:** Dynamic, e.g., "Top 10 Suppliers" or "Bottom 10 Items"
 - **Chart type:** Horizontal bar chart with rounded end caps
 - **Height:** Fixed at 320px
@@ -154,7 +154,7 @@ Five cards in a single responsive row (2 columns on small screens, 5 on extra-la
 
 **Behavior:**
 - Shows exactly 10 entries
-- Y-axis: entity name (truncated at 35 characters), 200px width
+- Y-axis: entity name (truncated at 50 characters), 280px width, font size 12px
 - X-axis: RM values (Gross Profit mode) or percentage (Margin % mode)
 - Each bar gets a unique color from a 10-color palette:
   - Profit mode: shades of emerald/green
@@ -166,10 +166,10 @@ Five cards in a single responsive row (2 columns on small screens, 5 on extra-la
 
 ### 5.3 Margin Distribution (Vertical Bar Chart)
 
-- **Position:** Right column (2/5 width on large screens)
+- **Position:** Right side of the Trend + Distribution row (2/5 width on large screens)
 - **Title:** "Supplier Margin Distribution" or "Item Margin Distribution" (depends on toggle)
 - **Chart type:** Vertical bar chart (NOT donut)
-- **Height:** Fixed at 320px
+- **Height:** Matches Profitability Trend card height (360px container, card stretches to fill row)
 
 **Entity toggle:** Suppliers / Items (button pair in header)
 
