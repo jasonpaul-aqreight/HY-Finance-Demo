@@ -6,6 +6,7 @@ import { AppSidebar } from "@/components/layout/AppSidebar";
 import { ScrollPreserver } from "@/components/layout/ScrollPreserver";
 import { SWRProvider } from "@/components/layout/SWRProvider";
 import { RoleProvider } from "@/components/layout/RoleProvider";
+import { DataFreshnessIndicator } from "@/components/layout/DataFreshnessIndicator";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -39,9 +40,12 @@ export default function RootLayout({
             <SidebarProvider>
               <div className="flex h-screen">
                 <AppSidebar />
-                <ScrollPreserver className="flex-1 overflow-y-auto">
-                  {children}
-                </ScrollPreserver>
+                <div className="flex-1 flex flex-col overflow-hidden">
+                  <DataFreshnessIndicator />
+                  <ScrollPreserver className="flex-1 overflow-y-auto">
+                    {children}
+                  </ScrollPreserver>
+                </div>
               </div>
             </SidebarProvider>
           </TooltipProvider>

@@ -16,7 +16,7 @@ export interface SyncStatus {
 
 export interface SyncResult {
   jobId: number;
-  status: 'success' | 'error';
+  status: 'success' | 'partial' | 'error';
   startedAt: string;
   completedAt: string;
   durationMs: number;
@@ -26,7 +26,7 @@ export interface SyncResult {
 
 export interface SyncJob {
   id: number;
-  status: 'success' | 'error';
+  status: 'success' | 'partial' | 'error';
   trigger_type: 'manual' | 'scheduled';
   started_at: string;
   completed_at: string;
