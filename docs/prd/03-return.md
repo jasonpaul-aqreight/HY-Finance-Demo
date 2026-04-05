@@ -23,23 +23,36 @@ This is the "return health" page — it helps management understand whether retu
 
 The page is organized into **two distinct sections** with clear section headers. This separation reflects a fundamental data distinction: period metrics (filtered by date range) vs. accumulated snapshot metrics (current state regardless of when the return was created).
 
-### Section 1: Return Trends (Date-Filtered)
+### Top-to-Bottom Section Order
 
-From top to bottom:
-
-1. **Date Range Filter** — Month-year pickers with range summary and quick-preset buttons.
-2. **KPI Cards** — A responsive row of four summary metric cards.
-3. **Settlement Breakdown + Monthly Return Trend** — Side-by-side equal-width layout:
-   - Left (50%): Settlement Breakdown (three progress bars).
-   - Right (50%): Monthly Return Trend (area chart).
-4. **Top 10 Product Returns** — Horizontal bar chart with dimension and metric toggles.
-
-### Section 2: Unsettled Returns (Accumulated — Not Date-Filtered)
-
-Preceded by a section header indicating these metrics are accumulated from the beginning of time:
-
-1. **Aging of Unsettled Returns** — Horizontal bar chart showing current unsettled balances by age bucket.
-2. **Customer Returns Table** — Full-width sortable, searchable, filterable table with pagination and Excel export.
+```
+┌─────────────────────────────────────────────────┐
+│  Date Range Filter                               │
+│  [Start] [End]  [3M] [6M] [12M] [YTD]           │
+├─────────────────────────────────────────────────┤
+│  ── Section 1: Return Trends (Date-Filtered) ──  │
+│                                                  │
+│  KPI Cards (4 cards)                             │
+│  [Total Returns] [Return Rate] [Avg Return]      │
+│  [Unsettled Returns]                             │
+├─────────────────────────────────────────────────┤
+│  ┌──────────────────┬──────────────────────┐     │
+│  │ Settlement       │ Monthly Return       │     │
+│  │ Breakdown        │ Trend                │     │
+│  │ (3 progress bars)│ (area chart)         │     │
+│  └──────────────────┴──────────────────────┘     │
+├─────────────────────────────────────────────────┤
+│  Top 10 Product Returns (horizontal bar chart)   │
+│  [Dimension toggle] [Metric toggle]              │
+├═════════════════════════════════════════════════┤
+│  ── Section 2: Unsettled Returns (Snapshot) ──   │
+│                                                  │
+│  Aging of Unsettled Returns (horizontal bar)     │
+├─────────────────────────────────────────────────┤
+│  Customer Returns Table                          │
+│  (sortable, searchable, filterable, exportable)  │
+└─────────────────────────────────────────────────┘
+```
 
 ### Responsive Behavior
 

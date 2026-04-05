@@ -25,6 +25,29 @@ The settings dialog is opened from the **Payment Collection page** via a button 
 
 ### 1.3 Dialog Layout
 
+```
+┌─────────────────────────────────────────────────┐
+│  Header: "Credit Health Score Settings"     [X]  │
+│  (non-admin warning banner if applicable)        │
+├─────────────────────────────────────────────────┤
+│  Credit Score Weights Card                       │
+│  [Credit Usage %] [Overdue Days %]               │
+│  [Payment Timeliness %] [Double Breach %]        │
+│  Total: N/100   [Reset to Defaults]              │
+├─────────────────────────────────────────────────┤
+│  Risk Level Thresholds Card                      │
+│  [Low Risk >=]  [High Risk <=]                   │
+│  ┌─────────────────────────────────────────┐     │
+│  │ ■ Red ────── ■ Yellow ────── ■ Green    │     │
+│  └─────────────────────────────────────────┘     │
+│  [Reset to Defaults]                             │
+├─────────────────────────────────────────────────┤
+│  ▶ How It Works (collapsible accordion)          │
+├─────────────────────────────────────────────────┤
+│  [Cancel]                            [Save]      │
+└─────────────────────────────────────────────────┘
+```
+
 The dialog is divided into four sections, top to bottom:
 
 #### Section 1: Header
@@ -169,11 +192,54 @@ The modal is triggered by clicking a **customer name** (styled as a blue underli
 | Sales Report | Group-By Table (customer dimension only) | Sales | Start date, end date |
 | Customer Margin | Customer Margin Table | Sales | Start date, end date |
 
-### 2.3 Modal Structure
+### 2.3 Modal Structure & Layout
 
 - **Size:** 90% viewport width × 90% viewport height
 - **Layout:** Fixed header (non-scrolling), scrollable body
 - **Close:** X button in header
+
+#### Profile View Layout
+
+```
+┌─────────────────────────────────────────────────────┐
+│  Company Name  ·  Code  ·  ● ACTIVE  CUSTOMER  [X]  │
+├─────────────────────────────────────────────────────┤
+│  ┌─────────────────────────┬───────────────────┐     │
+│  │ Customer Details        │ Log Navigation    │     │
+│  │ (3-col grid: General,   │ [Outstanding Inv] │     │
+│  │  Contact, Financial)    │ [Return Records]  │     │
+│  │                         │ [Sales Txns]      │     │
+│  └─────────────────────────┴───────────────────┘     │
+├─────────────────────────────────────────────────────┤
+│  Statistics Cards (4 cards)                          │
+│  [Health Score] [Credit Usage] [Outstanding Inv]     │
+│  [Returns]                                           │
+├─────────────────────────────────────────────────────┤
+│  Date Range: [Start] [End] [presets]                 │
+│  ┌──────────────────────┬──────────────────────┐     │
+│  │ Sales & Margin       │ Payment              │     │
+│  │ (bar + line combo)   │ (stacked bar + line) │     │
+│  ├──────────────────────┘                      │     │
+│  │ Returns (line chart)                        │     │
+│  └─────────────────────────────────────────────┘     │
+└─────────────────────────────────────────────────────┘
+```
+
+#### Outstanding Invoices / Return Records / Sales Views
+
+```
+┌─────────────────────────────────────────────────────┐
+│  Company Name  ·  Code  ·  ● ACTIVE  CUSTOMER  [X]  │
+├─────────────────────────────────────────────────────┤
+│  [← Back]  Title       [Search] [Export (Sales)]     │
+│  [Date Range (Sales only)]                           │
+├─────────────────────────────────────────────────────┤
+│  Data Table (sortable, paginated)                    │
+│  (full width, columns per view spec)                 │
+│                                                      │
+│  Footer: "Showing X record(s)"                       │
+└─────────────────────────────────────────────────────┘
+```
 
 ### 2.4 Header
 
@@ -327,13 +393,55 @@ Triggered by clicking a **supplier name** (blue underlined link) in the Supplier
 |-------------|-------|-------------|-------------|
 | Supplier Performance | Supplier Comparison Table | Items | Start date, end date, supplier metrics (attributed net sales, cost of sales, gross profit, margin %, items supplied) |
 
-### 3.3 Modal Structure
+### 3.3 Modal Structure & Layout
 
 - **Size:** 90% viewport width × 90% viewport height
 - **Layout:** Fixed position, centered with semi-transparent backdrop
 - **Header:** Sticky with border, fixed height
 - **Body:** Scrollable content area
 - **Close:** X button in header
+
+#### Profile View Layout
+
+```
+┌─────────────────────────────────────────────────────┐
+│  Company Name  ·  Code  ·  ● ACTIVE  SUPPLIER  [X]  │
+├─────────────────────────────────────────────────────┤
+│  ┌─────────────────────────┬───────────────────┐     │
+│  │ Supplier Details        │ Log Navigation    │     │
+│  │ (3-col grid: General,   │ [Items Supplied]  │     │
+│  │  Contact, Terms)        │                   │     │
+│  └─────────────────────────┴───────────────────┘     │
+├─────────────────────────────────────────────────────┤
+│  Date Range: [Start] [End] [presets]                 │
+│                                                      │
+│  KPI Cards (2 cards)                                 │
+│  [Margin Performance (gauge)] [Supply Dependency]    │
+├─────────────────────────────────────────────────────┤
+│  ┌──────────────────────┬──────────────────────┐     │
+│  │ Purchase Cost &      │ Top 5 Items by       │     │
+│  │ Margin Trend         │ Gross Profit         │     │
+│  │ (bar + line combo)   │ (horizontal bar)     │     │
+│  └──────────────────────┴──────────────────────┘     │
+└─────────────────────────────────────────────────────┘
+```
+
+#### Items View Layout
+
+```
+┌─────────────────────────────────────────────────────┐
+│  Company Name  ·  Code  ·  ● ACTIVE  SUPPLIER  [X]  │
+├─────────────────────────────────────────────────────┤
+│  [← Back]  "Items Supplied"  [Search] [ⓘ Est.]      │
+│  [Date Range]  [Sole Source ▣]  [Product ▼] [Var ▼]  │
+├─────────────────────────────────────────────────────┤
+│  Items Table (sortable, paginated)                   │
+│  [⚠] [Item Code] [Desc] [Qty] [Avg Price]           │
+│  [Sparkline] [Est. Sales] [Est. Cost] [Margin %]    │
+│                                                      │
+│  Footer: "Showing X items..."                        │
+└─────────────────────────────────────────────────────┘
+```
 
 ### 3.4 Header
 

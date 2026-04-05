@@ -23,17 +23,46 @@ It breaks down every ringgit Hoi-Yong spends into two buckets — Cost of Sales 
 
 ## 2. Page Layout
 
-The page follows a single continuous scroll with components in this order:
+### Top-to-Bottom Section Order
+
+```
+┌─────────────────────────────────────────────────┐
+│  Date Range Filter                               │
+│  [Start] [End]  [presets]                        │
+├─────────────────────────────────────────────────┤
+│  KPI Cards (4 cards)                             │
+│  [Total Costs] [Cost of Sales] [Operating Costs] │
+│  [Cost-to-Revenue Ratio]                         │
+├─────────────────────────────────────────────────┤
+│  Cost Type Toggle [All | Cost of Sales | OpCosts]│
+├─────────────────────────────────────────────────┤
+│  ┌───────────────────────┬───────────────┐       │
+│  │ Cost Trend Chart      │ Cost          │       │
+│  │ (stacked bar, 70%)    │ Composition   │       │
+│  │                       │ (donut, 30%)  │       │
+│  └───────────────────────┴───────────────┘       │
+│  Category Legend                                 │
+├─────────────────────────────────────────────────┤
+│  Top 10 Expenses (horizontal bar chart)          │
+│  [local toggles]                                 │
+├─────────────────────────────────────────────────┤
+│  Breakdown Tables                                │
+│  [Cost of Sales Breakdown | Operating Costs]     │
+│  (tabbed, height-locked container)               │
+└─────────────────────────────────────────────────┘
+```
+
+### Width / Responsiveness
 
 | Row | Content | Width / Responsiveness |
 |-----|---------|----------------------|
-| 1 | **Date Range Filter** — start/end month pickers with presets | Full width |
-| 2 | **KPI Cards** — 4 summary cards | 4 across on desktop, 2×2 on mobile |
-| 3 | **Cost Type Toggle** — segmented button: All / Cost of Sales / Operating Costs | Left-aligned, full width container |
-| 4 | **Cost Trend Chart** (left, 70%) + **Cost Composition Donut** (right, 30%) | Side-by-side on large screens; stacked on small. Enclosed in a single rounded card. |
-| 5 | **Category Legend** — colored squares with category names | Full width, below the chart card |
-| 6 | **Top 10 Expenses Chart** — horizontal bar chart with own local toggles | Full width |
-| 7 | **Breakdown Tables** — tabbed: "Cost of Sales Breakdown" and "Operating Costs Breakdown" | Full width, height-locked container to prevent layout shift when switching tabs |
+| 1 | Date Range Filter | Full width |
+| 2 | KPI Cards | 4 across on desktop, 2×2 on mobile |
+| 3 | Cost Type Toggle | Left-aligned, full width container |
+| 4 | Cost Trend + Donut | Side-by-side on large screens; stacked on small. Enclosed in a single rounded card. |
+| 5 | Category Legend | Full width, below the chart card |
+| 6 | Top 10 Expenses Chart | Full width |
+| 7 | Breakdown Tables | Full width, height-locked container to prevent layout shift when switching tabs |
 
 ---
 

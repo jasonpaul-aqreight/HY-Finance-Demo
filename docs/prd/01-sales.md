@@ -20,16 +20,32 @@ This is the "top line" page — the starting point for understanding business pe
 
 ## 2. Page Layout
 
-From top to bottom:
+### Top-to-Bottom Section Order
 
-1. **Date Range Filter** — Month-year pickers, range summary, and quick-preset buttons.
-2. **KPI Cards** — A responsive row of four summary metric cards.
-3. **Net Sales Trend Chart** — A stacked bar chart showing net sales components over time with granularity toggle.
-4. **Sales Breakdown Section** — A card containing:
-   - A "Group by" dimension picker (four options).
-   - Advanced filters (dimension-specific dropdowns and search).
-   - A horizontal bar chart of selected rows.
-   - A sortable, paginated data table with row-level selection checkboxes.
+```
+┌─────────────────────────────────────────────────┐
+│  Date Range Filter                               │
+│  [Start] [End]  [3M] [6M] [12M] [YTD]           │
+├─────────────────────────────────────────────────┤
+│  KPI Cards (4 cards)                             │
+│  [Net Sales] [Gross Sales] [Returns & CN]        │
+│  [Avg Daily Sales]                               │
+├─────────────────────────────────────────────────┤
+│  Net Sales Trend Chart                           │
+│  (stacked bar, granularity toggle: M / W / D)    │
+├─────────────────────────────────────────────────┤
+│  Sales Breakdown Card                            │
+│  ┌─────────────────────────────────────────┐     │
+│  │ [Group by: ▼]  [Filters...]  [Search]   │     │
+│  │                                         │     │
+│  │ Horizontal Bar Chart (selected rows)    │     │
+│  │                                         │     │
+│  │ ─────────────────────────────────────── │     │
+│  │ Data Table (sortable, paginated)        │     │
+│  │ [☐ select] [columns...] [export]        │     │
+│  └─────────────────────────────────────────┘     │
+└─────────────────────────────────────────────────┘
+```
 
 All sections respond to the global date range filter.
 

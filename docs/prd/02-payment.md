@@ -22,23 +22,39 @@ This is the "cash flow health check" page — it bridges the gap between revenue
 
 The page is organized into **two distinct sections** with a clear visual separator between them. This separation reflects a fundamental data distinction: period-based metrics (filtered by date range) vs. snapshot metrics (current state of all outstanding invoices).
 
-### Section 1: Payment Collection Trend (Date-Filtered)
+### Top-to-Bottom Section Order
 
-From top to bottom:
-
-1. **Date Range Filter** — Start and end date pickers.
-2. **Period KPI Cards** — A responsive row of three summary metric cards (Avg Collection Days, Collection Rate, Avg Monthly Collection).
-3. **Avg Collection Days Trend Chart** — Line chart showing monthly collection day values.
-4. **Invoiced vs Collected Chart** — Composed bar + line chart comparing monthly collection against invoicing.
-
-### Section 2: Outstanding Payment (Snapshot — As of Today)
-
-Preceded by a visual separator indicating these metrics are not filtered by date range:
-
-1. **Snapshot KPI Cards** — A responsive row of three summary metric cards (Total Outstanding, Overdue Amount, Credit Limit Breaches).
-2. **Aging Analysis Chart** — Horizontal bar chart with toggle views (All / By Agent / By Type).
-3. **Credit Usage Distribution Chart** — Donut chart showing credit limit usage categories.
-4. **Customer Credit Health Table** — Full-width sortable, searchable, paginated table with filtering and export.
+```
+┌─────────────────────────────────────────────────┐
+│  Date Range Filter                               │
+│  [Start] [End]                                   │
+├─────────────────────────────────────────────────┤
+│  ── Section 1: Payment Collection Trend ──       │
+│                                                  │
+│  Period KPI Cards (3 cards)                      │
+│  [Avg Collection Days] [Collection Rate]         │
+│  [Avg Monthly Collection]                        │
+├─────────────────────────────────────────────────┤
+│  Avg Collection Days Trend (line chart)          │
+├─────────────────────────────────────────────────┤
+│  Invoiced vs Collected (bar + line combo chart)  │
+├═════════════════════════════════════════════════┤
+│  ── Section 2: Outstanding Payment (Snapshot) ── │
+│                                                  │
+│  Snapshot KPI Cards (3 cards)                    │
+│  [Total Outstanding] [Overdue Amount]            │
+│  [Credit Limit Breaches]                         │
+├─────────────────────────────────────────────────┤
+│  ┌──────────────────┬──────────────────────┐     │
+│  │ Aging Analysis   │ Credit Usage         │     │
+│  │ (horizontal bar) │ Distribution (donut) │     │
+│  │ [All/Agent/Type] │                      │     │
+│  └──────────────────┴──────────────────────┘     │
+├─────────────────────────────────────────────────┤
+│  Customer Credit Health Table                    │
+│  (sortable, searchable, paginated, exportable)   │
+└─────────────────────────────────────────────────┘
+```
 
 ### Responsive Behavior
 

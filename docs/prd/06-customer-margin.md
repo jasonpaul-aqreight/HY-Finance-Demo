@@ -23,15 +23,40 @@ Unlike the Sales page (which tracks revenue volume) or the P&L page (which uses 
 
 ## 2. Page Layout
 
-The page follows a single continuous scroll with components in this order:
+### Top-to-Bottom Section Order
+
+```
+┌─────────────────────────────────────────────────┐
+│  Date Range Filter                               │
+│  [Start] [End]                                   │
+├─────────────────────────────────────────────────┤
+│  KPI Cards (5 cards)                             │
+│  [Net Sales] [Cost of Sales] [Gross Profit]      │
+│  [Avg Margin %] [Customers]                      │
+├─────────────────────────────────────────────────┤
+│  ┌────────────────────┬────────────────────┐     │
+│  │ Profitability      │ Margin             │     │
+│  │ Trend Chart        │ Distribution Chart │     │
+│  │ (bar+line, 60%)    │ (donut, 40%)       │     │
+│  └────────────────────┴────────────────────┘     │
+├─────────────────────────────────────────────────┤
+│  Top Customers Chart (horizontal bar)            │
+├─────────────────────────────────────────────────┤
+│  Tabbed Section                                  │
+│  [Customer Analysis | Credit Note Impact]        │
+│  (height-locked container)                       │
+└─────────────────────────────────────────────────┘
+```
+
+### Width / Responsiveness
 
 | Row | Content | Width / Responsiveness |
 |-----|---------|----------------------|
-| 1 | **Date Range Filter** — start/end month pickers | Full width |
-| 2 | **KPI Cards** — 5 summary cards | 5 across on desktop, 2–3 columns on tablet, stacked on mobile |
-| 3 | **Profitability Trend Chart** (left, 60%) + **Margin Distribution Chart** (right, 40%) | Side-by-side on large screens; stacked on small |
-| 4 | **Top Customers Chart** | Full width |
-| 5 | **Tabbed Section** — "Customer Analysis" tab and "Credit Note Impact" tab | Full width, height-locked container to prevent layout shift when switching tabs |
+| 1 | Date Range Filter | Full width |
+| 2 | KPI Cards | 5 across on desktop, 2–3 columns on tablet, stacked on mobile |
+| 3 | Profitability Trend + Margin Distribution | Side-by-side on large screens; stacked on small |
+| 4 | Top Customers Chart | Full width |
+| 5 | Tabbed Section | Full width, height-locked container to prevent layout shift when switching tabs |
 
 ---
 

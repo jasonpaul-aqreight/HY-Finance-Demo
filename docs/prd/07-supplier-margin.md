@@ -27,16 +27,42 @@ Unlike the Customer Margin page (which looks at who you *sell to*), this page lo
 
 ## 2. Page Layout
 
-The page follows a single continuous scroll with components in this order:
+### Top-to-Bottom Section Order
+
+```
+┌─────────────────────────────────────────────────┐
+│  Filter Bar (date range picker, bordered card)   │
+├─────────────────────────────────────────────────┤
+│  KPI Cards (5 cards)                             │
+│  [Purchase Cost] [Est. Net Sales] [Gross Profit] │
+│  [Avg Margin %] [Suppliers]                      │
+├─────────────────────────────────────────────────┤
+│  ┌────────────────────┬────────────────────┐     │
+│  │ Profitability      │ Margin             │     │
+│  │ Trend Chart        │ Distribution Chart │     │
+│  │ (bar+line, 3/5)    │ (donut, 2/5)       │     │
+│  └────────────────────┴────────────────────┘     │
+├─────────────────────────────────────────────────┤
+│  Top/Bottom Chart (horizontal bar)               │
+├─────────────────────────────────────────────────┤
+│  Purchase vs Selling Price Scatter Chart         │
+├─────────────────────────────────────────────────┤
+│  Tabbed Section                                  │
+│  [Supplier Analysis | Price Comparison]          │
+│  (full width)                                    │
+└─────────────────────────────────────────────────┘
+```
+
+### Width / Responsiveness
 
 | Row | Content | Width / Responsiveness |
 |-----|---------|----------------------|
-| 1 | **Filter Bar** — date range picker inside a bordered card | Full width |
-| 2 | **KPI Cards** — 5 summary cards | 2 columns small, 3 columns medium, 5 columns extra-large |
-| 3 | **Profitability Trend Chart** (left, 3/5 width) + **Margin Distribution Chart** (right, 2/5 width) | Side-by-side on large screens; stacked on small |
-| 4 | **Top/Bottom Chart** | Full width |
-| 5 | **Purchase vs Selling Price Scatter Chart** | Full width |
-| 6 | **Tabbed Section** — "Supplier Analysis" tab and "Price Comparison" tab | Full width |
+| 1 | Filter Bar | Full width |
+| 2 | KPI Cards | 2 columns small, 3 columns medium, 5 columns extra-large |
+| 3 | Profitability Trend + Margin Distribution | Side-by-side on large screens; stacked on small |
+| 4 | Top/Bottom Chart | Full width |
+| 5 | Purchase vs Selling Price Scatter | Full width |
+| 6 | Tabbed Section | Full width |
 
 Maximum content width: 1600px, centered.
 
