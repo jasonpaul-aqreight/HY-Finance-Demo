@@ -501,32 +501,23 @@ This encoding is an internal convention — the UI always displays human-readabl
 
 ## 9. Screenshot References
 
-*Screenshots to be captured in Session 12.*
+### KPI Cards & Monthly P&L Trend
 
-Planned captures:
+![KPI and Trend](screenshots/financial/kpi-trend.png)
 
-| # | Description | State |
-|---|-------------|-------|
-| 1 | Full page — default view with KPI cards and trend chart | Default FY selected |
-| 2 | Monthly P&L Trend — hover tooltip | Hovering over a month |
-| 3 | P&L Statement — collapsed (default) | All groups collapsed |
-| 4 | P&L Statement — one group expanded | Showing detail accounts |
-| 5 | Multi-Year Comparison — small multiples + table | With trend arrows visible |
-| 6 | Balance Sheet section — trend chart + statement table | Side by side on desktop |
-| 7 | Filter bar — financial year dropdown open | Showing available FY options |
+### Financial Year Filter
 
----
+![Fiscal Year Selector](screenshots/financial/fiscal-year.png)
 
-## Appendix: Differences Found During Reverse-Engineering
+### Profit & Loss Statement
 
-The following discrepancies were discovered between the previous technical documentation (`docs/pages/pnl.md`) and the live codebase:
+![P&L Statement](screenshots/financial/p&l_statement.png)
 
-| Area | Previous Doc | Actual (Live Codebase) |
-|------|-------------|----------------------|
-| Route | `/pnl` | `/financial` |
-| Project filter | Documented as dropdown in filter bar | Not rendered in UI (exists in API but unused) |
-| Range control | Documented as user-selectable (fy/last12/ytd) | Internal state only — no UI control exposed |
-| KPI data scope | Latest month values | YTD totals extracted from full P&L statement |
-| Multi-year scope | All available years | ±3 years around selected financial year (up to 7 years) |
-| BS table rows | Basic listing | Alternating row shading for readability |
-| Filter default | Latest FY | 2nd most recent FY (most complete data) |
+### Multi-Year Comparison — Small Multiples & Table
+
+![Multi-Year Comparison](screenshots/financial/multi-year-comparison.png)
+
+### Balance Sheet — Trend Chart & Statement Table
+
+![Balance Sheet](screenshots/financial/balance-sheet.png)
+

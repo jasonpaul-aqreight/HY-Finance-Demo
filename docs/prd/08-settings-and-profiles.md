@@ -646,49 +646,40 @@ The supplier profile uses "Est." prefix on certain metrics (Gross Profit, Margin
 
 ---
 
-## 6. Drift from Previous Documentation
+## 6. Screenshot References
 
-Major differences discovered between old documentation and current codebase:
+### Credit Health Score Settings Dialog
 
-| Area | Old Documentation | Actual Implementation |
-|------|------------------|----------------------|
-| **Settings access** | Separate page at `/payment/settings` with back-arrow | Dialog/modal triggered from "Score & Risk" button in customer table header |
-| **Scoring model** | V1: 5 factors (Utilization 35%, Overdue 25%, Consistency 15%, Timeliness 15%, Breach 10%) | V2: 4 factors (Utilization 40%, Overdue 30%, Timeliness 20%, Double Breach 10%). Consistency removed entirely. |
-| **Risk thresholds** | 4 tiers: Low ≥85, Moderate ≥65, Elevated ≥40, High <40 | 3 tiers: Low ≥75, Moderate (between), High ≤30 |
-| **Double Breach** | Single-factor "Overdue Limit Breach" (just overdue limit) | "Double Breach" — BOTH credit limit AND overdue limit must be breached for penalty |
-| **Settings storage** | JSON file at `data/settings.json` | Database table (`app_settings`, JSONB column) |
-| **Customer profile layout** | 3 summary panels + 3 tabs (Payment/Returns/Sold Items) | 4-view architecture: Profile (with details + statistics + trends), Outstanding Invoices, Returns, Sales |
-| **Customer profile trigger** | Click entire row | Click customer name (blue link) only |
-| **Default tab from Payment** | "payment" tab | Outstanding Invoices view |
-| **Customer profile views** | `payment`, `returns`, `sold-items` | `profile`, `outstanding`, `returns`, `sales` |
-| **Customer statistics** | Listed as KPIs in panels | Dedicated visualization cards: Health Score Gauge, Credit Usage Donut, Outstanding Aging Bar, Returns Donut |
-| **Customer trends** | Not documented | 3 trend charts (Sales & Margin, Payment, Returns) in 2-column grid with shared date range picker |
-| **Supplier profile layout** | Header + single Purchase Items tab | Two-view architecture: Profile (details + performance) and Items (with filters) |
-| **Supplier performance** | Not documented | Margin Gauge, Supply Dependency Bar, Purchase Trend chart, Top 5 Items chart |
-| **Supplier items filters** | Search only | Sole Supplier Toggle + Product/Variant searchable dropdowns + search |
-| **Sparkline interaction** | Static sparkline | Clickable sparkline → popover with expanded chart + monthly data table |
-| **Role-based access** | Not documented | Admin vs non-admin access for settings (read-only for non-admin) |
-| **How It Works section** | Not documented | Collapsible accordion with full scoring methodology explanation |
-| **Sold Items tab** | Group column included | No Group column; has Qty Sold, Net Sales, Cost, Margin % |
+![Settings Dialog](screenshots/payment/settings-dialog.png)
 
----
+### Settings Dialog — Admin Edit View
 
-## 7. Screenshot References
+![Admin Settings](screenshots/payment/admin-can-edit-payment-setting.png)
 
-*Screenshots to be captured in Session 12.*
+### Customer Profile — Overview (Details, Statistics & Gauges)
 
-- [ ] Settings dialog — default state with all weights
-- [ ] Settings dialog — risk threshold bar visualization
-- [ ] Settings dialog — "How It Works" expanded
-- [ ] Settings dialog — non-admin read-only view
-- [ ] Customer profile — Profile view (full layout)
-- [ ] Customer profile — Statistics cards detail
-- [ ] Customer profile — Trend charts with date range
-- [ ] Customer profile — Outstanding Invoices view
-- [ ] Customer profile — Return Records view
-- [ ] Customer profile — Sales Transactions view with export
-- [ ] Supplier profile — Profile view (full layout)
-- [ ] Supplier profile — Margin Gauge and Supply Dependency Bar
-- [ ] Supplier profile — Items view with sole-supplier toggle active
-- [ ] Supplier profile — Sparkline popover expanded
-- [ ] Supplier profile — Product/Variant filter interaction
+![Customer Profile Overview](screenshots/payment/customer-profile-overview.png)
+
+### Customer Profile — Outstanding Invoices View (from Payment page)
+
+![Customer Outstanding Log](screenshots/payment/customer-outstanding-log.png)
+
+### Customer Profile — Return Records View (from Return page)
+
+![Customer Profile Return](screenshots/return/customer-profile.png)
+
+### Customer Profile — Sales Transactions View (from Customer Margin page)
+
+![Customer Profile Sales](screenshots/customer-margin/customer-profile.png)
+
+### Supplier Profile — Overview (Details, Performance & Dependency)
+
+![Supplier Profile Overview](screenshots/supplier-margin/supplier-profile-overview.png)
+
+### Supplier Profile — Items Supplied View
+
+![Supplier Item View](screenshots/supplier-margin/item-view.png)
+
+### Supplier Profile — Sole Source Toggle Active
+
+![Sole Supplier](screenshots/supplier-margin/sole-supplier.png)

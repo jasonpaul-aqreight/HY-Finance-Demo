@@ -621,38 +621,31 @@ All queries read from the `pc_supplier_margin` pre-computed table (monthly aggre
 
 ## 11. Screenshot References
 
-*Screenshots to be captured in Session 12.*
+### Default View — KPI Cards, Profitability Trend & Margin Distribution
 
----
+![Top Section](screenshots/supplier-margin/top-section.png)
 
-## 12. Drift from Legacy Documentation
+### Top/Bottom Chart & Purchase vs Selling Price Scatter
 
-The following differences were discovered by reverse-engineering the live codebase (this spec reflects the **actual current implementation**):
+![Middle Info](screenshots/supplier-margin/middle-info.png)
 
-| Area | Old Documentation | Actual Implementation |
-|------|------------------|----------------------|
-| Page title | "Supplier Profit Margin Report" | **"Supplier Performance"** |
-| KPI card labels | "Gross Sales", "Purchase Cost", "Gross Profit" | **"Est. Net Sales", "Est. Cost of Sales", "Est. Gross Profit"** — "Est." prefix is significant, highlighting that values are attributed estimates |
-| KPI card formulas | Not mentioned | **Formula subtitles shown** below each card value (e.g., "IV + CS (excl. credit notes)") |
-| Estimation explanation | Not documented | **Info-icon callout** in supplier table header explaining the attribution methodology |
-| Distribution chart type | Donut/pie chart with inner/outer radius | **Vertical bar chart** with colored bars per bucket |
-| Distribution chart labels | External labels on slices ≥ 3% | **Count labels above bars** |
-| Tab name | "Item Pricing" | **"Price Comparison"** |
-| Item Pricing layout | Simple item search combobox → chart → table | **4-column filter row** (Search, Product dropdown, Country dropdown, Variant dropdown) + **side-by-side layout** (item list left 2/5, charts right 3/5) |
-| Item Pricing chart height | 400px | **300px** |
-| Supplier Comparison columns | 9 columns (Code, Name, Avg Price, Latest, Min, Max, Qty, Trend arrow, Last Purchase) | **6 columns** (Supplier with colored dot, Avg Price, Latest, Min, Max, Qty) — Trend arrow and Last Purchase columns not rendered |
-| Supplier table page size | 20 rows | **25 rows** (options: 10, 25, 50) |
-| Supplier table export | CSV | **Excel (.xlsx)** |
-| Supplier table column headers | "Revenue", "Purchase Cost", "Profit" | **"Est. Net Sales", "Est. Cost of Sales", "Est. Gross Profit"** |
-| Supplier table click | "Row click opens Supplier Profile Modal" | **Only supplier name (blue link) is clickable** — not entire row |
-| Supplier profile: default view | Single-tab modal opening to "Purchase Items" | **Two-view modal** — opens to "Items Supplied" view by default (from table). Profile view has Supplier Details, Performance section with gauge + dependency bar + trend charts |
-| Supplier profile: details | Not documented | **Full supplier details** in 3-column grid: General (type, agent, since), Contact (Contact Person, phone, mobile, email), Terms (payment terms, credit limit, currency) |
-| Supplier profile: performance | Not documented | **Performance section** with margin gauge, supply dependency visualization, purchase trend chart, top 5 items chart |
-| Supplier profile: item filters | Single search box | **Sole Source toggle** + product dropdown + variant dropdown + search |
-| Supplier profile: price trend | Simple sparkline in table cell | **Clickable sparkline** opens popover with expanded chart, price change summary, and monthly data table |
-| URL parameter persistence | Documented (start, end, g, supplier, ig params) | **Not implemented** — all state is client-side only |
-| Granularity toggle | Monthly/Quarterly/Yearly options | **Monthly only** (hardcoded) |
-| Supplier/item group filters in main UI | Described as repeatable URL params | **Not exposed in UI** — exist in backend/hooks but no controls shown |
-| Table alignment | Right-aligned numbers | **Supplier Analysis table: all data left-justified.** Supplier Comparison table: left-aligned text, right-aligned numeric columns (Avg Price, Latest, Min, Max, Qty) |
-| Non-product exclusion | Not documented | Items matching `ZZ-ZZ%` excluded at sync level + safety net in queries |
-| Data source | Direct table joins (iv, cs, pi with their detail tables) | **Pre-computed table** (`pc_supplier_margin`) — monthly aggregates populated during sync |
+### Purchase vs Selling Price (Detail)
+
+![Purchase vs Supplier](screenshots/supplier-margin/purchase-vs-supplier.png)
+
+### Supplier Analysis Table
+
+![Supplier Margin Table](screenshots/supplier-margin/supplier-margin-table.png)
+
+### Price Comparison Tab
+
+![Price Comparison](screenshots/supplier-margin/price-comparison:png.png)
+
+### Supplier Profile — Items Supplied View
+
+![Item View](screenshots/supplier-margin/item-view.png)
+
+### Supplier Profile — Sole Source Toggle Active
+
+![Sole Supplier](screenshots/supplier-margin/sole-supplier.png)
+

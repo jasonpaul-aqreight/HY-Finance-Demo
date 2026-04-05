@@ -532,19 +532,26 @@ All document dates are stored in UTC. Eight hours are added to convert to Malays
 
 ## 10. Screenshot References
 
-> Screenshots to be captured in Session 12.
+### Payment Trends — Collection Rate & Invoiced vs Collected
 
-- `screenshots/payment/default.png` — Full page default view showing both sections
-- `screenshots/payment/period-kpis.png` — Close-up of the three period KPI cards
-- `screenshots/payment/snapshot-kpis.png` — Close-up of the three snapshot KPI cards
-- `screenshots/payment/dso-trend.png` — Avg Collection Days Trend line chart
-- `screenshots/payment/invoiced-vs-collected.png` — Invoiced vs Collected composed chart
-- `screenshots/payment/aging-all.png` — Aging Analysis in "All" view
-- `screenshots/payment/aging-by-agent.png` — Aging Analysis in "By Agent" stacked view
-- `screenshots/payment/aging-by-type.png` — Aging Analysis in "By Type" stacked view
-- `screenshots/payment/credit-utilization.png` — Credit Usage donut chart
-- `screenshots/payment/customer-table.png` — Customer Credit Health table with filters
-- `screenshots/payment/customer-table-filters.png` — Table showing type and risk level filter dropdowns
-- `screenshots/payment/settings-dialog.png` — Score & Risk Settings dialog (admin view)
-- `screenshots/payment/settings-how-it-works.png` — Expanded "How Credit Health Score is calculated" section
-- `screenshots/payment/customer-profile-modal.png` — Customer Profile modal opened from Payment page (Outstanding Invoices tab)
+![Payment Trend](screenshots/payment/payment-trend.png)
+
+### Customer Credit Health Table
+
+![Customer Credit Health](screenshots/payment/customer-credit-health.png)
+
+### Customer Outstanding Invoices — Aging & Summary
+
+![Customer Outstanding](screenshots/payment/customer-outstanding.png)
+
+### Customer Profile — Outstanding Invoices Log
+
+![Customer Outstanding Log](screenshots/payment/customer-outstanding-log.png)
+
+### Credit Health Score Settings Dialog
+
+![Settings Dialog](screenshots/payment/settings-dialog.png)
+
+### Settings Dialog — Admin Edit View
+
+![Admin Settings](screenshots/payment/admin-can-edit-payment-setting.png)

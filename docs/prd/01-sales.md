@@ -404,15 +404,22 @@ When users change filters (date range, dimension, advanced filters), the previou
 
 ## 9. Screenshot References
 
-> Screenshots to be captured in Session 12.
+### Default View — KPI Cards, Trend Chart, Breakdown & Table
 
-- `screenshots/sales/default.png` — Default view (12M, Customer dimension, Monthly granularity)
-- `screenshots/sales/kpi-cards.png` — Close-up of the four KPI cards
-- `screenshots/sales/trend-daily.png` — Trend chart in Daily granularity
-- `screenshots/sales/trend-weekly.png` — Trend chart in Weekly granularity
-- `screenshots/sales/breakdown-product.png` — Breakdown by Product with filters
-- `screenshots/sales/breakdown-agent.png` — Breakdown by Sales Agent
-- `screenshots/sales/breakdown-outlet.png` — Breakdown by Outlet
-- `screenshots/sales/customer-profile-modal.png` — Customer Profile modal opened from Sales page
-- `screenshots/sales/excel-export.png` — Excel export button and behavior
-- `screenshots/sales/pagination.png` — Table pagination controls
+![Sales Default View](screenshots/sales/default-view.png)
+
+### Sales Breakdown — Group by Fruit Type
+
+![Group by Fruit](screenshots/sales/group-by-fruit.png)
+
+### Sales Breakdown — Group by Outlet
+
+![Group by Outlet](screenshots/sales/group-by-outlet.png)
+
+### Sales Breakdown — Group by Sales Agent
+
+![Group by Sales Agent](screenshots/sales/group-by-sales-agent.png)
+
+### Customer Profile Modal — Sales Transactions View
+
+![Customer Profile Sales Log](screenshots/sales/customer-profile-sales-log.png)

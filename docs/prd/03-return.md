@@ -413,25 +413,15 @@ The aging chart uses a **daily snapshot** — it reflects the current state of a
 
 ## 9. Screenshot References
 
-_Screenshots to be captured in Session 12._
+### Default View — KPI Cards, Settlement Breakdown, Trend & Product Returns
 
----
+![Return Default View](screenshots/return/default-view.png)
 
-## Appendix: Actual vs. Old Documentation Differences
+### Customer Returns Table (Unsettled Filter)
 
-The following differences were discovered by reverse-engineering the live codebase (this PRD reflects the actual implementation):
+![Unresolved Table](screenshots/return/unresolved-table.png)
 
-| Area | Old Documentation | Actual Implementation |
-|------|------------------|----------------------|
-| KPI Cards | 5 cards (separate "Return Records" card) | **4 cards** — Return Records count is the subtitle of "Total Returns" |
-| Page structure | Single scrollable view with a visual separator line | **Two named sections**: "Return Trends" and "Unsettled Returns" with section headers |
-| Table columns | 6 columns | **7 columns** — added "Code" (customer account code) as first column |
-| Table default sort | total_return_value descending | **unsettled descending** — prioritizes actionable items |
-| Table page size | 20 rows per page | **25 / 50 / 100** selectable page sizes |
-| Table filters | No filtering mentioned | **Status dropdown** (Unsettled / Settled / All) + **text search** by code or name |
-| Table default view | Shows all customers | **Defaults to "Unsettled" filter** — shows only customers needing action |
-| Row click | Entire row is clickable | **Only customer name** is clickable (blue underlined link) — consistent with global table standards |
-| Table export | Not mentioned | **Excel (.xlsx) export** of all sorted data |
-| Product exclusions | ZZ-ZZ- and XX-ZZ- prefixes | Also excludes **RE-*** prefix and specifically **ZZ-ZZ-ZZPL** (pallet) items |
-| Refund log | API supports returning recent refund log entries | **Not displayed** in the UI — only the settlement summary (knockoff / refunded / unsettled percentages) is shown |
-| Table alignment | Right-aligned for numeric columns | **Left-aligned for text columns (Code, Customer), right-aligned for numeric columns (Returns, Total Value, Knockoff, Refunded, Unsettled)** |
+### Customer Profile Modal — Return Records View
+
+![Customer Profile](screenshots/return/customer-profile.png)
+

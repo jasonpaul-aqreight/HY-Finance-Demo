@@ -263,8 +263,6 @@ Operating Costs accounts are organized into **13 sub-categories** based on their
 | 12 | Tax & Compliance | Stamp duty, penalties, government-related compliance costs |
 | 13 | Other | All Operating Costs accounts not mapped to the above categories |
 
-**Note on category differences from legacy documentation:** Earlier versions used 11 categories with different names (e.g., "Payroll", "Fuel", "Rental", "Electricity & Water"). The current system uses 13 more granular categories. The account-to-category mapping is maintained centrally and uses parent-child account hierarchy so that child accounts automatically inherit their parent's category.
-
 ---
 
 ## 8. Business Rules
@@ -358,23 +356,11 @@ The Expenses page is a **standalone page** with no outbound links to other pages
 
 ## 11. Screenshot References
 
-*Screenshots to be captured in Session 12.*
+### Default View — KPI Cards, Cost Trend, Composition Donut & Top 10
 
----
+![Expenses Default View](screenshots/expenses/default-view.png)
 
-## 12. Drift from Legacy Documentation
+### Operating Costs Breakdown Table (OPEX Tab)
 
-The following differences were discovered by reverse-engineering the live codebase (this spec reflects the **actual current implementation**):
+![OPEX Breakdown](screenshots/expenses/opex-breakdown.png)
 
-| Area | Old Documentation | Actual Implementation |
-|------|------------------|----------------------|
-| Operating Costs categories | 11 categories (Payroll, Electricity & Water, Packaging Materials, Fuel, Rental, Repair & Maintenance, Vehicle & Equipment Upkeep, Depreciation, Insurance, Finance Costs, Other OPEX) | **13 categories** with restructured names (People & Payroll, Vehicle & Transport, Property & Utilities, Depreciation, Office & Supplies, Equipment & IT, Insurance, Finance & Banking, Professional Fees, Marketing & Entertainment, Repair & Maintenance, Tax & Compliance, Other) |
-| Granularity toggle | Daily / Weekly / Monthly toggle in chart header | **Monthly only** — no granularity toggle in the UI |
-| Export format | "Export CSV" button generating .csv files | **"Export Excel"** button generating .xlsx files |
-| Operating Costs table default state | All categories collapsed by default | All categories **collapsed** by default (unchanged from legacy) |
-| Breakdown table layout | Two separate table sections (Cost of Sales then Operating Costs) | **Tabbed interface** with height-locking to prevent layout shift |
-| Table number alignment | Right-aligned for monetary values and percentages | **Left-aligned for text columns, right-aligned for numeric columns** (Net Cost, %) |
-| URL parameter persistence | Filter state persisted in URL query string | **In-memory state only** — no URL persistence |
-| Data source | Direct GL table joins (gldtl JOIN glmast) | **Pre-computed monthly table** (aggregated at sync time) |
-| Category legend | Not documented | **Shared legend** below chart card, updates dynamically with cost type toggle |
-| Category mapping method | Pattern matching on account number prefixes | **Centralized mapping** with parent-child account hierarchy (child accounts inherit parent's category) |

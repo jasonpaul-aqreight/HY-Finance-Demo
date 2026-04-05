@@ -425,21 +425,23 @@ These are noted for the production team to evaluate for inclusion.
 
 ## 11. Screenshot References
 
-*Screenshots to be captured in Session 12.*
+### Default View — KPI Cards, Profitability Trend & Margin Distribution
 
----
+![Top Section](screenshots/customer-margin/top-section.png)
 
-## 12. Drift from Legacy Documentation
+### Top Customers Chart
 
-The following differences were discovered by reverse-engineering the live codebase (this spec reflects the **actual current implementation**):
+![Middle Info](screenshots/customer-margin/middle-info.png)
 
-| Area | Old Documentation | Actual Implementation |
-|------|------------------|----------------------|
-| Displayed components | All charts and tables shown in a single page | **7 components removed from shell** — MarginByTypeChart, ProductGroupMarginChart, TopByMarginChart, TopByProfitChart, ProductCustomerMatrix, MonthlyPivotTable, DataQualityPanel are built but not wired into the layout |
-| Filter UI | Generic date filter only | Date range filter visible; **customer, customer type, sales agent, and product group filters** fully built in backend/hooks but not exposed in UI |
-| Customer table filter | No in-table filtering | **Multi-select customer combobox** added in table header with search and badge count |
-| Credit Note Impact default sort | "Sorted by Return Rate (highest first)" | Default sort is **Margin Lost descending** (worst margin impact first) |
-| Profile modal | "Customer Profile Modal" (generic) | Uses **redesigned customer profile** with specific tab defaulting ("Sales" tab) and date range passing |
-| Trend column | Not documented in old specs | **Clickable sparkline** per customer row — fetches monthly data individually, click opens popover with margin trend chart and monthly data table (Month, Revenue, Margin %) |
-| Export format | CSV export | **Excel (.xlsx) export** with configured column headers |
-| Table alignment | Right-aligned numbers | **Customer Analysis table:** all columns left-aligned. **Credit Note Impact table:** text columns left-aligned, numeric columns (Invoice Sales, Credit Note Amt, Return Rate, Margin Before, Margin After, Margin Lost) right-aligned. |
+### Customer Analysis Table
+
+![Margin Table](screenshots/customer-margin/margin-table.png)
+
+### Credit Note Impact Table
+
+![Credit Note Impact](screenshots/customer-margin/credit-note-impact.png)
+
+### Customer Profile Modal
+
+![Customer Profile](screenshots/customer-margin/customer-profile.png)
+
