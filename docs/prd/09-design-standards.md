@@ -382,7 +382,7 @@ Toggle buttons use a **segmented button group** style: outlined, horizontal, one
 | **Page size selector** | Dropdown in the pagination row. |
 | **Export** | "Export Excel" button exports all sorted/filtered rows (not just the current page) as **.xlsx** format. Never CSV. |
 | **Search** | Case-insensitive substring matching. Placeholder: "Search by [entity] code or name". Resets to page 1 on change. Real-time (no submit button). Clear button (X icon). |
-| **Alternating rows** | Subtle tint on every other row for readability. Applied on most tables (Sales Group-By, Supplier Analysis, Cost of Sales, Supplier Comparison); not all tables implement this consistently. |
+| **Alternating rows** | Subtle tint on every other row for readability. Applied consistently on all tables. |
 | **Container height** | Stable minimum height — when filters reduce visible rows, the container maintains its height to prevent page jumping. |
 
 ### 7.2 Table Header Controls Layout
@@ -423,7 +423,65 @@ Toggle buttons use a **segmented button group** style: outlined, horizontal, one
 | User changes dimension/group-by | Sort and selection reset to defaults |
 | User changes search text | Sort preserved; reset to page 1 |
 
-### 7.5 Exception: Hierarchical / Financial Tables
+### 7.5 Row Height & Cell Sizing
+
+| Row type | Vertical padding | Approximate height | Notes |
+|----------|------------------|--------------------|-------|
+| **Standard (text only)** | 8 px top + 8 px bottom | ~36 px | Default for all text, currency, percentage, badge cells |
+| **Graphic (sparkline, progress bar)** | 12 px top + 12 px bottom | ~44 px | Extra breathing room around inline graphic elements |
+| **Header** | Fixed 40 px height | 40 px | Bold text, sort indicators inline |
+| **Footer / subtotal** | 8 px top + 8 px bottom | ~36 px | Semi-bold text, used in financial/detail tables only |
+
+- Horizontal padding: 8 px on all cells
+- Primary analysis tables do **not** include a footer/total row — totals are shown in KPI cards above the table
+- Financial/detail tables (Cost of Sales, Operating Costs) may include a footer total row
+
+### 7.6 Sort Indicator Design
+
+| State | Icon | Style |
+|-------|------|-------|
+| **Unsorted** | Bi-directional arrow (↕) | Muted colour (secondary text) |
+| **Descending** | Down arrow (↓) | Full contrast (primary text) |
+| **Ascending** | Up arrow (↑) | Full contrast (primary text) |
+
+- Icon size: small (12–14 px), displayed inline to the right of the header text
+- Sort cycle: unsorted → descending → ascending → unsorted
+- Only displayed on sortable columns; non-sortable headers show no icon
+
+### 7.7 Search Input Specifications
+
+| Property | Specification |
+|----------|---------------|
+| **Width** | ~250–260 px |
+| **Height** | 32 px |
+| **Icon** | Search (magnifying glass) icon inside the input, left-positioned |
+| **Clear button** | X icon inside the input, right-positioned; visible only when input has text |
+| **Placeholder** | "Search by [entity] code or name" (e.g., "Search by customer code or name") |
+| **Behaviour** | Real-time client-side filtering, case-insensitive, no submit button |
+
+### 7.8 Export Button Specifications
+
+| Property | Specification |
+|----------|---------------|
+| **Label** | "Export Excel" |
+| **Style** | Outline variant, small size (28 px height) |
+| **Icon** | Download icon, left of text |
+| **Position** | Right side of the toolbar row (inside card header) |
+| **Scope** | Exports all rows matching current sort + filter (not just the visible page) |
+| **Format** | .xlsx only — never CSV |
+
+### 7.9 Clickable Link Specifications
+
+| Property | Specification |
+|----------|---------------|
+| **Colour** | Dark blue (#2E5090) |
+| **Underline** | Persistent (always visible, not just on hover) |
+| **Max width** | ~200 px with text truncation (ellipsis) |
+| **Tooltip** | Full entity name shown on hover when truncated |
+| **Cursor** | Pointer |
+| **Target** | Opens entity profile modal (view depends on calling page — see Section 9.3) |
+
+### 7.10 Exception: Hierarchical / Financial Tables
 
 The P&L Statement and Balance Sheet tables do **not** use standard pagination or search. Instead:
 
