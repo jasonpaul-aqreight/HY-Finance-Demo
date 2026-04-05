@@ -54,17 +54,32 @@ Every page begins with a **banner strip** below the top edge:
 | **Title** | 18 px, semi-bold |
 | **Description** | 16 px, muted colour, one line below the title |
 
-### 1.4 Standard Page Structure (Top → Bottom)
+### 1.4 Data Freshness Indicator
+
+A global status bar appears **above the page banner** on all pages when the last data sync did not fully succeed. It is invisible when the sync completed successfully.
+
+| State | Background | Text | Icon |
+|-------|-----------|------|------|
+| **Partial failure** | Amber-50 with amber-200 bottom border | "Some data may be outdated — last sync: {timestamp}" | Warning triangle |
+| **Full failure** | Red-50 with red-200 bottom border | "Last data sync failed — {timestamp}" | X-circle |
+
+- **Timestamp format:** `d MMM, h:mm a` in MYT (e.g., "5 Apr, 9:36 am")
+- **Typography:** 14 px, font-medium, high-contrast text (amber-900 / red-900) — no muted colours
+- **Layout:** Full-width bar, 8 px vertical padding, 16 px horizontal padding, icon + text inline
+- **Refresh:** Fetched on page load, refreshed every 60 seconds
+
+### 1.5 Standard Page Structure (Top → Bottom)
 
 Most pages follow this vertical sequence:
 
-1. **Page Banner** — Title + description + optional action buttons
-2. **Filter Bar** — Date range pickers + preset buttons (+ optional cost-type toggle)
-3. **KPI Cards Row** — 3–5 metric cards in a responsive grid
-4. **Primary Chart Section** — Full-width or two-column chart layout
-5. **Secondary Chart(s)** — Side-by-side or tabbed chart views
-6. **Data Table(s)** — Full-width table with header controls
-7. **Additional Sections** — Tabbed breakdown tables, hierarchical data, etc.
+1. **Data Freshness Indicator** — Only visible on sync failure (partial or error)
+2. **Page Banner** — Title + description + optional action buttons
+3. **Filter Bar** — Date range pickers + preset buttons (+ optional cost-type toggle)
+4. **KPI Cards Row** — 3–5 metric cards in a responsive grid
+5. **Primary Chart Section** — Full-width or two-column chart layout
+6. **Secondary Chart(s)** — Side-by-side or tabbed chart views
+7. **Data Table(s)** — Full-width table with header controls
+8. **Additional Sections** — Tabbed breakdown tables, hierarchical data, etc.
 
 **Vertical spacing between sections:** 24 px.
 

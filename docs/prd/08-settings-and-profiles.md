@@ -518,6 +518,8 @@ Within a modal, the Profile view and sub-views maintain **independent date range
 | Price trends | Supplier margin pre-computed table | Monthly per-item |
 | Sole-source analysis | Cross-supplier item comparison (computed on request) | Period-based |
 
+> **Data freshness:** All pre-computed and sync-dependent data sections above are only as current as the last successful sync. When a sync partially or fully fails, a global data freshness indicator appears at the top of every page (see [Design Standards — 1.4](09-design-standards.md#14-data-freshness-indicator)).
+
 ### 5.4 Formatting Conventions
 
 | Type | Format |
