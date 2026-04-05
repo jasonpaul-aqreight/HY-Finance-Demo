@@ -23,11 +23,12 @@ All financial data originates from **AutoCount Accounting**, a full-featured ERP
 
 ### Target Users
 
-| Role | Primary Interest |
-|------|-----------------|
-| Finance Director | P&L oversight, margin analysis, credit risk monitoring |
-| Management | Net sales trends, top customer/supplier performance, expense control |
-| Operations Team | Payment collection follow-up, return tracking, expense monitoring |
+| Role | Access Level | Primary Interest |
+|------|-------------|-----------------|
+| Admin | Full (read + settings) | System configuration, data sync management |
+| Director, Finance | Viewer (read-only) | P&L oversight, margin analysis, net sales trends, payment collection, expense monitoring |
+
+Other application roles (`sales`, `hr`, `management`) do not have access to Finance module pages.
 
 **Readability requirement:** End users are older executives. All text must be high-contrast and easily readable — never use gray, muted, or low-contrast text for important labels or data.
 
@@ -55,13 +56,13 @@ The Finance Dashboard is one module in a larger production application (which al
 
 ### Sidebar Navigation
 
-A collapsible sidebar on the left side contains 7 primary navigation items plus an admin section:
+The Finance module integrates into the existing production dashboard sidebar (which already includes Sales, HR, and other modules). Finance appears as a **collapsible navigation group**, collapsed by default.
 
-**Primary Navigation (top to bottom):**
+**Finance Group (when expanded):**
 
 | Order | Label | Icon Description |
 |-------|-------|-----------------|
-| 1 | Sales | Upward trend line |
+| 1 | Sales Report | Upward trend line |
 | 2 | Payment | Credit card |
 | 3 | Returns | Circular arrow (undo) |
 | 4 | Financials | Bar chart |
@@ -69,28 +70,23 @@ A collapsible sidebar on the left side contains 7 primary navigation items plus 
 | 6 | Customer Margin | People/users |
 | 7 | Supplier Performance | Truck |
 
-**Admin Section (below divider):**
-
-| Label | Icon Description |
-|-------|-----------------|
-| Data Sync | Refresh/sync arrows |
+**Data Sync:** The Finance sync functionality merges into the existing application-level Sync tab (shared with Sales and HR sync operations).
 
 ### Sidebar Behavior
 
 - **Collapsed state:** Shows icons only with tooltips on hover. Narrow width (~64px).
 - **Expanded state:** Shows icon + label text. Width ~224px.
 - **Active indicator:** Current page is highlighted. Sub-pages highlight their parent (e.g., Payment Settings highlights "Payment").
-- **Header:** Displays "Hoi-Yong Finance" branding when expanded.
+- **Header:** Displays the company logo when expanded.
 
 ### Page Layout Pattern
 
 Every dashboard page follows a consistent structure:
 
-1. **Page Banner** — Full-width header with page title and one-line description. Some pages include action buttons on the right (e.g., role switcher on Payment page).
-2. **Filter Bar** — Date range controls and page-specific filters.
-3. **KPI Summary Cards** — Row of metric cards showing key numbers at a glance.
-4. **Charts** — Trend lines, bar charts, distribution charts for visual analysis.
-5. **Tables / Detail Sections** — Sortable, paginated data tables or tabbed content areas.
+1. **Filter Bar** — Date range controls and page-specific filters.
+2. **KPI Summary Cards** — Row of metric cards showing key numbers at a glance.
+3. **Charts** — Trend lines, bar charts, distribution charts for visual analysis.
+4. **Tables / Detail Sections** — Sortable, paginated data tables or tabbed content areas.
 
 **Content constraints:**
 - Maximum content width: 1600px, horizontally centered
@@ -125,15 +121,21 @@ Used across 6 pages (Sales, Payment, Returns, Expenses, Customer Margin, Supplie
 
 **Exception:** Financial Statements page uses a **financial year dropdown** instead of date range pickers (see Section 8.4).
 
-### 4.2 Customer Profile Modal
+### 4.2 Entity Profile Modal (Shared Pattern)
 
-A large overlay (90% viewport width and height) providing a 360-degree view of a single customer. Accessible from multiple pages. The modal uses a **multi-view architecture** — a main profile view plus three detail sub-views.
+Both the Customer and Supplier profile modals share the same design pattern: a large overlay (90% viewport width and height) with a **multi-view architecture** — a main profile view plus detail sub-views. The shared pattern is described here; entity-specific sections follow.
 
-**Header (always visible):**
-- Company name (large, bold, truncated)
-- Customer code
-- Active/Inactive status badge (animated pulse dot — green or red)
-- "CUSTOMER" type badge (blue)
+**Shared Header (always visible):**
+- Company name (large, bold, full display)
+- Entity code (customer code or creditor code)
+- Active/Inactive status badge (green or red)
+- Entity type badge ("CUSTOMER" in blue, "SUPPLIER" in indigo)
+
+---
+
+#### 4.2.1 Customer Profile Modal
+
+Accessible from multiple pages. Provides a 360-degree view of a single customer.
 
 **Profile View — Section A: Customer Details + Logs (side by side)**
 
@@ -184,18 +186,12 @@ A shared date range picker controls all three trend charts simultaneously:
 |-------------|-------------|
 | Payment | Outstanding Invoices |
 | Returns | Return Records |
-| Sales | Sales Transactions |
+| Sales | Profile (main) |
 | Customer Margin | Sales Transactions |
 
-### 4.3 Supplier Profile Modal
+#### 4.2.2 Supplier Profile Modal
 
-A large overlay (90% viewport width and height) for viewing a single supplier. Accessible from Supplier Performance page. Uses the same **multi-view architecture** as the Customer Profile modal.
-
-**Header (always visible):**
-- Company name (large, bold, truncated)
-- Creditor code
-- Active/Inactive status badge (animated pulse dot — green or red)
-- "SUPPLIER" type badge (indigo)
+Accessible from Supplier Performance page. Uses the shared Entity Profile Modal pattern (see 4.2 above).
 
 **Profile View — Section A: Supplier Details + Log (side by side)**
 
@@ -289,9 +285,11 @@ Products are classified into a fruit taxonomy with three levels:
 | **Variant** | Fuji, Gala, Cavendish |
 
 **Classification method:**
-- **Primary:** Parsed from a structured field on the product record (format: "FRUIT → COUNTRY → VARIANT")
-- **Fallback:** Pattern-matched from the product description against a reference library of ~99 known fruits, ~199 countries, and known variants
+- **Primary (Tier 1):** Parsed from a structured field (`UDF_BoC`) on the product record (format: "FRUIT → COUNTRY → VARIANT")
+- **Fallback (Tier 2):** Pattern-matched from the product description against reference lookup tables of canonical fruit names, countries, and variants
 - Products that cannot be classified are marked "Uncategorized"
+
+> **See:** [Fruit Taxonomy Reference](./ref-fruit-taxonomy.md) for detailed parsing rules, reference table structure, alias mappings, and matching algorithm.
 
 **Excluded items:** Products with certain code prefixes (packing materials, pallets, non-product items) are excluded from fruit-based analysis.
 
@@ -350,14 +348,14 @@ All calculations **exclude cancelled records**. Only documents marked as non-can
 Used consistently across Customer Margin, Supplier Performance, and Financial Statements:
 
 ```
-Gross Profit = Revenue − Cost of Goods Sold (COGS)
-Margin % = (Gross Profit ÷ Revenue) × 100
+Gross Profit = Net Sales − Cost of Sales (COGS)
+Margin % = (Gross Profit ÷ Net Sales) × 100
 ```
 
 For **customer margin** specifically:
 ```
-Revenue = Invoice Revenue + Debit Note Revenue − Credit Note Revenue
-COGS = Invoice Cost + Debit Note Cost − Credit Note Cost
+Net Sales = Invoice Net Sales + Debit Note Net Sales − Credit Note Net Sales
+Cost of Sales = Invoice Cost + Debit Note Cost − Credit Note Cost
 ```
 
 - **Debit Notes** (supplier credits/rebates) are treated as positive adjustments — they increase revenue and reduce COGS, improving the customer's margin
