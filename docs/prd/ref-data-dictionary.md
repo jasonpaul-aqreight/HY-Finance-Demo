@@ -59,7 +59,7 @@ Data flows: RDS → sync-service → Local PostgreSQL → Dashboard
 | sales_agent | dbo."SalesAgent" | SalesAgent | Sales, Customer Margin |
 | supplier | dbo."Creditor" | AccNo | Supplier Margin |
 | supplier_type | dbo."CreditorType" | CreditorType | Supplier Margin |
-| product | dbo."Item" | ItemCode | Sales (fruit), Supplier Margin, Customer Margin, Return |
+| product | dbo."Item" | ItemCode | Sales (fruit), Supplier Margin, Customer Margin, Return. *Note: sync-service adds 6 computed columns: FruitName, FruitCountry, FruitVariant, Category, Variety, DisplayName (see Section 9.10)* |
 | product_group | dbo."ItemGroup" | ItemGroup | Supplier Margin, Customer Margin |
 | gl_account | dbo."GLMast" | AccNo | Expenses, P&L |
 | account_type | dbo."AccType" | AccType | P&L |
@@ -1138,6 +1138,8 @@ Monthly AR activity. Source: ARInvoice, ARPayment, ARCN, ARRefund, ARContraKnock
 | invoice_count | INTEGER | Count of invoices |
 | payment_count | INTEGER | Count of payments |
 
+*Note: The `contra`, `invoice_count`, and `payment_count` columns are not in the original migration 003. `invoice_count` and `payment_count` were added by migration 010. `contra` is written by the builder's swap pattern, which replaces the table schema on each sync.*
+
 #### pc_ar_customer_snapshot
 
 Point-in-time customer AR snapshot (daily). Source: ARInvoice (open), ARPaymentKnockOff, ARPayment, Debtor. Excludes "CASH SALES" debtors.
@@ -1168,8 +1170,10 @@ Point-in-time customer AR snapshot (daily). Source: ARInvoice (open), ARPaymentK
 | area_code | TEXT | Area code |
 | currency_code | TEXT | Default currency |
 | created_timestamp | TEXT | Customer creation date |
-| credit_score | INTEGER | Composite credit score (0-100); computed by sync-service |
+| credit_score | NUMERIC(8,2) | Composite credit score (0-100); computed by sync-service |
 | risk_tier | TEXT | 'Low', 'Moderate', or 'High'; derived from credit_score |
+
+*Note: `avg_days_late`, `credit_score`, and `risk_tier` are not in migration 003. They are computed and written by the builder's swap/snapshot pattern, which replaces table contents on each sync.*
 
 #### pc_ar_aging_history
 
@@ -1236,6 +1240,8 @@ Monthly return product breakdown. Source: CNDTL (CNType='RETURN') + local produc
 | credit_only_qty | NUMERIC(12,4) | Qty where GoodsReturn='F' (credit adjustment) |
 
 Items like `ZZ-ZZ-ZBKT*` (baskets) and `ZZ-ZZ-ZZPL*` (packing) are excluded.
+
+*Note: The builder writes columns `cn_count`, `goods_returned_qty`, `credit_only_qty` (shown above). Migration 003 originally defined these as `line_count` (INTEGER), `goods_return_count` (INTEGER), `credit_only_count` (INTEGER). The builder's swap pattern replaces the table on each sync, so the runtime schema reflects the builder column names.*
 
 #### pc_return_aging
 
@@ -1710,12 +1716,12 @@ The sync-service transforms Item.UDF_BoC into fruit classification columns using
 | Dashboard Page | Primary Data Tables | Drill-Down (RDS) | Lookup Tables |
 |---|---|---|---|
 | **Sales** | pc_sales_daily, pc_sales_by_customer, pc_sales_by_outlet, pc_sales_by_fruit | IV, CS, CN (agent customer counts) | customer, customer_type, sales_agent |
-| **Payment** | pc_ar_monthly, pc_ar_customer_snapshot, pc_ar_aging_history | ARInvoice, ARPayment (collection trend, invoice lists) | customer, customer_type, sales_agent |
-| **Return** | pc_return_monthly, pc_return_by_customer, pc_return_products, pc_return_aging, pc_sales_daily (return rate) | CN, ARRefund (refund metrics) | customer |
-| **Customer Margin** | pc_customer_margin, pc_customer_margin_by_product | IVDTL, DNDTL, CNDTL, Item (customer product details, data quality) | customer, customer_type, sales_agent, product_group |
-| **Supplier Performance** | pc_supplier_margin | IVDTL, CSDTL (price comparison, price spread) | supplier, supplier_type, product_group |
-| **Expenses** | pc_expense_monthly | (none) | pl_format, fiscal_year |
-| **P&L / Balance Sheet** | pc_pnl_period, pc_opening_balance | (none) | gl_account, account_type, fiscal_year, project |
+| **Payment** | pc_ar_monthly, pc_ar_customer_snapshot, pc_ar_aging_history | ARInvoice, ARPayment, ARPaymentKnockOff (collection trend, invoice lists, knockout details) | customer, customer_type, sales_agent |
+| **Return** | pc_return_monthly, pc_return_by_customer, pc_return_products, pc_return_aging, pc_sales_daily (return rate) | CN, ARCN, ARRefund (refund metrics, CN detail) | customer |
+| **Customer Margin** | pc_customer_margin, pc_customer_margin_by_product | IV+IVDTL, DN+DNDTL, CN+CNDTL, Item (customer product details, data quality) | customer, customer_type, sales_agent, product_group |
+| **Supplier Performance** | pc_supplier_margin | IV+IVDTL, CS+CSDTL (price comparison, price spread) | supplier, supplier_type, product_group, product |
+| **Expenses** | pc_expense_monthly | (none) | fiscal_year |
+| **P&L / Balance Sheet** | pc_pnl_period, pc_opening_balance | (none) | gl_account, account_type, fiscal_year, project, pl_format, bs_format |
 
 ---
 
