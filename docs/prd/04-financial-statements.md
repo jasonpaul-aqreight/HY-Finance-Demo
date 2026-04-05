@@ -36,11 +36,6 @@ The page follows the standard dashboard layout (fixed sidebar, max-width 1600px 
 
 ```
 ┌─────────────────────────────────────────────────┐
-│  Page Banner                                     │
-│  "Financial Statements"                          │
-│  "Profit & Loss statement, Year-over-Year        │
-│   comparison, and Balance Sheet overview."        │
-├─────────────────────────────────────────────────┤
 │  Filter Bar (financial year selector)              │
 ├─────────────────────────────────────────────────┤
 │  KPI Cards — Row 1 (4 cards)                     │

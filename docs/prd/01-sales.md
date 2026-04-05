@@ -22,11 +22,10 @@ This is the "top line" page — the starting point for understanding business pe
 
 From top to bottom:
 
-1. **Page Banner** — Title "Sales Report" with subtitle: "Provides net sales tracking on a daily, weekly, and monthly basis to monitor sales trends and performance."
-2. **Date Range Filter** — Month-year pickers, range summary, and quick-preset buttons.
-3. **KPI Cards** — A responsive row of four summary metric cards.
-4. **Net Sales Trend Chart** — A stacked bar chart showing net sales components over time with granularity toggle.
-5. **Sales Breakdown Section** — A card containing:
+1. **Date Range Filter** — Month-year pickers, range summary, and quick-preset buttons.
+2. **KPI Cards** — A responsive row of four summary metric cards.
+3. **Net Sales Trend Chart** — A stacked bar chart showing net sales components over time with granularity toggle.
+4. **Sales Breakdown Section** — A card containing:
    - A "Group by" dimension picker (four options).
    - Advanced filters (dimension-specific dropdowns and search).
    - A horizontal bar chart of selected rows.
@@ -246,7 +245,7 @@ A sortable, paginated data table displayed below the breakdown chart.
 
 ### 6.1 Date Range Filter
 
-- **Location:** Top of the page, below the banner.
+- **Location:** Top of the page.
 - **Controls:**
   - **Start month picker** — Selects the first day of the chosen month.
   - **End month picker** — Selects the last day of the chosen month.

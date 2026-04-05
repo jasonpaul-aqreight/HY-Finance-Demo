@@ -31,13 +31,12 @@ The page follows a single continuous scroll with components in this order:
 
 | Row | Content | Width / Responsiveness |
 |-----|---------|----------------------|
-| 1 | **Page Banner** — title "Supplier Performance" + description | Full width |
-| 2 | **Filter Bar** — date range picker inside a bordered card | Full width |
-| 3 | **KPI Cards** — 5 summary cards | 2 columns small, 3 columns medium, 5 columns extra-large |
-| 4 | **Profitability Trend Chart** — monthly bars + margin % line | Full width |
-| 5 | **Top/Bottom Chart** (left, 3/5 width) + **Margin Distribution Chart** (right, 2/5 width) | Side-by-side on large screens; stacked on small |
-| 6 | **Purchase vs Selling Price Scatter Chart** | Full width |
-| 7 | **Tabbed Section** — "Supplier Analysis" tab and "Price Comparison" tab | Full width |
+| 1 | **Filter Bar** — date range picker inside a bordered card | Full width |
+| 2 | **KPI Cards** — 5 summary cards | 2 columns small, 3 columns medium, 5 columns extra-large |
+| 3 | **Profitability Trend Chart** — monthly bars + margin % line | Full width |
+| 4 | **Top/Bottom Chart** (left, 3/5 width) + **Margin Distribution Chart** (right, 2/5 width) | Side-by-side on large screens; stacked on small |
+| 5 | **Purchase vs Selling Price Scatter Chart** | Full width |
+| 6 | **Tabbed Section** — "Supplier Analysis" tab and "Price Comparison" tab | Full width |
 
 Maximum content width: 1600px, centered.
 

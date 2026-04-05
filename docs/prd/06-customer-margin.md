@@ -27,12 +27,11 @@ The page follows a single continuous scroll with components in this order:
 
 | Row | Content | Width / Responsiveness |
 |-----|---------|----------------------|
-| 1 | **Page Banner** — title + description | Full width |
-| 2 | **Date Range Filter** — start/end month pickers | Full width |
-| 3 | **KPI Cards** — 5 summary cards | 5 across on desktop, 2–3 columns on tablet, stacked on mobile |
-| 4 | **Profitability Trend Chart** — monthly bars + margin % line | Full width |
-| 5 | **Top Customers Chart** (left, 60%) + **Margin Distribution Chart** (right, 40%) | Side-by-side on large screens; stacked on small |
-| 6 | **Tabbed Section** — "Customer Analysis" tab and "Credit Note Impact" tab | Full width, height-locked container to prevent layout shift when switching tabs |
+| 1 | **Date Range Filter** — start/end month pickers | Full width |
+| 2 | **KPI Cards** — 5 summary cards | 5 across on desktop, 2–3 columns on tablet, stacked on mobile |
+| 3 | **Profitability Trend Chart** — monthly bars + margin % line | Full width |
+| 4 | **Top Customers Chart** (left, 60%) + **Margin Distribution Chart** (right, 40%) | Side-by-side on large screens; stacked on small |
+| 5 | **Tabbed Section** — "Customer Analysis" tab and "Credit Note Impact" tab | Full width, height-locked container to prevent layout shift when switching tabs |
 
 ---
 

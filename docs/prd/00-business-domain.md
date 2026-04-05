@@ -582,7 +582,7 @@ For detailed views (e.g., individual customer invoices, product-level breakdowns
 - Credit score is recalculated using the latest saved settings (weights are configurable)
 - Avg Collection Days trend shows monthly rolling calculation
 - Collection trend: monthly invoiced vs. collected amounts
-- Role switcher (Admin/Viewer) in the page banner — only page with this feature
+- Role switcher (Admin/Viewer) at the top of the page — only page with this feature
 
 ### 8.3 Return / Credit Note
 

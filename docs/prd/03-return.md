@@ -27,13 +27,12 @@ The page is organized into **two distinct sections** with clear section headers.
 
 From top to bottom:
 
-1. **Page Banner** — Title "Returns" with subtitle: "Monitors all credit notes, product returns, and refunds to ensure accurate financial settlement."
-2. **Date Range Filter** — Month-year pickers with range summary and quick-preset buttons.
-3. **KPI Cards** — A responsive row of four summary metric cards.
-4. **Settlement Breakdown + Monthly Return Trend** — Side-by-side equal-width layout:
+1. **Date Range Filter** — Month-year pickers with range summary and quick-preset buttons.
+2. **KPI Cards** — A responsive row of four summary metric cards.
+3. **Settlement Breakdown + Monthly Return Trend** — Side-by-side equal-width layout:
    - Left (50%): Settlement Breakdown (three progress bars).
    - Right (50%): Monthly Return Trend (area chart).
-5. **Top 10 Product Returns** — Horizontal bar chart with dimension and metric toggles.
+4. **Top 10 Product Returns** — Horizontal bar chart with dimension and metric toggles.
 
 ### Section 2: Unsettled Returns (Accumulated — Not Date-Filtered)
 

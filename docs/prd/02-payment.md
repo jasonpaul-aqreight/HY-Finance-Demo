@@ -26,11 +26,10 @@ The page is organized into **two distinct sections** with a clear visual separat
 
 From top to bottom:
 
-1. **Page Banner** — Title "Payment Collection" with subtitle describing the page purpose.
-2. **Date Range Filter** — Start and end date pickers.
-3. **Period KPI Cards** — A responsive row of three summary metric cards (Avg Collection Days, Collection Rate, Avg Monthly Collection).
-4. **Avg Collection Days Trend Chart** — Line chart showing monthly collection day values.
-5. **Invoiced vs Collected Chart** — Composed bar + line chart comparing monthly collection against invoicing.
+1. **Date Range Filter** — Start and end date pickers.
+2. **Period KPI Cards** — A responsive row of three summary metric cards (Avg Collection Days, Collection Rate, Avg Monthly Collection).
+3. **Avg Collection Days Trend Chart** — Line chart showing monthly collection day values.
+4. **Invoiced vs Collected Chart** — Composed bar + line chart comparing monthly collection against invoicing.
 
 ### Section 2: Outstanding Payment (Snapshot — As of Today)
 
@@ -288,7 +287,7 @@ The main data table providing a comprehensive view of every customer's credit he
 
 ### 6.1 Date Range Filter
 
-- **Location:** Top of Section 1, below the page banner.
+- **Location:** Top of Section 1.
 - **Controls:**
   - **Start Date picker** — Selects a specific date (YYYY-MM-DD format).
   - **End Date picker** — Selects a specific date (YYYY-MM-DD format).

@@ -27,14 +27,13 @@ The page follows a single continuous scroll with components in this order:
 
 | Row | Content | Width / Responsiveness |
 |-----|---------|----------------------|
-| 1 | **Page Banner** — title + description | Full width |
-| 2 | **Date Range Filter** — start/end month pickers with presets | Full width |
-| 3 | **KPI Cards** — 4 summary cards | 4 across on desktop, 2×2 on mobile |
-| 4 | **Cost Type Toggle** — segmented button: All / Cost of Sales / Operating Costs | Left-aligned, full width container |
-| 5 | **Cost Trend Chart** (left, 70%) + **Cost Composition Donut** (right, 30%) | Side-by-side on large screens; stacked on small. Enclosed in a single rounded card. |
-| 6 | **Category Legend** — colored squares with category names | Full width, below the chart card |
-| 7 | **Top 10 Expenses Chart** — horizontal bar chart with own local toggles | Full width |
-| 8 | **Breakdown Tables** — tabbed: "Cost of Sales Breakdown" and "Operating Costs Breakdown" | Full width, height-locked container to prevent layout shift when switching tabs |
+| 1 | **Date Range Filter** — start/end month pickers with presets | Full width |
+| 2 | **KPI Cards** — 4 summary cards | 4 across on desktop, 2×2 on mobile |
+| 3 | **Cost Type Toggle** — segmented button: All / Cost of Sales / Operating Costs | Left-aligned, full width container |
+| 4 | **Cost Trend Chart** (left, 70%) + **Cost Composition Donut** (right, 30%) | Side-by-side on large screens; stacked on small. Enclosed in a single rounded card. |
+| 5 | **Category Legend** — colored squares with category names | Full width, below the chart card |
+| 6 | **Top 10 Expenses Chart** — horizontal bar chart with own local toggles | Full width |
+| 7 | **Breakdown Tables** — tabbed: "Cost of Sales Breakdown" and "Operating Costs Breakdown" | Full width, height-locked container to prevent layout shift when switching tabs |
 
 ---
 

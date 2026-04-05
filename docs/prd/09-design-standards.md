@@ -41,22 +41,9 @@ The sidebar contains **7 primary pages** and **1 admin section**, separated by a
 
 **Collapsed-mode tooltips:** When the sidebar is collapsed, hovering over an icon displays the page label in a tooltip to the right with a 10 px offset.
 
-### 1.3 Page Banner
+### 1.3 Data Freshness Indicator
 
-Every page begins with a **banner strip** below the top edge:
-
-| Element | Specification |
-|---------|---------------|
-| **Background** | Card background colour with a bottom border |
-| **Padding** | 24 px horizontal, 16 px vertical |
-| **Inner max-width** | 1 600 px, centred |
-| **Layout** | Title and description on the left; optional action buttons on the right |
-| **Title** | 18 px, semi-bold |
-| **Description** | 16 px, muted colour, one line below the title |
-
-### 1.4 Data Freshness Indicator
-
-A global status bar appears **above the page banner** on all pages when the last data sync did not fully succeed. It is invisible when the sync completed successfully.
+A global status bar appears **at the top of the content area** on all pages when the last data sync did not fully succeed. It is invisible when the sync completed successfully.
 
 | State | Background | Text | Icon |
 |-------|-----------|------|------|
@@ -68,18 +55,17 @@ A global status bar appears **above the page banner** on all pages when the last
 - **Layout:** Full-width bar, 8 px vertical padding, 16 px horizontal padding, icon + text inline
 - **Refresh:** Fetched on page load, refreshed every 60 seconds
 
-### 1.5 Standard Page Structure (Top → Bottom)
+### 1.4 Standard Page Structure (Top → Bottom)
 
 Most pages follow this vertical sequence:
 
 1. **Data Freshness Indicator** — Only visible on sync failure (partial or error)
-2. **Page Banner** — Title + description + optional action buttons
-3. **Filter Bar** — Date range pickers + preset buttons (+ optional cost-type toggle)
-4. **KPI Cards Row** — 3–5 metric cards in a responsive grid
-5. **Primary Chart Section** — Full-width or two-column chart layout
-6. **Secondary Chart(s)** — Side-by-side or tabbed chart views
-7. **Data Table(s)** — Full-width table with header controls
-8. **Additional Sections** — Tabbed breakdown tables, hierarchical data, etc.
+2. **Filter Bar** — Date range pickers + preset buttons (+ optional cost-type toggle)
+3. **KPI Cards Row** — 3–5 metric cards in a responsive grid
+4. **Primary Chart Section** — Full-width or two-column chart layout
+5. **Secondary Chart(s)** — Side-by-side or tabbed chart views
+6. **Data Table(s)** — Full-width table with header controls
+7. **Additional Sections** — Tabbed breakdown tables, hierarchical data, etc.
 
 **Vertical spacing between sections:** 24 px.
 
@@ -219,7 +205,7 @@ Each expense category has a permanently assigned colour used in charts and legen
 
 | Element | Size | Weight | Notes |
 |---------|------|--------|-------|
-| Page title (banner) | 18 px | Semi-bold (600) | |
+| Page title | 18 px | Semi-bold (600) | |
 | Section header | 16 px | Medium (500) | Optional tinted background strip |
 | Card title | 16 px | Medium (500) | |
 | Card title (compact) | 14 px | Medium (500) | Used in smaller card variants |
@@ -814,7 +800,6 @@ Two visual variants:
 ### 15.1 Elements That Must Be Identical Across All Pages
 
 - Sidebar appearance and behaviour
-- Page banner structure and styling
 - Date range filter component (where used)
 - Preset button set (3M, 6M, 12M, YTD)
 - KPI card container styling
