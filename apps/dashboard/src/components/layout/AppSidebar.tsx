@@ -29,7 +29,7 @@ const navItems = [
   { href: '/financial', label: 'Financials', icon: BarChart3 },
   { href: '/expenses', label: 'Expenses', icon: Receipt },
   { href: '/customer-margin', label: 'Customer Margin', icon: Users },
-  { href: '/supplier-performance', label: 'Supplier Margin', icon: Truck },
+  { href: '/supplier-performance', label: 'Supplier Performance', icon: Truck },
 ];
 
 const adminItems = [

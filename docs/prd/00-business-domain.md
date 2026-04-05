@@ -45,7 +45,7 @@ The Finance Dashboard is one module in a larger production application (which al
 | 4 | **Financial Statements** | Profit & Loss statement, Year-over-Year comparison, Balance Sheet |
 | 5 | **Expenses** | Cost of Sales (COGS) and Operating Costs (OPEX) breakdown, expense trend analysis, top expenses |
 | 6 | **Customer Margin** | Profit margin by customer — identify high-value relationships |
-| 7 | **Supplier Margin** | Profit margin by supplier — procurement analysis, price comparison |
+| 7 | **Supplier Performance** | Profit margin by supplier — procurement analysis, price comparison |
 | 8 | **Payment Settings** | Configure credit score weights and risk thresholds |
 | 9 | **Data Sync (Admin)** | Manage data synchronization from AutoCount to the dashboard |
 
@@ -67,7 +67,7 @@ A collapsible sidebar on the left side contains 7 primary navigation items plus 
 | 4 | Financials | Bar chart |
 | 5 | Expenses | Receipt |
 | 6 | Customer Margin | People/users |
-| 7 | Supplier Margin | Truck |
+| 7 | Supplier Performance | Truck |
 
 **Admin Section (below divider):**
 
@@ -102,7 +102,7 @@ Every dashboard page follows a consistent structure:
 
 ### 4.1 Date Range Filter
 
-Used across 6 pages (Sales, Payment, Returns, Expenses, Customer Margin, Supplier Margin).
+Used across 6 pages (Sales, Payment, Returns, Expenses, Customer Margin, Supplier Performance).
 
 **Controls:**
 - Two month-year pickers (start and end)
@@ -189,7 +189,7 @@ A shared date range picker controls all three trend charts simultaneously:
 
 ### 4.3 Supplier Profile Modal
 
-A large overlay (90% viewport width and height) for viewing a single supplier. Accessible from Supplier Margin page. Uses the same **multi-view architecture** as the Customer Profile modal.
+A large overlay (90% viewport width and height) for viewing a single supplier. Accessible from Supplier Performance page. Uses the same **multi-view architecture** as the Customer Profile modal.
 
 **Header (always visible):**
 - Company name (large, bold, truncated)
@@ -213,7 +213,7 @@ Right — "Log" panel with a single clickable button: **"Items Supplied"** → n
 
 | Calling Context | Default View |
 |----------------|-------------|
-| Supplier Margin table row | Items view (opens directly to items list) |
+| Supplier Performance table row | Items view (opens directly to items list) |
 | All other contexts | Profile view |
 
 **Profile View — Section B: Performance (date-filtered)**
@@ -347,7 +347,7 @@ All calculations **exclude cancelled records**. Only documents marked as non-can
 
 ### 6.5 Margin Calculation (Universal)
 
-Used consistently across Customer Margin, Supplier Margin, and Financial Statements:
+Used consistently across Customer Margin, Supplier Performance, and Financial Statements:
 
 ```
 Gross Profit = Revenue − Cost of Goods Sold (COGS)
@@ -617,7 +617,7 @@ For detailed views (e.g., individual customer invoices, product-level breakdowns
 - Margin distribution histogram with buckets: <0%, 0–5%, 5–10%, 10–15%, 15–20%, 20–30%, 30%+
 - Trend sparklines per customer for quick visual comparison
 
-### 8.7 Supplier Margin
+### 8.7 Supplier Performance
 
 - Date range filter only (multi-dimension filters for suppliers and item groups are planned but not yet exposed in the UI)
 - Tabbed analysis: Supplier Analysis tab and Price Comparison tab

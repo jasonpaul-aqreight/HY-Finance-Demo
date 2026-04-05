@@ -321,11 +321,11 @@ A near-full-screen modal providing a detailed view of a single supplier: contact
 
 ### 3.2 Where It Appears
 
-Triggered by clicking a **supplier name** (blue underlined link) in the Supplier Margin page's comparison table. The entire row is NOT clickable — only the name.
+Triggered by clicking a **supplier name** (blue underlined link) in the Supplier Performance page's comparison table. The entire row is NOT clickable — only the name.
 
 | Calling Page | Table | Default View | Data Passed |
 |-------------|-------|-------------|-------------|
-| Supplier Margin | Supplier Comparison Table | Items | Start date, end date, supplier metrics (attributed net sales, cost of sales, gross profit, margin %, items supplied) |
+| Supplier Performance | Supplier Comparison Table | Items | Start date, end date, supplier metrics (attributed net sales, cost of sales, gross profit, margin %, items supplied) |
 
 ### 3.3 Modal Structure
 
@@ -456,7 +456,7 @@ The supplier profile surfaces supply chain risk through multiple signals:
 | Credit Note / Return | Customer | Customer name (blue link) in Top Debtors Table | Returns | — |
 | Sales Report | Customer | Customer name (blue link) in Group-By Table (customer dimension only) | Sales | Start date, end date |
 | Customer Margin | Customer | Customer name (blue link) in Customer Margin Table | Sales | Start date, end date |
-| Supplier Margin | Supplier | Supplier name (blue link) in Supplier Comparison Table | Items | Start date, end date, supplier metrics |
+| Supplier Performance | Supplier | Supplier name (blue link) in Supplier Comparison Table | Items | Start date, end date, supplier metrics |
 
 ### 4.2 Interaction Pattern
 
@@ -482,7 +482,7 @@ When a modal is opened from a page with an active date range filter:
 
 - **Sales and Customer Margin pages:** Pass their current start/end dates to the modal. The Sales Transactions view and trend charts initialize with these dates.
 - **Payment and Return pages:** Do not pass date ranges (these pages use snapshot data, not date-ranged data)
-- **Supplier Margin page:** Passes its date range to both the Profile view trends and Items view table.
+- **Supplier Performance page:** Passes its date range to both the Profile view trends and Items view table.
 
 Within a modal, the Profile view and sub-views maintain **independent date ranges** — changing dates in one view does not affect the other.
 

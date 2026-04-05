@@ -33,7 +33,7 @@ The sidebar contains **7 primary pages** and **1 admin section**, separated by a
 | 4 | Financials | Bar chart |
 | 5 | Expenses | Receipt |
 | 6 | Customer Margin | People/users |
-| 7 | Supplier Margin | Truck |
+| 7 | Supplier Performance | Truck |
 | — | *divider line* | |
 | 8 | Data Sync *(internal)* | Refresh arrows |
 
@@ -547,7 +547,7 @@ When a profile modal opens, the initial view depends on where the user clicked:
 | Returns | Returns | — |
 | Sales Report | Sales | — |
 | Customer Margin | Sales | — |
-| Supplier Margin | — | Items Supplied |
+| Supplier Performance | — | Items Supplied |
 
 ### 9.4 Section-Level Loading
 
@@ -824,7 +824,7 @@ Some patterns are intentionally different on specific pages:
 | Financial Statements | No table pagination or search; collapsible row hierarchy instead | Hierarchical accounting data requires tree-style navigation |
 | Financial Statements | FY defaults to 2nd most recent (not latest) | Most recent FY is typically incomplete |
 | Expenses | Cost-type toggle (All / Cost of Sales / Operating Costs) between filters and KPI cards | Unique to this page's dual cost-structure analysis |
-| Supplier Margin | "Est." prefix on all KPI labels | Supplier margins are attributed estimates, not direct calculations |
+| Supplier Performance | "Est." prefix on all KPI labels | Supplier margins are attributed estimates, not direct calculations |
 | Payment Collection | Two distinct sections (Period + Snapshot) | Data has different temporal scopes requiring visual separation |
 
 ---

@@ -1,13 +1,13 @@
-# Supplier Margin
+# Supplier Performance
 
-> **Page Title:** "Supplier Margin"
+> **Page Title:** "Supplier Performance"
 > **Page Description:** "Analyzes profit margin trends for suppliers, supporting negotiation and procurement strategies."
 
 ---
 
 ## 1. Purpose & User Goals
 
-The Supplier Margin page answers: **"Which suppliers give us the best deals — and where are we losing money?"**
+The Supplier Performance page answers: **"Which suppliers give us the best deals — and where are we losing money?"**
 
 Unlike the Customer Margin page (which looks at who you *sell to*), this page looks at who you *buy from*. It calculates profitability at the **item level** by matching each product's purchase cost (from purchase invoices) to its selling price (from sales invoices and cash sales). When an item is supplied by multiple suppliers, revenue and cost are **attributed proportionally** based on each supplier's share of total purchased quantity.
 
@@ -21,7 +21,7 @@ Unlike the Customer Margin page (which looks at who you *sell to*), this page lo
 
 **Key caveat for users:** Because the system does not track which supplier's stock was sold to which customer, net sales, cost of sales, and profit per supplier are **estimated** — split based on each supplier's share of total purchases. Quantity purchased, average purchase price, and total spend use **actual data** from purchase invoices. All "Est." labels throughout the page reinforce this distinction.
 
-**Same formula, different lens:** Both Customer Margin and Supplier Margin calculate `(Selling Price − Purchase Price) / Selling Price`, but Customer Margin slices by who you sell to; Supplier Margin slices by who you buy from.
+**Same formula, different lens:** Both Customer Margin and Supplier Performance calculate `(Selling Price − Purchase Price) / Selling Price`, but Customer Margin slices by who you sell to; Supplier Performance slices by who you buy from.
 
 ---
 
@@ -31,7 +31,7 @@ The page follows a single continuous scroll with components in this order:
 
 | Row | Content | Width / Responsiveness |
 |-----|---------|----------------------|
-| 1 | **Page Banner** — title "Supplier Margin" + description | Full width |
+| 1 | **Page Banner** — title "Supplier Performance" + description | Full width |
 | 2 | **Filter Bar** — date range picker inside a bordered card | Full width |
 | 3 | **KPI Cards** — 5 summary cards | 2 columns small, 3 columns medium, 5 columns extra-large |
 | 4 | **Profitability Trend Chart** — monthly bars + margin % line | Full width |
@@ -591,7 +591,7 @@ The following differences were discovered by reverse-engineering the live codeba
 
 | Area | Old Documentation | Actual Implementation |
 |------|------------------|----------------------|
-| Page title | "Supplier Profit Margin Report" | **"Supplier Margin"** |
+| Page title | "Supplier Profit Margin Report" | **"Supplier Performance"** |
 | KPI card labels | "Gross Sales", "Purchase Cost", "Gross Profit" | **"Est. Net Sales", "Est. Cost of Sales", "Est. Gross Profit"** — "Est." prefix is significant, highlighting that values are attributed estimates |
 | KPI card formulas | Not mentioned | **Formula subtitles shown** below each card value (e.g., "IV + CS (excl. credit notes)") |
 | Estimation explanation | Not documented | **Info-icon callout** in supplier table header explaining the attribution methodology |
