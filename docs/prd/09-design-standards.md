@@ -220,13 +220,31 @@ Each expense category has a permanently assigned colour used in charts and legen
 
 ### 4.3 Readability Rules
 
-> **Critical mandate:** End users are older executives who need high readability.
+> **Critical mandate:** End users are older executives (50+) who need high readability. Every text element must be legible at arm's length on a standard 1080p monitor. When in doubt, bigger and darker.
 
-- **Never** use grey, muted, or low-contrast text for important labels or data values
-- All primary text must meet **WCAG AA** minimum contrast (4.5 : 1 for normal text)
-- KPI values and table data use high-contrast colours (near-black on white)
-- Muted colour is permitted only for secondary descriptions, subtitles, and help text — never for data
-- Link text is always dark blue (#2E5090) with a persistent underline to signal clickability
+#### Minimum font sizes
+
+| Element | Minimum size | Notes |
+|---------|-------------|-------|
+| KPI values, table data, labels, headers | 14 px | No data-bearing text below 14 px |
+| Subtitles, descriptions, chart axis labels | 13 px | Supporting context |
+| Absolute floor (any text) | 12 px | `text-[10px]` and `text-[11px]` are banned |
+
+#### Contrast rules
+
+- **Data and labels** (KPI labels, KPI values, table headers, table cells, entity names, chart legends): always full-contrast near-black (`#1A1A1A` / `text-foreground`) — no grey, no opacity modifiers
+- **Supporting text** (subtitles, pagination, filter labels, chart axis labels): dark grey minimum (`#4B4B4B` / `text-foreground/80`) — never lighter than 80 % opacity
+- **Supplementary text** (formula breakdowns, placeholders, empty-state hints): medium grey (`#6B6B6B` / `text-muted-foreground`) — never lighter than 70 % opacity
+- **Banned opacity values:** `text-foreground/60`, `/50`, `/40`, `/30` — these fail contrast on white backgrounds
+- All text must meet **WCAG AA** minimum contrast (4.5 : 1 for normal text, 3 : 1 for large text)
+
+#### Other rules
+
+- KPI labels (e.g. "NET SALES") must be **semi-bold (600)** — not thin grey uppercase
+- Link text is always dark blue (#2E5090) with a persistent underline
+- Semantic colours (red, amber, emerald) must be paired with a sign (+/−), arrow, or label — never colour alone
+- Chart axis tick labels and legend text follow the same size and contrast rules above
+- No text element should require squinting — if it does, it is too small or too light
 
 ---
 
