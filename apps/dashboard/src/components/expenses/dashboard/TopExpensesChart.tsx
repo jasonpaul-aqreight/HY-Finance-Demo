@@ -92,8 +92,8 @@ export function TopExpensesChart({ filters }: { filters: DashboardFilters }) {
             <ToggleGroup<CostType>
               options={[
                 { key: 'all', label: 'All' },
-                { key: 'cogs', label: 'COGS' },
-                { key: 'opex', label: 'OPEX' },
+                { key: 'cogs', label: 'Cost of Sales' },
+                { key: 'opex', label: 'Operating Costs' },
               ]}
               value={costType}
               onChange={setCostType}
@@ -131,16 +131,16 @@ export function TopExpensesChart({ filters }: { filters: DashboardFilters }) {
           <CardTitle>{title}</CardTitle>
           <p className="text-xs text-muted-foreground mt-1">
             {direction === 'top' ? 'Highest' : 'Lowest'} GL accounts by net cost &middot;
-            <span className="inline-block w-3 h-3 rounded-sm ml-2 mr-1 align-middle" style={{ background: COGS_COLOR }} />COGS
-            <span className="inline-block w-3 h-3 rounded-sm ml-2 mr-1 align-middle" style={{ background: OPEX_COLOR }} />OPEX
+            <span className="inline-block w-3 h-3 rounded-sm ml-2 mr-1 align-middle" style={{ background: COGS_COLOR }} />Cost of Sales
+            <span className="inline-block w-3 h-3 rounded-sm ml-2 mr-1 align-middle" style={{ background: OPEX_COLOR }} />Operating Costs
           </p>
         </div>
         <div className="flex items-center gap-1.5">
           <ToggleGroup<CostType>
             options={[
               { key: 'all', label: 'All' },
-              { key: 'cogs', label: 'COGS' },
-              { key: 'opex', label: 'OPEX' },
+              { key: 'cogs', label: 'Cost of Sales' },
+              { key: 'opex', label: 'Operating Costs' },
             ]}
             value={costType}
             onChange={setCostType}

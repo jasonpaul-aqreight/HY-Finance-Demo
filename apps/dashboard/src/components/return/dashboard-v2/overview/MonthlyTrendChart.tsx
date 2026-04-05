@@ -26,7 +26,7 @@ export function MonthlyTrendChart({ filters }: { filters: V2Filters }) {
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-sm">Monthly Return Trend</CardTitle>
-        <p className="text-xs text-muted-foreground">Return value vs unresolved amount over time</p>
+        <p className="text-xs text-muted-foreground">Return value vs unsettled amount over time</p>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={300}>
@@ -50,7 +50,7 @@ export function MonthlyTrendChart({ filters }: { filters: V2Filters }) {
                     <p className="font-semibold">Month: {label}</p>
                     {payload.map((p) => (
                       <p key={p.dataKey as string} style={{ color: p.color }}>
-                        {p.dataKey === 'return_value' ? 'Return Value' : 'Unresolved'}:{' '}
+                        {p.dataKey === 'return_value' ? 'Return Value' : 'Unsettled'}:{' '}
                         {formatRM(p.value as number)}
                       </p>
                     ))}
@@ -60,7 +60,7 @@ export function MonthlyTrendChart({ filters }: { filters: V2Filters }) {
             />
             <Legend
               formatter={(value) =>
-                value === 'return_value' ? 'Return Value' : 'Unresolved'
+                value === 'return_value' ? 'Return Value' : 'Unsettled'
               }
             />
             <Area

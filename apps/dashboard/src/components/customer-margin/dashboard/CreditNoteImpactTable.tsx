@@ -78,8 +78,8 @@ export function CreditNoteImpactTable({ filters }: Props) {
   function handleExportExcel() {
     exportToExcel('credit-note-impact', [
       { header: 'Customer', key: 'company_name', width: 30 },
-      { header: 'IV Revenue', key: 'iv_revenue', width: 16 },
-      { header: 'CN Amount', key: 'cn_revenue', width: 16 },
+      { header: 'Invoice Sales', key: 'iv_revenue', width: 16 },
+      { header: 'Credit Note Amt', key: 'cn_revenue', width: 16 },
       { header: 'Return Rate %', key: 'return_rate_pct', width: 14 },
       { header: 'Margin Before', key: 'margin_before', width: 14 },
       { header: 'Margin After', key: 'margin_after', width: 14 },
@@ -121,7 +121,7 @@ export function CreditNoteImpactTable({ filters }: Props) {
             <input
               value={search}
               onChange={e => { setSearch(e.target.value); setPage(1); }}
-              placeholder="Search customer or code..."
+              placeholder="Search by code or name..."
               className="h-8 w-full rounded-lg border border-input bg-transparent pl-8 pr-8 text-sm outline-none focus:ring-1 focus:ring-ring"
             />
             {search && (
@@ -147,8 +147,8 @@ export function CreditNoteImpactTable({ filters }: Props) {
               <TableHeader>
                 <TableRow>
                   <SortHeader col="company_name">Customer</SortHeader>
-                  <SortHeader col="iv_revenue" className="text-right">IV Revenue</SortHeader>
-                  <SortHeader col="cn_revenue" className="text-right">CN Amount</SortHeader>
+                  <SortHeader col="iv_revenue" className="text-right">Invoice Sales</SortHeader>
+                  <SortHeader col="cn_revenue" className="text-right">Credit Note Amt</SortHeader>
                   <SortHeader col="return_rate_pct" className="text-right">Return Rate</SortHeader>
                   <SortHeader col="margin_before" className="text-right">Margin Before</SortHeader>
                   <SortHeader col="margin_after" className="text-right">Margin After</SortHeader>

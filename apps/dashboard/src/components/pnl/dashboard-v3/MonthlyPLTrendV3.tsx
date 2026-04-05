@@ -36,8 +36,8 @@ export function MonthlyPLTrendV3({ fy, range }: Props) {
   const chartData = data.data.map(d => ({
     label: d.label,
     'Net Sales': d.net_sales,
-    COGS: d.cogs,
-    OPEX: d.expenses,
+    'Cost of Sales': d.cogs,
+    'Operating Costs': d.expenses,
     'Profit/Loss (+)': d.net_profit >= 0 ? d.net_profit : 0,
     'Profit/Loss (-)': d.net_profit < 0 ? d.net_profit : 0,
   }));
@@ -87,11 +87,11 @@ export function MonthlyPLTrendV3({ fy, range }: Props) {
                     </span>
                     <span className="flex items-center gap-1.5">
                       <span className="inline-block w-4 h-0.5" style={{ backgroundColor: '#ED7D31' }} />
-                      COGS
+                      Cost of Sales
                     </span>
                     <span className="flex items-center gap-1.5">
                       <span className="inline-block w-4 h-0.5" style={{ backgroundColor: '#8b5cf6' }} />
-                      OPEX
+                      Operating Costs
                     </span>
                   </div>
                 )}
@@ -107,14 +107,14 @@ export function MonthlyPLTrendV3({ fy, range }: Props) {
               />
               <Line
                 type="monotone"
-                dataKey="COGS"
+                dataKey="Cost of Sales"
                 stroke="#ED7D31"
                 strokeWidth={2}
                 dot={{ r: 3, fill: '#ED7D31' }}
               />
               <Line
                 type="monotone"
-                dataKey="OPEX"
+                dataKey="Operating Costs"
                 stroke="#8b5cf6"
                 strokeWidth={2}
                 dot={{ r: 3, fill: '#8b5cf6' }}

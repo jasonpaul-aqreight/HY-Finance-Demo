@@ -31,18 +31,18 @@ function getColumns(group: GroupByDimension): Column[] {
     return n != null ? Math.round(n).toLocaleString('en-MY') : '0';
   };
 
-  const active = (v: unknown) => (v === 'T' ? 'True' : v === 'F' ? 'False' : String(v ?? ''));
+  const active = (v: unknown) => (v === 'T' ? 'Active' : v === 'F' ? 'Inactive' : String(v ?? ''));
 
   switch (group) {
     case 'customer':
       return [
         { key: 'code', label: 'Code' },
         { key: 'name', label: 'Customer Name' },
-        { key: 'customer_type', label: 'Category' },
+        { key: 'customer_type', label: 'Customer Type' },
         { key: 'total_sales', label: 'Total Sales', format: rm },
         { key: 'invoice_sales', label: 'Invoice Sales', format: rm },
         { key: 'cash_sales', label: 'Cash Sales', format: rm },
-        { key: 'credit_notes', label: 'Credit Note', format: rm },
+        { key: 'credit_notes', label: 'Credit Notes', format: rm },
       ];
     case 'customer-type':
       return [
@@ -55,7 +55,7 @@ function getColumns(group: GroupByDimension): Column[] {
 
     case 'agent':
       return [
-        { key: 'name', label: 'Agent' },
+        { key: 'name', label: 'Sales Agent' },
         { key: 'is_active', label: 'Active', format: active },
         { key: 'total_sales', label: 'Total Sales', format: rm },
         { key: 'invoice_sales', label: 'Invoice Sales', format: rm },
@@ -68,11 +68,11 @@ function getColumns(group: GroupByDimension): Column[] {
         { key: 'total_sales', label: 'Total Sales', format: rm },
         { key: 'invoice_sales', label: 'Invoice Sales', format: rm },
         { key: 'cash_sales', label: 'Cash Sales', format: rm },
-        { key: 'credit_notes', label: 'Credit Note', format: rm },
+        { key: 'credit_notes', label: 'Credit Notes', format: rm },
       ];
     case 'fruit':
       return [
-        { key: 'name', label: 'Fruit' },
+        { key: 'name', label: 'Product' },
         { key: 'fruit_country', label: 'Country' },
         { key: 'fruit_variant', label: 'Variant' },
         { key: 'total_sales', label: 'Total Sales', format: rm },

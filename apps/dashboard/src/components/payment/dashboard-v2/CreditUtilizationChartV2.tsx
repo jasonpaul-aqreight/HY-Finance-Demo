@@ -6,16 +6,16 @@ import { useStableData } from '@/hooks/useStableData';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 
 const CATEGORY_LABELS: Record<string, string> = {
-  'Within Limit': 'Within Limit (< 80%)',
-  'Near Limit': 'Near Limit (\u2265 80%)',
-  'Over Limit': 'Over Limit (> 100%)',
+  'Within Limit': 'Within Limit',
+  'Near Limit': 'Near Limit',
+  'Over Limit': 'Over Limit',
   'No Limit Set': 'No Limit Set',
 };
 
 const CATEGORY_COLORS: Record<string, string> = {
-  'Within Limit (< 80%)': '#4ade80',
-  'Near Limit (\u2265 80%)': '#facc15',
-  'Over Limit (> 100%)': '#ef4444',
+  'Within Limit': '#4ade80',
+  'Near Limit': '#facc15',
+  'Over Limit': '#ef4444',
   'No Limit Set': '#9ca3af',
 };
 
@@ -41,7 +41,7 @@ export default function CreditUtilizationChartV2() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Credit Utilization Distribution</CardTitle>
+        <CardTitle>Credit Usage</CardTitle>
       </CardHeader>
       <CardContent>
         {!data ? (

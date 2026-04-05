@@ -3,7 +3,7 @@
 import { useMemo, useEffect } from 'react';
 import { useCostTrend } from '@/hooks/expenses/useCostData';
 import { useStableData } from '@/hooks/useStableData';
-import type { DashboardFilters, Granularity } from '@/hooks/expenses/useDashboardFilters';
+import type { DashboardFilters } from '@/hooks/expenses/useDashboardFilters';
 import {
   BarChart,
   Bar,
@@ -11,11 +11,8 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
 } from 'recharts';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { formatRM, getCategoryColor } from '@/lib/expenses/format';
 
 function formatYAxis(v: number) {
@@ -24,18 +21,10 @@ function formatYAxis(v: number) {
   return String(v);
 }
 
-function formatXLabel(label: string, granularity: Granularity) {
-  if (granularity === 'monthly') {
-    const [y, m] = label.split('-');
-    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    return `${months[parseInt(m) - 1]} ${y?.slice(2)}`;
-  }
-  if (granularity === 'weekly') {
-    return label.replace(/^\d{4}-/, '');
-  }
-  // daily: "2025-08-01" → "Aug 1"
-  const d = new Date(label + 'T00:00:00');
-  return d.toLocaleDateString('en-MY', { month: 'short', day: 'numeric' });
+function formatXLabel(label: string) {
+  const [y, m] = label.split('-');
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${months[parseInt(m) - 1]} ${y?.slice(2)}`;
 }
 
 function CustomTooltip({ active, payload, label }: {
@@ -64,11 +53,10 @@ function CustomTooltip({ active, payload, label }: {
 
 interface CostTrendChartProps {
   filters: DashboardFilters;
-  setFilters: (updates: Partial<DashboardFilters>) => void;
   onCategories?: (categories: string[]) => void;
 }
 
-export function CostTrendChart({ filters, setFilters, onCategories }: CostTrendChartProps) {
+export function CostTrendChart({ filters, onCategories }: CostTrendChartProps) {
   const { data: rawData } = useCostTrend(filters);
   const data = useStableData(rawData);
 
@@ -115,21 +103,6 @@ export function CostTrendChart({ filters, setFilters, onCategories }: CostTrendC
   return (
     <div>
       <div className="font-semibold text-sm pb-1">Cost Trend</div>
-      <div className="flex justify-center pb-2">
-        <div className="flex border rounded-md overflow-hidden">
-          {(['daily', 'weekly', 'monthly'] as const).map((g) => (
-            <Button
-              key={g}
-              size="sm"
-              variant={filters.granularity === g ? 'default' : 'ghost'}
-              className="rounded-none border-0 text-xs px-3 h-7 capitalize"
-              onClick={() => setFilters({ granularity: g })}
-            >
-              {g}
-            </Button>
-          ))}
-        </div>
-      </div>
       <ResponsiveContainer width="100%" height={360}>
         <BarChart data={chartData} margin={{ top: 8, right: 16, bottom: 8, left: 16 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -138,7 +111,7 @@ export function CostTrendChart({ filters, setFilters, onCategories }: CostTrendC
             tick={{ fontSize: 11 }}
             tickLine={false}
             interval="preserveStartEnd"
-            tickFormatter={(label: string) => formatXLabel(label, filters.granularity)}
+            tickFormatter={formatXLabel}
           />
           <YAxis
             tickFormatter={formatYAxis}

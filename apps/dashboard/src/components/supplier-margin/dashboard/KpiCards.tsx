@@ -58,9 +58,9 @@ export function KpiCards({ filters }: { filters: DashboardFilters }) {
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
       <KpiCard
-        title="Est. Gross Sales"
+        title="Est. Net Sales"
         value={formatRM(current.revenue)}
-        formula="IV + CS (excl. credit notes)"
+        formula="Invoice + Cash Sales (excl. credit notes)"
       />
       <KpiCard
         title="Est. Cost of Sales"
@@ -74,10 +74,10 @@ export function KpiCards({ filters }: { filters: DashboardFilters }) {
         formula="Est. Gross Sales − Est. Cost of Sales"
       />
       <KpiCard
-        title="Overall Margin"
+        title="Gross Margin %"
         value={current.margin_pct != null ? `${current.margin_pct.toFixed(1)}%` : '—'}
         valueColor={marginColor(current.margin_pct)}
-        formula="Gross Profit ÷ Gross Sales"
+        formula="Gross Profit ÷ Net Sales"
       />
       <KpiCard
         title="Active Suppliers"

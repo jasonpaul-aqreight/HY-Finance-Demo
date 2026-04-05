@@ -116,9 +116,9 @@ export function TopDebtorsTable({ initialStartDate, initialEndDate }: { initialS
       { header: 'Customer', key: 'company_name', width: 30 },
       { header: 'Returns', key: 'return_count', width: 10 },
       { header: 'Total Value', key: 'total_return_value', width: 16 },
-      { header: 'Knocked Off', key: 'total_knocked_off', width: 16 },
+      { header: 'Offset', key: 'total_knocked_off', width: 16 },
       { header: 'Refunded', key: 'total_refunded', width: 16 },
-      { header: 'Unresolved', key: 'unresolved', width: 16 },
+      { header: 'Unsettled', key: 'unresolved', width: 16 },
     ], sorted.map(r => ({
       debtor_code: r.debtor_code,
       company_name: r.company_name,
@@ -154,9 +154,9 @@ export function TopDebtorsTable({ initialStartDate, initialEndDate }: { initialS
     { key: 'company_name', label: 'Customer' },
     { key: 'return_count', label: 'Returns', align: 'right' },
     { key: 'total_return_value', label: 'Total Value', align: 'right' },
-    { key: 'total_knocked_off', label: 'Knocked Off', align: 'right' },
+    { key: 'total_knocked_off', label: 'Offset', align: 'right' },
     { key: 'total_refunded', label: 'Refunded', align: 'right' },
-    { key: 'unresolved', label: 'Unresolved', align: 'right' },
+    { key: 'unresolved', label: 'Unsettled', align: 'right' },
   ];
 
   return (
@@ -188,10 +188,10 @@ export function TopDebtorsTable({ initialStartDate, initialEndDate }: { initialS
               onValueChange={val => { setStatusFilter(val as StatusFilter); setPage(1); }}
             >
               <SelectTrigger size="sm" className="w-[150px]">
-                <SelectValue>{statusFilter === 'outstanding' ? 'Unresolved' : statusFilter === 'resolved' ? 'Resolved' : 'All Returned'}</SelectValue>
+                <SelectValue>{statusFilter === 'outstanding' ? 'Unsettled' : statusFilter === 'resolved' ? 'Resolved' : 'All Returned'}</SelectValue>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="outstanding">Unresolved</SelectItem>
+                <SelectItem value="outstanding">Unsettled</SelectItem>
                 <SelectItem value="resolved">Resolved</SelectItem>
                 <SelectItem value="all">All Returned</SelectItem>
               </SelectContent>
@@ -202,7 +202,7 @@ export function TopDebtorsTable({ initialStartDate, initialEndDate }: { initialS
       <CardContent className="p-0">
         {sorted.length === 0 ? (
           <p className="text-sm text-muted-foreground py-8 text-center">
-            {search ? 'No matching customers found.' : 'No outstanding returns.'}
+            {search ? 'No matching customers found.' : 'No unsettled returns.'}
           </p>
         ) : (
           <div ref={tableRef} style={{ minHeight: lockedHeight.current }}>

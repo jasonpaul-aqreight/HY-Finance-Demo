@@ -52,7 +52,7 @@ function ReconFormulaTooltip() {
       <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/60 cursor-help" />
       <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1 z-[100] hidden group-hover:block w-max bg-background border rounded-lg shadow-lg p-3 space-y-2">
         <p className="font-mono text-sm bg-muted/50 rounded px-2 py-1">
-          Unresolved = NetTotal - KnockOffAmt - RefundAmt
+          Unsettled = Total − Offset − Refund
         </p>
         <div className="space-y-1 text-sm">
           <div className="flex items-center gap-1.5">
@@ -65,7 +65,7 @@ function ReconFormulaTooltip() {
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
-            <span>= Total → Outstanding</span>
+            <span>= Total → Unsettled</span>
           </div>
         </div>
       </span>
@@ -95,13 +95,13 @@ export function KpiCardsV2({ filters }: { filters: V2Filters }) {
         subtitle={`${formatCount(data.return_count)} return credit notes`}
       />
       <KpiCard
-        title="Reconciled"
+        title="Settled"
         value={formatRM(data.total_knocked_off + data.total_refunded)}
         valueColor="text-emerald-600"
         subtitle={`Knocked Off + Refunded = ${data.total_return_value > 0 ? (((data.total_knocked_off + data.total_refunded) / data.total_return_value) * 100).toFixed(1) : '0'}% of total`}
       />
       <KpiCard
-        title="Unresolved"
+        title="Unsettled"
         value={formatRM(data.total_unresolved)}
         valueColor={data.total_unresolved > 0 ? 'text-red-600' : 'text-emerald-600'}
         subtitle={`${data.total_return_value > 0 ? ((data.total_unresolved / data.total_return_value) * 100).toFixed(1) : '0'}% of total — ${formatCount(data.partial_count)} partial + ${formatCount(data.outstanding_count)} outstanding`}

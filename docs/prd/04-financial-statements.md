@@ -10,7 +10,7 @@
 
 The Financial Statements page provides a comprehensive view of the company's financial health through two core accounting reports:
 
-- **Profit & Loss (P&L) Statement** — Shows revenue, costs, and profitability over a fiscal year, answering: *"Are we making or losing money, and where?"*
+- **Profit & Loss (P&L) Statement** — Shows revenue, costs, and profitability over a financial year, answering: *"Are we making or losing money, and where?"*
 - **Balance Sheet** — Shows what the company owns, owes, and is worth at a point in time, answering: *"What is our financial position right now?"*
 
 **Key questions this page answers for executives:**
@@ -41,13 +41,14 @@ The page follows the standard dashboard layout (fixed sidebar, max-width 1600px 
 │  "Profit & Loss statement, Year-over-Year        │
 │   comparison, and Balance Sheet overview."        │
 ├─────────────────────────────────────────────────┤
-│  Filter Bar (fiscal year selector)               │
+│  Filter Bar (financial year selector)              │
 ├─────────────────────────────────────────────────┤
 │  KPI Cards — Row 1 (4 cards)                     │
-│  [Net Sales] [COGS] [Gross Profit] [OPEX]        │
+│  [Net Sales] [Cost of Sales (COGS)] [Gross Profit]│
+│  [Operating Costs (OPEX)]                         │
 ├─────────────────────────────────────────────────┤
 │  KPI Cards — Row 2 (4 cards)                     │
-│  [Operating Profit] [Profit/Loss] [Expense Ratio]│
+│  [Operating Profit] [Profit/Loss] [Expense Ratio] │
 │  [Current Ratio]                                 │
 ├─────────────────────────────────────────────────┤
 │  Monthly P&L Trend (combo chart)                 │
@@ -86,17 +87,17 @@ Eight KPI cards arranged in two rows of four. Each card is a rounded container w
 | # | Label | Value | Formula | Format |
 |---|-------|-------|---------|--------|
 | 1 | **Net Sales** | YTD total | Sales + Sales Adjustments | RM currency |
-| 2 | **COGS** | YTD total | Net Sales − Gross Profit | RM currency |
-| 3 | **Gross Profit** | YTD total | Net Sales − COGS | RM currency, color-coded |
-| 4 | **OPEX** | YTD total | Sum of all operating expenses | RM currency |
+| 2 | **Cost of Sales (COGS)** | YTD total | Net Sales − Gross Profit | RM currency |
+| 3 | **Gross Profit** | YTD total | Net Sales − Cost of Sales | RM currency, color-coded |
+| 4 | **Operating Costs (OPEX)** | YTD total | Sum of all operating expenses | RM currency |
 
 ### Row 2: Profitability & Ratios
 
 | # | Label | Value | Formula | Format |
 |---|-------|-------|---------|--------|
-| 5 | **Operating Profit (EBIT)** | YTD total | Gross Profit − OPEX | RM currency, color-coded |
+| 5 | **Operating Profit** | YTD total | Gross Profit − Operating Costs | RM currency, color-coded |
 | 6 | **Profit/Loss** | Amount + margin | Net Profit and Net Margin % | RM currency + percentage, color-coded |
-| 7 | **Expense Ratio** | Percentage | OPEX ÷ Net Sales × 100 | Percentage |
+| 7 | **Expense Ratio** | Percentage | Operating Costs ÷ Net Sales × 100 | Percentage |
 | 8 | **Current Ratio** | Ratio | Current Assets ÷ Current Liabilities (from Balance Sheet) | Decimal (e.g., 2.50) |
 
 ### Color Rules (Alarm States)
@@ -121,7 +122,7 @@ While data loads, both rows show skeleton placeholders matching the 4-column car
 
 ### 4.1 Monthly P&L Trend
 
-A combination chart showing monthly financial performance across the selected fiscal year.
+A combination chart showing monthly financial performance across the selected financial year.
 
 **Chart Type:** Mixed bar + line chart
 
@@ -132,8 +133,8 @@ A combination chart showing monthly financial performance across the selected fi
 | Profit (positive months) | Bar | Green | Net profit when positive; bars extend upward |
 | Loss (negative months) | Bar | Red | Net profit when negative; bars extend downward |
 | Net Sales | Line | Blue | Monthly sales revenue |
-| COGS | Line | Orange | Monthly cost of goods sold |
-| OPEX | Line | Purple | Monthly operating expenses |
+| Cost of Sales | Line | Orange | Monthly cost of goods sold |
+| Operating Costs | Line | Purple | Monthly operating expenses |
 
 **Axes:**
 - **X-axis:** Month labels (Mar, Apr, May, ... Feb)
@@ -149,29 +150,29 @@ A combination chart showing monthly financial performance across the selected fi
 
 ### 4.2 Multi-Year Small Multiples
 
-Eight mini bar charts displayed in a 2×4 grid, each showing one P&L line item across fiscal years.
+Eight mini bar charts displayed in a 2×4 grid, each showing one P&L line item across financial years.
 
 **Categories (in order):**
 
 | # | Category | Bar Color |
 |---|----------|-----------|
 | 1 | Net Sales | Blue |
-| 2 | COGS | Orange |
+| 2 | Cost of Sales | Orange |
 | 3 | Gross Profit | Green |
 | 4 | Other Income | Purple |
-| 5 | OPEX | Indigo |
+| 5 | Operating Costs | Indigo |
 | 6 | Net Profit | Red |
 | 7 | Taxation | Gray |
-| 8 | NPAT | Orange |
+| 8 | Net Profit After Tax | Orange |
 
 **Per Mini Chart:**
 - **Height:** ~80px (compact)
-- **X-axis:** Fiscal year labels abbreviated (e.g., '25, '24, '23)
+- **X-axis:** Financial year labels abbreviated (e.g., '25, '24, '23)
 - **Y-axis:** Hidden (auto-scaled per chart)
 - **Reference line:** Y=0 baseline shown for categories that can go negative
 - **Hover tooltip:** Full category name + compact RM value
 
-**Data Scope:** Shows the selected fiscal year plus the 3 prior fiscal years (up to 4 years total).
+**Data Scope:** Shows the selected financial year plus the 3 prior financial years (up to 4 years total).
 
 ---
 
@@ -207,10 +208,10 @@ A hierarchical, collapsible accounting statement showing detailed income and exp
 | Column | Description | Sticky | Alignment |
 |--------|-------------|--------|-----------|
 | Account | Account name (min 160px) | Yes (left) | Left |
-| Month columns | One per month in fiscal year (Mar–Feb) | No | Right |
-| YTD | Year-to-date total | No | Right |
-| Prior YTD | Same period in prior fiscal year | No | Right |
-| YoY % | Year-over-year change percentage | No | Right |
+| Month columns | One per month in financial year (Mar–Feb) | No | Right |
+| Year to Date | Year-to-date total | No | Right |
+| Prior Year | Same period in prior financial year | No | Right |
+| vs Last Year | Year-over-year change percentage | No | Right |
 
 **Account Type Groups (display order):**
 
@@ -234,11 +235,11 @@ A hierarchical, collapsible accounting statement showing detailed income and exp
 
 | After Group | Computed Row | Style | Formula |
 |-------------|-------------|-------|---------|
-| CO | **Gross Profit / (Loss)** | Bold, shaded background | Net Sales − COGS |
+| CO | **Gross Profit / (Loss)** | Bold, shaded background | Net Sales − Cost of Sales |
 | CO | *Gross Margin %* | Italic, small text | (Gross Profit ÷ Net Sales) × 100 |
 | EP | **Net Profit / (Loss)** | Bold, shaded background | Gross Profit + Other Income − Expenses |
 | EP | *Net Margin %* | Italic, small text | (Net Profit ÷ Net Sales) × 100 |
-| TX | **Net Profit / (Loss) After Taxation** | Bold, darkest shading | Net Profit − Taxation |
+| TX | **Net Profit After Tax** | Bold, darkest shading | Net Profit − Taxation |
 
 **Row Styling:**
 
@@ -247,18 +248,18 @@ A hierarchical, collapsible accounting statement showing detailed income and exp
 | Detail (account) | None | Normal |
 | Subtotal (group total) | Light shading | Semi-bold |
 | Total (computed) | Medium shading | Bold |
-| Grand total (NPAT) | Dark shading | Bold |
+| Grand total (Net Profit After Tax) | Dark shading | Bold |
 | Margin % | None | Italic, small, muted |
 
 **Number Formatting:**
 - All amounts use standard number format (no RM prefix in table cells)
 - Zero values display as en-dash (–)
 - Negative values display in red text
-- YoY % column: green for positive change, red for negative change
+- vs Last Year column: green for positive change, red for negative change
 
 **Horizontal Scrolling:** The table scrolls horizontally to accommodate all month columns. The Account column remains sticky on the left.
 
-**Export:** "Export Excel" button in the table header. Exports all rows (expanded) with columns: Account, all month columns, YTD, Prior YTD. File format: .xlsx
+**Export:** "Export Excel" button in the table header. Exports all rows (expanded) with columns: Account, all month columns, Year to Date, Prior Year. File format: .xlsx
 
 **No pagination** — this is a hierarchical accounting table, not a data listing.
 
@@ -266,14 +267,14 @@ A hierarchical, collapsible accounting statement showing detailed income and exp
 
 ### 5.2 Multi-Year Comparison Table
 
-A summary table comparing key P&L line items across multiple fiscal years.
+A summary table comparing key P&L line items across multiple financial years.
 
 **Columns:**
 
 | Column | Description | Alignment |
 |--------|-------------|-----------|
 | Line Item | P&L category name (min 140px, sticky left) | Left |
-| FY columns | One per fiscal year in range | Right |
+| FY columns | One per financial year in range | Right |
 | Trend | Change indicator (current vs prior year) | Center |
 
 **Line Items (in order):**
@@ -281,19 +282,19 @@ A summary table comparing key P&L line items across multiple fiscal years.
 | Line Item | Style | Description |
 |-----------|-------|-------------|
 | Net Sales | Normal | Total revenue |
-| COGS | Normal | Cost of goods |
-| **Gross Profit** | Bold | Revenue less COGS |
+| Cost of Sales | Normal | Cost of goods |
+| **Gross Profit** | Bold | Revenue less Cost of Sales |
 | *Gross Margin %* | Italic, small, muted | Profitability ratio |
 | Other Income | Normal | Non-operating income |
-| OPEX | Normal | Operating expenses |
+| Operating Costs | Normal | Operating expenses |
 | **Net Profit** | Bold | Bottom-line profit |
 | *Net Margin %* | Italic, small, muted | Net profitability ratio |
 | Taxation | Normal | Tax amounts |
-| **NPAT** | Bold | Net Profit After Tax |
+| **Net Profit After Tax** | Bold | Net Profit After Tax |
 
 **Visual Highlights:**
-- The currently selected fiscal year column is highlighted with a shaded background and bold text
-- Partial fiscal years (incomplete data) are marked with an asterisk (*) and a footer note: *"* Partial fiscal year (data not yet complete)"*
+- The currently selected financial year column is highlighted with a shaded background and bold text
+- Partial financial years (incomplete data) are marked with an asterisk (*) and a footer note: *"* Partial financial year (data not yet complete)"*
 
 **Trend Arrows (comparing current FY vs. prior FY):**
 
@@ -358,22 +359,22 @@ A snapshot comparison table showing the company's assets, liabilities, and equit
 
 ## 6. Filters & Controls
 
-### Fiscal Year Selector
+### Financial Year Selector
 
 | Control | Type | Default | Options |
 |---------|------|---------|---------|
-| Fiscal Year | Dropdown | 2nd most recent FY (most complete data) | All fiscal years with data (e.g., FY2023, FY2024, FY2025) |
+| Financial Year | Dropdown | 2nd most recent FY (most complete data) | All financial years with data (e.g., FY2023, FY2024, FY2025) |
 
-**Center Display:** The filter bar shows a centered label indicating the full date range of the selected fiscal year:
-> **Fiscal Year 2025 (Mar 2024 – Feb 2025)**
+**Center Display:** The filter bar shows a centered label indicating the full date range of the selected financial year:
+> **Financial Year 2025 (Mar 2024 – Feb 2025)**
 
-If data for the current FY is incomplete, the end month shows the actual latest month with data (e.g., "Mar 2024 – Oct 2024") rather than the theoretical end (Feb 2025).
+If data for the current financial year is incomplete, the end month shows the actual latest month with data (e.g., "Mar 2024 – Oct 2024") rather than the theoretical end (Feb 2025).
 
-### Fiscal Year Convention
+### Financial Year Convention
 
-- Fiscal year runs **March to February**
+- Financial year runs **March to February**
 - The named year is the **end** year: FY2025 = March 2024 through February 2025
-- This aligns with Malaysian fiscal year conventions used by the source accounting system
+- This aligns with Malaysian financial year conventions used by the source accounting system
 
 ### Expand/Collapse Controls
 
@@ -415,11 +416,11 @@ Sales (SL)
 
 + Other Income (OI)
 − Operating Expenses (EP)
-= NET PROFIT (a.k.a. EBIT — Earnings Before Interest & Tax)
+= NET PROFIT (a.k.a. Operating Profit)
   → Net Margin % = (Net Profit ÷ Net Sales) × 100
 
 − Taxation (TX)
-= NET PROFIT AFTER TAXATION (NPAT)
+= NET PROFIT AFTER TAX
 ```
 
 ### Account Type System
@@ -477,12 +478,12 @@ CHECK: Total Assets = Total Equity & Liabilities (must balance)
 
 ### Retained Earnings
 
-Retained Earnings on the Balance Sheet includes the accumulated current-year P&L. This is a running total from inception, not just the current fiscal year.
+Retained Earnings on the Balance Sheet includes the accumulated current-year P&L. This is a running total from inception, not just the current financial year.
 
 ### Multi-Year Comparison Rules
 
-- Shows the selected fiscal year plus 3 prior years (up to 4 years total)
-- Partial fiscal years are detected automatically (latest data period < FY end period)
+- Shows the selected financial year plus 3 prior years (up to 4 years total)
+- Partial financial years are detected automatically (latest data period < FY end period)
 - Trend arrows use a ±2% dead zone — changes within ±2% are shown as flat (→)
 - Amount rows show percentage change; margin rows show percentage point (pp) change
 
@@ -491,7 +492,7 @@ Retained Earnings on the Balance Sheet includes the accumulated current-year P&L
 The system uses a numeric period encoding: `year × 12 + month`. For example:
 - March 2024 = 24,291
 - February 2025 = 24,302
-- FY2025 spans period 24,291 to 24,302
+- Financial Year 2025 spans period 24,291 to 24,302
 
 This encoding is an internal convention — the UI always displays human-readable month/year labels.
 
@@ -517,7 +518,7 @@ Planned captures:
 | 4 | P&L Statement — one group expanded | Showing detail accounts |
 | 5 | Multi-Year Comparison — small multiples + table | With trend arrows visible |
 | 6 | Balance Sheet section — trend chart + statement table | Side by side on desktop |
-| 7 | Filter bar — fiscal year dropdown open | Showing available FY options |
+| 7 | Filter bar — financial year dropdown open | Showing available FY options |
 
 ---
 
@@ -531,6 +532,6 @@ The following discrepancies were discovered between the previous technical docum
 | Project filter | Documented as dropdown in filter bar | Not rendered in UI (exists in API but unused) |
 | Range control | Documented as user-selectable (fy/last12/ytd) | Internal state only — no UI control exposed |
 | KPI data scope | Latest month values | YTD totals extracted from full P&L statement |
-| Multi-year scope | All available years | ±3 years around selected FY (up to 7 years) |
+| Multi-year scope | All available years | ±3 years around selected financial year (up to 7 years) |
 | BS table rows | Basic listing | Alternating row shading for readability |
 | Filter default | Latest FY | 2nd most recent FY (most complete data) |

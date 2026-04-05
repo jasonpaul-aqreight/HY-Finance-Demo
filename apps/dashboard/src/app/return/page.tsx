@@ -6,8 +6,8 @@ export default function ReturnPage() {
   return (
     <>
       <PageBanner
-        title="Credit Note / Return / Refund"
-        description="Monitors all credit notes, product returns, and refunds to ensure accurate financial reconciliation."
+        title="Returns"
+        description="Track credit notes, returns, and refund settlements."
       />
       <Suspense fallback={<div className="p-8 text-muted-foreground">Loading dashboard...</div>}>
         <ReturnVersionRouter />

@@ -28,7 +28,7 @@ export default function DsoTrendChartV2({ filters }: DsoTrendChartV2Props) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>DSO Trend</CardTitle>
+        <CardTitle>Collection Days Trend</CardTitle>
       </CardHeader>
       <CardContent>
         {!data ? (
@@ -45,7 +45,7 @@ export default function DsoTrendChartV2({ filters }: DsoTrendChartV2Props) {
                 wrapperStyle={{ zIndex: 50 }}
                 formatter={(value) => [
                   value != null ? `${Number(value).toFixed(1)} days` : '--',
-                  'DSO',
+                  'Days',
                 ]}
               />
               {avgDso != null && (

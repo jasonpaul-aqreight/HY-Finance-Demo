@@ -85,27 +85,27 @@ export function PLKpiCardsV3({ fy }: Props) {
   // Row 1: Revenue & Costs
   const row1: KpiCardProps[] = [
     { title: 'Net Sales', value: formatRM(data.net_sales) },
-    { title: 'COGS', value: formatRM(cogs),
-      subtitle: 'Cost of Goods Sold' },
+    { title: 'Cost of Sales', value: formatRM(cogs),
+      subtitle: 'Direct costs of products sold' },
     { title: 'Gross Profit', value: formatRM(data.gross_profit),
-      subtitle: 'Sales - COGS',
+      subtitle: 'Sales - Cost of Sales',
       valueColor: data.gross_profit < 0 ? 'red' : 'green' },
-    { title: 'OPEX', value: formatRM(data.expenses),
-      subtitle: 'Operating Expenses' },
+    { title: 'Operating Costs', value: formatRM(data.expenses),
+      subtitle: 'Day-to-day business costs' },
   ];
 
   // Row 2: Profitability & Ratios
   const row2: KpiCardProps[] = [
-    { title: 'Operating Profit (EBIT)', value: formatRM(operating_profit),
-      subtitle: 'Gross Profit - OPEX',
+    { title: 'Operating Profit', value: formatRM(operating_profit),
+      subtitle: 'Gross Profit − Operating Costs',
       alarm: operating_profit < 0 ? 'negative' : 'positive',
       valueColor: operating_profit < 0 ? 'red' : 'green' },
     { title: 'Profit/Loss', value: formatRM(data.net_profit),
-      subtitle: `EBIT + Other Income - Tax | Margin: ${formatPct(net_margin_pct)}`,
+      subtitle: `Operating Profit + Other Income - Tax | Margin: ${formatPct(net_margin_pct)}`,
       alarm: data.net_profit < 0 ? 'negative' : 'positive',
       valueColor: data.net_profit < 0 ? 'red' : 'green' },
     { title: 'Expense Ratio', value: formatPct(data.expense_ratio),
-      subtitle: 'OPEX / Net Sales' },
+      subtitle: 'Operating Costs ÷ Net Sales' },
     { title: 'Current Ratio', value: currentRatio.toFixed(2),
       subtitle: 'Current Assets / Current Liabilities',
       alarm: currentRatio >= 1 ? 'positive' : (bsData ? 'negative' : null),

@@ -5,11 +5,11 @@ import { SearchIcon } from 'lucide-react';
 import type { GroupByDimension } from '@/lib/sales/types';
 
 const PLACEHOLDERS: Record<GroupByDimension, string> = {
-  'customer':      'Search by customer code or name',
-  'customer-type': 'Search by category',
-  'fruit':         'Search by fruit name',
-  'agent':         'Search by agent name',
-  'outlet':        'Search by location',
+  'customer':      'Search by code or name...',
+  'customer-type': 'Search by customer type',
+  'fruit':         'Search by product name',
+  'agent':         'Search by sales agent',
+  'outlet':        'Search by outlet',
 };
 
 interface GroupByFiltersProps {

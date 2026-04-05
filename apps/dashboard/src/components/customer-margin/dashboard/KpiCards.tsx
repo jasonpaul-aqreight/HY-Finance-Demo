@@ -30,8 +30,8 @@ export function KpiCards({ filters }: KpiCardsProps) {
   if (!data) return <SkeletonCards />;
 
   const cards = [
-    { title: 'Net Sales', value: formatRM(data.total_revenue), color: 'text-foreground', formula: 'IV + DN − CN' },
-    { title: 'Total COGS', value: formatRM(data.total_cogs), color: 'text-foreground', formula: 'Cost of goods sold' },
+    { title: 'Net Sales', value: formatRM(data.total_revenue), color: 'text-foreground', formula: 'Invoice + Debit Note − Credit Note' },
+    { title: 'Cost of Sales', value: formatRM(data.total_cogs), color: 'text-foreground' },
     {
       title: 'Gross Profit',
       value: formatRM(data.gross_profit),
@@ -39,7 +39,7 @@ export function KpiCards({ filters }: KpiCardsProps) {
       formula: 'Net Sales − COGS',
     },
     {
-      title: 'Overall Margin',
+      title: 'Gross Margin %',
       value: formatMarginPct(data.margin_pct),
       color: marginColor(data.margin_pct),
       formula: 'Gross Profit ÷ Net Sales',

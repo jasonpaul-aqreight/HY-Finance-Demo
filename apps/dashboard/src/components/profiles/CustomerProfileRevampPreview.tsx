@@ -70,12 +70,12 @@ function formatDate(dateStr: string) {
 
 // ─── Chart Colors — distinct per bucket ──────────────────────────────────────
 const AGING_COLORS: Record<string, string> = {
-  'Not Due': '#3b82f6',
-  '1-30 days': '#22c55e',
-  '31-60 days': '#facc15',
-  '61-90 days': '#f97316',
-  '91-120 days': '#ef4444',
-  '120+ days': '#7c3aed',
+  'Not Yet Due': '#3b82f6',
+  '1-30 Days': '#22c55e',
+  '31-60 Days': '#facc15',
+  '61-90 Days': '#f97316',
+  '91-120 Days': '#ef4444',
+  '120+ Days': '#7c3aed',
 };
 
 const RETURN_DONUT_COLORS = ['#10b981', '#ef4444'];
@@ -157,19 +157,19 @@ export function CustomerProfileRevamp({ open, onClose, debtorCode, companyName, 
   const agingBuckets = useMemo(() => {
     if (!invoices || !Array.isArray(invoices)) return [];
     const buckets: Record<string, { amount: number; count: number }> = {
-      'Not Due': { amount: 0, count: 0 }, '1-30 days': { amount: 0, count: 0 },
-      '31-60 days': { amount: 0, count: 0 }, '61-90 days': { amount: 0, count: 0 },
-      '91-120 days': { amount: 0, count: 0 }, '120+ days': { amount: 0, count: 0 },
+      'Not Yet Due': { amount: 0, count: 0 }, '1-30 Days': { amount: 0, count: 0 },
+      '31-60 Days': { amount: 0, count: 0 }, '61-90 Days': { amount: 0, count: 0 },
+      '91-120 Days': { amount: 0, count: 0 }, '120+ Days': { amount: 0, count: 0 },
     };
     for (const inv of invoices) {
       const overdue = inv.days_overdue ?? 0;
       let key: string;
-      if (overdue <= 0) key = 'Not Due';
-      else if (overdue <= 30) key = '1-30 days';
-      else if (overdue <= 60) key = '31-60 days';
-      else if (overdue <= 90) key = '61-90 days';
-      else if (overdue <= 120) key = '91-120 days';
-      else key = '120+ days';
+      if (overdue <= 0) key = 'Not Yet Due';
+      else if (overdue <= 30) key = '1-30 Days';
+      else if (overdue <= 60) key = '31-60 Days';
+      else if (overdue <= 90) key = '61-90 Days';
+      else if (overdue <= 120) key = '91-120 Days';
+      else key = '120+ Days';
       buckets[key].amount += inv.outstanding ?? 0;
       buckets[key].count += 1;
     }
@@ -339,7 +339,7 @@ function ProfileView({
               <div className="p-4 space-y-3">
                 <h4 className="text-xs font-bold text-foreground uppercase tracking-widest border-b pb-2">Contact</h4>
                 <div className="space-y-2 text-sm">
-                  <DetailRow label="PIC" value={profile?.attention || '—'} />
+                  <DetailRow label="Contact Person" value={profile?.attention || '—'} />
                   <DetailRow label="Phone" value={profile?.phone1 || '—'} />
                   <DetailRow label="Mobile" value={profile?.mobile || '—'} />
                   <DetailRow label="Email" value={profile?.email_address || '—'} />
@@ -422,8 +422,8 @@ function ProfileView({
             <p className="text-sm font-bold text-foreground mb-2">Sales &amp; Margin</p>
             <div className="grid grid-cols-3 gap-2 mb-3">
               <KpiCard label="Net Sales" value={formatRM(salesKpis.revenue)} />
-              <KpiCard label="Avg Margin" value={`${salesKpis.avgMargin.toFixed(1)}%`} />
-              <KpiCard label="COGS" value={formatRM(salesKpis.cogs)} />
+              <KpiCard label="Avg Gross Margin" value={`${salesKpis.avgMargin.toFixed(1)}%`} />
+              <KpiCard label="Cost of Sales" value={formatRM(salesKpis.cogs)} />
             </div>
             <SalesMarginChart data={monthlyData} isLoading={monthlyLoading} error={monthlyError} />
           </CardContent></Card>

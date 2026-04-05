@@ -38,8 +38,8 @@ export function ProductGroupMarginChart({ filters }: Props) {
                 ]}
               />
               <Legend />
-              <Bar yAxisId="left" dataKey="revenue" name="Revenue" fill="#3b82f6" radius={[2, 2, 0, 0]} />
-              <Bar yAxisId="left" dataKey="cogs" name="COGS" fill="#f97316" radius={[2, 2, 0, 0]} />
+              <Bar yAxisId="left" dataKey="revenue" name="Net Sales" fill="#3b82f6" radius={[2, 2, 0, 0]} />
+              <Bar yAxisId="left" dataKey="cogs" name="Cost of Sales" fill="#f97316" radius={[2, 2, 0, 0]} />
               <Bar yAxisId="right" dataKey="margin_pct" name="Margin %" fill="#10b981" radius={[2, 2, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>

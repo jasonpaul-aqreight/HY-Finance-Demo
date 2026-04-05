@@ -190,13 +190,13 @@ function HowItWorks() {
 
           {/* Credit Utilization */}
           <div>
-            <h4 className="text-sm font-semibold">1. Credit Utilization</h4>
+            <h4 className="text-sm font-semibold">1. Credit Usage</h4>
             <p className="mt-1 text-sm text-muted-foreground">
               How much of their credit limit has the customer used?
               Less usage = higher score.
             </p>
             <div className="mt-2 rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
-              <strong>Formula:</strong> Score = 100 - Utilization%
+              <strong>Formula:</strong> Score = 100 − Credit Used %
             </div>
             <p className="mt-1.5 text-xs text-muted-foreground italic">
               Example: Credit limit RM 50,000, owes RM 20,000 → 40% used → Score = 60
@@ -413,7 +413,7 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
                       How much each factor contributes to the final score. Must add up to exactly 100.
                     </p>
                     <div className="grid grid-cols-4 gap-x-4 gap-y-3">
-                      <NumberInput label="Credit Utilization" value={form.creditScoreWeights.utilization}
+                      <NumberInput label="Credit Usage" value={form.creditScoreWeights.utilization}
                         onChange={v => setForm(f => ({ ...f, creditScoreWeights: { ...f.creditScoreWeights, utilization: v } }))}
                         suffix="%" min={0} max={100} disabled={!isAdmin} />
                       <NumberInput label="Overdue Days" value={form.creditScoreWeights.overdueDays}

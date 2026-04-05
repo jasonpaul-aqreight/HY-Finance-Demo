@@ -6,12 +6,21 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid, Cell } from 'recharts';
 import { formatRM, formatCount } from '@/lib/format';
 
+// API returns lowercase hyphenated bucket names; map to display labels
+const BUCKET_LABEL: Record<string, string> = {
+  '0-30 days': '0–30 Days',
+  '31-60 days': '31–60 Days',
+  '61-90 days': '61–90 Days',
+  '91-180 days': '91–180 Days',
+  '180+ days': '180+ Days',
+};
+
 const BUCKET_COLORS: Record<string, string> = {
-  '0-30 days': '#10B981',
-  '31-60 days': '#F59E0B',
-  '61-90 days': '#F97316',
-  '91-180 days': '#EF4444',
-  '180+ days': '#991B1B',
+  '0–30 Days': '#10B981',
+  '31–60 Days': '#F59E0B',
+  '61–90 Days': '#F97316',
+  '91–180 Days': '#EF4444',
+  '180+ Days': '#991B1B',
 };
 
 export function AgingChart() {
@@ -21,23 +30,23 @@ export function AgingChart() {
   if (!data) {
     return (
       <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-sm">Aging of Unresolved Returns</CardTitle></CardHeader>
+        <CardHeader className="pb-2"><CardTitle className="text-sm">Aging of Unsettled Returns</CardTitle></CardHeader>
         <CardContent><div className="h-[280px] bg-muted rounded animate-pulse" /></CardContent>
       </Card>
     );
   }
 
   // Ensure all buckets are present even if 0
-  const allBuckets = ['0-30 days', '31-60 days', '61-90 days', '91-180 days', '180+ days'];
-  const chartData = allBuckets.map(bucket => {
-    const found = data.find(d => d.bucket === bucket);
-    return { bucket, count: found?.count ?? 0, amount: found?.amount ?? 0 };
+  const apiBuckets = ['0-30 days', '31-60 days', '61-90 days', '91-180 days', '180+ days'];
+  const chartData = apiBuckets.map(apiBucket => {
+    const found = data.find(d => d.bucket === apiBucket);
+    return { bucket: BUCKET_LABEL[apiBucket] ?? apiBucket, count: found?.count ?? 0, amount: found?.amount ?? 0 };
   });
 
   return (
     <Card className="w-full">
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm">Aging of Unresolved Returns</CardTitle>
+        <CardTitle className="text-sm">Aging of Unsettled Returns</CardTitle>
 
       </CardHeader>
       <CardContent>

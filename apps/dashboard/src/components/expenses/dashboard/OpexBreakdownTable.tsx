@@ -44,7 +44,7 @@ function handleExportExcel(groups: GroupedCategory[], total: number) {
     { header: 'Account No', key: 'acc_no', width: 14 },
     { header: 'Account Name', key: 'account_name', width: 30 },
     { header: 'Net Cost (RM)', key: 'net_cost', width: 16 },
-    { header: '% of OPEX', key: 'pct_of_opex', width: 12 },
+    { header: '% of Total', key: 'pct_of_opex', width: 12 },
   ], rows);
 }
 
@@ -82,7 +82,7 @@ export function OpexBreakdownTable({ filters }: { filters: DashboardFilters }) {
   if (isLoading) {
     return (
       <Card>
-        <CardHeader><CardTitle>OPEX Breakdown</CardTitle></CardHeader>
+        <CardHeader><CardTitle>Operating Costs Breakdown</CardTitle></CardHeader>
         <CardContent><div className="h-48 bg-muted animate-pulse rounded" /></CardContent>
       </Card>
     );
@@ -91,7 +91,7 @@ export function OpexBreakdownTable({ filters }: { filters: DashboardFilters }) {
   return (
     <Card>
       <CardHeader className="pb-2 flex-row items-center justify-between">
-        <CardTitle>OPEX Breakdown</CardTitle>
+        <CardTitle>Operating Costs Breakdown</CardTitle>
         <Button size="sm" variant="outline" onClick={() => handleExportExcel(groups, total)}>
           Export Excel
         </Button>
@@ -104,7 +104,7 @@ export function OpexBreakdownTable({ filters }: { filters: DashboardFilters }) {
                 <TableHead>Category / Account</TableHead>
                 <TableHead>Account Name</TableHead>
                 <TableHead className="text-right">Net Cost (RM)</TableHead>
-                <TableHead className="text-right">% of OPEX</TableHead>
+                <TableHead className="text-right">% of Total</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -142,7 +142,7 @@ export function OpexBreakdownTable({ filters }: { filters: DashboardFilters }) {
               {groups.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
-                    No OPEX data for selected period
+                    No operating costs data for selected period
                   </TableCell>
                 </TableRow>
               )}
@@ -150,7 +150,7 @@ export function OpexBreakdownTable({ filters }: { filters: DashboardFilters }) {
             {groups.length > 0 && (
               <TableFooter>
                 <TableRow className="font-semibold">
-                  <TableCell colSpan={2}>TOTAL OPEX</TableCell>
+                  <TableCell colSpan={2}>TOTAL OPERATING COSTS</TableCell>
                   <TableCell className="text-right font-mono">{formatRM(total, 2)}</TableCell>
                   <TableCell className="text-right">100.0%</TableCell>
                 </TableRow>

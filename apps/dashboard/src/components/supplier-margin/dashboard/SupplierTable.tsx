@@ -83,7 +83,7 @@ function SupplierCombobox({
         <span className="flex-1 text-left">
           {selected.length > 0
             ? `${selected.length} supplier${selected.length > 1 ? 's' : ''} selected`
-            : 'Search suppliers...'}
+            : 'Search by code or name...'}
         </span>
         {selected.length > 0 && (
           <span className="rounded-full bg-primary px-1.5 text-xs text-primary-foreground">
@@ -99,7 +99,7 @@ function SupplierCombobox({
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Search by supplier code or name..."
+              placeholder="Search by code or name..."
               className="flex-1 bg-transparent text-sm outline-none"
               autoFocus
             />
@@ -142,9 +142,9 @@ function handleExportExcel(rows: SupplierRow[]) {
     { header: 'Supplier Name', key: 'company_name', width: 30 },
     { header: 'Type', key: 'supplier_type', width: 16 },
     { header: 'Items', key: 'items_supplied', width: 10 },
-    { header: 'Est. Revenue', key: 'attributed_revenue', width: 16 },
+    { header: 'Est. Net Sales', key: 'attributed_revenue', width: 16 },
     { header: 'Est. Cost of Sales', key: 'attributed_cogs', width: 18 },
-    { header: 'Est. Profit', key: 'attributed_profit', width: 16 },
+    { header: 'Est. Gross Profit', key: 'attributed_profit', width: 16 },
     { header: 'Margin %', key: 'margin_pct', width: 12 },
   ], rows.map(r => ({
     creditor_code: r.creditor_code,
@@ -270,9 +270,9 @@ export function SupplierTable({ filters }: { filters: DashboardFilters }) {
                 <SortHeader col="company_name" label="Supplier Name" />
                 <TableHead>Type</TableHead>
                 <SortHeader col="items_supplied" label="Items" />
-                <SortHeader col="attributed_revenue" label="Est. Revenue" />
+                <SortHeader col="attributed_revenue" label="Est. Net Sales" />
                 <SortHeader col="attributed_cogs" label="Est. Cost of Sales" />
-                <SortHeader col="attributed_profit" label="Est. Profit" />
+                <SortHeader col="attributed_profit" label="Est. Gross Profit" />
                 <TableHead className="w-[130px]">Trend</TableHead>
                 <SortHeader col="margin_pct" label="Margin %" />
               </TableRow>

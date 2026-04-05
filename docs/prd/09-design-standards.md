@@ -29,11 +29,11 @@ The sidebar contains **7 primary pages** and **1 admin section**, separated by a
 |---|-------|-----------------|
 | 1 | Sales | Trending-up arrow |
 | 2 | Payment | Credit card |
-| 3 | Return | Rotate/undo arrow |
+| 3 | Returns | Rotate/undo arrow |
 | 4 | Financials | Bar chart |
 | 5 | Expenses | Receipt |
 | 6 | Customer Margin | People/users |
-| 7 | Supplier Performance | Truck |
+| 7 | Supplier Margin | Truck |
 | — | *divider line* | |
 | 8 | Data Sync *(internal)* | Refresh arrows |
 
@@ -118,8 +118,8 @@ Most pages follow this vertical sequence:
 | Invoice / Sales | Dark blue | #2E5090 |
 | Cash Sales | Green | #548235 |
 | Credit Notes / Returns | Red | #C00000 |
-| COGS | Blue (variant) | — |
-| OPEX | Orange | #F97316 |
+| Cost of Sales (COGS) | Blue (variant) | — |
+| Operating Costs (OPEX) | Orange | #F97316 |
 | Profit (net) | Emerald | #10B981 |
 
 ### 3.3 Risk-Level Colours
@@ -153,7 +153,7 @@ Most pages follow this vertical sequence:
 | 20–30 % | Emerald (#10B981) |
 | 30 %+ | Dark emerald (#059669) |
 
-### 3.6 OPEX Category Colours (13 categories)
+### 3.6 Operating Costs Category Colours (13 categories)
 
 Each expense category has a permanently assigned colour used in charts and legends:
 
@@ -173,7 +173,7 @@ Each expense category has a permanently assigned colour used in charts and legen
 | Tax & Compliance | Yellow |
 | Other | Orange |
 
-### 3.7 Utilisation Colours (Credit Limit)
+### 3.7 Credit Usage Colours (Credit Limit)
 
 | Utilisation Band | Colour |
 |------------------|--------|
@@ -260,7 +260,7 @@ KPI card values may be conditionally coloured:
 | Profit / positive growth | Green text (#10B981) |
 | Loss / negative growth | Red text (#EF4444) |
 | Margin % | Red < 10 %, Amber 10–20 %, Green ≥ 20 % |
-| DSO (days) | Green ≤ 30, Yellow ≤ 60, Red > 60 |
+| Avg Collection Days | Green ≤ 30, Yellow ≤ 60, Red > 60 |
 | Current ratio | Green ≥ 1.0, Red < 1.0 |
 | Total outstanding (Payment) | Orange (static) |
 | Neutral / informational | Blue (static, no conditional logic) |
@@ -277,12 +277,12 @@ While data is loading, each card shows an **animated skeleton placeholder** matc
 
 | Type | Pages where used |
 |------|-----------------|
-| **Line chart** | DSO trend, margin trends, price trends, multi-series time series |
-| **Vertical bar (stacked)** | Monthly revenue breakdown, cost trends, profitability bars |
-| **Horizontal bar** | Top customers by revenue, top returned products |
-| **Combo (bar + line overlay)** | Revenue bars + margin % line on secondary axis |
-| **Donut / Pie** | Credit utilisation, return settlement, cost composition |
-| **Stacked area** | Return value + unresolved overlay |
+| **Line chart** | Avg Collection Days trend, margin trends, price trends, multi-series time series |
+| **Vertical bar (stacked)** | Monthly net sales breakdown, cost trends, profitability bars |
+| **Horizontal bar** | Top customers by net sales, top returned products |
+| **Combo (bar + line overlay)** | Net sales bars + margin % line on secondary axis |
+| **Donut / Pie** | Credit usage, return settlement, cost composition |
+| **Stacked area** | Return value + unsettled overlay |
 | **Scatter / Bubble** | Purchase vs selling price (bubble size = volume) |
 | **Small multiples (2 × 4 grid)** | Multi-year P&L comparison bar charts |
 | **Gauge (semi-circle)** | Credit health score, margin performance |
@@ -358,7 +358,7 @@ Charts may include toggle buttons in their card header:
 | Metric | Gross Profit / Margin % | Switches Y-axis measure; mutually exclusive |
 | Direction | Top / Bottom | Reverses sort order of ranked lists |
 | View mode | All / By Agent / By Type | Changes chart grouping or stacking |
-| Cost type | All / COGS / OPEX | Filters cost data shown |
+| Cost type | All / Cost of Sales / Operating Costs | Filters cost data shown |
 | Entity | Suppliers / Items | Switches scatter-chart data set |
 
 Toggle buttons use a **segmented button group** style: outlined, horizontal, one active (filled/highlighted), rest outlined/neutral.
@@ -373,7 +373,7 @@ Toggle buttons use a **segmented button group** style: outlined, horizontal, one
 
 | Rule | Specification |
 |------|---------------|
-| **Alignment** | Text columns left-aligned. Numeric and currency columns right-aligned with monospace digits on financial/detail tables (P&L, Balance Sheet, COGS, OPEX, Credit Note Impact, Supplier Comparison, Return Top Debtors). Primary analysis tables (Payment Customers, Customer Margin, Sales Group-By, Supplier Analysis) keep all columns left-aligned. |
+| **Alignment** | Text columns left-aligned. Numeric and currency columns right-aligned with monospace digits on financial/detail tables (P&L, Balance Sheet, Cost of Sales, Operating Costs, Credit Note Impact, Supplier Comparison, Return Top Debtors). Primary analysis tables (Payment Customers, Customer Margin, Sales Group-By, Supplier Analysis) keep all columns left-aligned. |
 | **Sorting** | All columns sortable. Toggle cycle: unsorted (bi-directional arrow) → descending (down arrow) → ascending (up arrow). |
 | **Clickable elements** | Only entity names (customer / supplier) are clickable — styled as **blue underlined links**. Rows are NOT clickable. |
 | **Pagination** | Server-side. Default page size: 25 rows. Options: 10, 25, 50. |
@@ -381,7 +381,7 @@ Toggle buttons use a **segmented button group** style: outlined, horizontal, one
 | **Page size selector** | Dropdown in the pagination row. |
 | **Export** | "Export Excel" button exports all sorted/filtered rows (not just the current page) as **.xlsx** format. Never CSV. |
 | **Search** | Case-insensitive substring matching. Placeholder: "Search by [entity] code or name". Resets to page 1 on change. Real-time (no submit button). Clear button (X icon). |
-| **Alternating rows** | Subtle tint on every other row for readability. Applied on most tables (Sales Group-By, Supplier Analysis, COGS, Supplier Comparison); not all tables implement this consistently. |
+| **Alternating rows** | Subtle tint on every other row for readability. Applied on most tables (Sales Group-By, Supplier Analysis, Cost of Sales, Supplier Comparison); not all tables implement this consistently. |
 | **Container height** | Stable minimum height — when filters reduce visible rows, the container maintains its height to prevent page jumping. |
 
 ### 7.2 Table Header Controls Layout
@@ -448,23 +448,23 @@ Used on all pages except Financial Statements:
 | **Button layout** | Horizontal row, below or beside the pickers |
 | **Range summary** | Displayed as "MMM yyyy — MMM yyyy (N months)" |
 
-### 8.2 Fiscal Year Selector (Financial Statements Only)
+### 8.2 Financial Year Selector (Financial Statements Only)
 
 | Element | Specification |
 |---------|---------------|
 | **Component** | Single dropdown |
-| **Label format** | "Fiscal Year 2025 (Mar 2024 – Feb 2025)" |
-| **Fiscal year definition** | March to February; the named year is the end year |
-| **Default** | 2nd most recent fiscal year (most complete data) |
+| **Label format** | "Financial Year 2025 (Mar 2024 – Feb 2025)" |
+| **Financial year definition** | March to February; the named year is the end year |
+| **Default** | 2nd most recent financial year (most complete data) |
 | **Range** | Selected FY plus 3 prior years (up to 4 years total) |
 
 ### 8.3 Dropdown Filters
 
 | Type | Behaviour |
 |------|-----------|
-| **Single-select** | Category, Status, Type, Cost Type — one option active at a time; "All [Category]" option to clear |
-| **Multi-select (combobox)** | Customer, Supplier, Item, Fruit, Variant — searchable text input within dropdown; checkbox-based selection; badge showing selected count; clear-all button |
-| **Cascading** | Fruit → Country → Variant. Changing a parent filter clears child selections and narrows child options |
+| **Single-select** | Customer Type, Status, Type, Cost Type — one option active at a time; "All [Type]" option to clear |
+| **Multi-select (combobox)** | Customer, Supplier, Item, Product, Variant — searchable text input within dropdown; checkbox-based selection; badge showing selected count; clear-all button |
+| **Cascading** | Product → Country → Variant. Changing a parent filter clears child selections and narrows child options |
 
 ### 8.4 Filter Logic
 
@@ -544,10 +544,10 @@ When a profile modal opens, the initial view depends on where the user clicked:
 | Calling page | Customer default view | Supplier default view |
 |--------------|-----------------------|-----------------------|
 | Payment Collection | Outstanding Invoices | — |
-| Credit Note / Return | Returns | — |
+| Returns | Returns | — |
 | Sales Report | Sales | — |
 | Customer Margin | Sales | — |
-| Supplier Performance | — | Items Supplied |
+| Supplier Margin | — | Items Supplied |
 
 ### 9.4 Section-Level Loading
 
@@ -603,7 +603,7 @@ Triggered by a button (e.g., "Score & Risk") in a table header — not a separat
 | Table cells | DD MMM YYYY | 01 Jan 2024 |
 | Chart X-axis (monthly) | MMM YY | Jan 25 |
 | Month-year picker display | MMM yyyy | Mar 2025 |
-| Fiscal year label | "FY20XX (MMM YYYY – MMM YYYY)" | FY2025 (Mar 2024 – Feb 2025) |
+| Financial year label | "FY20XX (MMM YYYY – MMM YYYY)" | FY2025 (Mar 2024 – Feb 2025) |
 | Range summary | "MMM yyyy — MMM yyyy (N months)" | Jan 2024 — Dec 2024 (12 months) |
 
 ### 10.4 Numbers
@@ -733,7 +733,7 @@ Triggered by a button (e.g., "Score & Risk") in a table header — not a separat
 - **Indicator:** Disclosure triangle (▶ collapsed, ▼ expanded)
 - **Toggle:** Click the section header
 - **Animation:** Smooth expand/collapse transition
-- **Default state:** Varies by context (e.g., COGS table expanded; settings help collapsed; P&L account details collapsed)
+- **Default state:** Varies by context (e.g., Cost of Sales table expanded; settings help collapsed; P&L account details collapsed)
 
 ### 12.6 Tabs
 
@@ -820,11 +820,11 @@ Some patterns are intentionally different on specific pages:
 
 | Page | Variation | Reason |
 |------|-----------|--------|
-| Financial Statements | Fiscal year dropdown instead of date range pickers | Data is structured by fiscal year, not arbitrary date ranges |
+| Financial Statements | Financial year dropdown instead of date range pickers | Data is structured by financial year, not arbitrary date ranges |
 | Financial Statements | No table pagination or search; collapsible row hierarchy instead | Hierarchical accounting data requires tree-style navigation |
 | Financial Statements | FY defaults to 2nd most recent (not latest) | Most recent FY is typically incomplete |
-| Expenses | Cost-type toggle (All / COGS / OPEX) between filters and KPI cards | Unique to this page's dual cost-structure analysis |
-| Supplier Performance | "Est." prefix on all KPI labels | Supplier margins are attributed estimates, not direct calculations |
+| Expenses | Cost-type toggle (All / Cost of Sales / Operating Costs) between filters and KPI cards | Unique to this page's dual cost-structure analysis |
+| Supplier Margin | "Est." prefix on all KPI labels | Supplier margins are attributed estimates, not direct calculations |
 | Payment Collection | Two distinct sections (Period + Snapshot) | Data has different temporal scopes requiring visual separation |
 
 ---
@@ -836,7 +836,7 @@ These are patterns that were **explicitly removed or avoided** based on real-wor
 | Anti-pattern | Correct approach |
 |--------------|-----------------|
 | Making entire table rows clickable | Only the entity name (blue link) is clickable — avoids conflicts with text selection, checkboxes, and sparkline clicks |
-| Right-aligning numerics on primary analysis tables | Primary analysis tables (Payment, Customer Margin, Sales, Supplier Analysis) keep all columns left-aligned for consistent scanning. Financial/detail tables (P&L, Balance Sheet, COGS, OPEX, Credit Note Impact, Supplier Comparison, Return Top Debtors) right-align numeric columns for decimal alignment. |
+| Right-aligning numerics on primary analysis tables | Primary analysis tables (Payment, Customer Margin, Sales, Supplier Analysis) keep all columns left-aligned for consistent scanning. Financial/detail tables (P&L, Balance Sheet, Cost of Sales, Operating Costs, Credit Note Impact, Supplier Comparison, Return Top Debtors) right-align numeric columns for decimal alignment. |
 | Using grey/muted text for data labels | High-contrast text for all labels — older executives need readability |
 | CSV export | Always .xlsx (Excel) — matches the user base's workflow |
 | Collapsing sidebar by default | Expand by default — labels help users learn the navigation |

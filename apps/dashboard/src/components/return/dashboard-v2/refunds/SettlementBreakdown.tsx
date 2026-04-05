@@ -46,7 +46,7 @@ export function SettlementBreakdown({ filters }: { filters: V2Filters }) {
       </CardHeader>
       <CardContent className="space-y-4 px-4 flex-1 flex flex-col justify-center">
         <ProgressRow
-          label="Knocked Off (against invoices)"
+          label="Knockoff (Offset Against Invoices)"
           amount={summary.total_knocked_off}
           pct={summary.knock_off_pct}
           color="bg-emerald-500"
@@ -58,7 +58,7 @@ export function SettlementBreakdown({ filters }: { filters: V2Filters }) {
           color="bg-blue-500"
         />
         <ProgressRow
-          label="Unresolved"
+          label="Unsettled"
           amount={summary.total_unresolved}
           pct={summary.unresolved_pct}
           color="bg-red-500"

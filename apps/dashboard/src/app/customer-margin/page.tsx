@@ -6,8 +6,8 @@ export default function CustomerMarginPage() {
   return (
     <>
       <PageBanner
-        title="Customer Profit Margin Report"
-        description="Tracks profit margin trends by customer to identify high-value relationships and optimize pricing strategies."
+        title="Customer Margin"
+        description="Analyse profit margins by customer to identify high-value relationships and optimise pricing."
       />
       <Suspense fallback={<div className="p-8 text-muted-foreground">Loading dashboard...</div>}>
         <MarginDashboardShell />

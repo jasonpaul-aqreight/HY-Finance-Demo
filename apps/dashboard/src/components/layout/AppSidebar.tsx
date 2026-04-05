@@ -25,11 +25,11 @@ import {
 const navItems = [
   { href: '/sales', label: 'Sales', icon: TrendingUp },
   { href: '/payment', label: 'Payment', icon: CreditCard },
-  { href: '/return', label: 'Return', icon: RotateCcw },
+  { href: '/return', label: 'Returns', icon: RotateCcw },
   { href: '/financial', label: 'Financials', icon: BarChart3 },
   { href: '/expenses', label: 'Expenses', icon: Receipt },
   { href: '/customer-margin', label: 'Customer Margin', icon: Users },
-  { href: '/supplier-performance', label: 'Supplier Performance', icon: Truck },
+  { href: '/supplier-performance', label: 'Supplier Margin', icon: Truck },
 ];
 
 const adminItems = [

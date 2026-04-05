@@ -64,7 +64,7 @@ function CustomerCombobox({
         <span className="flex-1 text-left">
           {selected.length > 0
             ? `${selected.length} customer${selected.length > 1 ? 's' : ''} selected`
-            : 'Search customers...'}
+            : 'Search by code or name...'}
         </span>
         {selected.length > 0 && (
           <span className="rounded-full bg-primary px-1.5 text-xs text-primary-foreground">
@@ -80,7 +80,7 @@ function CustomerCombobox({
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Search by customer code or name..."
+              placeholder="Search by code or name..."
               className="flex-1 bg-transparent text-sm outline-none"
               autoFocus
             />
@@ -161,8 +161,8 @@ export function CustomerMarginTable({ filters }: Props) {
       { header: 'Code', key: 'debtor_code', width: 14 },
       { header: 'Name', key: 'company_name', width: 30 },
       { header: 'Type', key: 'debtor_type', width: 16 },
-      { header: 'Revenue', key: 'revenue', width: 16 },
-      { header: 'COGS', key: 'cogs', width: 16 },
+      { header: 'Net Sales', key: 'revenue', width: 16 },
+      { header: 'Cost of Sales', key: 'cogs', width: 16 },
       { header: 'Gross Profit', key: 'gross_profit', width: 16 },
       { header: 'Margin %', key: 'margin_pct', width: 12 },
     ], data.rows.map(r => ({
@@ -222,8 +222,8 @@ export function CustomerMarginTable({ filters }: Props) {
                   <TableHead>Code</TableHead>
                   <SortHeader col="company_name">Name</SortHeader>
                   <TableHead>Type</TableHead>
-                  <SortHeader col="revenue">Revenue</SortHeader>
-                  <SortHeader col="cogs">COGS</SortHeader>
+                  <SortHeader col="revenue">Net Sales</SortHeader>
+                  <SortHeader col="cogs">Cost of Sales</SortHeader>
                   <SortHeader col="gross_profit">Gross Profit</SortHeader>
                   <SortHeader col="margin_pct">Margin %</SortHeader>
                   <TableHead>Trend</TableHead>

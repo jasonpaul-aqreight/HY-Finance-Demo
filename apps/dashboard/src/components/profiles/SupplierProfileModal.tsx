@@ -364,7 +364,7 @@ function ProfileView({
               <div className="p-4 space-y-3">
                 <h4 className="text-xs font-bold text-foreground uppercase tracking-widest border-b pb-2">Contact</h4>
                 <div className="space-y-2 text-sm">
-                  <DetailRow label="PIC" value={s?.pic ?? '—'} />
+                  <DetailRow label="Contact Person" value={s?.pic ?? '—'} />
                   <DetailRow label="Phone" value={s?.phone ?? '—'} />
                   <DetailRow label="Mobile" value={s?.mobile ?? '—'} />
                   <DetailRow label="Email" value={s?.email ?? '—'} />
@@ -415,7 +415,7 @@ function ProfileView({
               <span className="text-4xl font-extrabold text-amber-600">{soleCount}</span>
               <span className="text-lg text-foreground/50 font-medium">/ {totalVariants}</span>
             </div>
-            <p className="text-xs text-foreground/50 mt-1">fruit variants with no alternative supplier</p>
+            <p className="text-xs text-foreground/50 mt-1">product variants with no alternative supplier</p>
             <SupplyDependencyBar sole={soleCount} total={totalVariants} />
           </CardContent></Card>
         </div>
@@ -426,7 +426,7 @@ function ProfileView({
             <p className="text-sm font-bold text-foreground mb-2">Purchase Trend &amp; Margin</p>
             <div className="grid grid-cols-3 gap-2 mb-3">
               <KpiCard label="Accumulated Purchase Cost" value={formatRM(totalPurchaseCost)} />
-              <KpiCard label="Avg Margin" value={`${avgMargin.toFixed(1)}%`} />
+              <KpiCard label="Avg Gross Margin" value={`${avgMargin.toFixed(1)}%`} />
               <KpiCard label="Est. Gross Profit" value={formatRM(Math.round(attributedProfit))} />
             </div>
             {perf && perf.margin_trend.length > 0 ? (
@@ -725,7 +725,7 @@ function ItemsSuppliedTable({ creditorCode, startDate, endDate, search }: {
           </button>
           {soleOnly && (
             <p className="text-xs text-amber-700">
-              Sole source — no other supplier supplies these fruit varieties. Dependency is assessed by fruit type, not individual SKU.
+              Sole source — no other supplier supplies these product varieties. Dependency is assessed by fruit type, not individual SKU.
             </p>
           )}
         </div>
@@ -735,8 +735,8 @@ function ItemsSuppliedTable({ creditorCode, startDate, endDate, search }: {
             value={fruitFilter}
             onChange={(val) => { setFruitFilter(val); if (!val) setVariantFilter(''); }}
             options={fruitOptions}
-            placeholder="All Fruits"
-            searchPlaceholder="Search fruit..."
+            placeholder="All Products"
+            searchPlaceholder="Search product..."
             className="w-[160px]"
           />
           <SearchableSelect

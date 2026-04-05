@@ -57,7 +57,7 @@ export function DashboardShellV2() {
 
       {/* ═══ Section 2: Outstanding Position (as of today) ═══ */}
       <div className="mt-10">
-        <SectionHeader title="Unresolved Returns" subtitle="Accumulated from beginning to now" />
+        <SectionHeader title="Unsettled Returns" subtitle="Accumulated from beginning to now" />
       </div>
 
       <div className="mt-4">

@@ -142,7 +142,7 @@ export function NetSalesTrend({ filters, setFilters }: NetSalesTrendProps) {
               wrapperStyle={{ fontSize: 12 }}
               content={() => {
                 const items = [
-                  { label: 'Invoice', color: COLORS.invoice },
+                  { label: 'Invoice Sales', color: COLORS.invoice },
                   { label: 'Cash Sales', color: COLORS.cashSales },
                   { label: 'Credit Notes', color: COLORS.creditNotes },
                 ];

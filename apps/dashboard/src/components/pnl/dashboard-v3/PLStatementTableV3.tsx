@@ -85,8 +85,8 @@ export function PLStatementTableV3({ fy }: Props) {
     const cols = [
       { header: 'Account', key: 'account', width: 30 },
       ...months.map(m => ({ header: m.label.split(' ')[0], key: String(m.period), width: 14 })),
-      { header: 'YTD', key: 'ytd', width: 16 },
-      { header: 'Prior YTD', key: 'prior_ytd', width: 16 },
+      { header: 'Year to Date', key: 'ytd', width: 16 },
+      { header: 'Prior Year', key: 'prior_ytd', width: 16 },
     ];
     const rows: Record<string, unknown>[] = [];
     for (const group of data.groups) {
@@ -182,13 +182,13 @@ export function PLStatementTableV3({ fy }: Props) {
                 </TableHead>
               ))}
               <TableHead className="text-right border-l-2 border-border">
-                YTD
+                Year to Date
               </TableHead>
               <TableHead className="text-right">
-                Prior YTD
+                Prior Year
               </TableHead>
               <TableHead className="text-right">
-                YoY %
+                vs Last Year
               </TableHead>
             </TableRow>
           </TableHeader>

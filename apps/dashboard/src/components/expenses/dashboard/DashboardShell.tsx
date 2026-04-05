@@ -28,8 +28,8 @@ function BreakdownTabs({ filters }: { filters: DashboardFilters }) {
     <div ref={containerRef} style={{ minHeight: lockedHeight.current }}>
       <Tabs defaultValue="cogs">
         <TabsList>
-          <TabsTrigger value="cogs">COGS Breakdown</TabsTrigger>
-          <TabsTrigger value="opex">OPEX Breakdown</TabsTrigger>
+          <TabsTrigger value="cogs">Cost of Sales Breakdown</TabsTrigger>
+          <TabsTrigger value="opex">Operating Costs Breakdown</TabsTrigger>
         </TabsList>
         <TabsContent value="cogs">
           <CogsBreakdownTable filters={filters} />
@@ -44,8 +44,8 @@ function BreakdownTabs({ filters }: { filters: DashboardFilters }) {
 
 const COST_TYPES: Array<{ label: string; value: CostType }> = [
   { label: 'All', value: 'all' },
-  { label: 'COGS', value: 'cogs' },
-  { label: 'OPEX', value: 'opex' },
+  { label: 'Cost of Sales', value: 'cogs' },
+  { label: 'Operating Costs', value: 'opex' },
 ];
 
 export function DashboardShell() {
@@ -89,7 +89,7 @@ export function DashboardShell() {
 
               <div className="grid grid-cols-1 xl:grid-cols-10 gap-6">
                 <div className="xl:col-span-7">
-                  <CostTrendChart filters={filters} setFilters={setFilters} onCategories={handleCategories} />
+                  <CostTrendChart filters={filters} onCategories={handleCategories} />
                 </div>
                 <div className="xl:col-span-3">
                   <CostCompositionChart filters={filters} />

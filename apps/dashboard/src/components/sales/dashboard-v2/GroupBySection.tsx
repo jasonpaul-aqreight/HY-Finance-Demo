@@ -24,7 +24,7 @@ const MAX_SELECTED = 10;
 
 const GROUP_OPTIONS: { value: GroupByDimension; label: string }[] = [
   { value: 'customer', label: 'Customer' },
-  { value: 'fruit', label: 'Fruit' },
+  { value: 'fruit', label: 'Product' },
   { value: 'agent', label: 'Sales Agent' },
   { value: 'outlet', label: 'Outlet' },
 ];
@@ -251,8 +251,8 @@ export function GroupBySection({ filters, setFilters }: GroupBySectionProps) {
                     value={fruitName}
                     onChange={(val) => setFruitName(val)}
                     options={fruitNameOptions}
-                    placeholder="All Fruits"
-                    searchPlaceholder="Search fruit..."
+                    placeholder="All Products"
+                    searchPlaceholder="Search product..."
                     className="w-[200px]"
                     disabled={filtersLoading}
                   />

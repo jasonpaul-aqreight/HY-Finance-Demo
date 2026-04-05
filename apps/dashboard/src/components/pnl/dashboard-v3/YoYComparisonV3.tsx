@@ -33,11 +33,11 @@ interface TableLineItem {
 
 const TABLE_ITEMS: TableLineItem[] = [
   { key: 'net_sales', label: 'Net Sales' },
-  { key: 'cogs', label: 'COGS' },
+  { key: 'cogs', label: 'Cost of Sales' },
   { key: 'gross_profit', label: 'Gross Profit', isTotal: true },
   { key: 'gross_margin_pct', label: 'Gross Margin %', isMargin: true },
   { key: 'other_income', label: 'Other Income' },
-  { key: 'expenses', label: 'OPEX' },
+  { key: 'expenses', label: 'Operating Costs' },
   { key: 'net_profit', label: 'Net Profit', isTotal: true },
   { key: 'net_margin_pct', label: 'Net Margin %', isMargin: true },
   { key: 'taxation', label: 'Taxation' },
@@ -47,13 +47,13 @@ const TABLE_ITEMS: TableLineItem[] = [
 // Categories for the small multiples chart
 const CHART_CATEGORIES: { key: keyof MultiYearPLRow; label: string; color: string }[] = [
   { key: 'net_sales', label: 'Net Sales', color: '#2E5090' },
-  { key: 'cogs', label: 'COGS', color: '#ED7D31' },
+  { key: 'cogs', label: 'Cost of Sales', color: '#ED7D31' },
   { key: 'gross_profit', label: 'Gross Profit', color: '#22c55e' },
   { key: 'other_income', label: 'Other Income', color: '#8b5cf6' },
-  { key: 'expenses', label: 'OPEX', color: '#6366f1' },
+  { key: 'expenses', label: 'Operating Costs', color: '#6366f1' },
   { key: 'net_profit', label: 'Net Profit', color: '#ef4444' },
   { key: 'taxation', label: 'Taxation', color: '#94a3b8' },
-  { key: 'npat', label: 'NPAT', color: '#f97316' },
+  { key: 'npat', label: 'Net Profit After Tax', color: '#f97316' },
 ];
 
 function MiniChart({ label, color, data, dataKey, fy }: {
@@ -242,7 +242,7 @@ export function YoYComparisonV3({ fy }: Props) {
           </Table>
           {data.some(d => d.isPartial) && (
             <div className="px-4 py-2 text-xs text-muted-foreground border-t">
-              * Partial fiscal year (data not yet complete)
+              * Partial financial year (data not yet complete)
             </div>
           )}
         </CardContent>

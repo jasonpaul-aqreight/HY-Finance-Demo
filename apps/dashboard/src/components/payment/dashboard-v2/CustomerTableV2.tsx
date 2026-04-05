@@ -64,15 +64,15 @@ export default function CustomerTableV2({ initialStartDate, initialEndDate }: { 
     exportToExcel('customer-credit-health', [
       { header: 'Code', key: 'debtor_code', width: 14 },
       { header: 'Name', key: 'company_name', width: 30 },
-      { header: 'Category', key: 'debtor_type', width: 16 },
+      { header: 'Type', key: 'debtor_type', width: 16 },
       { header: 'Agent', key: 'sales_agent', width: 14 },
       { header: 'Credit Limit', key: 'credit_limit', width: 16 },
       { header: 'Outstanding', key: 'total_outstanding', width: 16 },
       { header: 'Oldest Due', key: 'oldest_due', width: 14 },
       { header: 'Max Overdue Days', key: 'max_overdue_days', width: 16 },
       { header: 'Aging Count', key: 'aging_count', width: 12 },
-      { header: 'Credit Util %', key: 'utilization_pct', width: 14 },
-      { header: 'Credit Health Score', key: 'credit_score', width: 18 },
+      { header: 'Credit Used %', key: 'utilization_pct', width: 14 },
+      { header: 'Health Score', key: 'credit_score', width: 18 },
       { header: 'Risk Level', key: 'risk_tier', width: 12 },
     ], data.rows.map(r => ({
       debtor_code: r.debtor_code,
@@ -103,7 +103,7 @@ export default function CustomerTableV2({ initialStartDate, initialEndDate }: { 
           <div className="flex items-center gap-2">
             <input
               type="text"
-              placeholder="Search by customer code or name..."
+              placeholder="Search by code or name..."
               value={search}
               onChange={e => { setSearch(e.target.value); setPage(1); }}
               className="h-7 w-48 rounded-md border border-input bg-transparent px-2 text-sm"
@@ -113,10 +113,10 @@ export default function CustomerTableV2({ initialStartDate, initialEndDate }: { 
               onValueChange={val => { setCategoryFilter(val === 'all' ? '' : val ?? ''); setPage(1); }}
             >
               <SelectTrigger size="sm" className="w-[150px]">
-                <SelectValue>{categoryFilter || 'All Category'}</SelectValue>
+                <SelectValue>{categoryFilter || 'All Types'}</SelectValue>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Category</SelectItem>
+                <SelectItem value="all">All Types</SelectItem>
                 <SelectItem value="Consumer">Consumer</SelectItem>
                 <SelectItem value="Fruit Shop">Fruit Shop</SelectItem>
                 <SelectItem value="Hospitality Business">Hospitality</SelectItem>
@@ -165,7 +165,7 @@ export default function CustomerTableV2({ initialStartDate, initialEndDate }: { 
                     Name <SortIcon active={sort === 'company_name'} asc={order === 'asc'} />
                   </TableHead>
                   <TableHead className="cursor-pointer" onClick={() => handleSort('debtor_type')}>
-                    Category <SortIcon active={sort === 'debtor_type'} asc={order === 'asc'} />
+                    Type <SortIcon active={sort === 'debtor_type'} asc={order === 'asc'} />
                   </TableHead>
                   <TableHead className="cursor-pointer" onClick={() => handleSort('sales_agent')}>
                     Agent <SortIcon active={sort === 'sales_agent'} asc={order === 'asc'} />
@@ -177,7 +177,7 @@ export default function CustomerTableV2({ initialStartDate, initialEndDate }: { 
                     Outstanding <SortIcon active={sort === 'total_outstanding'} asc={order === 'asc'} />
                   </TableHead>
                   <TableHead className="cursor-pointer" onClick={() => handleSort('utilization_pct')}>
-                    Credit Util <SortIcon active={sort === 'utilization_pct'} asc={order === 'asc'} />
+                    Credit Used <SortIcon active={sort === 'utilization_pct'} asc={order === 'asc'} />
                   </TableHead>
                   <TableHead className="cursor-pointer" onClick={() => handleSort('aging_count')}>
                     Aging Count <SortIcon active={sort === 'aging_count'} asc={order === 'asc'} />
@@ -186,7 +186,7 @@ export default function CustomerTableV2({ initialStartDate, initialEndDate }: { 
                     Oldest Due <SortIcon active={sort === 'max_overdue_days'} asc={order === 'asc'} />
                   </TableHead>
                   <TableHead className="cursor-pointer" onClick={() => handleSort('credit_score')}>
-                    Credit Health Score <SortIcon active={sort === 'credit_score'} asc={order === 'asc'} />
+                    Health Score <SortIcon active={sort === 'credit_score'} asc={order === 'asc'} />
                   </TableHead>
                   <TableHead className="cursor-pointer" onClick={() => handleSort('risk_tier')}>
                     Risk Level <SortIcon active={sort === 'risk_tier'} asc={order === 'asc'} />

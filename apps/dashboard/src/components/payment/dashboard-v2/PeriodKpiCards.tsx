@@ -74,15 +74,15 @@ export default function PeriodKpiCards({ filters }: PeriodKpiCardsProps) {
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
       <KpiCard
-        title="Days Sales Outstanding (DSO)"
+        title="Avg Collection Days"
         value={data.dso != null ? formatDays(data.dso) : '--'}
-        subtitle="avg monthly DSO"
+        subtitle="avg days to collect payment"
         colorClass={dsoColor}
         extra={
           <InfoTooltip>
-            <p>Days Sales Outstanding measures how many days, on average, it takes a company to collect payment after making a sale. It&apos;s a cash flow efficiency metric.</p>
+            <p>Average Collection Days measures how many days, on average, it takes a company to collect payment after making a sale. It&apos;s a cash flow efficiency metric.</p>
             <p className="font-mono bg-muted/50 rounded px-2 py-1">
-              DSO = (Accounts Receivable / Total Invoice Sales) &times; Number of Days
+              Collection Days = (Accounts Receivable / Total Invoice Sales) &times; Number of Days
             </p>
           </InfoTooltip>
         }
@@ -95,7 +95,7 @@ export default function PeriodKpiCards({ filters }: PeriodKpiCardsProps) {
         extra={
           <InfoTooltip>
             <p>Collection Rate measures how much of the invoiced amount has been collected in cash payments during the selected period. A rate above 100% means you&apos;re collecting more than you&apos;re billing (clearing older debts).</p>
-            <p className="text-muted-foreground">Note: Contra settlements (debtor/creditor offsets) are not included as they are non-cash.</p>
+            <p className="text-muted-foreground">Note: Offsets between amounts owed and owing are not included as they are non-cash.</p>
             <p className="font-mono bg-muted/50 rounded px-2 py-1">
               Collection Rate = (Total Collected &divide; Total Invoiced) &times; 100
             </p>

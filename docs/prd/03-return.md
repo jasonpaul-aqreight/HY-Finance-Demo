@@ -1,21 +1,21 @@
-# Credit Note / Return / Refund
+# Returns
 
-> Monitors all credit notes issued for product returns, tracks reconciliation status (knocked off, refunded, or unresolved), analyzes return patterns by product and customer, and highlights aging of unresolved balances.
+> Monitors all credit notes issued for product returns, tracks settlement status (knockoff, refunded, or unsettled), analyzes return patterns by product and customer, and highlights aging of unsettled balances.
 
 ---
 
 ## 1. Purpose & User Goals
 
-The Credit Note / Return / Refund page is the central view for tracking goods returned by customers and the financial impact of those returns. It answers:
+The Returns page is the central view for tracking goods returned by customers and the financial impact of those returns. It answers:
 
 - How much has been returned in total, and what percentage of sales does that represent?
-- How much of the returned value has been reconciled (knocked off against invoices or refunded) versus still outstanding?
+- How much of the returned value has been settled (offset against invoices or refunded) versus still unsettled?
 - Which products generate the most returns — by frequency or by cost?
-- How are returns trending month over month, and is the unresolved backlog growing or shrinking?
-- Which customers have the largest unresolved return balances?
-- How old are the unresolved returns — are they recent or long-overdue?
+- How are returns trending month over month, and is the unsettled backlog growing or shrinking?
+- Which customers have the largest unsettled return balances?
+- How old are the unsettled returns — are they recent or long-overdue?
 
-This is the "return health" page — it helps management understand whether returns are under control, reconciliation processes are keeping up, and whether specific products or customers require attention.
+This is the "return health" page — it helps management understand whether returns are under control, settlement processes are keeping up, and whether specific products or customers require attention.
 
 ---
 
@@ -27,7 +27,7 @@ The page is organized into **two distinct sections** with clear section headers.
 
 From top to bottom:
 
-1. **Page Banner** — Title "Credit Note / Return / Refund" with subtitle: "Monitors all credit notes, product returns, and refunds to ensure accurate financial reconciliation."
+1. **Page Banner** — Title "Returns" with subtitle: "Monitors all credit notes, product returns, and refunds to ensure accurate financial settlement."
 2. **Date Range Filter** — Month-year pickers with range summary and quick-preset buttons.
 3. **KPI Cards** — A responsive row of four summary metric cards.
 4. **Settlement Breakdown + Monthly Return Trend** — Side-by-side equal-width layout:
@@ -35,11 +35,11 @@ From top to bottom:
    - Right (50%): Monthly Return Trend (area chart).
 5. **Top 10 Product Returns** — Horizontal bar chart with dimension and metric toggles.
 
-### Section 2: Unresolved Returns (Accumulated — Not Date-Filtered)
+### Section 2: Unsettled Returns (Accumulated — Not Date-Filtered)
 
 Preceded by a section header indicating these metrics are accumulated from the beginning of time:
 
-1. **Aging of Unresolved Returns** — Horizontal bar chart showing current unresolved balances by age bucket.
+1. **Aging of Unsettled Returns** — Horizontal bar chart showing current unsettled balances by age bucket.
 2. **Customer Returns Table** — Full-width sortable, searchable, filterable table with pagination and Excel export.
 
 ### Responsive Behavior
@@ -57,7 +57,7 @@ Maximum content width: 1600px, horizontally centered.
 
 ### 3.1 Date Range Filter
 
-Controls all metrics in Section 1 (Return Trends). Does **not** affect Section 2 (Unresolved Returns).
+Controls all metrics in Section 1 (Return Trends). Does **not** affect Section 2 (Unsettled Returns).
 
 | Control | Details |
 |---------|---------|
@@ -84,7 +84,7 @@ The Customer Returns Table has its own independent filters:
 
 | Control | Details |
 |---------|---------|
-| **Status Filter** | Dropdown with three options: "Unresolved" (default), "Resolved", "All Returned" |
+| **Status Filter** | Dropdown with three options: "Unsettled" (default), "Settled", "All Returned" |
 | **Search** | Text input filtering by customer code or company name (case-insensitive) |
 
 Both filters reset pagination to page 1 when changed.
@@ -102,38 +102,38 @@ Four cards displayed in a responsive grid. All monetary values formatted as Mala
 - **Format:** RM with thousands separator (e.g., "RM 1,130,242")
 - **Subtitle:** "{N} return credit notes" — count of credit notes in the period
 
-### 4.2 Reconciled
+### 4.2 Settled
 
-- **Label:** "Reconciled"
-- **Value:** Sum of knocked-off amounts + refunded amounts in the date range
-- **Formula:** Knocked Off + Refunded
+- **Label:** "Settled"
+- **Value:** Sum of knockoff amounts + refunded amounts in the date range
+- **Formula:** Knockoff + Refunded
 - **Format:** RM with thousands separator
-- **Value Color:** Green (positive — indicates resolved)
-- **Subtitle:** "Knocked Off + Refunded = {N}% of total"
-- **Percentage formula:** (Knocked Off + Refunded) / Total Return Value x 100
+- **Value Color:** Green (positive — indicates settled)
+- **Subtitle:** "Knockoff + Refunded = {N}% of total"
+- **Percentage formula:** (Knockoff + Refunded) / Total Return Value x 100
 
-### 4.3 Unresolved
+### 4.3 Unsettled
 
-- **Label:** "Unresolved"
-- **Value:** Total return value minus reconciled amount in the date range
-- **Formula:** Total Return Value -- Knocked Off -- Refunded
+- **Label:** "Unsettled"
+- **Value:** Total return value minus settled amount in the date range
+- **Formula:** Total Return Value -- Knockoff -- Refunded
 - **Format:** RM with thousands separator
 - **Value Color:** Red if amount > 0; green if zero (fully settled)
-- **Subtitle:** "{N}% of total -- {X} partial + {Y} outstanding"
+- **Subtitle:** "{N}% of total -- {X} partial + {Y} unsettled"
 - **Help Tooltip:** Hoverable info icon reveals:
-  - Formula: "Unresolved = NetTotal -- KnockOffAmt -- RefundAmt"
+  - Formula: "Unsettled = NetTotal -- KnockOffAmt -- RefundAmt"
   - Color legend:
     - Green dot = 0 (Settled)
     - Amber dot = > 0 and < Total (Partial)
-    - Red dot = equals Total (Outstanding)
+    - Red dot = equals Total (Unsettled)
 
 **Settlement classification logic:**
 
 | Status | Condition |
 |--------|-----------|
-| Settled (reconciled) | Knocked Off + Refunded >= Return Amount |
-| Partial | Knocked Off + Refunded > 0 AND < Return Amount |
-| Outstanding | Knocked Off + Refunded = 0 |
+| Settled | Knockoff + Refunded >= Return Amount |
+| Partial | Knockoff + Refunded > 0 AND < Return Amount |
+| Unsettled | Knockoff + Refunded = 0 |
 
 ### 4.4 Return %
 
@@ -166,9 +166,9 @@ Three bars showing where the return money went:
 
 | Bar | Label | Color | Data |
 |-----|-------|-------|------|
-| 1 | Knocked Off (against invoices) | Green | Amount + percentage of total return value |
+| 1 | Knockoff (Offset Against Invoices) | Green | Amount + percentage of total return value |
 | 2 | Refunded (cash/cheque) | Blue | Amount + percentage of total return value |
-| 3 | Unresolved | Red | Amount + percentage of total return value |
+| 3 | Unsettled | Red | Amount + percentage of total return value |
 
 Each bar displays: label on the left, "RM {amount} ({pct}%)" on the right, filled proportionally to the percentage. Bars are capped at 100% width.
 
@@ -189,11 +189,11 @@ Each bar displays: label on the left, "RM {amount} ({pct}%)" on the right, fille
 | Series | Legend Label | Color | Fill Opacity |
 |--------|-------------|-------|-------------|
 | 1 | Return Value | Indigo | 15% |
-| 2 | Unresolved | Red | 15% |
+| 2 | Unsettled | Red | 15% |
 
-**Tooltip** on hover shows both Return Value and Unresolved amount for the month.
+**Tooltip** on hover shows both Return Value and Unsettled amount for the month.
 
-**Key interpretation:** The gap between the indigo (total) and red (unresolved) areas shows how much gets reconciled each month. A growing red area relative to indigo signals reconciliation is falling behind.
+**Key interpretation:** The gap between the indigo (total) and red (unsettled) areas shows how much gets settled each month. A growing red area relative to indigo signals settlement is falling behind.
 
 ### 5.3 Top 10 Product Returns
 
@@ -238,14 +238,14 @@ Results are limited to the top 10 ranked by the chosen metric, descending. Chart
 - Goods Returned Quantity (physical returns)
 - Credit Only Quantity (credit adjustment, no physical return)
 
-### 5.4 Aging of Unresolved Returns
+### 5.4 Aging of Unsettled Returns
 
 | Property | Value |
 |----------|-------|
-| **Title** | Aging of Unresolved Returns |
+| **Title** | Aging of Unsettled Returns |
 | **Type** | Horizontal bar chart |
-| **Location** | Section 2 (Unresolved Returns) |
-| **Filtered by date range?** | **No** — shows current point-in-time snapshot of all unresolved returns |
+| **Location** | Section 2 (Unsettled Returns) |
+| **Filtered by date range?** | **No** — shows current point-in-time snapshot of all unsettled returns |
 | **Y-axis** | Age bucket (category), 80px label width |
 | **X-axis** | Amount in RM |
 
@@ -253,17 +253,17 @@ Results are limited to the top 10 ranked by the chosen metric, descending. Chart
 
 | Bucket | Color | Day Range |
 |--------|-------|-----------|
-| 0-30 days | Green (#10B981) | 0 to 30 |
-| 31-60 days | Amber (#F59E0B) | 31 to 60 |
-| 61-90 days | Orange (#F97316) | 61 to 90 |
-| 91-180 days | Red (#EF4444) | 91 to 180 |
-| 180+ days | Dark Red (#991B1B) | Over 180 |
+| 0–30 Days | Green (#10B981) | 0 to 30 |
+| 31–60 Days | Amber (#F59E0B) | 31 to 60 |
+| 61–90 Days | Orange (#F97316) | 61 to 90 |
+| 91–180 Days | Red (#EF4444) | 91 to 180 |
+| 180+ Days | Dark Red (#991B1B) | Over 180 |
 
-All five buckets are always displayed, even if count and amount are zero. Only records with an unresolved balance (return amount minus all settlements > RM 0.01) are included.
+All five buckets are always displayed, even if count and amount are zero. Only records with an unsettled balance (return amount minus all settlements > RM 0.01) are included.
 
 **Tooltip** on hover: bucket name, amount in RM, and count of credit notes.
 
-**Key interpretation:** A healthy distribution concentrates unresolved value in the 0-30 day bucket (recently created, still being processed). Heavy concentration in 180+ days signals a backlog of forgotten or disputed returns.
+**Key interpretation:** A healthy distribution concentrates unsettled value in the 0–30 Days bucket (recently created, still being processed). Heavy concentration in 180+ Days signals a backlog of forgotten or disputed returns.
 
 ---
 
@@ -275,10 +275,10 @@ All five buckets are always displayed, even if count and amount are zero. Only r
 |----------|-------|
 | **Title** | Customer Returns |
 | **Subtitle** | "{N} customers" when showing all; "{N} customers of {M} total" when a status filter is active |
-| **Location** | Section 2 (Unresolved Returns) |
+| **Location** | Section 2 (Unsettled Returns) |
 | **Filtered by date range?** | **No** — shows all-time return data |
-| **Default filter** | Status = "Unresolved" (shows only customers with unresolved returns) |
-| **Default sort** | Unresolved amount, descending |
+| **Default filter** | Status = "Unsettled" (shows only customers with unsettled returns) |
+| **Default sort** | Unsettled amount, descending |
 | **Pagination** | Selectable page sizes: 25, 50, 100 |
 | **Export** | Excel (.xlsx) button — exports all sorted data (not just current page) |
 | **Search** | Text input filtering by customer code or company name |
@@ -291,29 +291,29 @@ All five buckets are always displayed, even if count and amount are zero. Only r
 | 2 | Customer | Left | Company name as **blue underlined link** (clickable). Truncated with hover tooltip for full name. Falls back to customer code if name not available. |
 | 3 | Returns | Right | Integer count of return credit notes |
 | 4 | Total Value | Right | RM currency amount |
-| 5 | Knocked Off | Right | RM currency amount |
+| 5 | Knockoff | Right | RM currency amount |
 | 6 | Refunded | Right | RM currency in blue text if > 0; em-dash "--" if zero |
-| 7 | Unresolved | Right | Three-state display (see below) |
+| 7 | Unsettled | Right | Three-state display (see below) |
 
-**Unresolved column three-state display:**
+**Unsettled column three-state display:**
 
 | Condition | Display |
 |-----------|---------|
-| Unresolved amount <= RM 0.01 | Green text: "Settled" |
-| Unresolved > RM 0.01 AND customer has any knock-off or refund | Amber text: RM amount (partial settlement) |
-| Unresolved > RM 0.01 AND customer has zero knock-off and zero refund | Red text: RM amount (fully outstanding) |
+| Unsettled amount <= RM 0.01 | Green text: "Settled" |
+| Unsettled > RM 0.01 AND customer has any knockoff or refund | Amber text: RM amount (partial settlement) |
+| Unsettled > RM 0.01 AND customer has zero knockoff and zero refund | Red text: RM amount (fully unsettled) |
 
 **Status filter behavior:**
 
 | Filter Option | Shows |
 |---------------|-------|
-| Unresolved (default) | Customers where unresolved amount > RM 0.01 |
-| Resolved | Customers where unresolved amount <= RM 0.01 |
+| Unsettled (default) | Customers where unsettled amount > RM 0.01 |
+| Settled | Customers where unsettled amount <= RM 0.01 |
 | All Returned | All customers with any return history |
 
 **Sorting:** Click any column header to sort; click again to reverse direction. Text columns (Code, Customer) default to ascending on first click; numeric columns default to descending.
 
-**Empty state:** "No outstanding returns" message when no data matches the current filters.
+**Empty state:** "No unsettled returns" message when no data matches the current filters.
 
 ---
 
@@ -326,10 +326,10 @@ Clicking a **customer name** (the blue underlined link — not the row) in the C
 **Default view:** The modal opens to the **Return Records** sub-view (not the profile overview), because the user's intent is to investigate that customer's returns.
 
 **Return Records sub-view features:**
-- Table of individual credit notes with columns: Doc No, Date, Amount, Knocked Off, Refunded, Unresolved, Reason
+- Table of individual credit notes with columns: Doc No, Date, Amount, Knockoff, Refunded, Unsettled, Reason
 - Search by document number
 - All columns sortable
-- Three-state unresolved cell rendering (Settled in green / Partial in amber / Outstanding in red)
+- Three-state unsettled cell rendering (Settled in green / Partial in amber / Unsettled in red)
 - No pagination (all records displayed)
 
 The modal is the shared Customer Profile Modal described in the Business Domain document (Section 4.2), which also provides access to outstanding invoices, sales transactions, trend charts, and customer statistics.
@@ -342,15 +342,15 @@ The modal is the shared Customer Profile Modal described in the Business Domain 
 
 Only credit notes with type = RETURN are included on this page. Non-return credit notes (discounts, adjustments, allowances) are excluded. All cancelled documents are excluded.
 
-### 8.2 Reconciliation Formula
+### 8.2 Settlement Formula
 
 ```
-Unresolved Amount = Return Credit Note Total -- Knocked Off Amount -- Refunded Amount
+Unsettled Amount = Return Credit Note Total -- Knockoff Amount -- Refunded Amount
 ```
 
-- **Knock Off:** The return amount is deducted from the customer's next invoice. This is the most common resolution method (~92% of returns).
+- **Knockoff (Offset Against Invoices):** The return amount is deducted from the customer's next invoice. This is the most common resolution method (~92% of returns).
 - **Refund:** The customer receives cash or a cheque. This is rare (~0.3%).
-- **Unresolved:** The credit note is still open — the customer is owed money but it hasn't been processed yet.
+- **Unsettled:** The credit note is still open — the customer is owed money but it hasn't been processed yet.
 
 ### 8.3 Return Rate Thresholds
 
@@ -393,9 +393,9 @@ The product returns chart excludes non-product items:
 | Section | Data Scope | Why |
 |---------|------------|-----|
 | Return Trends (Section 1) | Filtered by selected date range | Shows period performance — "how are we doing this year?" |
-| Unresolved Returns (Section 2) | All-time accumulated data | An unresolved credit note from 3 years ago is still a current problem |
+| Unsettled Returns (Section 2) | All-time accumulated data | An unsettled credit note from 3 years ago is still a current problem |
 
-The aging chart uses a **daily snapshot** — it reflects the current state of all unresolved returns as of the latest data sync, not a historical calculation.
+The aging chart uses a **daily snapshot** — it reflects the current state of all unsettled returns as of the latest data sync, not a historical calculation.
 
 ---
 
@@ -412,14 +412,14 @@ The following differences were discovered by reverse-engineering the live codeba
 | Area | Old Documentation | Actual Implementation |
 |------|------------------|----------------------|
 | KPI Cards | 5 cards (separate "Return Records" card) | **4 cards** — Return Records count is the subtitle of "Total Returns" |
-| Page structure | Single scrollable view with a visual separator line | **Two named sections**: "Return Trends" and "Unresolved Returns" with section headers |
+| Page structure | Single scrollable view with a visual separator line | **Two named sections**: "Return Trends" and "Unsettled Returns" with section headers |
 | Table columns | 6 columns | **7 columns** — added "Code" (customer account code) as first column |
-| Table default sort | total_return_value descending | **unresolved descending** — prioritizes actionable items |
+| Table default sort | total_return_value descending | **unsettled descending** — prioritizes actionable items |
 | Table page size | 20 rows per page | **25 / 50 / 100** selectable page sizes |
-| Table filters | No filtering mentioned | **Status dropdown** (Unresolved / Resolved / All) + **text search** by code or name |
-| Table default view | Shows all customers | **Defaults to "Unresolved" filter** — shows only customers needing action |
+| Table filters | No filtering mentioned | **Status dropdown** (Unsettled / Settled / All) + **text search** by code or name |
+| Table default view | Shows all customers | **Defaults to "Unsettled" filter** — shows only customers needing action |
 | Row click | Entire row is clickable | **Only customer name** is clickable (blue underlined link) — consistent with global table standards |
 | Table export | Not mentioned | **Excel (.xlsx) export** of all sorted data |
 | Product exclusions | ZZ-ZZ- and XX-ZZ- prefixes | Also excludes **RE-*** prefix and specifically **ZZ-ZZ-ZZPL** (pallet) items |
-| Refund log | API supports returning recent refund log entries | **Not displayed** in the UI — only the settlement summary (knocked off / refunded / unresolved percentages) is shown |
-| Table alignment | Right-aligned for numeric columns | **Left-aligned for text columns (Code, Customer), right-aligned for numeric columns (Returns, Total Value, Knocked Off, Refunded, Unresolved)** |
+| Refund log | API supports returning recent refund log entries | **Not displayed** in the UI — only the settlement summary (knockoff / refunded / unsettled percentages) is shown |
+| Table alignment | Right-aligned for numeric columns | **Left-aligned for text columns (Code, Customer), right-aligned for numeric columns (Returns, Total Value, Knockoff, Refunded, Unsettled)** |

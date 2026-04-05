@@ -24,7 +24,7 @@ function handleExportExcel(rows: Row[], total: number) {
     { header: 'Account No', key: 'acc_no', width: 14 },
     { header: 'Account Name', key: 'account_name', width: 30 },
     { header: 'Net Cost (RM)', key: 'net_cost', width: 16 },
-    { header: '% of COGS', key: 'pct_of_cogs', width: 12 },
+    { header: '% of Total', key: 'pct_of_cogs', width: 12 },
   ], rows.map(r => ({
     acc_no: r.acc_no,
     account_name: r.account_name,
@@ -73,7 +73,7 @@ export function CogsBreakdownTable({ filters }: { filters: DashboardFilters }) {
   if (isLoading) {
     return (
       <Card>
-        <CardHeader><CardTitle>COGS Breakdown</CardTitle></CardHeader>
+        <CardHeader><CardTitle>Cost of Sales Breakdown</CardTitle></CardHeader>
         <CardContent><div className="h-48 bg-muted animate-pulse rounded" /></CardContent>
       </Card>
     );
@@ -82,7 +82,7 @@ export function CogsBreakdownTable({ filters }: { filters: DashboardFilters }) {
   return (
     <Card>
       <CardHeader className="pb-2 flex-row items-center justify-between">
-        <CardTitle>COGS Breakdown</CardTitle>
+        <CardTitle>Cost of Sales Breakdown</CardTitle>
         <Button size="sm" variant="outline" onClick={() => handleExportExcel(sorted, total)}>
           Export Excel
         </Button>
@@ -95,7 +95,7 @@ export function CogsBreakdownTable({ filters }: { filters: DashboardFilters }) {
                 <SortHeader col="acc_no" label="Account No" />
                 <SortHeader col="account_name" label="Account Name" />
                 <SortHeader col="net_cost" label="Net Cost (RM)" />
-                <TableHead className="text-right">% of COGS</TableHead>
+                <TableHead className="text-right">% of Total</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -114,7 +114,7 @@ export function CogsBreakdownTable({ filters }: { filters: DashboardFilters }) {
               {sorted.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
-                    No COGS data for selected period
+                    No cost of sales data for selected period
                   </TableCell>
                 </TableRow>
               )}
@@ -122,7 +122,7 @@ export function CogsBreakdownTable({ filters }: { filters: DashboardFilters }) {
             {sorted.length > 0 && (
               <TableFooter>
                 <TableRow className="font-semibold">
-                  <TableCell colSpan={2}>TOTAL COGS</TableCell>
+                  <TableCell colSpan={2}>TOTAL COST OF SALES</TableCell>
                   <TableCell className="text-right font-mono">{formatRM(total, 2)}</TableCell>
                   <TableCell className="text-right">100.0%</TableCell>
                 </TableRow>

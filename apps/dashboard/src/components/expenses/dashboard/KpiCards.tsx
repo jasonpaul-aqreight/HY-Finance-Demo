@@ -73,20 +73,20 @@ export function KpiCards({ filters }: { filters: DashboardFilters }) {
       <KpiCard
         title="Total Costs"
         value={formatRM(current.total_costs)}
-        subtext={`COGS ${calculated.cogs_pct_of_total.toFixed(1)}% · OPEX ${calculated.opex_pct_of_total.toFixed(1)}%`}
+        subtext={`Cost of Sales ${calculated.cogs_pct_of_total.toFixed(1)}% · Operating Costs ${calculated.opex_pct_of_total.toFixed(1)}%`}
       />
       <KpiCard
-        title="COGS"
+        title="Cost of Sales (COGS)"
         value={formatRM(current.cogs)}
-        subtext="Cost of Goods Sold"
+        subtext="Direct costs of products sold"
       />
       <KpiCard
-        title="OPEX"
+        title="Operating Costs (OPEX)"
         value={formatRM(current.opex)}
-        subtext="Operating Expenses"
+        subtext="Day-to-day business costs"
       />
       <KpiCard
-        title="YoY Change"
+        title="vs Last Year"
         value={yoyLabel}
         valueColor={yoyColor}
         subtext="vs same period last year"

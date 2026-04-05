@@ -6,8 +6,8 @@ export default function SupplierMarginPage() {
   return (
     <>
       <PageBanner
-        title="Supplier Performance Report"
-        description="Analyzes profit margin trends for suppliers, supporting negotiation and procurement strategies."
+        title="Supplier Margin"
+        description="Analyze estimated profit margins by supplier to support procurement and negotiation decisions."
       />
       <Suspense fallback={<div className="p-8 text-muted-foreground">Loading dashboard...</div>}>
         <DashboardShell />

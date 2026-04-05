@@ -76,7 +76,7 @@ export function MarginTrendChart({ filters }: { filters: DashboardFilters }) {
       <CardHeader className="pb-2">
         <CardTitle>Profitability Trend</CardTitle>
         <p className="text-xs text-muted-foreground">
-          Est. Gross Profit (bars) with Margin % overlay (line)
+          Est. Gross Profit with Gross Margin % overlay
         </p>
       </CardHeader>
       <CardContent>

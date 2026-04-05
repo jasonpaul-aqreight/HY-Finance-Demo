@@ -62,8 +62,8 @@ export function GroupByChart({ selectedData, title }: GroupByChartProps) {
             tickLine={false}
             width={280}
           />
-          <Tooltip wrapperStyle={{ zIndex: 50 }} formatter={(v: unknown) => [formatRM(v as number), 'Total Sales']} />
-          <Bar dataKey="total_sales" name="Total Sales" radius={[0, 3, 3, 0]}>
+          <Tooltip wrapperStyle={{ zIndex: 50 }} formatter={(v: unknown) => [formatRM(v as number), 'Net Sales']} />
+          <Bar dataKey="total_sales" name="Net Sales" radius={[0, 3, 3, 0]}>
             {barData.map((_, idx) => (
               <Cell key={idx} fill={BAR_COLORS[idx % BAR_COLORS.length]} />
             ))}

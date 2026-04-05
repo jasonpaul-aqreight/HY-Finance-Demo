@@ -49,7 +49,7 @@ export function FilterBarV3({ filters, onFilterChange, latestMonth }: FilterBarV
         onValueChange={(v) => v && onFilterChange({ fiscalYear: v })}
       >
         <SelectTrigger className="w-[140px] h-9 text-sm">
-          <SelectValue placeholder="Fiscal Year" />
+          <SelectValue placeholder="Financial Year" />
         </SelectTrigger>
         <SelectContent>
           {fyOptions.map(fy => (
@@ -60,7 +60,7 @@ export function FilterBarV3({ filters, onFilterChange, latestMonth }: FilterBarV
 
       {filters.fiscalYear && (
         <p className="flex-1 text-center text-lg font-semibold tracking-tight">
-          Fiscal Year {fyYear} ({start} – {end})
+          Financial Year {fyYear} ({start} – {end})
         </p>
       )}
 

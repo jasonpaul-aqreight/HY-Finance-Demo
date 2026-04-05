@@ -9,7 +9,7 @@
 The Payment Collection page is the central view for accounts receivable management. It answers:
 
 - How much do customers owe us right now, and how much is overdue?
-- How efficiently are we collecting payments over time (DSO and collection rate)?
+- How efficiently are we collecting payments over time (average collection days and collection rate)?
 - Which customers are exceeding their credit limits?
 - How risky is each customer based on their payment behavior?
 - Is our collection performance improving or deteriorating month over month?
@@ -28,8 +28,8 @@ From top to bottom:
 
 1. **Page Banner** — Title "Payment Collection" with subtitle describing the page purpose.
 2. **Date Range Filter** — Start and end date pickers.
-3. **Period KPI Cards** — A responsive row of three summary metric cards (DSO, Collection Rate, Avg Monthly Collection).
-4. **DSO Trend Chart** — Line chart showing monthly DSO values.
+3. **Period KPI Cards** — A responsive row of three summary metric cards (Avg Collection Days, Collection Rate, Avg Monthly Collection).
+4. **Avg Collection Days Trend Chart** — Line chart showing monthly collection day values.
 5. **Invoiced vs Collected Chart** — Composed bar + line chart comparing monthly collection against invoicing.
 
 ### Section 2: Outstanding Payment (Snapshot — As of Today)
@@ -38,7 +38,7 @@ Preceded by a visual separator indicating these metrics are not filtered by date
 
 1. **Snapshot KPI Cards** — A responsive row of three summary metric cards (Total Outstanding, Overdue Amount, Credit Limit Breaches).
 2. **Aging Analysis Chart** — Horizontal bar chart with toggle views (All / By Agent / By Type).
-3. **Credit Utilization Distribution Chart** — Donut chart showing credit limit usage categories.
+3. **Credit Usage Distribution Chart** — Donut chart showing credit limit usage categories.
 4. **Customer Credit Health Table** — Full-width sortable, searchable, paginated table with filtering and export.
 
 ### Responsive Behavior
@@ -59,12 +59,12 @@ Six cards total, split into two groups of three. All monetary values formatted a
 
 ### Period KPI Cards (Section 1 — Date-Filtered)
 
-#### 3.1 Days Sales Outstanding (DSO)
+#### 3.1 Avg Collection Days
 
-- **Label:** "Days Sales Outstanding (DSO)"
-- **Value:** Average of all monthly DSO values in the selected date range
+- **Label:** "Avg Collection Days"
+- **Value:** Average of all monthly collection day values in the selected date range (also known as Days Sales Outstanding / DSO)
 - **Formula:** For each month: (AR Outstanding at month-end ÷ Credit Sales for that month) × Days in that month. KPI shows the average across all valid months.
-- **Subtitle:** "avg monthly DSO"
+- **Subtitle:** "avg monthly collection days"
 - **Format:** "{N} days"
 - **Color coding:** Green if ≤30 days, yellow if ≤60 days, red if >60 days
 - **Tooltip:** Shows the formula explanation
@@ -78,7 +78,7 @@ Six cards total, split into two groups of three. All monetary values formatted a
 - **Subtitle:** "in selected period"
 - **Format:** "{N.N}%"
 - **Color coding:** Green if ≥80%, yellow if ≥50%, red if <50%
-- **Note:** Excludes contra settlements (non-cash offsets) — measures actual cash collection only
+- **Note:** Excludes offsets between amounts owed and owing (non-cash offsets) — measures actual cash collection only
 
 #### 3.3 Avg Monthly Collection
 
@@ -119,7 +119,7 @@ Six cards total, split into two groups of three. All monetary values formatted a
 
 ## 4. Charts
 
-### 4.1 DSO Trend
+### 4.1 Avg Collection Days Trend
 
 A line chart showing how collection speed changes over time.
 
@@ -129,15 +129,15 @@ A line chart showing how collection speed changes over time.
 
 **Y-axis:** Days (label: "Days").
 
-**Line:** Monthly DSO values, colored dark blue (#2E5090).
+**Line:** Monthly collection day values, colored dark blue (#2E5090).
 
-**Reference line:** Dashed horizontal line at the average DSO across all displayed months, labeled "Avg {N}d".
+**Reference line:** Dashed horizontal line at the average across all displayed months, labeled "Avg {N}d".
 
-**Tooltip:** On hover, shows "DSO: {N.N} days" for that month.
+**Tooltip:** On hover, shows "Avg Collection Days: {N.N} days" for that month.
 
 **Scope:** Period-filtered — responds to the date range selector.
 
-**DSO calculation per month:**
+**Calculation per month (DSO formula):**
 1. AR Outstanding at month-end = cumulative invoiced amount minus cumulative payments, credit notes, and refunds (all non-cancelled, timezone-adjusted).
 2. Monthly Credit Sales = invoice totals for that month only.
 3. DSO = (AR Outstanding ÷ Monthly Credit Sales) × Days in that month.
@@ -180,10 +180,10 @@ A horizontal bar chart showing outstanding invoices broken down by how overdue t
 | Bucket | Condition | Color |
 |--------|-----------|-------|
 | Not Yet Due | Invoice due date has not passed | Green |
-| 1-30 Days | 1 to 30 days past due | Yellow |
-| 31-60 Days | 31 to 60 days past due | Orange |
-| 61-90 Days | 61 to 90 days past due | Light red |
-| 91-120 Days | 91 to 120 days past due | Red |
+| 1–30 Days | 1 to 30 days past due | Yellow |
+| 31–60 Days | 31 to 60 days past due | Orange |
+| 61–90 Days | 61 to 90 days past due | Light red |
+| 91–120 Days | 91 to 120 days past due | Red |
 | 120+ Days | More than 120 days past due | Dark red |
 
 **Y-axis:** Bucket labels.
@@ -196,13 +196,13 @@ A horizontal bar chart showing outstanding invoices broken down by how overdue t
 |------|-------|----------|
 | All | "All" | Simple horizontal bars, one per bucket, each colored by bucket severity. Invoice count label displayed to the right of each bar. |
 | By Agent | "By Agent" | Stacked horizontal bars where each segment represents a different sales agent. Distinct color per agent. Legend shown below chart. |
-| By Type | "By Type" | Stacked horizontal bars where each segment represents a customer category (e.g., Chain Store, Restaurant, Wholesaler). Distinct color per type. Legend shown below chart. |
+| By Type | "By Type" | Stacked horizontal bars where each segment represents a customer type (e.g., Chain Store, Restaurant, Wholesaler). Distinct color per type. Legend shown below chart. |
 
 **Tooltip:** Shows formatted RM amount per segment on hover.
 
-### 4.4 Credit Utilization Distribution
+### 4.4 Credit Usage Distribution
 
-A donut (ring) chart showing how customers are distributed across credit utilization categories.
+A donut (ring) chart showing how customers are distributed across credit usage categories.
 
 **Scope:** Snapshot (not date-filtered).
 
@@ -210,9 +210,9 @@ A donut (ring) chart showing how customers are distributed across credit utiliza
 
 | Category | Condition | Color |
 |----------|-----------|-------|
-| Within Limit (< 80%) | Utilization below 80% | Green |
-| Near Limit (≥ 80%) | Utilization between 80% and 100% | Yellow |
-| Over Limit (> 100%) | Utilization exceeds 100% | Red |
+| Within Limit (< 80%) | Usage below 80% | Green |
+| Near Limit (≥ 80%) | Usage between 80% and 100% | Yellow |
+| Over Limit (> 100%) | Usage exceeds 100% | Red |
 | No Limit Set | Customer has no credit limit assigned (null or 0) | Gray |
 
 **Center label:** Total number of customers that have credit limits set (excludes "No Limit Set" category).
@@ -223,7 +223,7 @@ A donut (ring) chart showing how customers are distributed across credit utiliza
 
 **Empty categories:** Categories with zero customers are hidden from both chart and legend.
 
-**Utilization calculation:** Total Outstanding ÷ Credit Limit × 100. Customers without a credit limit are categorized as "No Limit Set."
+**Credit usage calculation:** Total Outstanding ÷ Credit Limit × 100. Customers without a credit limit are categorized as "No Limit Set."
 
 ---
 
@@ -246,7 +246,7 @@ The main data table providing a comprehensive view of every customer's credit he
 | Control | Behavior |
 |---------|----------|
 | **Search** | Text input ("Search by customer code or name..."). Case-insensitive substring match. Resets to page 1 on change. Width: ~192px. |
-| **Category Filter** | Dropdown allowing selection of customer category. Options: All Category, Consumer, Fruit Shop, Hospitality, Intermediary, Supermarket, Wet Market, Wholesaler. Default: "All Category". |
+| **Type Filter** | Dropdown allowing selection of customer type. Options: All Types, Consumer, Fruit Shop, Hospitality, Intermediary, Supermarket, Wet Market, Wholesaler. Default: "All Types". |
 | **Risk Level Filter** | Dropdown allowing selection of risk tier. Options: All Risk Level, Low Risk, Moderate Risk, High Risk. Default: "All Risk Level". |
 | **Score & Risk** | Button (admin-only) that opens the Settings dialog (see Section 7). |
 | **Export Excel** | Button that exports the current filtered/sorted data as an .xlsx file with formatted columns. |
@@ -257,14 +257,14 @@ The main data table providing a comprehensive view of every customer's credit he
 |--------|-------------|--------|-------|
 | Code | Customer account number | Monospace, small text | — |
 | Name | Company name | Blue underlined link (clickable) | Opens Customer Profile modal. Max width ~200px, truncated if longer. |
-| Category | Customer classification | Pill/badge styling | e.g., "Chain Store", "Wholesaler" |
+| Type | Customer type classification | Pill/badge styling | e.g., "Chain Store", "Wholesaler" |
 | Agent | Sales agent managing this account | Small text | — |
 | Credit Limit | Maximum approved credit amount | RM currency; "--" if no limit set | — |
 | Outstanding | Total amount currently owed | RM currency, bold | — |
-| Credit Util | Outstanding ÷ Credit Limit × 100 | Progress bar + percentage label | Bar color: green (<80%), yellow (80–99%), red (≥100%). Shows "--" if no credit limit. |
+| Credit Used | Outstanding ÷ Credit Limit × 100 | Progress bar + percentage label | Bar color: green (<80%), yellow (80–99%), red (≥100%). Shows "--" if no credit limit. |
 | Aging Count | Number of overdue invoices | Whole number; red text if >0 | — |
 | Oldest Due | Days since oldest overdue invoice | "{N}d" format; "--" if nothing overdue | Red bold text if overdue |
-| Credit Health Score | Credit health score | 0–100, monospace | See Section 7 for calculation |
+| Health Score | Credit health score | 0–100, monospace | See Section 7 for calculation |
 | Risk Level | Risk tier classification | Color-coded pill | Green = "Low", Yellow = "Moderate", Red = "High" |
 
 **Sorting behavior:**
@@ -294,7 +294,7 @@ The main data table providing a comprehensive view of every customer's credit he
   - **End Date picker** — Selects a specific date (YYYY-MM-DD format).
   - Both pickers are bounded by the earliest and latest invoice dates in the data.
 - **Default range:** On first load, the system fetches the min/max invoice dates, then defaults to a 12-month window: start = first day of the month 11 months before the max date's month; end = last day of the max date's month.
-- **Scope:** Affects only Section 1 components (Period KPI Cards, DSO Trend chart, Invoiced vs Collected chart). Section 2 components are never affected by date range.
+- **Scope:** Affects only Section 1 components (Period KPI Cards, Avg Collection Days Trend chart, Invoiced vs Collected chart). Section 2 components are never affected by date range.
 - **Key behavior:** The default range is calculated relative to the latest data date (not today's date), ensuring the page always shows data on first load even if the data sync hasn't run recently.
 
 ### 6.2 Aging Chart View Toggle
@@ -307,7 +307,7 @@ The main data table providing a comprehensive view of every customer's credit he
 ### 6.3 Table Filters
 
 - **Search:** Real-time text filtering by customer code or name. Case-insensitive. Resets pagination to page 1.
-- **Category dropdown:** Filters table to a single customer category. "All Category" clears the filter.
+- **Type dropdown:** Filters table to a single customer type. "All Types" clears the filter.
 - **Risk Level dropdown:** Filters table to a single risk tier. "All Risk Level" clears the filter.
 - All filters are combined with AND logic.
 
@@ -321,13 +321,13 @@ Every customer receives a **credit health score** from 0 (worst) to 100 (best). 
 
 Each factor produces a component score from 0 to 100, which is then multiplied by its weight.
 
-#### Factor 1: Credit Utilization (default weight: 40%)
+#### Factor 1: Credit Usage (default weight: 40%)
 
 Measures how much of the customer's credit limit is currently in use.
 
-- **Input:** Utilization % = Total Outstanding ÷ Credit Limit × 100
+- **Input:** Usage % = Total Outstanding ÷ Credit Limit × 100
 - **If no credit limit is set:** Returns a neutral score of 50 (unknown risk)
-- **Score:** max(0, round(100 − Utilization %)). A customer at exactly their limit scores 0; a customer with no outstanding balance scores 100.
+- **Score:** max(0, round(100 − Usage %)). A customer at exactly their limit scores 0; a customer with no outstanding balance scores 100.
 
 #### Factor 2: Overdue Days (default weight: 30%)
 
@@ -371,7 +371,7 @@ A binary penalty for customers who have breached **both** their credit limit and
 
 ```
 Score = round(
-    (Utilization Weight ÷ 100) × Utilization Score +
+    (Credit Usage Weight ÷ 100) × Credit Usage Score +
     (Overdue Days Weight ÷ 100) × Overdue Score +
     (Timeliness Weight ÷ 100) × Timeliness Score +
     (Double Breach Weight ÷ 100) × Double Breach Score
@@ -398,7 +398,7 @@ Four input fields, one per factor. Constraint: all four must sum to exactly 100%
 
 | Factor | Default Weight |
 |--------|---------------|
-| Credit Utilization | 40% |
+| Credit Usage | 40% |
 | Overdue Days | 30% |
 | Payment Timeliness | 20% |
 | Double Breach | 10% |
@@ -450,16 +450,16 @@ The Payment page does not link to other dashboard pages. All drill-down happens 
 
 AR is the total money owed by customers for goods delivered but not yet paid. It is the sum of all outstanding (unpaid) invoices.
 
-### DSO Formula
+### Avg Collection Days Formula (DSO)
 
 ```
-Monthly DSO = (AR Outstanding at month-end ÷ Monthly Credit Sales) × Days in that month
+Monthly Collection Days = (AR Outstanding at month-end ÷ Monthly Credit Sales) × Days in that month
 ```
 
 - AR Outstanding = cumulative invoiced amount minus cumulative payments, credit notes, and refunds
 - Credit Sales = invoice totals for that month (credit-term invoices only, not cash sales)
-- If credit sales = 0 for a month, DSO is undefined (excluded from averages)
-- KPI DSO = average of all valid monthly DSO values in the date range
+- If credit sales = 0 for a month, the value is undefined (excluded from averages)
+- KPI Avg Collection Days = average of all valid monthly values in the date range
 
 ### Collection Rate Formula
 
@@ -469,7 +469,7 @@ Collection Rate = (Total Collected ÷ Total Invoiced) × 100
 
 - Collected = sum of all payment amounts within the date range (non-cancelled)
 - Invoiced = sum of all invoice totals within the date range (non-cancelled)
-- Excludes contra settlements (non-cash offsets)
+- Excludes offsets between amounts owed and owing (non-cash offsets)
 
 ### Avg Monthly Collection Formula
 
@@ -477,14 +477,14 @@ Collection Rate = (Total Collected ÷ Total Invoiced) × 100
 Avg Monthly Collection = Total Collected ÷ Number of Months in Range
 ```
 
-### Credit Utilization
+### Credit Usage
 
 ```
-Utilization % = Total Outstanding ÷ Credit Limit × 100
+Credit Usage % = Total Outstanding ÷ Credit Limit × 100
 ```
 
-- Customers with no credit limit (null or 0) are categorized as "No Limit Set" and excluded from utilization calculations
-- A customer with outstanding of RM 120,000 and a limit of RM 100,000 has 120% utilization (over limit)
+- Customers with no credit limit (null or 0) are categorized as "No Limit Set" and excluded from credit usage calculations
+- A customer with outstanding of RM 120,000 and a limit of RM 100,000 has 120% usage (over limit)
 
 ### Overdue Calculation
 
@@ -494,8 +494,8 @@ An invoice is "overdue" when the current date exceeds its due date. The number o
 
 This is a critical design principle:
 
-- **Period-based metrics** (Section 1): DSO, Collection Rate, Avg Monthly Collection, DSO Trend chart, Invoiced vs Collected chart. These respond to the date range filter.
-- **Snapshot metrics** (Section 2): Total Outstanding, Overdue Amount, Credit Limit Breaches, Aging Analysis, Credit Utilization, Customer Credit Health table. These always show the current accumulated position from the beginning of time to today. They are **never** filtered by the date range.
+- **Period-based metrics** (Section 1): Avg Collection Days, Collection Rate, Avg Monthly Collection, Avg Collection Days Trend chart, Invoiced vs Collected chart. These respond to the date range filter.
+- **Snapshot metrics** (Section 2): Total Outstanding, Overdue Amount, Credit Limit Breaches, Aging Analysis, Credit Usage, Customer Credit Health table. These always show the current accumulated position from the beginning of time to today. They are **never** filtered by the date range.
 
 ### Excluded Records
 
@@ -522,14 +522,14 @@ All document dates are stored in UTC. Eight hours are added to convert to Malays
 - `screenshots/payment/default.png` — Full page default view showing both sections
 - `screenshots/payment/period-kpis.png` — Close-up of the three period KPI cards
 - `screenshots/payment/snapshot-kpis.png` — Close-up of the three snapshot KPI cards
-- `screenshots/payment/dso-trend.png` — DSO Trend line chart
+- `screenshots/payment/dso-trend.png` — Avg Collection Days Trend line chart
 - `screenshots/payment/invoiced-vs-collected.png` — Invoiced vs Collected composed chart
 - `screenshots/payment/aging-all.png` — Aging Analysis in "All" view
 - `screenshots/payment/aging-by-agent.png` — Aging Analysis in "By Agent" stacked view
 - `screenshots/payment/aging-by-type.png` — Aging Analysis in "By Type" stacked view
-- `screenshots/payment/credit-utilization.png` — Credit Utilization donut chart
+- `screenshots/payment/credit-utilization.png` — Credit Usage donut chart
 - `screenshots/payment/customer-table.png` — Customer Credit Health table with filters
-- `screenshots/payment/customer-table-filters.png` — Table showing category and risk level filter dropdowns
+- `screenshots/payment/customer-table-filters.png` — Table showing type and risk level filter dropdowns
 - `screenshots/payment/settings-dialog.png` — Score & Risk Settings dialog (admin view)
 - `screenshots/payment/settings-how-it-works.png` — Expanded "How Credit Health Score is calculated" section
 - `screenshots/payment/customer-profile-modal.png` — Customer Profile modal opened from Payment page (Outstanding Invoices tab)

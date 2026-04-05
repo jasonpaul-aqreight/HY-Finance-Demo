@@ -26,7 +26,7 @@ All financial data originates from **AutoCount Accounting**, a full-featured ERP
 | Role | Primary Interest |
 |------|-----------------|
 | Finance Director | P&L oversight, margin analysis, credit risk monitoring |
-| Management | Revenue trends, top customer/supplier performance, expense control |
+| Management | Net sales trends, top customer/supplier performance, expense control |
 | Operations Team | Payment collection follow-up, return tracking, expense monitoring |
 
 **Readability requirement:** End users are older executives. All text must be high-contrast and easily readable — never use gray, muted, or low-contrast text for important labels or data.
@@ -39,13 +39,13 @@ The Finance Dashboard is one module in a larger production application (which al
 
 | # | Page Name | Purpose |
 |---|-----------|---------|
-| 1 | **Sales Report** | Revenue tracking (daily/weekly/monthly) — invoices, cash sales, credit notes |
+| 1 | **Sales Report** | Net sales tracking (daily/weekly/monthly) — invoices, cash sales, credit notes |
 | 2 | **Payment Collection** | Customer credit health, payment aging, outstanding amounts, credit scoring |
-| 3 | **Credit Note / Return / Refund** | Credit note tracking, return reconciliation, product return analysis |
+| 3 | **Returns** | Credit note tracking, return reconciliation, product return analysis |
 | 4 | **Financial Statements** | Profit & Loss statement, Year-over-Year comparison, Balance Sheet |
-| 5 | **Cost Tracking (Expenses)** | COGS and OPEX breakdown, expense trend analysis, top expenses |
-| 6 | **Customer Profit Margin** | Profit margin by customer — identify high-value relationships |
-| 7 | **Supplier Performance** | Profit margin by supplier — procurement analysis, price comparison |
+| 5 | **Expenses** | Cost of Sales (COGS) and Operating Costs (OPEX) breakdown, expense trend analysis, top expenses |
+| 6 | **Customer Margin** | Profit margin by customer — identify high-value relationships |
+| 7 | **Supplier Margin** | Profit margin by supplier — procurement analysis, price comparison |
 | 8 | **Payment Settings** | Configure credit score weights and risk thresholds |
 | 9 | **Data Sync (Admin)** | Manage data synchronization from AutoCount to the dashboard |
 
@@ -63,11 +63,11 @@ A collapsible sidebar on the left side contains 7 primary navigation items plus 
 |-------|-------|-----------------|
 | 1 | Sales | Upward trend line |
 | 2 | Payment | Credit card |
-| 3 | Return | Circular arrow (undo) |
+| 3 | Returns | Circular arrow (undo) |
 | 4 | Financials | Bar chart |
 | 5 | Expenses | Receipt |
 | 6 | Customer Margin | People/users |
-| 7 | Supplier Performance | Truck |
+| 7 | Supplier Margin | Truck |
 
 **Admin Section (below divider):**
 
@@ -102,7 +102,7 @@ Every dashboard page follows a consistent structure:
 
 ### 4.1 Date Range Filter
 
-Used across 6 pages (Sales, Payment, Return, Expenses, Customer Margin, Supplier Performance).
+Used across 6 pages (Sales, Payment, Returns, Expenses, Customer Margin, Supplier Margin).
 
 **Controls:**
 - Two month-year pickers (start and end)
@@ -123,7 +123,7 @@ Used across 6 pages (Sales, Payment, Return, Expenses, Customer Margin, Supplier
 - Pickers are bounded by earliest and latest available dates from the database
 - Default initialization: last 12 months from the latest data date
 
-**Exception:** Financial Statements page uses a **fiscal year dropdown** instead of date range pickers (see Section 8.4).
+**Exception:** Financial Statements page uses a **financial year dropdown** instead of date range pickers (see Section 8.4).
 
 ### 4.2 Customer Profile Modal
 
@@ -142,7 +142,7 @@ Left — "Customer Details" card with three columns:
 | Column | Fields |
 |--------|--------|
 | General | Customer Type, Sales Agent, Customer Since |
-| Contact | PIC (person in charge), Phone, Mobile, Email |
+| Contact | Contact Person, Phone, Mobile, Email |
 | Financial | Credit Limit, Payment Terms, Currency |
 
 Right — "Logs" panel (3 clickable buttons, each navigating to a sub-view):
@@ -158,15 +158,15 @@ Right — "Logs" panel (3 clickable buttons, each navigating to a sub-view):
 Four equal cards in a row:
 
 1. **Credit Health Score** — Half-gauge (0–100 scale), color-coded green/amber/red. Shows Risk Tier badge (Low/Moderate/High) and lifetime average payment days.
-2. **Credit Utilization** — Donut chart showing utilization percentage. Color: green <80%, amber 80–100%, red >100%. Shows outstanding amount and credit limit below.
+2. **Credit Usage** — Donut chart showing utilization percentage. Color: green <80%, amber 80–100%, red >100%. Shows outstanding amount and credit limit below.
 3. **Outstanding Invoices** — Horizontal stacked bar by aging bucket (Not Due, 1–30, 31–60, 61–90, 91–120, 120+ days) with inline legend showing amounts per bucket. Shows overdue total below.
-4. **Returns** — Donut chart showing Settled vs. Unsettled count. Shows unsettled amount below.
+4. **Returns** — Donut chart showing Settled vs Unsettled count. Shows unsettled amount below.
 
 **Profile View — Section C: Trends (date-filtered)**
 
 A shared date range picker controls all three trend charts simultaneously:
 
-1. **Sales & Margin** — KPIs: Net Sales, Avg Margin %, COGS. Chart: revenue bars + margin % line (dual axis, monthly).
+1. **Sales & Margin** — KPIs: Net Sales, Avg Margin %, Cost of Sales. Chart: net sales bars + margin % line (dual axis, monthly).
 2. **Payment** — KPIs: Collection amount, Collection Rate %, Avg Pay Days. Chart: invoiced bars + collected bars + collection rate % line.
 3. **Returns** — KPIs: Total Returns amount, Count. Chart: return value trend line.
 
@@ -175,21 +175,21 @@ A shared date range picker controls all three trend charts simultaneously:
 | Sub-View | Content | Features |
 |----------|---------|----------|
 | Outstanding Invoices | Table of unpaid invoices with Doc No, dates, amounts, days overdue | Search by doc number, sortable, no pagination |
-| Return Records | Table of credit notes with amounts, knock-off, refund, unresolved status | Search by doc number, sortable, no pagination |
-| Sales Transactions | Table of items sold with qty, revenue, cost, margin % | Own independent date range filter, server-side pagination, Excel export |
+| Return Records | Table of credit notes with amounts, knockoff, refund, unsettled status | Search by doc number, sortable, no pagination |
+| Sales Transactions | Table of items sold with qty, net sales, cost, margin % | Own independent date range filter, server-side pagination, Excel export |
 
 **Context-sensitive default view:**
 
 | Calling Page | Default View |
 |-------------|-------------|
 | Payment | Outstanding Invoices |
-| Return | Return Records |
+| Returns | Return Records |
 | Sales | Sales Transactions |
 | Customer Margin | Sales Transactions |
 
 ### 4.3 Supplier Profile Modal
 
-A large overlay (90% viewport width and height) for viewing a single supplier. Accessible from Supplier Performance page. Uses the same **multi-view architecture** as the Customer Profile modal.
+A large overlay (90% viewport width and height) for viewing a single supplier. Accessible from Supplier Margin page. Uses the same **multi-view architecture** as the Customer Profile modal.
 
 **Header (always visible):**
 - Company name (large, bold, truncated)
@@ -204,7 +204,7 @@ Left — "Supplier Details" card with three columns:
 | Column | Fields |
 |--------|--------|
 | General | Supplier Type, Purchase Agent, Supplier Since |
-| Contact | PIC (person in charge), Phone, Mobile, Email |
+| Contact | Contact Person, Phone, Mobile, Email |
 | Terms | Payment Terms, Credit Limit, Currency |
 
 Right — "Log" panel with a single clickable button: **"Items Supplied"** → navigates to Items view.
@@ -213,7 +213,7 @@ Right — "Log" panel with a single clickable button: **"Items Supplied"** → n
 
 | Calling Context | Default View |
 |----------------|-------------|
-| Supplier Performance table row | Items view (opens directly to items list) |
+| Supplier Margin table row | Items view (opens directly to items list) |
 | All other contexts | Profile view |
 
 **Profile View — Section B: Performance (date-filtered)**
@@ -223,7 +223,7 @@ A date range picker controls all performance visuals. Two rows:
 *Statistics row (2 cards):*
 
 1. **Margin Performance** — Semicircle gauge (0–50% scale), color: green ≥20%, amber ≥10%, red <10%. Shows average margin percentage.
-2. **Supply Dependency** — Sole-supplier count (amber) out of total fruit variants. Horizontal stacked bar showing multi-source (blue) vs. sole-supplier (amber) proportions.
+2. **Supply Dependency** — Sole-supplier count (amber) out of total product variants. Horizontal stacked bar showing multi-source (blue) vs. sole-supplier (amber) proportions.
 
 *Trend charts row (2 charts):*
 
@@ -233,11 +233,11 @@ A date range picker controls all performance visuals. Two rows:
 **Items View (accessed from Log panel — entire body swaps):**
 
 - Back arrow to return to profile
-- Disclaimer note explaining that revenue, COGS, and profit are estimated allocations based on purchase share
+- Disclaimer note explaining that net sales, cost of sales, and profit are estimated allocations based on purchase share
 - **Own independent date range filter** (separate from profile performance date range)
-- **Sole Source Only** toggle filter — filters to items where this is the only supplier for that fruit variant (amber styling when active)
-- **Fruit** and **Variant** cascading dropdown filters
-- Items table with columns: sole-source icon, Item Code, Description, Qty Purchased, Avg Purchase Price, Price Trend (sparkline), Est. Revenue, Est. Cost of Sales, Margin %
+- **Sole Source Only** toggle filter — filters to items where this is the only supplier for that product variant (amber styling when active)
+- **Product** and **Variant** cascading dropdown filters
+- Items table with columns: sole-source icon, Item Code, Description, Qty Purchased, Avg Purchase Price, Price Trend (sparkline), Est. Net Sales, Est. Cost of Sales, Margin %
 - **Price Trend sparklines:** Inline mini line charts (green = price stable/decreasing, red = price increasing). Click to expand a popover with full chart and monthly price data table.
 - Sole-source rows highlighted with subtle amber background
 
@@ -260,7 +260,7 @@ The system works with these core business entities:
 | **Sales Agent** | Sales representatives managing customer relationships | ~21 |
 | **GL Account** | Chart of accounts (revenue, cost, expense, asset, liability accounts) | ~1,576 |
 | **Account Type** | Classification of GL accounts (Sales, COGS, Expense, Asset, etc.) | 16 |
-| **Fiscal Year** | Defined fiscal periods (Hoi-Yong uses March–February fiscal year) | ~8 |
+| **Financial Year** | Defined financial year periods (Hoi-Yong uses March–February financial year) | ~8 |
 | **Project** | Project or branch codes | ~4 |
 
 ### 5.2 Transaction Types
@@ -347,7 +347,7 @@ All calculations **exclude cancelled records**. Only documents marked as non-can
 
 ### 6.5 Margin Calculation (Universal)
 
-Used consistently across Customer Margin, Supplier Performance, and Financial Statements:
+Used consistently across Customer Margin, Supplier Margin, and Financial Statements:
 
 ```
 Gross Profit = Revenue − Cost of Goods Sold (COGS)
@@ -379,7 +379,7 @@ A **4-factor weighted model** that scores each customer's credit health from 0 t
 
 | Factor | Weight | What It Measures |
 |--------|--------|-----------------|
-| Credit Utilization | 40% | How much of their credit limit is used |
+| Credit Usage | 40% | How much of their credit limit is used |
 | Overdue Days | 30% | How long their oldest invoice is overdue |
 | Payment Timeliness | 20% | Average lateness of payments (last 12 months) |
 | Double Breach | 10% | Whether they've exceeded BOTH credit limit AND overdue limit |
@@ -431,14 +431,14 @@ Score = (Utilization × 0.40) + (Overdue Days × 0.30) + (Timeliness × 0.20) + 
 
 **Configurable:** The weights and tier thresholds can be adjusted by the user via the Payment Settings page.
 
-### 6.8 Days Sales Outstanding (DSO)
+### 6.8 Avg Collection Days
 
 ```
-DSO = (Accounts Receivable Outstanding ÷ Monthly Credit Sales) × Days in Month
+Avg Collection Days = (Accounts Receivable Outstanding ÷ Monthly Credit Sales) × Days in Month
 Collection Rate = (Amount Collected ÷ Amount Invoiced) × 100  [rolling 12 months]
 ```
 
-### 6.9 Credit Utilization Categories
+### 6.9 Credit Usage Categories
 
 | Category | Definition |
 |----------|------------|
@@ -457,9 +457,9 @@ Collection Rate = (Amount Collected ÷ Amount Invoiced) × 100  [rolling 12 mont
 
 | State | Definition |
 |-------|------------|
-| Reconciled | Credit note fully settled (knocked off against invoices or refunded) |
+| Settled | Credit note fully settled (knockoff against invoices or refunded) |
 | Partial | Credit note partially settled |
-| Outstanding | Credit note not yet resolved |
+| Outstanding | Credit note not yet settled |
 
 **Return aging buckets:** 0–30 days, 31–60 days, 61–90 days, 91–180 days, 180+ days
 
@@ -471,18 +471,18 @@ For accounts receivable: Current (not yet due), 1–30 days, 31–60 days, 61–
 
 ```
 Net Sales = Sales + Sales Adjustments
-COGS = Cost of Goods Sold
-Gross Profit = Net Sales − COGS
+Cost of Sales = Cost of Goods Sold
+Gross Profit = Net Sales − Cost of Sales
 Gross Margin % = (Gross Profit ÷ Net Sales) × 100
 Other Income = Non-operating income
-Operating Expenses = All OPEX categories
-Net Profit = Gross Profit + Other Income − Operating Expenses
-Net Margin % = (Net Profit ÷ Net Sales) × 100
+Operating Costs = All operating expense categories
+Operating Profit = Gross Profit + Other Income − Operating Costs
+Net Margin % = (Operating Profit ÷ Net Sales) × 100
 Taxation = Tax amounts
-Net Profit After Tax (NPAT) = Net Profit − Taxation
+Net Profit After Tax = Operating Profit − Taxation
 ```
 
-**Fiscal Year Convention:** March to February, where the named year is the **end** year (e.g., FY2025 = March 2024 – February 2025)
+**Financial Year Convention:** March to February, where the named year is the **end** year (e.g., FY2025 = March 2024 – February 2025)
 
 ### 6.13 Expense Categorization
 
@@ -490,10 +490,10 @@ Expenses are split into two top-level types:
 
 | Type | Description |
 |------|-------------|
-| **COGS** (Cost of Goods Sold) | Direct costs of products sold |
-| **OPEX** (Operating Expenses) | Indirect business expenses |
+| **Cost of Sales (COGS)** | Direct costs of products sold |
+| **Operating Costs (OPEX)** | Indirect business expenses |
 
-**OPEX Sub-Categories (13):**
+**Operating Costs Sub-Categories (13):**
 
 1. People & Payroll
 2. Vehicle & Transport
@@ -532,12 +532,12 @@ Run aggregation queries against AutoCount to build 17 pre-computed analytics tab
 
 | Domain | Tables | Grain |
 |--------|--------|-------|
-| Sales | 4 tables | Daily: total revenue; by customer; by dimension (type/agent/outlet); by fruit |
+| Sales | 4 tables | Daily: net sales total; by customer; by dimension (type/agent/outlet); by product |
 | Payment / AR | 3 tables | Monthly AR activity; daily customer snapshot; daily aging snapshot |
 | Returns | 4 tables | Monthly overview; by customer; by product; daily aging snapshot |
 | Customer Margin | 2 tables | Monthly by customer; monthly by customer × product group |
 | Supplier Margin | 1 table | Monthly by supplier × product |
-| P&L | 2 tables | By fiscal period and account; opening balances |
+| P&L | 2 tables | By financial year period and account; opening balances |
 | Expenses | 1 table | Monthly by GL account |
 
 **Phase 2b — Atomic Swap:**
@@ -567,10 +567,10 @@ For detailed views (e.g., individual customer invoices, product-level breakdowns
 ### 8.1 Sales Report
 
 - Supports 3 granularity levels: daily, weekly (ISO week), monthly
-- Revenue trend includes a 3-month moving average line
+- Net sales trend includes a 3-month moving average line
 - Optional prior-period overlay for year-over-year comparison
-- Breakdown dimensions: customer, customer type, sales agent, outlet/location, fruit name, fruit country, fruit variant
-- Includes all customer accounts in revenue totals (both named "CASH DEBTOR-xxx" accounts and generic "CASH SALES")
+- Breakdown dimensions: customer, customer type, sales agent, outlet/location, product name, product country, product variant
+- Includes all customer accounts in net sales totals (both named "CASH DEBTOR-xxx" accounts and generic "CASH SALES")
 
 ### 8.2 Payment Collection
 
@@ -578,35 +578,35 @@ For detailed views (e.g., individual customer invoices, product-level breakdowns
 - Excludes the generic "CASH SALES" account from AR metrics (named "CASH DEBTOR-xxx" accounts are included)
 - AR aging supports filtering by dimension: overall, by customer type, by sales agent
 - Credit score is recalculated using the latest saved settings (weights are configurable)
-- DSO trend shows monthly rolling calculation
+- Avg Collection Days trend shows monthly rolling calculation
 - Collection trend: monthly invoiced vs. collected amounts
 - Role switcher (Admin/Viewer) in the page banner — only page with this feature
 
 ### 8.3 Return / Credit Note
 
-- **Important distinction:** Some sections show period-filtered data (returns within the selected date range), while others show point-in-time snapshots (current unresolved balance regardless of date filter)
+- **Important distinction:** Some sections show period-filtered data (returns within the selected date range), while others show point-in-time snapshots (current unsettled balance regardless of date filter)
 - Aging analysis is snapshot-based (always shows current state)
-- Product return analysis can be grouped by: item, fruit, variant, country
+- Product return analysis can be grouped by: item, product, variant, country
 - Product return metrics: frequency (count) or value (amount)
 - Excludes packing materials and pallets from product return charts
 
 ### 8.4 Financial Statements
 
-- Uses **fiscal year dropdown** instead of date range filter (March–February, where FY2025 = Mar 2024 – Feb 2025)
-- Defaults to the second-latest fiscal year (to ensure complete data)
+- Uses **financial year dropdown** instead of date range filter (March–February, where FY2025 = Mar 2024 – Feb 2025)
+- Defaults to the second-latest financial year (to ensure complete data)
 - Five sections: KPI Summary, Monthly P&L Trend, P&L Statement Table, Multi-Year Comparison, Balance Sheet (trend chart + statement table)
 - P&L displayed as hierarchical statement with row types: detail, subtotal, total, grand total, margin. Negative values shown in red.
 - Supports multi-year comparison (current vs. prior year)
 - Balance Sheet is point-in-time (end of selected period)
 - **No pagination** on financial statement tables — use Excel export only
 
-### 8.5 Cost Tracking (Expenses)
+### 8.5 Expenses
 
-- Toggle between All / COGS / OPEX view (global cost type filter)
+- Toggle between All / Cost of Sales / Operating Costs view (global cost type filter)
 - Trend chart is **monthly only** (no granularity toggle)
-- Top Expenses chart with independent local toggles: cost type (All/COGS/OPEX) and direction (Top 10 / Bottom 10)
+- Top Expenses chart with independent local toggles: cost type (All/Cost of Sales/Operating Costs) and direction (Top 10 / Bottom 10)
 - Cost composition shown as donut/pie chart with dynamic legend
-- COGS and OPEX breakdown tables (tabbed) are hierarchical — **no pagination, Excel export only**
+- Cost of Sales and Operating Costs breakdown tables (tabbed) are hierarchical — **no pagination, Excel export only**
 - YoY comparison: current period vs. same period in prior year
 
 ### 8.6 Customer Margin
@@ -617,7 +617,7 @@ For detailed views (e.g., individual customer invoices, product-level breakdowns
 - Margin distribution histogram with buckets: <0%, 0–5%, 5–10%, 10–15%, 15–20%, 20–30%, 30%+
 - Trend sparklines per customer for quick visual comparison
 
-### 8.7 Supplier Performance
+### 8.7 Supplier Margin
 
 - Date range filter only (multi-dimension filters for suppliers and item groups are planned but not yet exposed in the UI)
 - Tabbed analysis: Supplier Analysis tab and Price Comparison tab
