@@ -424,7 +424,7 @@ export async function getCreditUtilization(filters: Filters = {}): Promise<Credi
       ROUND(SUM(s.total_outstanding)::numeric, 2)::float AS total_outstanding
     FROM pc_ar_customer_snapshot s
     WHERE s.snapshot_date = $1 AND s.is_active = 'T'
-      AND s.company_name NOT ILIKE 'CASH DEBT%' AND s.company_name NOT ILIKE 'CASH SALES%'
+      AND s.company_name NOT ILIKE 'CASH SALES%'
       ${where}
     GROUP BY category
   `, [latest.d, ...params]);
@@ -452,7 +452,7 @@ export async function getKpis(refDate: string, filters: Filters = {}): Promise<K
       ROUND(SUM(s.overdue_amount)::numeric, 2)::float AS overdue_amount
     FROM pc_ar_customer_snapshot s
     WHERE s.snapshot_date = $1 AND s.total_outstanding > 0
-      AND s.company_name NOT ILIKE 'CASH DEBT%' AND s.company_name NOT ILIKE 'CASH SALES%'
+      AND s.company_name NOT ILIKE 'CASH SALES%'
       ${where}
   `, [latest.d, ...params])).rows[0] as { total_outstanding: number; overdue_amount: number };
 
@@ -463,7 +463,7 @@ export async function getKpis(refDate: string, filters: Filters = {}): Promise<K
     WHERE s.snapshot_date = $1
       AND s.credit_limit > 0
       AND s.total_outstanding > s.credit_limit
-      AND s.company_name NOT ILIKE 'CASH DEBT%' AND s.company_name NOT ILIKE 'CASH SALES%'
+      AND s.company_name NOT ILIKE 'CASH SALES%'
       ${where}
   `, [latest.d, ...params])).rows[0] as { cnt: number };
 
@@ -550,7 +550,7 @@ export async function getCreditHealthTable(
     FROM pc_ar_customer_snapshot s
     WHERE s.snapshot_date = $1
       AND (s.is_active = 'T' OR s.total_outstanding > 0)
-      AND s.company_name NOT ILIKE 'CASH DEBT%' AND s.company_name NOT ILIKE 'CASH SALES%'
+      AND s.company_name NOT ILIKE 'CASH SALES%'
       ${where}
   `, [latest.d, ...params])).rows.map((r: {
     debtor_code: string; company_name: string; debtor_type: string; sales_agent: string;
@@ -714,7 +714,7 @@ export async function getKpisV2(startDate: string, endDate: string): Promise<Kpi
   const osRow = (await pool.query(`
     SELECT ROUND(SUM(total_outstanding)::numeric, 2)::float AS total_outstanding
     FROM pc_ar_customer_snapshot WHERE snapshot_date = $1 AND total_outstanding > 0
-      AND company_name NOT ILIKE 'CASH DEBT%' AND company_name NOT ILIKE 'CASH SALES%'
+      AND company_name NOT ILIKE 'CASH SALES%'
   `, [latest.d])).rows[0] as { total_outstanding: number } | undefined;
 
   // Snapshot: Overdue Customers
@@ -724,7 +724,7 @@ export async function getKpisV2(startDate: string, endDate: string): Promise<Kpi
       ROUND(COALESCE(SUM(overdue_amount), 0)::numeric, 2)::float AS overdue_amount
     FROM pc_ar_customer_snapshot
     WHERE snapshot_date = $1 AND overdue_amount > 0
-      AND company_name NOT ILIKE 'CASH DEBT%' AND company_name NOT ILIKE 'CASH SALES%'
+      AND company_name NOT ILIKE 'CASH SALES%'
   `, [latest.d])).rows[0] as { cnt: number; overdue_amount: number };
 
   const totalOs = osRow?.total_outstanding ?? 0;
@@ -758,7 +758,7 @@ export async function getKpisV2(startDate: string, endDate: string): Promise<Kpi
       AND credit_limit > 0
       AND total_outstanding > credit_limit
       AND is_active = 'T'
-      AND company_name NOT ILIKE 'CASH DEBT%' AND company_name NOT ILIKE 'CASH SALES%'
+      AND company_name NOT ILIKE 'CASH SALES%'
   `, [latest.d])).rows[0] as { cnt: number };
 
   // Period: Avg Monthly Collection
@@ -800,7 +800,6 @@ export async function getCreditUtilizationV2(): Promise<CreditUtilizationRow[]> 
       ROUND(SUM(COALESCE(total_outstanding, 0))::numeric, 2)::float AS total_outstanding
     FROM pc_ar_customer_snapshot
     WHERE snapshot_date = $1 AND (is_active = 'T' OR is_active IS NULL)
-      AND company_name NOT ILIKE 'CASH DEBT%'
       AND company_name NOT ILIKE 'CASH SALES%'
     GROUP BY category
   `, [latest.d]);
@@ -874,7 +873,6 @@ export async function getCreditHealthTableV2(
       avg_days_late::float AS avg_days_late
     FROM pc_ar_customer_snapshot
     WHERE snapshot_date = $1 AND (is_active = 'T' OR is_active IS NULL)
-      AND company_name NOT ILIKE 'CASH DEBT%'
       AND company_name NOT ILIKE 'CASH SALES%'
   `, [latest.d])).rows;
 

@@ -247,7 +247,6 @@ export async function getCustomerReturnDetailsAll(debtorCode: string): Promise<C
     WHERE cn."Cancelled" = 'F'
       AND cn."CNType" = 'RETURN'
       AND cn."DebtorCode" = $1
-      AND d."CompanyName" NOT ILIKE 'CASH DEBT%'
       AND d."CompanyName" NOT ILIKE 'CASH SALES%'
     ORDER BY cn."DocDate" DESC
   `, [debtorCode]);
@@ -272,7 +271,6 @@ export async function getCustomerReturnDetails(debtorCode: string, start: string
     WHERE cn."Cancelled" = 'F'
       AND cn."CNType" = 'RETURN'
       AND cn."DebtorCode" = $1
-      AND d."CompanyName" NOT ILIKE 'CASH DEBT%'
       AND d."CompanyName" NOT ILIKE 'CASH SALES%'
       AND (cn."DocDate" + INTERVAL '8 hours')::date BETWEEN $2::date AND $3::date
     ORDER BY cn."DocDate" DESC
