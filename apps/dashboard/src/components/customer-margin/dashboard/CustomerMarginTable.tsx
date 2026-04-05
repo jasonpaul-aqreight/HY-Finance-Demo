@@ -245,8 +245,8 @@ export function CustomerMarginTable({ filters }: Props) {
                   <SortHeader col="revenue">Net Sales</SortHeader>
                   <SortHeader col="cogs">Cost of Sales</SortHeader>
                   <SortHeader col="gross_profit">Gross Profit</SortHeader>
-                  <SortHeader col="margin_pct">Margin %</SortHeader>
                   <TableHead>Trend</TableHead>
+                  <SortHeader col="margin_pct">Margin %</SortHeader>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -264,11 +264,11 @@ export function CustomerMarginTable({ filters }: Props) {
                     <TableCell className="font-medium">
                       {formatRM(r.gross_profit)}
                     </TableCell>
-                    <TableCell className="font-medium">
-                      {formatMarginPct(r.margin_pct)}
-                    </TableCell>
                     <TableCell>
                         <SparklineCell code={r.debtor_code} companyName={r.company_name ?? r.debtor_code} startDate={filters.startDate} endDate={filters.endDate} />
+                    </TableCell>
+                    <TableCell className="font-medium">
+                      {formatMarginPct(r.margin_pct)}
                     </TableCell>
                   </TableRow>
                 ))}
