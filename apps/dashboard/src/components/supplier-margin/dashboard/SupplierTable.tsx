@@ -312,7 +312,7 @@ export function SupplierTable({ filters }: { filters: DashboardFilters }) {
                         columns={supplierMarginColumns}
                       />
                   </TableCell>
-                  <TableCell className={`text-sm font-medium ${marginColor(row.margin_pct)}`}>
+                  <TableCell className="text-sm font-medium">
                     {row.margin_pct != null ? `${row.margin_pct.toFixed(1)}%` : '—'}
                   </TableCell>
                 </TableRow>

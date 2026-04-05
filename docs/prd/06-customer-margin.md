@@ -185,8 +185,8 @@ The primary table showing every customer's margin performance.
 | Customer Type | Badge | No | Customer type classification, or "Unassigned" if none |
 | Net Sales | RM, no decimals | Yes | Total sales (invoices + debit notes − credit notes) |
 | Cost of Sales | RM, no decimals | Yes | Item-level cost of sales |
-| Gross Profit | RM, no decimals, colored | Yes | Net Sales − Cost of Sales. Green if ≥ 0, Red if < 0 |
-| Margin % | Percentage, 1 decimal, colored | Yes | (Gross Profit ÷ Net Sales) × 100. Red < 10%, Amber 10–20%, Green ≥ 20% |
+| Gross Profit | RM, no decimals | Yes | Net Sales − Cost of Sales |
+| Margin % | Percentage, 1 decimal | Yes | (Gross Profit ÷ Net Sales) × 100 |
 | Trend | Clickable sparkline | No | Mini line chart (margin % over time) with tooltip popover on click |
 
 **Trend column details:**

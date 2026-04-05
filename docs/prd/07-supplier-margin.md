@@ -287,7 +287,7 @@ The primary table listing every supplier with their financial performance.
 | 6 | Est. Cost of Sales | Yes | Attributed cost of sales (RM formatted) |
 | 7 | Est. Gross Profit | Yes | Attributed gross profit (RM formatted, bold) |
 | 8 | Trend | No | Clickable sparkline (100×28px) with hover expand icon. Opens popover with margin trend chart and monthly data table. Fixed 130px width |
-| 9 | Margin % | Yes | Percentage to 1 decimal, color-coded (Red < 10%, Amber 10–20%, Green ≥ 20%) |
+| 9 | Margin % | Yes | Percentage to 1 decimal, plain text (no color coding — sparkline color conveys trend direction) |
 
 **Trend indicator:** The sparkline color (green/red) indicates overall direction. Detailed change information (exact values, percentage change) is available in the sparkline tooltip popover.
 

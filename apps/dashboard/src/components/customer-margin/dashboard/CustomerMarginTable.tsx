@@ -261,10 +261,10 @@ export function CustomerMarginTable({ filters }: Props) {
                     <TableCell><Badge variant="secondary">{r.debtor_type}</Badge></TableCell>
                     <TableCell>{formatRM(r.revenue)}</TableCell>
                     <TableCell>{formatRM(r.cogs)}</TableCell>
-                    <TableCell className={`font-medium ${r.gross_profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                    <TableCell className="font-medium">
                       {formatRM(r.gross_profit)}
                     </TableCell>
-                    <TableCell className={`font-medium ${marginColor(r.margin_pct)}`}>
+                    <TableCell className="font-medium">
                       {formatMarginPct(r.margin_pct)}
                     </TableCell>
                     <TableCell>
