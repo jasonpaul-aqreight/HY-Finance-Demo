@@ -750,10 +750,15 @@ Two visual variants:
 
 ### 12.7 Sparklines (In-Table Trend Indicators)
 
-- Mini line charts rendered within table cells (~120 px wide)
+- Mini line charts rendered within table cells (~100 px wide × 28 px tall)
 - Show 6–12 months of directional trend
-- Accompanied by an arrow indicator (up = green, down = red)
-- **Clickable:** Clicking a sparkline opens a popover with an expanded chart and monthly data table
+- Color indicates direction: green = improving, red = declining (context-aware — "improving" means margin up for customers/suppliers, price down for items)
+- **Clickable:** Clicking a sparkline opens a standardized popover with:
+  1. **Header:** Entity name, value range (first → last), percentage change with ▲/▼ arrow, month count
+  2. **Chart:** Full LineChart with axes, gridlines, and hover tooltip
+  3. **Table:** Scrollable monthly data table with context-relevant columns
+- Expand icon appears on hover to indicate clickability
+- No separate trend arrows (▲/▼) are displayed alongside sparklines — the tooltip popover provides unambiguous, detailed trend information
 
 ---
 

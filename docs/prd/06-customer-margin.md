@@ -187,12 +187,13 @@ The primary table showing every customer's margin performance.
 | Cost of Sales | RM, no decimals | Yes | Item-level cost of sales |
 | Gross Profit | RM, no decimals, colored | Yes | Net Sales − Cost of Sales. Green if ≥ 0, Red if < 0 |
 | Margin % | Percentage, 1 decimal, colored | Yes | (Gross Profit ÷ Net Sales) × 100. Red < 10%, Amber 10–20%, Green ≥ 20% |
-| Trend | Sparkline + arrow indicator | No | Mini line chart (margin % over time) + direction arrow |
+| Trend | Clickable sparkline | No | Mini line chart (margin % over time) with tooltip popover on click |
 
 **Trend column details:**
 - Sparkline: Miniature line chart showing monthly margin % for that customer over the selected date range
 - Color: Green if ending margin ≥ starting margin, Red if ending margin < starting margin
-- Arrow indicator: Green ▲ (improving), Red ▼ (declining), Grey — (flat, within 0.5 percentage points)
+- Clickable: Opens a standardized tooltip popover showing customer name, margin range with % change, a full line chart with axes, and a monthly data table (Month | Revenue | Margin %)
+- Expand icon appears on hover to indicate clickability
 - Each customer's monthly data is fetched individually to render the sparkline
 
 **Sorting:**
@@ -352,7 +353,7 @@ This section helps users know what to watch for:
 |--------|--------------|-----------------|
 | Growing "< 0%" bucket in distribution | More customers becoming unprofitable | Review pricing strategy for affected customers |
 | High-revenue customer with < 10% margin | Big customer but barely profitable | Pricing renegotiation opportunity |
-| Red ▼ arrows on large customers | Margin eroding over time | Investigate — are costs rising or prices being discounted? |
+| Red sparklines on large customers (click for details) | Margin eroding over time | Investigate — are costs rising or prices being discounted? |
 | Margin Lost > 5 percentage points | Returns significantly hurting profitability | Check product quality or return process for that customer |
 | Many customers in 0–5% bucket | Widespread thin margins | Systemic pricing or cost issue |
 
@@ -414,6 +415,6 @@ The following differences were discovered by reverse-engineering the live codeba
 | Customer table filter | No in-table filtering | **Multi-select customer combobox** added in table header with search and badge count |
 | Credit Note Impact default sort | "Sorted by Return Rate (highest first)" | Default sort is **Margin Lost descending** (worst margin impact first) |
 | Profile modal | "Customer Profile Modal" (generic) | Uses **redesigned customer profile** with specific tab defaulting ("Sales" tab) and date range passing |
-| Trend column | Not documented in old specs | **Sparkline + arrow indicator** per customer row — fetches monthly data individually, shows margin direction with green ▲ / red ▼ / grey — |
+| Trend column | Not documented in old specs | **Clickable sparkline** per customer row — fetches monthly data individually, click opens popover with margin trend chart and monthly data table (Month, Revenue, Margin %) |
 | Export format | CSV export | **Excel (.xlsx) export** with configured column headers |
 | Table alignment | Right-aligned numbers | **Customer Analysis table:** all columns left-aligned. **Credit Note Impact table:** text columns left-aligned, numeric columns (Invoice Sales, Credit Note Amt, Return Rate, Margin Before, Margin After, Margin Lost) right-aligned. |

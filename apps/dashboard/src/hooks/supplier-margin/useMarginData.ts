@@ -58,7 +58,7 @@ export function useSparklines(filters: DashboardFilters) {
   });
   for (const s of filters.suppliers) params.append('supplier', s);
   for (const ig of filters.itemGroups) params.append('item_group', ig);
-  return useSWR<{ data: Record<string, number[]> }>(
+  return useSWR<{ data: Record<string, { period: string; margin_pct: number }[]> }>(
     filters.startDate ? `/api/supplier-performance/margin/sparklines?${params}` : null,
     fetcher,
   );

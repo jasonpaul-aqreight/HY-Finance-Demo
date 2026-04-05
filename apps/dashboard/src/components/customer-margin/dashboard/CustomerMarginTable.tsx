@@ -10,9 +10,11 @@ import { useCustomerMargins, useCustomerMonthly, useFilterCustomers } from '@/ho
 import { useStableData } from '@/hooks/useStableData';
 import type { MarginDashboardFilters } from '@/hooks/customer-margin/useDashboardFilters';
 import { formatRM, formatMarginPct, marginColor } from '@/lib/customer-margin/format';
-import { CustomerSparkline } from './CustomerSparkline';
+import { SparklineTooltip, type SparklineTooltipColumn } from '@/components/shared/SparklineTooltip';
+import { formatMonth } from '@/lib/format-month';
 import { exportToExcel } from '@/lib/export-excel';
 import { Download, ArrowUpDown, ChevronDown, Search, X } from 'lucide-react';
+import type { CustomerMonthlyRow } from '@/lib/customer-margin/queries';
 import { CustomerProfileRevamp } from '@/components/profiles/CustomerProfileRevampPreview';
 
 interface Props {
@@ -115,9 +117,27 @@ function CustomerCombobox({
   );
 }
 
-function SparklineCell({ code, startDate, endDate }: { code: string; startDate: string; endDate: string }) {
+const customerMarginColumns: SparklineTooltipColumn<CustomerMonthlyRow>[] = [
+  { header: 'Month', align: 'left', render: (r) => <span className="text-foreground/70">{formatMonth(r.period)}</span> },
+  { header: 'Revenue', align: 'right', render: (r) => <span className="font-mono">{formatRM(r.revenue)}</span> },
+  { header: 'Margin %', align: 'right', render: (r) => <span className="font-mono">{formatMarginPct(r.margin_pct)}</span> },
+];
+
+function SparklineCell({ code, companyName, startDate, endDate }: { code: string; companyName: string; startDate: string; endDate: string }) {
   const { data } = useCustomerMonthly(code, startDate, endDate);
-  return <CustomerSparkline data={data ?? []} />;
+  const rows = data ?? [];
+  return (
+    <SparklineTooltip<CustomerMonthlyRow>
+      title={companyName}
+      data={rows}
+      periodKey="period"
+      valueKey="margin_pct"
+      valueLabel="Margin %"
+      valueFormatter={(v) => `${v.toFixed(1)}%`}
+      improvementDirection="up"
+      columns={customerMarginColumns}
+    />
+  );
 }
 
 /* ── Main table ────────────────────────────────────────────────────────────── */
@@ -248,12 +268,7 @@ export function CustomerMarginTable({ filters }: Props) {
                       {formatMarginPct(r.margin_pct)}
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-1">
-                        <SparklineCell code={r.debtor_code} startDate={filters.startDate} endDate={filters.endDate} />
-                        {(r as { trend?: string }).trend === 'up' && <span className="text-emerald-600 text-xs font-medium">▲</span>}
-                        {(r as { trend?: string }).trend === 'down' && <span className="text-red-600 text-xs font-medium">▼</span>}
-                        {(r as { trend?: string }).trend === 'flat' && <span className="text-muted-foreground text-xs">—</span>}
-                      </div>
+                        <SparklineCell code={r.debtor_code} companyName={r.company_name ?? r.debtor_code} startDate={filters.startDate} endDate={filters.endDate} />
                     </TableCell>
                   </TableRow>
                 ))}

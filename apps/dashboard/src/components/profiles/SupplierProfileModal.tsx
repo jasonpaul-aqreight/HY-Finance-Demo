@@ -26,12 +26,6 @@ import {
 import { formatRM, formatCount, marginColor } from '@/lib/supplier-margin/format';
 import { SearchableSelect } from '@/components/sales/dashboard-v2/SearchableSelect';
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
-import { Expand } from 'lucide-react';
-import {
   useSupplierDetails,
   useSupplierPerformance,
   useSupplierProfileSummary,
@@ -39,15 +33,10 @@ import {
   useSupplierItemTrends,
 } from '@/hooks/supplier-margin/useMarginData';
 import { useStableData } from '@/hooks/useStableData';
+import { SparklineTooltip, type SparklineTooltipColumn } from '@/components/shared/SparklineTooltip';
+import { formatMonth } from '@/lib/format-month';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function formatMonth(ym: string) {
-  if (!ym || !ym.includes('-')) return ym;
-  const [y, m] = ym.split('-');
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  return `${months[parseInt(m, 10) - 1]} ${y.slice(2)}`;
-}
 
 function compactRM(value: number) {
   if (Math.abs(value) >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
@@ -112,75 +101,32 @@ function LogButton({ icon, label, onClick }: {
   );
 }
 
+type ItemMonthlyRow = { month: string; avg_price: number; qty: number };
+
+const itemPriceColumns: SparklineTooltipColumn<ItemMonthlyRow>[] = [
+  { header: 'Month', align: 'left', render: (r) => <span className="text-foreground/70">{formatMonth(r.month)}</span> },
+  { header: 'Avg Price', align: 'right', render: (r) => <span className="font-mono">RM {r.avg_price.toFixed(2)}</span> },
+  { header: 'Qty', align: 'right', render: (r) => <span className="tabular-nums">{formatCount(r.qty)}</span> },
+];
+
 function PriceTrendCell({ description, trend }: {
   description: string;
-  trend: { prices: number[]; monthly: { month: string; avg_price: number; qty: number }[] } | undefined;
+  trend: { prices: number[]; monthly: ItemMonthlyRow[] } | undefined;
 }) {
-  const prices = trend?.prices ?? [];
   const monthly = trend?.monthly ?? [];
-
-  // No trend (0 or 1 data point) — leave blank
-  if (prices.length < 2) {
-    return null;
-  }
-
-  const first = prices[0];
-  const last = prices[prices.length - 1];
-  const changePct = ((last - first) / first) * 100;
-  const color = last <= first ? '#10b981' : '#ef4444';
-  const chartData = prices.map((v, i) => ({ i, v }));
+  if (monthly.length < 2) return null;
 
   return (
-    <Popover>
-      <PopoverTrigger render={
-        <button className="group flex items-center gap-1 cursor-pointer rounded px-1 -mx-1 hover:bg-muted/60 transition-colors">
-          <LineChart width={100} height={28} data={chartData}>
-            <YAxis domain={['dataMin', 'dataMax']} hide />
-            <Line type="monotone" dataKey="v" stroke={color} strokeWidth={1.5} dot={false} isAnimationActive={false} />
-          </LineChart>
-          <Expand className="h-3 w-3 text-foreground/0 group-hover:text-foreground/40 transition-colors shrink-0" />
-        </button>
-      } />
-      <PopoverContent className="w-[340px] p-0" align="start">
-        <div className="p-3 border-b">
-          <p className="text-xs font-bold text-foreground truncate">{description}</p>
-          <div className="flex items-center gap-2 mt-1">
-            <span className="text-xs font-mono text-foreground/70">RM {first.toFixed(2)} → RM {last.toFixed(2)}</span>
-            <span className={`text-xs font-bold ${changePct <= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-              {changePct <= 0 ? '▼' : '▲'}{Math.abs(changePct).toFixed(1)}%
-            </span>
-            <span className="text-xs text-foreground/40">({monthly.length} mths)</span>
-          </div>
-        </div>
-        <div className="p-3">
-          <ResponsiveContainer width="100%" height={120}>
-            <LineChart data={monthly} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis dataKey="month" tickFormatter={formatMonth} tick={{ fontSize: 10 }} />
-              <YAxis domain={['dataMin - 0.5', 'dataMax + 0.5']} tickFormatter={(v: number) => `${v.toFixed(0)}`} tick={{ fontSize: 10 }} width={35} />
-              <Tooltip formatter={(value: any) => [`RM ${Number(value).toFixed(2)}`, 'Avg Price']} labelFormatter={(l: any) => formatMonth(String(l))} />
-              <Line type="monotone" dataKey="avg_price" stroke={color} strokeWidth={2} dot={{ r: 3, fill: color }} isAnimationActive={false} />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-        <div className="border-t">
-          <table className="w-full text-xs">
-            <thead><tr className="bg-muted/30">
-              <th className="px-3 py-1.5 text-left font-semibold">Month</th>
-              <th className="px-3 py-1.5 text-right font-semibold">Avg Price</th>
-              <th className="px-3 py-1.5 text-right font-semibold">Qty</th>
-            </tr></thead>
-            <tbody>{monthly.map((m) => (
-              <tr key={m.month} className="border-t">
-                <td className="px-3 py-1 text-foreground/70">{formatMonth(m.month)}</td>
-                <td className="px-3 py-1 text-right font-mono">RM {m.avg_price.toFixed(2)}</td>
-                <td className="px-3 py-1 text-right tabular-nums">{formatCount(m.qty)}</td>
-              </tr>
-            ))}</tbody>
-          </table>
-        </div>
-      </PopoverContent>
-    </Popover>
+    <SparklineTooltip<ItemMonthlyRow>
+      title={description}
+      data={monthly}
+      periodKey="month"
+      valueKey="avg_price"
+      valueLabel="Avg Price"
+      valueFormatter={(v) => `RM ${v.toFixed(2)}`}
+      improvementDirection="down"
+      columns={itemPriceColumns}
+    />
   );
 }
 

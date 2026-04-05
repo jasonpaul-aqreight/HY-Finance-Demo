@@ -2,7 +2,6 @@
 
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { useSupplierTable, useSparklines, useDimensions } from '@/hooks/supplier-margin/useMarginData';
-import { Sparkline } from './Sparkline';
 import type { DashboardFilters } from '@/hooks/supplier-margin/useDashboardFilters';
 import {
   Table,
@@ -19,6 +18,8 @@ import { formatRM, marginColor } from '@/lib/supplier-margin/format';
 import { exportToExcel } from '@/lib/export-excel';
 import { Search, ChevronDown, X, Info } from 'lucide-react';
 import { SupplierProfileModal } from '@/components/profiles/SupplierProfileModal';
+import { SparklineTooltip, type SparklineTooltipColumn } from '@/components/shared/SparklineTooltip';
+import { formatMonth } from '@/lib/format-month';
 
 interface SupplierRow {
   creditor_code: string;
@@ -36,6 +37,13 @@ interface SupplierRow {
 }
 
 type SortKey = 'company_name' | 'attributed_revenue' | 'attributed_cogs' | 'attributed_profit' | 'margin_pct' | 'items_supplied';
+
+type SparklinePoint = { period: string; margin_pct: number };
+
+const supplierMarginColumns: SparklineTooltipColumn<SparklinePoint>[] = [
+  { header: 'Month', align: 'left', render: (r) => <span className="text-foreground/70">{formatMonth(r.period)}</span> },
+  { header: 'Margin %', align: 'right', render: (r) => <span className="font-mono">{r.margin_pct.toFixed(1)}%</span> },
+];
 
 /* ── Combobox multi-select ─────────────────────────────────────────────────── */
 
@@ -163,7 +171,7 @@ function handleExportExcel(rows: SupplierRow[]) {
 export function SupplierTable({ filters }: { filters: DashboardFilters }) {
   const { data, isLoading } = useSupplierTable(filters);
   const { data: sparklineData } = useSparklines(filters);
-  const sparklines: Record<string, number[]> = sparklineData?.data ?? {};
+  const sparklines: Record<string, SparklinePoint[]> = sparklineData?.data ?? {};
   const [sortKey, setSortKey] = useState<SortKey>('attributed_revenue');
   const [sortAsc, setSortAsc] = useState(false);
   const [page, setPage] = useState(1);
@@ -293,12 +301,16 @@ export function SupplierTable({ filters }: { filters: DashboardFilters }) {
                   <TableCell className="text-sm">{formatRM(row.attributed_cogs)}</TableCell>
                   <TableCell className="text-sm font-semibold">{formatRM(row.attributed_profit)}</TableCell>
                   <TableCell className="w-[130px]">
-                    <div className="flex items-center gap-1">
-                      <Sparkline data={sparklines[row.creditor_code] ?? []} />
-                      {row.trend === 'up' && <span className="text-emerald-600 text-xs font-medium">▲</span>}
-                      {row.trend === 'down' && <span className="text-red-600 text-xs font-medium">▼</span>}
-                      {row.trend === 'flat' && <span className="text-muted-foreground text-xs">—</span>}
-                    </div>
+                      <SparklineTooltip<SparklinePoint>
+                        title={row.company_name}
+                        data={sparklines[row.creditor_code] ?? []}
+                        periodKey="period"
+                        valueKey="margin_pct"
+                        valueLabel="Margin %"
+                        valueFormatter={(v) => `${v.toFixed(1)}%`}
+                        improvementDirection="up"
+                        columns={supplierMarginColumns}
+                      />
                   </TableCell>
                   <TableCell className={`text-sm font-medium ${marginColor(row.margin_pct)}`}>
                     {row.margin_pct != null ? `${row.margin_pct.toFixed(1)}%` : '—'}

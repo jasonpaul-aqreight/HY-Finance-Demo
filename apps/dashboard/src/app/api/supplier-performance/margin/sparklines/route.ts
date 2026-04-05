@@ -15,11 +15,14 @@ export async function GET(request: NextRequest) {
 
     const rows = await getSupplierSparklines(start, end, suppliers, itemGroups);
 
-    // Aggregate into Record<string, number[]> keyed by creditor_code
-    const data: Record<string, number[]> = {};
+    // Aggregate into Record<string, { period, margin_pct }[]> keyed by creditor_code
+    const data: Record<string, { period: string; margin_pct: number }[]> = {};
     for (const row of rows) {
       if (!data[row.creditor_code]) data[row.creditor_code] = [];
-      data[row.creditor_code].push(row.margin_pct ?? 0);
+      data[row.creditor_code].push({
+        period: row.period,
+        margin_pct: row.margin_pct ?? 0,
+      });
     }
 
     return NextResponse.json({ data });

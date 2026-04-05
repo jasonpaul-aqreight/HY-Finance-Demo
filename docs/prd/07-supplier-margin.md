@@ -238,9 +238,27 @@ Five cards in a single responsive row (2 columns on small screens, 5 on extra-la
 
 - **Dimensions:** 100px wide × 28px tall
 - **Type:** Mini line chart (no axes, no dots, no animation)
-- **Data:** Array of monthly margin percentages for each supplier, ordered chronologically
-- **Color logic:** Green (`hsl(152, 69%, 40%)`) if last value ≥ first value (trending up or flat); Red (`hsl(0, 72%, 51%)`) if last < first (trending down)
+- **Data:** Array of monthly margin percentages (with period labels) for each supplier, ordered chronologically
+- **Color logic:** Green (`#10b981`) if last value ≥ first value (trending up or flat); Red (`#ef4444`) if last < first (trending down)
 - **Fallback:** Shows "—" dash if fewer than 2 data points
+- **Clickable:** Clicking the sparkline opens a popover with detailed margin trend data (see Sparkline Tooltip Popover below)
+- **Expand icon:** A small expand icon appears on hover to indicate clickability
+
+#### Sparkline Tooltip Popover (Standardized)
+
+All sparklines across the dashboard use a consistent popover pattern when clicked:
+
+1. **Header:** Entity name (truncated), value range (first → last), percentage change with directional arrow (▲/▼) and color, month count
+2. **Chart:** Full LineChart (340×120px) with CartesianGrid, labeled axes, and hover tooltip showing exact values
+3. **Table:** Scrollable monthly data table (max 200px height) with relevant columns
+
+**Supplier Performance table tooltip columns:** Month | Margin %
+**Customer Margin table tooltip columns:** Month | Revenue | Margin %
+**Supplier Profile item tooltip columns:** Month | Avg Price | Qty
+
+**Color semantics are context-aware:**
+- Margin sparklines: Green = margin increasing (good), Red = margin decreasing (bad)
+- Price sparklines: Green = price decreasing (good for procurement), Red = price increasing (bad)
 
 ---
 
@@ -268,10 +286,10 @@ The primary table listing every supplier with their financial performance.
 | 5 | Est. Net Sales | Yes | Attributed net sales (RM formatted) |
 | 6 | Est. Cost of Sales | Yes | Attributed cost of sales (RM formatted) |
 | 7 | Est. Gross Profit | Yes | Attributed gross profit (RM formatted, bold) |
-| 8 | Trend | No | Sparkline (100×28px) + directional arrow (▲ green / ▼ red / — muted). Fixed 130px width |
+| 8 | Trend | No | Clickable sparkline (100×28px) with hover expand icon. Opens popover with margin trend chart and monthly data table. Fixed 130px width |
 | 9 | Margin % | Yes | Percentage to 1 decimal, color-coded (Red < 10%, Amber 10–20%, Green ≥ 20%) |
 
-**Trend arrow logic:** Compares current-period margin to prior-period margin (same-length lookback). Threshold: ±0.5 percentage points.
+**Trend indicator:** The sparkline color (green/red) indicates overall direction. Detailed change information (exact values, percentage change) is available in the sparkline tooltip popover.
 
 **Row styling:** Alternating row shading — even rows have a subtle muted background.
 
@@ -516,12 +534,9 @@ These are derived from the `product` lookup table, not from the item description
 
 An item is flagged as "sole source" when it has only **one** supplier in the selected date range. This is determined by product variant, not individual SKU — the modal states "no other supplier supplies these product variants."
 
-### 8.8 Sparkline Trend Arrow Threshold
+### 8.8 Sparkline Trend Indicator
 
-Compares current-period margin to prior-period margin (same-length lookback):
-- Up arrow (green ▲): current margin > prior + 0.5 percentage points
-- Down arrow (red ▼): current margin < prior − 0.5 percentage points
-- Dash (muted —): within ±0.5 pp
+The sparkline color conveys direction at a glance (green = improving, red = declining). Clicking the sparkline opens a standardized tooltip popover showing the exact first-to-last change percentage, a full chart with axes, and a monthly data table. No separate trend arrows are displayed — the tooltip popover provides more precise and unambiguous trend information.
 
 ### 8.9 Data Source
 
@@ -550,7 +565,7 @@ All queries read from the `pc_supplier_margin` pre-computed table (monthly aggre
 | Large red slice in distribution chart (< 0%) | Multiple suppliers/items with negative margins | Investigate loss-making relationships |
 | Big red dots below diagonal in scatter chart | Popular products sold at a loss | Fix pricing or switch supplier |
 | High sole-source count in supplier profile | Too dependent on one supplier for multiple items | Diversify sourcing for vulnerable items |
-| Red sparklines + down arrows on high-revenue suppliers | Margins eroding on your biggest suppliers | Urgent — small margin change has large RM impact |
+| Red sparklines on high-revenue suppliers (click for details) | Margins eroding on your biggest suppliers | Urgent — small margin change has large RM impact |
 | Price trend lines diverging (item pricing panel) | Different suppliers pricing the same item very differently | Potential negotiation or switching opportunity |
 
 ---

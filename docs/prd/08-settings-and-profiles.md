@@ -417,21 +417,21 @@ Accessed via the "Items Supplied" button in Profile view. This is also the **def
 
 #### Price Trend Sparkline Interaction
 
-The sparkline is a key feature for supplier negotiation:
+The sparkline uses the standardized SparklineTooltip component (shared across all dashboard sparklines):
 
 1. **Default state:** Tiny 100×28px line chart inline in the table cell
-   - **Green line:** Price stable or declining (good)
+   - **Green line:** Price stable or declining (good for procurement)
    - **Red line:** Price increasing (needs attention)
    - Requires minimum 2 data points to render
 
 2. **Hover:** Expand icon appears over the sparkline
 
-3. **Click → Popover:** Opens a detailed popover containing:
-   - **Header:** Item description, price change percentage (green ▼ for decrease, red ▲ for increase), number of months tracked
-   - **Expanded chart:** 120px height detailed monthly price chart
-   - **Data table:** Monthly breakdown with columns: Month, Avg Price, Qty
+3. **Click → Popover:** Opens a standardized tooltip popover containing:
+   - **Header:** Item description, price range (RM first → RM last), percentage change with directional arrow (green ▼ for decrease, red ▲ for increase), number of months tracked
+   - **Expanded chart:** 120px height LineChart with axes, gridlines, and hover tooltip showing exact values
+   - **Data table:** Scrollable monthly breakdown with columns: Month, Avg Price, Qty
 
-This interaction allows users to spot price trends at a glance in the table, then drill into specifics for negotiation preparation.
+This interaction allows users to spot price trends at a glance in the table, then drill into specifics for negotiation preparation. The same popover pattern is used for sparklines in the Supplier Performance and Customer Margin tables for UI consistency.
 
 ### 3.7 Supply Chain Risk Assessment
 
