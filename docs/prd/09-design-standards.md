@@ -644,7 +644,7 @@ Triggered by a button (e.g., "Score & Risk") in a table header — not a separat
 | Context | Loading pattern |
 |---------|----------------|
 | **First page load** | Skeleton placeholders matching the final layout (pulsing grey rectangles) |
-| **Filter / date change** | Keep old data visible during the transition; do NOT flash empty states |
+| **Filter / date change** | Keep old data visible during the transition; do NOT flash empty states. Changing filters, toggles, or dropdowns must not alter the user's scroll position |
 | **Section-level** | Each major section (KPI row, chart, table) loads independently; skeleton per section |
 | **Modal sections** | Independent loading per section — partial data display is normal |
 
