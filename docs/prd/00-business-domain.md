@@ -15,7 +15,7 @@
 - **Supplier Base:** ~452 suppliers (farms, importers, consolidators)
 - **Product Catalog:** ~6,400 items (fruits, packaging materials, logistics items)
 - **Currency:** MYR (Malaysian Ringgit), displayed as "RM" (e.g., "RM 1,234")
-- **Rare exception:** Some SGD-denominated records exist — always use local-currency equivalent for consistent MYR reporting
+- **Rare exception:** Some SGD-denominated records exist — always use AutoCount `Local*` fields (e.g., `LocalNetTotal`) for consistent MYR reporting
 
 ### Source System
 
@@ -338,7 +338,7 @@ All calculations **exclude cancelled records**. Only documents marked as non-can
 
 - All amounts are in **MYR (Malaysian Ringgit)**
 - Display format: "RM" prefix with thousands separators, no decimals by default (e.g., "RM 1,234")
-- For rare SGD-denominated records, the local-currency equivalent field is used to ensure consistent MYR reporting
+- For rare SGD-denominated records, AutoCount `Local*` fields (e.g., `LocalNetTotal`, `LocalSubTotal`) are used to ensure consistent MYR reporting. See [Data Dictionary Section 9.4](ref-data-dictionary.md#94-multi-currency-handling) for the full field mapping and access patterns.
 - Percentages: one decimal place with explicit +/− sign (e.g., "+12.3%", "−4.1%")
 - Non-finite values (division by zero, etc.): display as em-dash ("—")
 - Growth coloring: **green** for positive, **red** for negative, muted for null/non-finite
@@ -539,7 +539,7 @@ Run aggregation queries against AutoCount to build 17 pre-computed analytics tab
 | Expenses | 1 table | Monthly by GL account |
 
 **Phase 2b — Atomic Swap:**
-New data is built into staging tables, then swapped atomically to live tables — ensuring the dashboard never shows partial/inconsistent data.
+New data is built into staging tables, then swapped atomically to live tables. Each Phase 2 builder runs inside a database SAVEPOINT — if an individual builder fails, only that table is rolled back while the rest succeed. A sync with partial builder failures is marked as `partial` (not `error`).
 
 ### Sync Schedule
 
@@ -551,8 +551,12 @@ New data is built into staging tables, then swapped atomically to live tables �
 ### Sync Metadata
 
 The system tracks:
-- **Sync Jobs:** Each sync run with status (pending/running/success/error), timing, row counts
+- **Sync Jobs:** Each sync run with status (pending/running/success/partial/error), timing, row counts
 - **Sync Logs:** Detailed audit trail per table (phase, duration, rows affected)
+- **Data Freshness Indicator:** A global banner appears at the top of all dashboard pages when the last sync was not fully successful:
+  - **Partial sync:** Amber warning — "Some data may be outdated" with last sync timestamp
+  - **Failed sync:** Red alert — "Last data sync failed" with timestamp
+  - **Successful sync:** No banner (hidden)
 
 ### Drill-Down Data
 
@@ -637,10 +641,12 @@ For detailed views (e.g., individual customer invoices, product-level breakdowns
 ### 8.9 Data Sync (Admin)
 
 - Shows current sync status and last sync time
-- Sync job history with expandable log details
+- Sync job history with expandable log details (status badges: green = success, amber = partial, red = error)
 - Manual sync trigger button
 - Schedule configuration (cron expression with human-readable description)
 - Designed for non-technical users: friendly status indicators, plain-language descriptions
+
+**Note:** The data freshness banner (see Section 7 — Sync Metadata) is a global feature visible on all dashboard pages, not only the admin sync page.
 
 ---
 
@@ -654,6 +660,8 @@ For detailed views (e.g., individual customer invoices, product-level breakdowns
 | Percentage display | One decimal place with +/− sign (e.g., "+12.3%") |
 | Non-finite values | Display as em-dash "—" |
 | Growth indicators | Green = positive, Red = negative, Muted = null/non-finite |
+| Currency fields | Always use `Local*` fields (e.g., `LocalNetTotal`) for MYR aggregations — never `NetTotal` |
+| Data freshness | Global banner on all pages: hidden on success, amber on partial sync, red on failed sync |
 | Table sorting | All columns sortable, toggle ascending/descending |
 | Table alignment | All data left-justified (no right-aligned numbers) |
 | Table pagination | Server-side, selectable: 10, 25, or 50 rows per page |
