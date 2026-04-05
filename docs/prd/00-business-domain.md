@@ -297,14 +297,17 @@ Products are classified into a fruit taxonomy with three levels:
 
 ### 5.4 Cash vs. Credit Customer Distinction
 
-Two special customer accounts exist for walk-in/cash transactions:
-- **"CASH DEBTOR"** and **"CASH SALES"** accounts
+Two categories of cash-related customer accounts exist in the system, with different treatment:
 
-These accounts are:
+**Generic "CASH SALES" account (300-C016)**
+- An anonymous walk-in bucket with no customer identity
 - **Included** in sales revenue totals (cash is valid revenue)
-- **Excluded** from payment/AR analysis (no credit terms apply)
-- **Excluded** from return analysis (no meaningful customer relationship)
-- **Excluded** from customer margin analysis (no attributable relationship)
+- **Excluded** from payment/AR, return, and customer margin analysis (no identifiable customer relationship)
+
+**Named "CASH DEBTOR-xxx" accounts (~42 accounts)**
+- Real businesses and individuals with names, credit limits, payment terms, and repeat transactions
+- The word "CASH" in these account names is an accounting artifact — they operate as credit customers
+- **Included** in all modules: sales revenue, payment/AR, return analysis, and customer margin
 
 ---
 
@@ -567,12 +570,12 @@ For detailed views (e.g., individual customer invoices, product-level breakdowns
 - Revenue trend includes a 3-month moving average line
 - Optional prior-period overlay for year-over-year comparison
 - Breakdown dimensions: customer, customer type, sales agent, outlet/location, fruit name, fruit country, fruit variant
-- Includes "CASH DEBTOR" accounts in revenue totals
+- Includes all customer accounts in revenue totals (both named "CASH DEBTOR-xxx" accounts and generic "CASH SALES")
 
 ### 8.2 Payment Collection
 
 - **Two-section layout:** Section 1 "Payment Collection Trend" is date-filtered; Section 2 "Outstanding Payment" shows accumulated totals as of today (not date-filtered)
-- Excludes cash accounts from all AR metrics
+- Excludes the generic "CASH SALES" account from AR metrics (named "CASH DEBTOR-xxx" accounts are included)
 - AR aging supports filtering by dimension: overall, by customer type, by sales agent
 - Credit score is recalculated using the latest saved settings (weights are configurable)
 - DSO trend shows monthly rolling calculation
