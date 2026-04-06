@@ -10,17 +10,23 @@
 **Step 1** — Clone this repo and go into the folder:
 
 ```bash
-git clone -b demo/docker-handoff https://github.com/jasonpaul-aqreight/HY-Finance-Demo.git
+git clone https://github.com/jasonpaul-aqreight/HY-Finance-Demo.git
 cd HY-Finance-Demo
 ```
 
-**Step 2** — Copy the example file to create your `.env`:
+**Step 2** — Switch to the demo branch:
+
+```bash
+git checkout demo/docker-handoff
+```
+
+**Step 3** — Copy the example file to create your `.env`:
 
 ```bash
 cp .env.example .env
 ```
 
-**Step 3** — Open `.env` and paste the 3 values from Bitwarden:
+**Step 4** — Open `.env` and paste the 3 values from Bitwarden:
 
 ```
 RDS_HOST=paste-host-here
@@ -28,7 +34,7 @@ RDS_USER=paste-username-here
 RDS_PASSWORD=paste-password-here
 ```
 
-**Step 4** — Start everything:
+**Step 5** — Start everything:
 
 ```bash
 docker compose up --build
