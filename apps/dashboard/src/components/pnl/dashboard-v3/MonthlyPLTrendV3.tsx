@@ -33,7 +33,7 @@ export function MonthlyPLTrendV3({ fy, range }: Props) {
     );
   }
 
-  const chartData = data.data.map(d => ({
+  const chartData = (Array.isArray(data?.data) ? data.data : []).map(d => ({
     label: d.label,
     'Net Sales': d.net_sales,
     'Cost of Sales': d.cogs,

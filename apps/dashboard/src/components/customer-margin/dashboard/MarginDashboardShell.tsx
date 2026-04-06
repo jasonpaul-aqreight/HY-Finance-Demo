@@ -13,8 +13,12 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
 
 export function MarginDashboardShell() {
-  const { filters, setFilters, bounds } = useDashboardFilters();
+  const { filters, setFilters, ready, bounds } = useDashboardFilters();
   const [tab, setTab] = useState('analysis');
+
+  if (!ready) {
+    return <div className="mx-auto max-w-[1600px] px-6 py-6 text-foreground/60">Loading data range...</div>;
+  }
 
   return (
     <div className="mx-auto max-w-[1600px] space-y-4 px-6 py-6">

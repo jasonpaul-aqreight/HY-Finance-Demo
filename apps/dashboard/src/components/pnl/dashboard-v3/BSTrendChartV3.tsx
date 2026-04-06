@@ -38,7 +38,7 @@ export function BSTrendChartV3({ fy, range }: Props) {
     );
   }
 
-  const chartData = data.map(d => ({
+  const chartData = (Array.isArray(data) ? data : []).map(d => ({
     month: d.label.split(' ')[0],
     'Total Assets': d.total_assets,
     'Total Liabilities': d.total_liabilities,

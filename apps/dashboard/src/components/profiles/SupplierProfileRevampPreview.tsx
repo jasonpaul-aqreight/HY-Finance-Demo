@@ -308,7 +308,7 @@ function ProfileView({
                 <div className="space-y-2 text-sm">
                   <DetailRow label="Supplier Type" value={s.creditor_type} />
                   <DetailRow label="Purchase Agent" value={s.purchase_agent} />
-                  <DetailRow label="Supplier Since" value={new Date(s.supplier_since).toLocaleDateString('en-MY', { day: '2-digit', month: 'short', year: 'numeric' })} />
+                  <DetailRow label="Supplier Since" value={s.supplier_since ? new Date(s.supplier_since).toLocaleDateString('en-MY', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'} />
                 </div>
               </div>
               <div className="p-4 space-y-3">
