@@ -66,8 +66,15 @@ function scheduleSync(cronExpression: string) {
 const app = express();
 app.use(express.json());
 
-// Health check
+// Track whether initial sync has completed (used by Docker healthcheck)
+let initialSyncDone = process.env.SYNC_ON_STARTUP !== 'true';
+
+// Health check — returns 503 until initial sync is done
 app.get('/health', (_req, res) => {
+  if (!initialSyncDone) {
+    res.status(503).json({ status: 'syncing', uptime: process.uptime() });
+    return;
+  }
   res.json({ status: 'ok', uptime: process.uptime() });
 });
 
@@ -104,6 +111,7 @@ async function main() {
     } catch (err) {
       console.error('[STARTUP] Initial sync failed (cron will retry later):', err);
     }
+    initialSyncDone = true;
   }
 
   // Load schedule from app_settings or use default
