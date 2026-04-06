@@ -40,7 +40,11 @@ RDS_PASSWORD=paste-password-here
 docker compose up --build
 ```
 
-Wait 2-3 minutes for data to load, then open **http://localhost:8000**
+Wait 2-3 minutes for data to load. You'll know it's ready when you see `dashboard-1 | ✓ Ready` in the terminal:
+
+![Docker Ready](docs/docker-ready.png)
+
+Then open **http://localhost:8000**
 
 ## Stop
 
