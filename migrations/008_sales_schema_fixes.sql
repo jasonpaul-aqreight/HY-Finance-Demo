@@ -9,9 +9,17 @@
 -- ============================================================================
 
 -- ── 1. Rename debtor_name → company_name in pc_sales_by_customer ─────────
+--    (Skip if column already named correctly, e.g. fresh DB from 003)
 
-ALTER TABLE pc_sales_by_customer
-  RENAME COLUMN debtor_name TO company_name;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'pc_sales_by_customer' AND column_name = 'debtor_name'
+  ) THEN
+    ALTER TABLE pc_sales_by_customer RENAME COLUMN debtor_name TO company_name;
+  END IF;
+END $$;
 
 -- ── 2. Add breakdown columns to pc_sales_by_fruit ────────────────────────
 
