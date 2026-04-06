@@ -34,7 +34,7 @@ RDS_PASSWORD=paste-password-here
 docker compose up --build
 ```
 
-Wait 2-3 minutes for data to load, then open **http://localhost:3000**
+Wait 2-3 minutes for data to load, then open **http://localhost:8000**
 
 ## Stop
 

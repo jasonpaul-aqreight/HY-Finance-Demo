@@ -42,7 +42,7 @@ services:
       RDS_DATABASE_URL: postgresql://${RDS_USER}:${RDS_PASSWORD}@${RDS_HOST}:5432/autocount?sslmode=no-verify
       SYNC_SERVICE_URL: http://sync:4000
     ports:
-      - "3000:3000"
+      - "8000:3000"
     depends_on:
       postgres:
         condition: service_healthy
