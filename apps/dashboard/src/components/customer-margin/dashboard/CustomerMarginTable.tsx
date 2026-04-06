@@ -43,7 +43,7 @@ function CustomerCombobox({
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const filtered = (customers ?? []).filter(c =>
+  const filtered = (Array.isArray(customers) ? customers : []).filter(c =>
     !search || c.code.toLowerCase().includes(search.toLowerCase()) ||
     (c.name ?? '').toLowerCase().includes(search.toLowerCase())
   ).slice(0, 50);

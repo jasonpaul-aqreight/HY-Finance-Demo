@@ -26,7 +26,7 @@ export function useDashboardFilters() {
 
   // Initialize filters once bounds arrive
   useEffect(() => {
-    if (bounds && !filters) {
+    if (bounds?.max_date && !filters) {
       const endDate = endOfMonth(new Date(bounds.max_date));
       const startDate = startOfMonth(subMonths(endDate, 11));
       setFiltersState({

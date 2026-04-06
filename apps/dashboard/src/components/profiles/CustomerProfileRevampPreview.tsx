@@ -586,6 +586,7 @@ function AgingStackedBar({ buckets, total, isLoading, error }: { buckets: any[];
 function ReturnsDonut({ data, isLoading, error }: { data: any[]; isLoading?: boolean; error?: any }) {
   if (isLoading) return <LoadingSpinner />;
   if (error) return <ErrorMessage message="Failed to load return data" />;
+  if (!Array.isArray(data) || data.length === 0) return <div className="text-sm text-foreground/60 text-center py-6">No returns</div>;
   const total = data.reduce((s, d) => s + d.value, 0);
   if (total === 0) return <div className="text-sm text-foreground/60 text-center py-6">No returns</div>;
   const unsettled = data.find(d => d.name === 'Unsettled')?.value ?? 0;
