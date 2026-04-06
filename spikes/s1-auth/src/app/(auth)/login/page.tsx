@@ -120,14 +120,15 @@ function LoginForm() {
       </form>
 
       <div style={{ marginTop: 24, padding: 16, backgroundColor: '#f5f5f5', fontSize: 13 }}>
-        <strong>Test accounts (password: test123)</strong>
+        <strong>Test accounts — all 7 roles (password: test123)</strong>
         <ul style={{ paddingLeft: 20, margin: '8px 0 0' }}>
-          <li>+60123456789 — superadmin</li>
-          <li>+60198765432 — finance</li>
-          <li>+60111222333 — hr</li>
-          <li>+60144555666 — director</li>
-          <li>+60177888999 — sale</li>
-          <li>admin@hoiyong.com — superadmin</li>
+          <li>+60123456789 — superadmin (all modules)</li>
+          <li>+60198765432 — finance (Finance only)</li>
+          <li>+60111222333 — hr (HR only)</li>
+          <li>+60144555666 — director (all modules)</li>
+          <li>+60177888999 — sale (Sales only)</li>
+          <li>+60155666777 — operation (Sales only)</li>
+          <li>+60166777888 — manager (HR only)</li>
         </ul>
       </div>
     </div>

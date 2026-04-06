@@ -21,12 +21,15 @@ export async function POST(request: Request) {
   const isEmail = identifier.includes('@')
 
   // Mock user data matching production JWT payload structure
+  // All 7 roles: superadmin, finance, hr, director, sale, operation, manager
   const mockUsers: Record<string, { role: string; name: string; department_code?: string }> = {
     '+60123456789': { role: 'superadmin', name: 'Admin User' },
     '+60198765432': { role: 'finance', name: 'Finance User', department_code: 'FIN' },
     '+60111222333': { role: 'hr', name: 'HR User', department_code: 'HR' },
     '+60144555666': { role: 'director', name: 'Director User' },
     '+60177888999': { role: 'sale', name: 'Sales User' },
+    '+60155666777': { role: 'operation', name: 'Operations User' },
+    '+60166777888': { role: 'manager', name: 'Manager User', department_code: 'OPS' },
     'admin@hoiyong.com': { role: 'superadmin', name: 'Admin User' },
     'finance@hoiyong.com': { role: 'finance', name: 'Finance User', department_code: 'FIN' },
   }

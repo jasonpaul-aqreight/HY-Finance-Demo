@@ -5,11 +5,12 @@ export default async function HRPage() {
   const session = await getServerSession(authOptions)
 
   return (
-    <div style={{ maxWidth: 800, margin: '40px auto', fontFamily: 'sans-serif' }}>
-      <h1>HR Module</h1>
-      <p>If you can see this, your role ({session?.user.role}) has HR access.</p>
-      <p>Allowed roles: superadmin, hr, director, manager</p>
-      <a href="/home">Back to Home</a>
+    <div>
+      <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>HR Module</h1>
+      <p style={{ color: '#64748b', marginBottom: 24 }}>
+        Your role <strong style={{ color: '#2563eb' }}>{session?.user.role}</strong> has HR access.
+      </p>
+      <p style={{ fontSize: 14, color: '#94a3b8' }}>Allowed roles: superadmin, hr, director, manager</p>
     </div>
   )
 }

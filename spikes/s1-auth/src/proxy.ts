@@ -1,20 +1,15 @@
 /**
- * SPIKE S1 — KEY VALIDATION POINT
+ * SPIKE S1+S5 — Route protection via proxy.ts
  *
  * Next.js 16 renamed middleware.ts → proxy.ts
- * This file validates that NextAuth v4's getToken() works
- * inside the new proxy.ts context.
+ * Now uses shared module-permissions for single source of truth.
  */
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { getToken } from 'next-auth/jwt'
+import { canAccessPath } from '@/lib/module-permissions'
 
 const publicRoutes = ['/login']
-
-// Module-level route access control (mirrors production RBAC)
-const FINANCE_ALLOWED_ROLES = ['superadmin', 'finance', 'director']
-const HR_ALLOWED_ROLES = ['superadmin', 'hr', 'director', 'manager']
-const SALES_ALLOWED_ROLES = ['superadmin', 'sale', 'operation', 'director']
 
 export default async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -58,19 +53,11 @@ export default async function proxy(request: NextRequest) {
     )
   }
 
-  // Role-based module access (multi-module validation)
+  // Role-based module access using shared permission map
   if (token) {
     const userRole = (token.role as string) || ''
-
-    if (pathname.startsWith('/finance') && !FINANCE_ALLOWED_ROLES.includes(userRole)) {
-      return NextResponse.redirect(new URL('/home', request.url))
-    }
-
-    if (pathname.startsWith('/hr') && !HR_ALLOWED_ROLES.includes(userRole)) {
-      return NextResponse.redirect(new URL('/home', request.url))
-    }
-
-    if (pathname.startsWith('/sales') && !SALES_ALLOWED_ROLES.includes(userRole)) {
+    if (!canAccessPath(userRole, pathname)) {
+      console.log(`[proxy.ts] BLOCKED: role=${userRole} path=${pathname}`)
       return NextResponse.redirect(new URL('/home', request.url))
     }
   }

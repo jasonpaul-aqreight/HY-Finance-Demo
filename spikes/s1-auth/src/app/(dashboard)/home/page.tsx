@@ -1,61 +1,68 @@
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth-options'
+import { getModulesForRole, MODULE_CONFIGS } from '@/lib/module-permissions'
 import { SessionDebug } from '@/components/session-debug'
 
 /**
- * SPIKE S1 — KEY VALIDATION POINT
- *
- * getServerSession() in a Server Component on Next.js 16 + React 19.
- * This validates that server-side session retrieval works.
+ * SPIKE S5 — Home page showing module access summary per role.
  */
 export default async function HomePage() {
   const session = await getServerSession(authOptions)
+  const role = session?.user.role || 'sale'
+  const accessibleModules = getModulesForRole(role)
 
   return (
-    <div style={{ maxWidth: 800, margin: '40px auto', fontFamily: 'sans-serif' }}>
-      <h1>Home — Spike S1 Validation</h1>
+    <div>
+      <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>
+        Welcome, {session?.user.name}
+      </h1>
+      <p style={{ color: '#64748b', marginBottom: 32 }}>
+        Spike S5 — Multi-Module Navigation + RBAC Visibility
+      </p>
 
-      <div style={{ padding: 16, backgroundColor: '#e8f5e9', marginBottom: 24, borderRadius: 4 }}>
-        <strong>getServerSession() in Server Component:</strong>{' '}
-        {session ? 'PASS' : 'FAIL — session is null'}
+      {/* Module access matrix */}
+      <div style={{ marginBottom: 32 }}>
+        <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12 }}>Module Access for role: <span style={{ color: '#2563eb' }}>{role}</span></h2>
+        <table style={{ borderCollapse: 'collapse', width: '100%', maxWidth: 500 }}>
+          <thead>
+            <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
+              <th style={{ textAlign: 'left', padding: '8px 12px' }}>Module</th>
+              <th style={{ textAlign: 'left', padding: '8px 12px' }}>Access</th>
+              <th style={{ textAlign: 'left', padding: '8px 12px' }}>Allowed Roles</th>
+            </tr>
+          </thead>
+          <tbody>
+            {MODULE_CONFIGS.map((mod) => {
+              const hasAccess = accessibleModules.some((m) => m.id === mod.id)
+              return (
+                <tr key={mod.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                  <td style={{ padding: '8px 12px', fontWeight: 600 }}>
+                    {mod.icon} {mod.label}
+                  </td>
+                  <td style={{ padding: '8px 12px' }}>
+                    <span style={{
+                      padding: '2px 8px',
+                      borderRadius: 4,
+                      fontSize: 13,
+                      fontWeight: 600,
+                      backgroundColor: hasAccess ? '#dcfce7' : '#fee2e2',
+                      color: hasAccess ? '#166534' : '#991b1b',
+                    }}>
+                      {hasAccess ? 'ALLOWED' : 'BLOCKED'}
+                    </span>
+                  </td>
+                  <td style={{ padding: '8px 12px', fontSize: 13, color: '#64748b' }}>
+                    {mod.allowedRoles.join(', ')}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
       </div>
 
-      {session && (
-        <div style={{ marginBottom: 24 }}>
-          <h2>Session Data (Server Component)</h2>
-          <table style={{ borderCollapse: 'collapse', width: '100%' }}>
-            <tbody>
-              {[
-                ['User ID', session.user.id],
-                ['Name', session.user.name],
-                ['Email', session.user.email],
-                ['Phone', session.user.phone],
-                ['Role', session.user.role],
-                ['Permissions', session.user.permissions?.join(', ')],
-                ['Employee Code', session.user.employee_code],
-                ['Department Code', session.user.department_code],
-                ['Access Token', session.accessToken ? `${session.accessToken.slice(0, 20)}...` : 'none'],
-                ['Cognito Sub', session.cognitoSub],
-              ].map(([label, value]) => (
-                <tr key={label} style={{ borderBottom: '1px solid #ddd' }}>
-                  <td style={{ padding: 8, fontWeight: 600 }}>{label}</td>
-                  <td style={{ padding: 8 }}>{value || '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      <h2>Multi-Module Navigation (RBAC Test)</h2>
-      <p>Click each module link. proxy.ts should block based on your role:</p>
-      <ul style={{ lineHeight: 2 }}>
-        <li><a href="/finance">Finance Module</a> — superadmin, finance, director only</li>
-        <li><a href="/hr">HR Module</a> — superadmin, hr, director, manager only</li>
-        <li><a href="/sales">Sales Module</a> — superadmin, sale, operation, director only</li>
-      </ul>
-
-      <h2>Client Component Session (useSession)</h2>
+      {/* Session debug (client component from S1) */}
+      <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12 }}>Client Session (useSession)</h2>
       <SessionDebug />
     </div>
   )
