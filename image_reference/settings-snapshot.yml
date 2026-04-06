@@ -1,0 +1,107 @@
+- generic [ref=e1]:
+  - button "Open Next.js Dev Tools" [ref=e7] [cursor=pointer]:
+    - img [ref=e8]
+  - alert [ref=e11]
+  - generic [ref=e12]:
+    - complementary [ref=e13]:
+      - generic [ref=e14]:
+        - heading [level=1] [ref=e848]: Hoi-Yong Finance
+        - button [ref=e849]:
+          - img [ref=e17]
+      - navigation [ref=e20]:
+        - link [ref=e850] [cursor=pointer]:
+          - /url: /sales
+          - img [ref=e22]
+          - generic [ref=e25]: Sales
+        - link [ref=e851] [cursor=pointer]:
+          - /url: /payment
+          - img [ref=e27]
+          - generic [ref=e29]: Payment
+        - link [ref=e852] [cursor=pointer]:
+          - /url: /return
+          - img [ref=e31]
+          - generic [ref=e34]: Return
+        - link [ref=e853] [cursor=pointer]:
+          - /url: /financial
+          - img [ref=e36]
+          - generic [ref=e38]: Financials
+        - link [ref=e854] [cursor=pointer]:
+          - /url: /expenses
+          - img [ref=e40]
+          - generic [ref=e43]: Expenses
+        - link [ref=e855] [cursor=pointer]:
+          - /url: /customer-margin
+          - img [ref=e45]
+          - generic [ref=e50]: Customer Margin
+        - link [ref=e856] [cursor=pointer]:
+          - /url: /supplier-performance
+          - img [ref=e52]
+          - generic [ref=e57]: Supplier Performance
+        - generic [ref=e58]:
+          - text: Admin
+          - link [ref=e857] [cursor=pointer]:
+            - /url: /admin/sync
+    - main [ref=e67]:
+      - generic [ref=e69]:
+        - generic [ref=e70]:
+          - heading [level=2] [ref=e858]: Payment Collection
+          - paragraph [ref=e72]: Tracks customer payment health, including payment aging, outstanding amounts, and credit scoring to assess risk and improve cash flow management.
+        - generic [ref=e74]:
+          - generic [ref=e75]: Role
+          - combobox [ref=e76]
+      - generic [ref=e77]:
+        - generic [ref=e79]:
+          - heading [level=2] [ref=e859]: Payment Collection Trend
+          - generic [ref=e81]: Filtered by date range
+        - generic [ref=e83]:
+          - generic [ref=e84]
+          - generic [ref=e89]: Nov 2024 – Oct 2025 (12 months)
+          - generic [ref=e90]
+        - generic [ref=e96]:
+          - generic [ref=e175]
+          - generic [ref=e184]
+          - generic [ref=e193]
+        - generic [ref=e109]:
+          - generic [ref=e110]
+          - generic [ref=e115]
+        - generic [ref=e122]:
+          - heading [level=2] [ref=e868]: Outstanding Payment
+          - generic [ref=e124]: Accumulated from beginning to now
+        - generic [ref=e126]:
+          - generic [ref=e383]
+          - generic [ref=e391]
+          - generic [ref=e400]
+        - generic [ref=e139]:
+          - generic [ref=e140]
+          - generic [ref=e150]
+        - generic [ref=e156]:
+          - generic [ref=e157]
+          - generic [ref=e172]
+  - generic [ref=e847]: Not Yet Due
+  - dialog [ref=e1151]:
+    - generic [ref=e1152]:
+      - generic [ref=e1153]:
+        - heading "Credit Health Score Settings" [level=2] [ref=e1154]
+        - button [active] [ref=e1155]:
+          - img [ref=e1156]
+      - paragraph [ref=e1159]: The Credit Health Score rates each customer from 0 (highest risk) to 100 (safest), shown in the Score and Risk columns below.
+    - generic [ref=e1161]:
+      - generic [ref=e1162]:
+        - generic [ref=e1164]: Credit Health Score Weights
+        - generic [ref=e1165]:
+          - paragraph [ref=e1166]: How much each factor contributes to the final score. Must add up to exactly 100.
+          - generic [ref=e1167]
+          - generic [ref=e1184]
+      - generic [ref=e1187]:
+        - generic [ref=e1189]: Risk Level Thresholds
+        - generic [ref=e1190]:
+          - paragraph [ref=e1191]: Set the score boundaries for each risk level. Moderate is automatically the range between Low and High.
+          - generic [ref=e1192]
+          - generic [ref=e1199]
+          - button "Reset to Defaults" [ref=e1223]
+      - button "How Credit Health Score is calculated" [ref=e1225]:
+        - heading "How Credit Health Score is calculated" [level=3] [ref=e1226]
+        - img [ref=e1227]
+    - generic [ref=e1229]:
+      - button "Cancel" [ref=e1230]
+      - button "Save" [ref=e1231]

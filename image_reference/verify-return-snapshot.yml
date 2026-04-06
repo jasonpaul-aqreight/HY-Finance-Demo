@@ -1,0 +1,453 @@
+- generic [active] [ref=e1]:
+  - button "Open Next.js Dev Tools" [ref=e7] [cursor=pointer]:
+    - img [ref=e8]
+  - alert [ref=e11]
+  - generic [ref=e12]:
+    - complementary [ref=e13]:
+      - generic [ref=e14]:
+        - heading "Hoi-Yong Finance" [level=1] [ref=e15]
+        - button "Collapse sidebar" [ref=e16]:
+          - img [ref=e17]
+      - navigation [ref=e20]:
+        - link "Sales" [ref=e21] [cursor=pointer]:
+          - /url: /sales
+          - img [ref=e22]
+          - generic [ref=e25]: Sales
+        - link "Payment" [ref=e26] [cursor=pointer]:
+          - /url: /payment
+          - img [ref=e27]
+          - generic [ref=e29]: Payment
+        - link "Return" [ref=e30] [cursor=pointer]:
+          - /url: /return
+          - img [ref=e31]
+          - generic [ref=e34]: Return
+        - link "Financials" [ref=e35] [cursor=pointer]:
+          - /url: /financial
+          - img [ref=e36]
+          - generic [ref=e38]: Financials
+        - link "Expenses" [ref=e39] [cursor=pointer]:
+          - /url: /expenses
+          - img [ref=e40]
+          - generic [ref=e43]: Expenses
+        - link "Customer Margin" [ref=e44] [cursor=pointer]:
+          - /url: /customer-margin
+          - img [ref=e45]
+          - generic [ref=e50]: Customer Margin
+        - link "Supplier Performance" [ref=e51] [cursor=pointer]:
+          - /url: /supplier-performance
+          - img [ref=e52]
+          - generic [ref=e57]: Supplier Performance
+        - generic [ref=e58]:
+          - text: Admin
+          - link "Data Sync" [ref=e60] [cursor=pointer]:
+            - /url: /admin/sync
+            - img [ref=e61]
+            - generic [ref=e66]: Data Sync
+    - main [ref=e67]:
+      - generic [ref=e70]:
+        - heading "Credit Note / Return / Refund" [level=2] [ref=e71]
+        - paragraph [ref=e72]: Monitors all credit notes, product returns, and refunds to ensure accurate financial reconciliation.
+      - main [ref=e73]:
+        - generic [ref=e77]:
+          - heading "Return Trends" [level=2] [ref=e78]
+          - generic [ref=e79]: Filtered by date range
+        - generic [ref=e80]:
+          - generic [ref=e81]:
+            - generic [ref=e82]: Date Range
+            - button "Nov 2024" [ref=e83]:
+              - img
+              - text: Nov 2024
+            - generic [ref=e84]: →
+            - button "Oct 2025" [ref=e85]:
+              - img
+              - text: Oct 2025
+          - generic [ref=e86]: Nov 2024 – Oct 2025 (12 months)
+          - generic [ref=e87]:
+            - button "3M" [ref=e88]
+            - button "6M" [ref=e89]
+            - button "12M" [ref=e90]
+            - button "YTD" [ref=e91]
+        - generic [ref=e93]:
+          - generic [ref=e94]:
+            - generic [ref=e96]: Total Returns
+            - generic [ref=e97]:
+              - generic [ref=e98]: RM 987,873
+              - generic [ref=e99]: 4,184 return credit notes
+          - generic [ref=e100]:
+            - generic [ref=e102]: Reconciled
+            - generic [ref=e103]:
+              - generic [ref=e104]: RM 914,501
+              - generic [ref=e105]: Knocked Off + Refunded = 92.6% of total
+          - generic [ref=e106]:
+            - generic [ref=e108]:
+              - text: Unresolved
+              - img [ref=e110]
+            - generic [ref=e113]:
+              - generic [ref=e114]: RM 73,371
+              - generic [ref=e115]: 7.4% of total — 62 partial + 379 outstanding
+          - generic [ref=e116]:
+            - generic [ref=e118]: Return %
+            - generic [ref=e119]:
+              - generic [ref=e120]: 1.1%
+              - generic [ref=e121]: return value ÷ total sales
+        - generic [ref=e122]:
+          - generic [ref=e123]:
+            - generic [ref=e125]: Settlement Breakdown
+            - generic [ref=e126]:
+              - generic [ref=e128]:
+                - generic [ref=e129]: Knocked Off (against invoices)
+                - generic [ref=e130]: RM 910,925 (92.2%)
+              - generic [ref=e134]:
+                - generic [ref=e135]: Refunded (cash/cheque)
+                - generic [ref=e136]: RM 3,576 (0.4%)
+              - generic [ref=e140]:
+                - generic [ref=e141]: Unresolved
+                - generic [ref=e142]: RM 73,371 (7.4%)
+          - generic [ref=e145]:
+            - generic [ref=e146]:
+              - generic [ref=e147]: Monthly Return Trend
+              - paragraph [ref=e148]: Return value vs unresolved amount over time
+            - generic [ref=e151]:
+              - list [ref=e153]:
+                - listitem [ref=e154]:
+                  - img "Return Value legend icon" [ref=e155]
+                  - text: Return Value
+                - listitem [ref=e157]:
+                  - img "Unresolved legend icon" [ref=e158]
+                  - text: Unresolved
+              - application [ref=e160]:
+                - generic [ref=e181]:
+                  - generic [ref=e182]:
+                    - generic [ref=e184]: 11/24
+                    - generic [ref=e186]: 12/24
+                    - generic [ref=e188]: 01/25
+                    - generic [ref=e190]: 02/25
+                    - generic [ref=e192]: 03/25
+                    - generic [ref=e194]: 04/25
+                    - generic [ref=e196]: 05/25
+                    - generic [ref=e198]: 06/25
+                    - generic [ref=e200]: 07/25
+                    - generic [ref=e202]: 08/25
+                    - generic [ref=e204]: 09/25
+                    - generic [ref=e206]: 10/25
+                  - generic [ref=e207]:
+                    - generic [ref=e209]: RM 0
+                    - generic [ref=e211]: RM35,000
+                    - generic [ref=e213]: RM70,000
+                    - generic [ref=e215]: RM105,000
+                    - generic [ref=e217]: RM140,000
+        - generic [ref=e219]:
+          - generic [ref=e220]:
+            - generic [ref=e221]:
+              - generic [ref=e222]: Top 10 Returns by All
+              - generic [ref=e223]:
+                - generic [ref=e224]:
+                  - button "Frequency" [ref=e225]
+                  - button "Value (RM)" [ref=e226]
+                - generic [ref=e227]:
+                  - button "All" [ref=e228]
+                  - button "Fruit" [ref=e229]
+                  - button "Variant" [ref=e230]
+                  - button "Country" [ref=e231]
+            - paragraph [ref=e232]: Ranked by frequency · most frequent returns
+          - application [ref=e236]:
+            - generic [ref=e281]:
+              - generic [ref=e282]:
+                - generic [ref=e284]: "0"
+                - generic [ref=e286]: "20"
+                - generic [ref=e288]: "40"
+                - generic [ref=e290]: "60"
+                - generic [ref=e292]: "80"
+              - generic [ref=e293]:
+                - generic [ref=e295]: GRAPES CHINA SHINE MUSCAT (GREEN SEEDLESS) 500G* 1X10 P…
+                - generic [ref=e297]: MELON
+                - generic [ref=e299]: ORANGE
+                - generic [ref=e301]: GRAPES EGYPT FLAME (RED SEEDLESS) 500G* 1X11 PACK 5.5KG…
+                - generic [ref=e303]: GRAPES CHINA SHINE MUSCAT (GREEN SEEDLESS) 500G* 1X10 P…
+                - generic [ref=e305]: DRAGON FRUITS RED LOCAL 2A 1KG
+                - generic [ref=e307]: LEMON
+                - generic [ref=e309]: GRAPES CHINA RED GLOBE (BASKET) 6.5KG
+                - generic [ref=e311]: AVOCADO AUSTRALIA HASS 28 PCS 5KG VITOR
+                - generic [ref=e313]: STRAWBERRY EGYPT 250G* 1X10 PACK 2.5KG UNITED FRUT
+        - generic [ref=e316]:
+          - heading "Unresolved Returns" [level=2] [ref=e317]
+          - generic [ref=e318]: Accumulated from beginning to now
+        - generic [ref=e320]:
+          - generic [ref=e322]: Aging of Unresolved Returns
+          - application [ref=e326]:
+            - generic [ref=e347]:
+              - generic [ref=e348]:
+                - generic [ref=e350]: RM 0
+                - generic [ref=e352]: RM 25,000
+                - generic [ref=e354]: RM 50,000
+                - generic [ref=e356]: RM 75,000
+                - generic [ref=e358]: RM 100,000
+              - generic [ref=e359]:
+                - generic [ref=e361]: 0-30 days
+                - generic [ref=e363]: 31-60 days
+                - generic [ref=e365]: 61-90 days
+                - generic [ref=e367]: 91-180 days
+                - generic [ref=e369]: 180+ days
+        - generic [ref=e371]:
+          - generic [ref=e372]:
+            - generic [ref=e373]:
+              - generic [ref=e374]: Customer Returns
+              - paragraph [ref=e375]: 86 customers of 296 total
+            - generic [ref=e377]:
+              - textbox "Search by code or name..." [ref=e378]
+              - button "Export Excel" [ref=e379]
+              - combobox [ref=e380]:
+                - generic [ref=e381]: Unresolved
+                - img: ▼
+              - textbox [ref=e382]: outstanding
+          - generic [ref=e384]:
+            - table [ref=e387]:
+              - rowgroup [ref=e388]:
+                - row "Code↕ Customer↕ Returns↕ Total Value↕ Knocked Off↕ Refunded↕ Unresolved↓" [ref=e389]:
+                  - columnheader "Code↕" [ref=e390] [cursor=pointer]
+                  - columnheader "Customer↕" [ref=e391] [cursor=pointer]
+                  - columnheader "Returns↕" [ref=e392] [cursor=pointer]
+                  - columnheader "Total Value↕" [ref=e393] [cursor=pointer]
+                  - columnheader "Knocked Off↕" [ref=e394] [cursor=pointer]
+                  - columnheader "Refunded↕" [ref=e395] [cursor=pointer]
+                  - columnheader "Unresolved↓" [ref=e396] [cursor=pointer]
+              - rowgroup [ref=e397]:
+                - row "300-S083 ST ROSYAM MART SDN BHD (SENAWANG) 33 RM 26,527 RM 18,090 — RM 8,436" [ref=e398]:
+                  - cell "300-S083" [ref=e399]
+                  - cell "ST ROSYAM MART SDN BHD (SENAWANG)" [ref=e400]:
+                    - button "ST ROSYAM MART SDN BHD (SENAWANG)" [ref=e401] [cursor=pointer]
+                  - cell "33" [ref=e402]
+                  - cell "RM 26,527" [ref=e403]
+                  - cell "RM 18,090" [ref=e404]
+                  - cell "—" [ref=e405]
+                  - cell "RM 8,436" [ref=e406]
+                - row "300-M008 MY HERO HYPERMARKET SDN BHD 29 RM 28,845 RM 21,675 — RM 7,170" [ref=e407]:
+                  - cell "300-M008" [ref=e408]
+                  - cell "MY HERO HYPERMARKET SDN BHD" [ref=e409]:
+                    - button "MY HERO HYPERMARKET SDN BHD" [ref=e410] [cursor=pointer]
+                  - cell "29" [ref=e411]
+                  - cell "RM 28,845" [ref=e412]
+                  - cell "RM 21,675" [ref=e413]
+                  - cell "—" [ref=e414]
+                  - cell "RM 7,170" [ref=e415]
+                - row "300-L020 LAM SENG AIK TENG SDN BHD 5 RM 15,980 RM 9,445 — RM 6,535" [ref=e416]:
+                  - cell "300-L020" [ref=e417]
+                  - cell "LAM SENG AIK TENG SDN BHD" [ref=e418]:
+                    - button "LAM SENG AIK TENG SDN BHD" [ref=e419] [cursor=pointer]
+                  - cell "5" [ref=e420]
+                  - cell "RM 15,980" [ref=e421]
+                  - cell "RM 9,445" [ref=e422]
+                  - cell "—" [ref=e423]
+                  - cell "RM 6,535" [ref=e424]
+                - row "300-G026 SBH STRUDEL (M) SDN. BHD. 9 RM 13,880 RM 8,470 — RM 5,410" [ref=e425]:
+                  - cell "300-G026" [ref=e426]
+                  - cell "SBH STRUDEL (M) SDN. BHD." [ref=e427]:
+                    - button "SBH STRUDEL (M) SDN. BHD." [ref=e428] [cursor=pointer]
+                  - cell "9" [ref=e429]
+                  - cell "RM 13,880" [ref=e430]
+                  - cell "RM 8,470" [ref=e431]
+                  - cell "—" [ref=e432]
+                  - cell "RM 5,410" [ref=e433]
+                - row "300-S004 ST ROSYAM MART (SHAH ALAM) SDN BHD 34 RM 18,199 RM 13,233 — RM 4,966" [ref=e434]:
+                  - cell "300-S004" [ref=e435]
+                  - cell "ST ROSYAM MART (SHAH ALAM) SDN BHD" [ref=e436]:
+                    - button "ST ROSYAM MART (SHAH ALAM) SDN BHD" [ref=e437] [cursor=pointer]
+                  - cell "34" [ref=e438]
+                  - cell "RM 18,199" [ref=e439]
+                  - cell "RM 13,233" [ref=e440]
+                  - cell "—" [ref=e441]
+                  - cell "RM 4,966" [ref=e442]
+                - row "300-S066 ST ROSYAM MART SDN BHD (SEMENYIH) 59 RM 25,696 RM 20,933 — RM 4,763" [ref=e443]:
+                  - cell "300-S066" [ref=e444]
+                  - cell "ST ROSYAM MART SDN BHD (SEMENYIH)" [ref=e445]:
+                    - button "ST ROSYAM MART SDN BHD (SEMENYIH)" [ref=e446] [cursor=pointer]
+                  - cell "59" [ref=e447]
+                  - cell "RM 25,696" [ref=e448]
+                  - cell "RM 20,933" [ref=e449]
+                  - cell "—" [ref=e450]
+                  - cell "RM 4,763" [ref=e451]
+                - row "300-N027 NSK GROCER (KL) SDN BHD (3 DAMANSARA) 68 RM 16,531 RM 12,061 — RM 4,470" [ref=e452]:
+                  - cell "300-N027" [ref=e453]
+                  - cell "NSK GROCER (KL) SDN BHD (3 DAMANSARA)" [ref=e454]:
+                    - button "NSK GROCER (KL) SDN BHD (3 DAMANSARA)" [ref=e455] [cursor=pointer]
+                  - cell "68" [ref=e456]
+                  - cell "RM 16,531" [ref=e457]
+                  - cell "RM 12,061" [ref=e458]
+                  - cell "—" [ref=e459]
+                  - cell "RM 4,470" [ref=e460]
+                - row "300-S046 SUNNYFRESH FRUIT&VEGETABLE SDN BHD 4 RM 6,907 RM 2,945 — RM 3,962" [ref=e461]:
+                  - cell "300-S046" [ref=e462]
+                  - cell "SUNNYFRESH FRUIT&VEGETABLE SDN BHD" [ref=e463]:
+                    - button "SUNNYFRESH FRUIT&VEGETABLE SDN BHD" [ref=e464] [cursor=pointer]
+                  - cell "4" [ref=e465]
+                  - cell "RM 6,907" [ref=e466]
+                  - cell "RM 2,945" [ref=e467]
+                  - cell "—" [ref=e468]
+                  - cell "RM 3,962" [ref=e469]
+                - row "300-S021 SRI TERNAK MART (SK) SDN BHD 485 RM 217,131 RM 213,267 — RM 3,864" [ref=e470]:
+                  - cell "300-S021" [ref=e471]
+                  - cell "SRI TERNAK MART (SK) SDN BHD" [ref=e472]:
+                    - button "SRI TERNAK MART (SK) SDN BHD" [ref=e473] [cursor=pointer]
+                  - cell "485" [ref=e474]
+                  - cell "RM 217,131" [ref=e475]
+                  - cell "RM 213,267" [ref=e476]
+                  - cell "—" [ref=e477]
+                  - cell "RM 3,864" [ref=e478]
+                - row "300-H003 HANITEK SDN. BHD. 10 RM 4,951 RM 1,386 — RM 3,565" [ref=e479]:
+                  - cell "300-H003" [ref=e480]
+                  - cell "HANITEK SDN. BHD." [ref=e481]:
+                    - button "HANITEK SDN. BHD." [ref=e482] [cursor=pointer]
+                  - cell "10" [ref=e483]
+                  - cell "RM 4,951" [ref=e484]
+                  - cell "RM 1,386" [ref=e485]
+                  - cell "—" [ref=e486]
+                  - cell "RM 3,565" [ref=e487]
+                - row "300-M013 MYFRESH GROCER HOUSE SDN BHD (USJ 4/6B) 95 RM 11,950 RM 8,392 — RM 3,558" [ref=e488]:
+                  - cell "300-M013" [ref=e489]
+                  - cell "MYFRESH GROCER HOUSE SDN BHD (USJ 4/6B)" [ref=e490]:
+                    - button "MYFRESH GROCER HOUSE SDN BHD (USJ 4/6B)" [ref=e491] [cursor=pointer]
+                  - cell "95" [ref=e492]
+                  - cell "RM 11,950" [ref=e493]
+                  - cell "RM 8,392" [ref=e494]
+                  - cell "—" [ref=e495]
+                  - cell "RM 3,558" [ref=e496]
+                - row "300-S003 SECRET RECIPE MANUFACTURING SDN. BHD. 111 RM 60,384 RM 56,980 — RM 3,404" [ref=e497]:
+                  - cell "300-S003" [ref=e498]
+                  - cell "SECRET RECIPE MANUFACTURING SDN. BHD." [ref=e499]:
+                    - button "SECRET RECIPE MANUFACTURING SDN. BHD." [ref=e500] [cursor=pointer]
+                  - cell "111" [ref=e501]
+                  - cell "RM 60,384" [ref=e502]
+                  - cell "RM 56,980" [ref=e503]
+                  - cell "—" [ref=e504]
+                  - cell "RM 3,404" [ref=e505]
+                - row "300-F004 MYFRESH GROCER HOUSE SDN BHD (USJ HEIGHTS) 101 RM 16,391 RM 13,184 — RM 3,207" [ref=e506]:
+                  - cell "300-F004" [ref=e507]
+                  - cell "MYFRESH GROCER HOUSE SDN BHD (USJ HEIGHTS)" [ref=e508]:
+                    - button "MYFRESH GROCER HOUSE SDN BHD (USJ HEIGHTS)" [ref=e509] [cursor=pointer]
+                  - cell "101" [ref=e510]
+                  - cell "RM 16,391" [ref=e511]
+                  - cell "RM 13,184" [ref=e512]
+                  - cell "—" [ref=e513]
+                  - cell "RM 3,207" [ref=e514]
+                - row "300-N028 NSK GROCER (KL) SDN BHD (BERJAYA TIMES SQUARE) 86 RM 12,559 RM 9,387 — RM 3,172" [ref=e515]:
+                  - cell "300-N028" [ref=e516]
+                  - cell "NSK GROCER (KL) SDN BHD (BERJAYA TIMES SQUARE)" [ref=e517]:
+                    - button "NSK GROCER (KL) SDN BHD (BERJAYA TIMES SQUARE)" [ref=e518] [cursor=pointer]
+                  - cell "86" [ref=e519]
+                  - cell "RM 12,559" [ref=e520]
+                  - cell "RM 9,387" [ref=e521]
+                  - cell "—" [ref=e522]
+                  - cell "RM 3,172" [ref=e523]
+                - row "300-N026 NSK GROCER (KL) SDN BHD (PARAGON POINT) 97 RM 19,017 RM 15,847 — RM 3,170" [ref=e524]:
+                  - cell "300-N026" [ref=e525]
+                  - cell "NSK GROCER (KL) SDN BHD (PARAGON POINT)" [ref=e526]:
+                    - button "NSK GROCER (KL) SDN BHD (PARAGON POINT)" [ref=e527] [cursor=pointer]
+                  - cell "97" [ref=e528]
+                  - cell "RM 19,017" [ref=e529]
+                  - cell "RM 15,847" [ref=e530]
+                  - cell "—" [ref=e531]
+                  - cell "RM 3,170" [ref=e532]
+                - row "300-N023 NSK GROCER (KL) SDN BHD 54 RM 7,397 RM 4,262 — RM 3,135" [ref=e533]:
+                  - cell "300-N023" [ref=e534]
+                  - cell "NSK GROCER (KL) SDN BHD" [ref=e535]:
+                    - button "NSK GROCER (KL) SDN BHD" [ref=e536] [cursor=pointer]
+                  - cell "54" [ref=e537]
+                  - cell "RM 7,397" [ref=e538]
+                  - cell "RM 4,262" [ref=e539]
+                  - cell "—" [ref=e540]
+                  - cell "RM 3,135" [ref=e541]
+                - row "300-N029 NSK GROCER (KL) SDN BHD (THE SUMMIT SUBANG USJ) 68 RM 7,973 RM 5,643 — RM 2,330" [ref=e542]:
+                  - cell "300-N029" [ref=e543]
+                  - cell "NSK GROCER (KL) SDN BHD (THE SUMMIT SUBANG USJ)" [ref=e544]:
+                    - button "NSK GROCER (KL) SDN BHD (THE SUMMIT SUBANG USJ)" [ref=e545] [cursor=pointer]
+                  - cell "68" [ref=e546]
+                  - cell "RM 7,973" [ref=e547]
+                  - cell "RM 5,643" [ref=e548]
+                  - cell "—" [ref=e549]
+                  - cell "RM 2,330" [ref=e550]
+                - row "300-A004 ANEKA INTERTRADE MARKETING SDN BHD 52 RM 33,384 RM 31,250 — RM 2,134" [ref=e551]:
+                  - cell "300-A004" [ref=e552]
+                  - cell "ANEKA INTERTRADE MARKETING SDN BHD" [ref=e553]:
+                    - button "ANEKA INTERTRADE MARKETING SDN BHD" [ref=e554] [cursor=pointer]
+                  - cell "52" [ref=e555]
+                  - cell "RM 33,384" [ref=e556]
+                  - cell "RM 31,250" [ref=e557]
+                  - cell "—" [ref=e558]
+                  - cell "RM 2,134" [ref=e559]
+                - row "300-S019 SRI TERNAK FOOD MART SDN BHD 171 RM 65,454 RM 63,583 — RM 1,871" [ref=e560]:
+                  - cell "300-S019" [ref=e561]
+                  - cell "SRI TERNAK FOOD MART SDN BHD" [ref=e562]:
+                    - button "SRI TERNAK FOOD MART SDN BHD" [ref=e563] [cursor=pointer]
+                  - cell "171" [ref=e564]
+                  - cell "RM 65,454" [ref=e565]
+                  - cell "RM 63,583" [ref=e566]
+                  - cell "—" [ref=e567]
+                  - cell "RM 1,871" [ref=e568]
+                - row "300-M017 MYFRESH GROCER HOUSE SDN BHD (USJ 11/3) 85 RM 10,048 RM 8,480 — RM 1,568" [ref=e569]:
+                  - cell "300-M017" [ref=e570]
+                  - cell "MYFRESH GROCER HOUSE SDN BHD (USJ 11/3)" [ref=e571]:
+                    - button "MYFRESH GROCER HOUSE SDN BHD (USJ 11/3)" [ref=e572] [cursor=pointer]
+                  - cell "85" [ref=e573]
+                  - cell "RM 10,048" [ref=e574]
+                  - cell "RM 8,480" [ref=e575]
+                  - cell "—" [ref=e576]
+                  - cell "RM 1,568" [ref=e577]
+                - row "300-N031 NSK GROCER (KL) SDN BHD(RIVER CITY) 71 RM 8,378 RM 6,938 — RM 1,440" [ref=e578]:
+                  - cell "300-N031" [ref=e579]
+                  - cell "NSK GROCER (KL) SDN BHD(RIVER CITY)" [ref=e580]:
+                    - button "NSK GROCER (KL) SDN BHD(RIVER CITY)" [ref=e581] [cursor=pointer]
+                  - cell "71" [ref=e582]
+                  - cell "RM 8,378" [ref=e583]
+                  - cell "RM 6,938" [ref=e584]
+                  - cell "—" [ref=e585]
+                  - cell "RM 1,440" [ref=e586]
+                - row "300-S045 SOON CHEONG MARINE PRODUCTS S/B(SUNGAI BULOH) 75 RM 18,123 RM 16,715 — RM 1,408" [ref=e587]:
+                  - cell "300-S045" [ref=e588]
+                  - cell "SOON CHEONG MARINE PRODUCTS S/B(SUNGAI BULOH)" [ref=e589]:
+                    - button "SOON CHEONG MARINE PRODUCTS S/B(SUNGAI BULOH)" [ref=e590] [cursor=pointer]
+                  - cell "75" [ref=e591]
+                  - cell "RM 18,123" [ref=e592]
+                  - cell "RM 16,715" [ref=e593]
+                  - cell "—" [ref=e594]
+                  - cell "RM 1,408" [ref=e595]
+                - row "300-H013 HOONG FRUITS TRADING 324 RM 40,949 RM 39,691 — RM 1,258" [ref=e596]:
+                  - cell "300-H013" [ref=e597]
+                  - cell "HOONG FRUITS TRADING" [ref=e598]:
+                    - button "HOONG FRUITS TRADING" [ref=e599] [cursor=pointer]
+                  - cell "324" [ref=e600]
+                  - cell "RM 40,949" [ref=e601]
+                  - cell "RM 39,691" [ref=e602]
+                  - cell "—" [ref=e603]
+                  - cell "RM 1,258" [ref=e604]
+                - row "300-S035 SRI MAJU IKHLAS VENTURE 2 RM 1,360 RM 170 — RM 1,190" [ref=e605]:
+                  - cell "300-S035" [ref=e606]
+                  - cell "SRI MAJU IKHLAS VENTURE" [ref=e607]:
+                    - button "SRI MAJU IKHLAS VENTURE" [ref=e608] [cursor=pointer]
+                  - cell "2" [ref=e609]
+                  - cell "RM 1,360" [ref=e610]
+                  - cell "RM 170" [ref=e611]
+                  - cell "—" [ref=e612]
+                  - cell "RM 1,190" [ref=e613]
+                - row "300-N030 NSK GROCER (KL) SDN BHD (AMCORP MALL) 73 RM 8,919 RM 7,738 — RM 1,181" [ref=e614]:
+                  - cell "300-N030" [ref=e615]
+                  - cell "NSK GROCER (KL) SDN BHD (AMCORP MALL)" [ref=e616]:
+                    - button "NSK GROCER (KL) SDN BHD (AMCORP MALL)" [ref=e617] [cursor=pointer]
+                  - cell "73" [ref=e618]
+                  - cell "RM 8,919" [ref=e619]
+                  - cell "RM 7,738" [ref=e620]
+                  - cell "—" [ref=e621]
+                  - cell "RM 1,181" [ref=e622]
+            - generic [ref=e623]:
+              - generic [ref=e624]:
+                - generic [ref=e625]: Showing 1–25 of 86 customers
+                - generic [ref=e626]:
+                  - generic [ref=e627]: "Rows:"
+                  - combobox [ref=e628]:
+                    - generic [ref=e629]: "25"
+                    - img: ▼
+                  - textbox [ref=e630]: "25"
+              - generic [ref=e631]:
+                - button "Prev" [disabled]
+                - generic [ref=e632]: Page 1 of 4
+                - button "Next" [ref=e633]
+  - generic [ref=e634]: "0"

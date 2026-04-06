@@ -1,0 +1,126 @@
+- generic [ref=e1]:
+  - alert [ref=e2]
+  - generic [ref=e3]:
+    - complementary [ref=e4]:
+      - generic [ref=e5]:
+        - heading "Hoi-Yong Finance" [level=1] [ref=e6]
+        - button "Collapse sidebar" [ref=e7]:
+          - img [ref=e8]
+      - navigation [ref=e11]:
+        - link "Sales" [ref=e12] [cursor=pointer]:
+          - /url: /sales
+          - img [ref=e13]
+          - generic [ref=e16]: Sales
+        - link "Payment" [ref=e17] [cursor=pointer]:
+          - /url: /payment
+          - img [ref=e18]
+          - generic [ref=e20]: Payment
+        - link "Return" [ref=e21] [cursor=pointer]:
+          - /url: /return
+          - img [ref=e22]
+          - generic [ref=e25]: Return
+        - link "Financials" [ref=e26] [cursor=pointer]:
+          - /url: /financial
+          - img [ref=e27]
+          - generic [ref=e29]: Financials
+        - link "Expenses" [ref=e30] [cursor=pointer]:
+          - /url: /expenses
+          - img [ref=e31]
+          - generic [ref=e34]: Expenses
+        - link "Customer Margin" [ref=e35] [cursor=pointer]:
+          - /url: /customer-margin
+          - img [ref=e36]
+          - generic [ref=e41]: Customer Margin
+        - link "Supplier Performance" [ref=e42] [cursor=pointer]:
+          - /url: /supplier-performance
+          - img [ref=e43]
+          - generic [ref=e48]: Supplier Performance
+        - generic [ref=e49]:
+          - text: Admin
+          - link "Data Sync" [ref=e51] [cursor=pointer]:
+            - /url: /admin/sync
+            - img [ref=e52]
+            - generic [ref=e57]: Data Sync
+    - main [ref=e58]:
+      - generic [ref=e61]:
+        - heading "Sales Report" [level=2] [ref=e62]
+        - paragraph [ref=e63]: Provides revenue tracking on a daily, weekly, and monthly basis to monitor sales trends and performance.
+      - main [ref=e66]:
+        - generic [ref=e67]:
+          - generic [ref=e68]:
+            - generic [ref=e69]: Date Range
+            - button "Nov 2024" [ref=e70]:
+              - img
+              - text: Nov 2024
+            - generic [ref=e71]: →
+            - button "Oct 2025" [ref=e72]:
+              - img
+              - text: Oct 2025
+          - generic [ref=e73]: Nov 2024 – Oct 2025 (12 months)
+          - generic [ref=e74]:
+            - button "3M" [ref=e75]
+            - button "6M" [ref=e76]
+            - button "12M" [ref=e77]
+            - button "YTD" [ref=e78]
+        - generic [ref=e79]:
+          - generic [ref=e80]:
+            - generic [ref=e82]: Net Sales
+            - generic [ref=e83]:
+              - generic [ref=e84]: RM 88,292,352
+              - paragraph [ref=e85]: Invoice + Cash Sales − Credit Notes
+          - generic [ref=e86]:
+            - generic [ref=e88]: Invoice Sales
+            - generic [ref=e89]:
+              - generic [ref=e90]: RM 83,771,320
+              - paragraph [ref=e91]: Billed on credit terms to customer
+          - generic [ref=e92]:
+            - generic [ref=e94]: Cash Sales
+            - generic [ref=e95]:
+              - generic [ref=e96]: RM 5,534,329
+              - paragraph [ref=e97]: Immediate payment
+          - generic [ref=e98]:
+            - generic [ref=e100]: Credit Notes
+            - generic [ref=e101]:
+              - generic [ref=e102]: "-RM 1,013,268"
+              - paragraph [ref=e103]: Goods returns & adjustments
+        - generic [ref=e104]:
+          - generic [ref=e106]:
+            - generic [ref=e107]: Net Sales Trend
+            - generic [ref=e109]:
+              - button "daily" [ref=e110]
+              - button "weekly" [ref=e111]
+              - button "monthly" [ref=e112]
+          - generic [ref=e115]:
+            - generic [ref=e117]:
+              - generic [ref=e120]: Invoice
+              - generic [ref=e123]: Cash Sales
+              - generic [ref=e126]: Credit Notes
+            - application [ref=e127]:
+              - generic [ref=e250]:
+                - generic [ref=e251]
+                - generic [ref=e276]
+        - generic [ref=e287]:
+          - generic [ref=e289]:
+            - generic [ref=e290]: Sales Breakdown
+            - generic [ref=e291]:
+              - generic [ref=e292]:
+                - generic [ref=e293]: "Group by:"
+                - combobox [active] [ref=e294]
+                - textbox [ref=e296]: customer
+              - generic [ref=e297]:
+                - generic [ref=e298]: "Filter by:"
+                - button "All Categories" [ref=e299]
+                - button "Clear" [disabled]
+          - generic [ref=e302]:
+            - generic [ref=e304]:
+              - heading "Sales Chart" [level=3] [ref=e306]
+              - application [ref=e309]:
+                - generic [ref=e347]
+            - generic [ref=e391]:
+              - generic [ref=e392]:
+                - generic [ref=e393]
+                - generic [ref=e398]
+              - table [ref=e402]:
+                - rowgroup [ref=e403]
+                - rowgroup [ref=e413]
+  - generic [ref=e4428]: MY HERO HYPERMARKET SDN BHD

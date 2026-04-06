@@ -1,0 +1,80 @@
+- generic [ref=e1]:
+  - alert [ref=e2]
+  - generic [ref=e3]:
+    - complementary [ref=e4]:
+      - generic [ref=e5]:
+        - heading [level=1] [ref=e6]: Hoi-Yong Finance
+        - button [ref=e7]:
+          - img [ref=e8]
+      - navigation [ref=e11]:
+        - link [ref=e12] [cursor=pointer]:
+          - /url: /sales
+          - img [ref=e13]
+          - generic [ref=e16]: Sales
+        - link [ref=e17] [cursor=pointer]:
+          - /url: /payment
+          - img [ref=e18]
+          - generic [ref=e20]: Payment
+        - link [ref=e21] [cursor=pointer]:
+          - /url: /return
+          - img [ref=e22]
+          - generic [ref=e25]: Return
+        - link [ref=e26] [cursor=pointer]:
+          - /url: /financial
+          - img [ref=e27]
+          - generic [ref=e29]: Financials
+        - link [ref=e30] [cursor=pointer]:
+          - /url: /expenses
+          - img [ref=e31]
+          - generic [ref=e34]: Expenses
+        - link [ref=e35] [cursor=pointer]:
+          - /url: /customer-margin
+          - img [ref=e36]
+          - generic [ref=e41]: Customer Margin
+        - link [ref=e42] [cursor=pointer]:
+          - /url: /supplier-performance
+          - img [ref=e43]
+          - generic [ref=e48]: Supplier Performance
+        - generic [ref=e49]:
+          - text: Admin
+          - link [ref=e51] [cursor=pointer]:
+            - /url: /admin/sync
+    - main [ref=e58]
+  - dialog [active] [ref=e63]:
+    - generic [ref=e69]:
+      - generic [ref=e70]:
+        - heading "LUEN SENG FRUITS STALL" [level=2] [ref=e71]
+        - generic [ref=e72]:
+          - paragraph [ref=e73]: 300-L006
+          - generic [ref=e74]: ACTIVE
+      - generic [ref=e76]:
+        - generic [ref=e77]: CUSTOMER
+        - button [ref=e78]:
+          - img [ref=e79]
+    - generic [ref=e1338]:
+      - generic [ref=e1340]:
+        - generic [ref=e1341]:
+          - heading "Customer Details" [level=3] [ref=e1344]
+          - generic [ref=e1345]
+        - generic [ref=e1385]:
+          - heading "Logs" [level=3] [ref=e1388]
+          - generic [ref=e1389]
+      - generic [ref=e1420]:
+        - generic [ref=e1422]:
+          - heading "Statistics" [level=3] [ref=e1423]
+          - generic [ref=e1424]: Lifetime snapshot — from first transaction to today
+        - generic [ref=e1425]:
+          - generic [ref=e1427]
+          - generic [ref=e1438]
+          - generic [ref=e1460]
+          - generic [ref=e1493]
+      - generic [ref=e1521]:
+        - heading "Trends" [level=3] [ref=e1524]
+        - generic [ref=e1526]:
+          - generic [ref=e1527]
+          - generic [ref=e1532]
+        - generic [ref=e1537]:
+          - generic [ref=e1539]
+          - generic [ref=e1865]
+          - generic [ref=e2015]
+  - generic [ref=e770]: 60%

@@ -1,0 +1,80 @@
+- generic [ref=e1]:
+  - button "Open Next.js Dev Tools" [ref=e7] [cursor=pointer]:
+    - img [ref=e8]
+  - alert [ref=e11]
+  - generic [ref=e12]:
+    - complementary [ref=e13]:
+      - generic [ref=e14]:
+        - heading "Hoi-Yong Finance" [level=1] [ref=e15]
+        - button "Collapse sidebar" [ref=e16]:
+          - img [ref=e17]
+      - navigation [ref=e20]:
+        - link "Sales" [ref=e21] [cursor=pointer]:
+          - /url: /sales
+          - img [ref=e22]
+          - generic [ref=e25]: Sales
+        - link "Payment" [active] [ref=e26] [cursor=pointer]:
+          - /url: /payment
+          - img [ref=e27]
+          - generic [ref=e29]: Payment
+        - link "Return" [ref=e30] [cursor=pointer]:
+          - /url: /return
+          - img [ref=e31]
+          - generic [ref=e34]: Return
+        - link "Financials" [ref=e35] [cursor=pointer]:
+          - /url: /financial
+          - img [ref=e36]
+          - generic [ref=e38]: Financials
+        - link "Expenses" [ref=e39] [cursor=pointer]:
+          - /url: /expenses
+          - img [ref=e40]
+          - generic [ref=e43]: Expenses
+        - link "Customer Margin" [ref=e44] [cursor=pointer]:
+          - /url: /customer-margin
+          - img [ref=e45]
+          - generic [ref=e50]: Customer Margin
+        - link "Supplier Performance" [ref=e51] [cursor=pointer]:
+          - /url: /supplier-performance
+          - img [ref=e52]
+          - generic [ref=e57]: Supplier Performance
+        - generic [ref=e58]:
+          - text: Admin
+          - link "Data Sync" [ref=e60] [cursor=pointer]:
+            - /url: /admin/sync
+    - main [ref=e67]:
+      - generic [ref=e940]:
+        - generic [ref=e941]:
+          - heading "Payment Collection" [level=2] [ref=e942]
+          - paragraph [ref=e943]: Tracks customer payment health, including payment aging, outstanding amounts, and credit scoring to assess risk and improve cash flow management.
+        - generic [ref=e945]:
+          - generic [ref=e946]: Role
+          - combobox [ref=e947]
+      - generic [ref=e948]:
+        - generic [ref=e950]:
+          - heading "Payment Collection Trend" [level=2] [ref=e951]
+          - generic [ref=e952]: Filtered by date range
+        - generic [ref=e954]:
+          - generic [ref=e955]
+          - generic [ref=e960]: Nov 2024 – Oct 2025 (12 months)
+          - generic [ref=e961]
+        - generic [ref=e967]:
+          - generic [ref=e969]
+          - generic [ref=e978]
+          - generic [ref=e987]
+        - generic [ref=e995]:
+          - generic [ref=e996]
+          - generic [ref=e1067]
+        - generic [ref=e1187]:
+          - heading "Outstanding Payment" [level=2] [ref=e1188]
+          - generic [ref=e1189]: Accumulated from beginning to now
+        - generic [ref=e1191]:
+          - generic [ref=e1193]
+          - generic [ref=e1201]
+          - generic [ref=e1210]
+        - generic [ref=e1218]:
+          - generic [ref=e1219]
+          - generic [ref=e1272]
+        - generic [ref=e1313]:
+          - generic [ref=e1314]
+          - generic [ref=e1329]
+  - generic [ref=e938]: Not Yet Due
