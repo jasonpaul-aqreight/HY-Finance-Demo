@@ -4,7 +4,7 @@ services:
     environment:
       POSTGRES_DB: hoiyong
       POSTGRES_USER: hoiyong
-      POSTGRES_PASSWORD: ${POSTGRES_LOCAL_PASSWORD:-hoiyong_dev_2026}
+      POSTGRES_PASSWORD: hoiyong_dev_2026
     ports:
       - "5433:5432"
     volumes:
@@ -22,8 +22,8 @@ services:
       context: ./apps/sync-service
       dockerfile: Dockerfile
     environment:
-      DATABASE_URL: postgres://hoiyong:${POSTGRES_LOCAL_PASSWORD:-hoiyong_dev_2026}@postgres:5432/hoiyong
-      AUTOCOUNT_DATABASE_URL: ${AUTOCOUNT_DATABASE_URL}
+      DATABASE_URL: postgres://hoiyong:hoiyong_dev_2026@postgres:5432/hoiyong
+      AUTOCOUNT_DATABASE_URL: postgresql://${RDS_USER}:${RDS_PASSWORD}@${RDS_HOST}:5432/autocount?sslmode=no-verify
       SYNC_PORT: 4000
       SYNC_ON_STARTUP: "true"
     ports:
@@ -38,8 +38,8 @@ services:
       context: ./apps/dashboard
       dockerfile: Dockerfile
     environment:
-      DATABASE_URL: postgres://hoiyong:${POSTGRES_LOCAL_PASSWORD:-hoiyong_dev_2026}@postgres:5432/hoiyong
-      RDS_DATABASE_URL: ${RDS_DATABASE_URL}
+      DATABASE_URL: postgres://hoiyong:hoiyong_dev_2026@postgres:5432/hoiyong
+      RDS_DATABASE_URL: postgresql://${RDS_USER}:${RDS_PASSWORD}@${RDS_HOST}:5432/autocount?sslmode=no-verify
       SYNC_SERVICE_URL: http://sync:4000
     ports:
       - "3000:3000"
