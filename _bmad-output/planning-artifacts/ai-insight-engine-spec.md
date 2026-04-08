@@ -97,11 +97,12 @@ The Sales page currently has no section headers. Two section headers will be add
 | Setting | Value |
 |---------|-------|
 | SDK | `@anthropic-ai/sdk` (standard Anthropic SDK with tool use) |
-| Model | Latest Haiku (`claude-haiku-4-5-20251001`) |
+| Model | Configurable via `AI_INSIGHT_MODEL` env var (default: `claude-haiku-4-5-20251001`) |
+| Prompt logging | Configurable via `AI_INSIGHT_LOG_PROMPTS` env var (`true`/`false`, default: `false`) — prints all prompts to terminal |
 | Max runtime per section | 5 minutes |
 | Max cost per section | $0.50 USD |
 | Estimated cost per section | ~$0.02–0.10 (well within limit) |
-| Output format | Markdown (supports tables, bold, bullets) |
+| Output format | Markdown (bullet points for observations, tables for data comparisons) |
 | Tool use | Yes — custom tool definitions for read-only data exploration |
 | Agentic pattern | Multi-step reasoning loop: send → tool_use → execute → tool_result → repeat until done |
 
@@ -170,29 +171,29 @@ Each section has a header bar that doubles as the AI Insight Panel toggle.
 **State 3: Results available**
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│  Section Title                              Get Insight ▲│
-├─────────────────────────────────────────────────────────┤
-│                                                         │
-│  ── High-Level Summary ──                               │
-│  👍 Good: Collection rate at 84.7% — healthy...         │
-│  👍 Good: Avg monthly collection steady at RM 5.8M...   │
-│  👎 Bad: Avg collection days at 44 — above 30-day...    │
-│  👎 Bad: Collection gap widening — invoiced exceeds...  │
-│                                                         │
-├─────────────────────────────────────────────────────────┤
-│  Analyzed: Nov 2024 – Oct 2025 (12 months)              │
-│  Analysis Time: 12s   Tokens: 3,421   Cost: $0.03      │
-│  Last Updated: 2026-04-08 14:32      By: Jason          │
-│                                              [Analyze]  │
-└─────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│  Section Title                                        Get Insight ▲│
+├──────────────────────────────┬──────────────────────────────────────┤
+│  POSITIVE                    │  NEGATIVE                           │
+│                              │                                     │
+│  ● Title Insight [Metric]    │  ● Title Insight [Metric]           │
+│    Description preview...    │    Description preview...           │
+│                              │                                     │
+│  ● Title Insight [Metric]    │  ● Title Insight [Metric]           │
+│    Description preview...    │    Description preview...           │
+│                              │                                     │
+├──────────────────────────────┴──────────────────────────────────────┤
+│  Analyzed: Nov 2024 – Oct 2025 (12 months)                         │
+│  Analysis Time: 68s   Tokens: 23,494   Cost: $0.03                │
+│  Last Updated: 2026-04-08 14:32      By: Jason          [Analyze] │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
-- Each insight is one line, clickable
-- Good insights: green text with 👍 prefix
-- Bad insights: red text with 👎 prefix
-- Maximum: **3 good + 3 bad** insights displayed
-- Clicking an insight opens the **Insight Detail Dialog** (Section 4.4)
+- **Two-column layout:** POSITIVE (left) and NEGATIVE (right), separated visually
+- Each insight is a card with: green/red dot + **bold title** + **metric badge** (e.g., "Collection Rate", "DSO") + truncated description preview
+- Clicking a card opens the **Insight Detail Dialog** (Section 4.4)
+- Maximum: **3 positive + 3 negative** insights displayed
+- Empty column shows "No positive highlights found." or "No concerns found."
 - "Analyzed" row shows the date range used (or "Snapshot — current state" for non-date-filtered sections like Outstanding Payment)
 
 **State 4: Blocked by concurrent user**
@@ -792,9 +793,9 @@ Provide a concise analysis.
 ### 6.6 Summary Prompt (Used in Step 5 — Same for All Sections)
 
 ```
-You are a senior financial analyst producing a high-level summary for
-a section of the Hoi-Yong Finance dashboard. You are speaking to a
-senior director.
+You are a senior financial analyst producing a summary for a section
+of the Hoi-Yong Finance dashboard. You are speaking to a senior
+director who may only read this summary and skip individual details.
 
 Below are the individual analyses for each component in this section.
 Review them all and produce a summary.
@@ -806,13 +807,15 @@ Rules:
   "good": [
     {
       "title": "One-line insight (max 80 chars)",
-      "detail": "Markdown explanation with evidence (tables, bullets, numbers)"
+      "metric": "Short metric area label (max 25 chars)",
+      "detail": "Detailed markdown explanation — see detail rules"
     }
   ],
   "bad": [
     {
       "title": "One-line insight (max 80 chars)",
-      "detail": "Markdown explanation with evidence (tables, bullets, numbers)"
+      "metric": "Short metric area label (max 25 chars)",
+      "detail": "Detailed markdown explanation — see detail rules"
     }
   ]
 }
@@ -820,10 +823,22 @@ Rules:
 - Maximum 3 good insights and 3 bad insights.
 - Rank by business impact — most important first.
 - Each title must be self-explanatory in one line.
-- Each detail must include specific numbers as evidence.
+- The metric field identifies the dashboard area (e.g., "DSO",
+  "Collection Rate", "Aging", "Net Sales", "By Customer").
+
+Detail rules:
+- Tell the COMPLETE STORY — a director reading only this summary
+  should understand the full situation without checking components.
+- Use bullet points for observations, Markdown tables for data.
+- Include specific numbers, percentages, and trend evidence.
+- Aim for 100-200 words per detail.
+
+Quality rules:
+- Do not produce contradicting good and bad insights for the same
+  metric. Pick the dominant signal or merge into one nuanced insight.
+- If two component analyses overlap, synthesize into one insight.
 - If everything is good, you may have 0 bad insights (and vice versa).
-- Do not repeat what individual analyses said — synthesize across them.
-- Use Markdown tables in the detail field where data comparison helps.
+- Synthesize across components — do not repeat verbatim.
 ```
 
 **Summary User Prompt Template (Dynamic — Fed from Step 3 Results):**

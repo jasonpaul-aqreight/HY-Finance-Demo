@@ -17,6 +17,57 @@ interface AiInsightPanelProps {
   onCancel: () => void;
 }
 
+function InsightCard({
+  insight,
+  sentiment,
+  onClick,
+}: {
+  insight: SummaryInsight;
+  sentiment: 'good' | 'bad';
+  onClick: () => void;
+}) {
+  const isGood = sentiment === 'good';
+  return (
+    <button
+      onClick={onClick}
+      className={`flex items-start gap-3 text-left w-full rounded-lg border px-3 py-2.5 transition-colors cursor-pointer ${
+        isGood
+          ? 'border-green-200 hover:bg-green-50'
+          : 'border-red-200 hover:bg-red-50'
+      }`}
+    >
+      <span
+        className={`mt-1 shrink-0 h-3 w-3 rounded-full ${
+          isGood ? 'bg-green-500' : 'bg-red-500'
+        }`}
+      />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className={`text-sm font-semibold ${isGood ? 'text-green-800' : 'text-red-800'}`}>
+            {insight.title}
+          </span>
+          {insight.metric && (
+            <span
+              className={`inline-block text-xs font-medium px-1.5 py-0.5 rounded ${
+                isGood
+                  ? 'bg-green-100 text-green-700'
+                  : 'bg-red-100 text-red-700'
+              }`}
+            >
+              {insight.metric}
+            </span>
+          )}
+        </div>
+        {insight.detail && (
+          <p className="text-xs text-foreground/70 mt-1 line-clamp-2">
+            {insight.detail.replace(/[*#|`\-\n]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120)}...
+          </p>
+        )}
+      </div>
+    </button>
+  );
+}
+
 export function AiInsightPanel({
   status,
   data,
@@ -31,6 +82,9 @@ export function AiInsightPanel({
   const isAnalyzing = status === 'analyzing';
   const isBlocked = status === 'blocked';
   const hasResults = status === 'complete' && data;
+
+  const goodInsights = hasResults ? (data.summary_json?.good ?? []).slice(0, 3) : [];
+  const badInsights = hasResults ? (data.summary_json?.bad ?? []).slice(0, 3) : [];
 
   return (
     <div className="rounded-b-md border border-t-0 border-primary/10 bg-background">
@@ -86,30 +140,48 @@ export function AiInsightPanel({
           </div>
         )}
 
-        {/* State 3: Results */}
+        {/* State 3: Results — Two-column layout */}
         {hasResults && data.summary_json && (
-          <div className="space-y-1 py-1">
-            <p className="text-xs font-semibold tracking-wide text-foreground/50 uppercase mb-2">High-Level Summary</p>
-            {data.summary_json.good.slice(0, 3).map((item, i) => (
-              <button
-                key={`good-${i}`}
-                onClick={() => setSelectedInsight({ insight: item, sentiment: 'good' })}
-                className="flex items-start gap-2 text-sm text-left w-full hover:bg-green-50 rounded px-1 py-0.5 transition-colors cursor-pointer"
-              >
-                <span className="shrink-0">👍</span>
-                <span className="text-green-700 font-medium">{item.title}</span>
-              </button>
-            ))}
-            {data.summary_json.bad.slice(0, 3).map((item, i) => (
-              <button
-                key={`bad-${i}`}
-                onClick={() => setSelectedInsight({ insight: item, sentiment: 'bad' })}
-                className="flex items-start gap-2 text-sm text-left w-full hover:bg-red-50 rounded px-1 py-0.5 transition-colors cursor-pointer"
-              >
-                <span className="shrink-0">👎</span>
-                <span className="text-red-700 font-medium">{item.title}</span>
-              </button>
-            ))}
+          <div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* POSITIVE column */}
+              <div>
+                <p className="text-xs font-semibold tracking-wide text-green-700 uppercase mb-2">Positive</p>
+                {goodInsights.length > 0 ? (
+                  <div className="space-y-2">
+                    {goodInsights.map((item, i) => (
+                      <InsightCard
+                        key={`good-${i}`}
+                        insight={item}
+                        sentiment="good"
+                        onClick={() => setSelectedInsight({ insight: item, sentiment: 'good' })}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-foreground/50 py-2">No positive highlights found.</p>
+                )}
+              </div>
+
+              {/* NEGATIVE column */}
+              <div>
+                <p className="text-xs font-semibold tracking-wide text-red-700 uppercase mb-2">Negative</p>
+                {badInsights.length > 0 ? (
+                  <div className="space-y-2">
+                    {badInsights.map((item, i) => (
+                      <InsightCard
+                        key={`bad-${i}`}
+                        insight={item}
+                        sentiment="bad"
+                        onClick={() => setSelectedInsight({ insight: item, sentiment: 'bad' })}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-foreground/50 py-2">No concerns found.</p>
+                )}
+              </div>
+            </div>
           </div>
         )}
 

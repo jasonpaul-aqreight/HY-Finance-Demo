@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { getAnthropicClient, AI_MODEL, MAX_TOKENS, estimateCost } from './client';
+import { getAnthropicClient, AI_MODEL, MAX_TOKENS, estimateCost, LOG_PROMPTS } from './client';
 import {
   getComponentSystemPrompt,
   getSummarySystemPrompt,
@@ -171,6 +171,16 @@ async function analyzeComponent(
     { role: 'user', content: userPrompt },
   ];
 
+  if (LOG_PROMPTS) {
+    console.log(`\n${'═'.repeat(80)}`);
+    console.log(`📊 COMPONENT: ${componentName} (${componentKey})`);
+    console.log(`${'─'.repeat(80)}`);
+    console.log(`SYSTEM PROMPT:\n${systemPrompt}`);
+    console.log(`${'─'.repeat(80)}`);
+    console.log(`USER PROMPT:\n${userPrompt}`);
+    console.log(`${'═'.repeat(80)}\n`);
+  }
+
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
   let toolCallCount = 0;
@@ -304,6 +314,16 @@ async function runSummaryAnalysis(
     }),
   });
 
+  if (LOG_PROMPTS) {
+    console.log(`\n${'═'.repeat(80)}`);
+    console.log(`📋 SUMMARY GENERATION: ${sectionKey}`);
+    console.log(`${'─'.repeat(80)}`);
+    console.log(`SYSTEM PROMPT:\n${getSummarySystemPrompt()}`);
+    console.log(`${'─'.repeat(80)}`);
+    console.log(`USER PROMPT:\n${userPrompt}`);
+    console.log(`${'═'.repeat(80)}\n`);
+  }
+
   const response = await callWithRetry(
     () => client.messages.create({
       model: AI_MODEL,
@@ -321,6 +341,12 @@ async function runSummaryAnalysis(
   const textBlock = response.content.find(
     (b): b is Anthropic.TextBlock => b.type === 'text',
   );
+
+  if (LOG_PROMPTS && textBlock) {
+    console.log(`\n${'─'.repeat(80)}`);
+    console.log(`📋 SUMMARY RESPONSE:\n${textBlock.text}`);
+    console.log(`${'─'.repeat(80)}\n`);
+  }
 
   if (!textBlock) {
     return { json: { good: [], bad: [] }, tokenCount, inputTokens, outputTokens };

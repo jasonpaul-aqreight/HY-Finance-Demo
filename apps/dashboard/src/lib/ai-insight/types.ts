@@ -31,6 +31,7 @@ export interface AnalyzeRequest {
 
 export interface SummaryInsight {
   title: string;
+  metric?: string; // Short label for the metric area, e.g. "DSO", "Collection Rate"
   detail: string;
 }
 
