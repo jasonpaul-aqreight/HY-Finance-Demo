@@ -37,6 +37,7 @@ export function useInsightAnalysis(page: PageKey, sectionKey: SectionKey) {
   const [error, setError] = useState<string | null>(null);
   const [lockStatus, setLockStatus] = useState<LockStatus | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
+  const readerRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null);
 
   // Fetch existing stored insight on mount
   const fetchStored = useCallback(async () => {
@@ -116,6 +117,7 @@ export function useInsightAnalysis(page: PageKey, sectionKey: SectionKey) {
         setStatus('error');
         return;
       }
+      readerRef.current = reader;
 
       const decoder = new TextDecoder();
       let buffer = '';
@@ -140,11 +142,10 @@ export function useInsightAnalysis(page: PageKey, sectionKey: SectionKey) {
             }
           }
         }
-      } catch (err) {
-        if (status === 'analyzing') {
-          setError('Connection lost');
-          setStatus('error');
-        }
+      } catch {
+        // Reader was cancelled (e.g. by cancel button) — ignore
+      } finally {
+        readerRef.current = null;
       }
     },
     [page, sectionKey, checkLock],
@@ -188,12 +189,35 @@ export function useInsightAnalysis(page: PageKey, sectionKey: SectionKey) {
 
   // Cancel running analysis
   const cancel = useCallback(async () => {
+    // Immediately update local state so UI responds instantly
+    setStatus('idle');
+    setProgress([]);
+    setError(null);
+
+    // Cancel the client-side SSE reader
+    if (readerRef.current) {
+      try {
+        readerRef.current.cancel();
+      } catch {
+        // Best effort
+      }
+      readerRef.current = null;
+    }
+
+    // Tell the server to abort
     try {
-      await fetch('/api/ai-insight/cancel', { method: 'POST' });
+      await fetch('/api/ai-insight/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ section_key: sectionKey }),
+      });
     } catch {
       // Best effort
     }
-  }, []);
+
+    // Reload previous stored result if any
+    fetchStored();
+  }, [sectionKey, fetchStored]);
 
   // Load stored insight on mount
   useEffect(() => {

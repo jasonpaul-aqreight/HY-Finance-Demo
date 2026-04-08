@@ -25,7 +25,7 @@ export function InsightDetailDialog({
 }: InsightDetailDialogProps) {
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-lg max-h-[80vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[90vw] h-[90vh] overflow-y-auto">
         <DialogHeader>
           <div
             className={`-mx-4 -mt-4 px-4 py-3 rounded-t-xl ${

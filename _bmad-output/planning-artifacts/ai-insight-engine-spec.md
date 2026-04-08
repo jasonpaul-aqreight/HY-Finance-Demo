@@ -245,6 +245,7 @@ Opened when clicking a good/bad insight line in the AI Panel.
 └─────────────────────────────────────────────────────┘
 ```
 
+- **Dialog size: 90vw × 90vh** (matches Customer Profile dialog for consistency — end users are older executives who need large, readable content)
 - Header bar is color-coded: red for bad, green for good
 - Body is rendered Markdown (supports tables, bold, bullets, code blocks)
 - Close button (✕) in top-right corner
@@ -283,6 +284,7 @@ Opened when clicking the 🔍 icon on any KPI, chart, or table.
 └─────────────────────────────────────────────────────┘
 ```
 
+- **Dialog size: 90vw × 90vh** (matches Customer Profile dialog and Insight Detail Dialog for consistency)
 - Top section: static content hardcoded from PRD (what it is, formula, good/bad indicator)
 - Bottom section: AI-generated analysis from the last section-level "Analyze" run
 - If analysis has never been run: bottom section shows "No analysis available. Run 'Analyze' from the section panel."
@@ -332,8 +334,9 @@ Step 8: Update UI with results
 ### 5.3 Cancellation
 
 - User clicks "Cancel" during analysis
-- All in-flight API calls are aborted via `AbortController` signals
-- Each parallel call must share a single `AbortController` — when cancel is triggered, `controller.abort()` cancels all in-flight Claude SDK calls simultaneously
+- **Client-side:** UI immediately resets to idle state (no waiting for server confirmation), the SSE stream reader is cancelled via `reader.cancel()`, and any previous stored results are reloaded
+- **Server-side:** The cancel request includes `section_key` in the POST body, the matching `AbortController` is looked up and `controller.abort()` cancels all in-flight Claude SDK calls simultaneously
+- Each parallel call shares a single `AbortController` per section
 - Results are collected into a temporary buffer, **not** written to DB until all complete successfully
 - On cancel or error: buffer is discarded — **nothing is saved to DB** (all-or-nothing transaction)
 - Panel returns to previous state (last results, or "never generated")

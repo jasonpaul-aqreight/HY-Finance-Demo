@@ -56,7 +56,7 @@ export function ComponentInsightDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-lg max-h-[80vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[90vw] h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>About: {info?.name || componentKey}</DialogTitle>
         </DialogHeader>
