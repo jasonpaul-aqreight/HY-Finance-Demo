@@ -5,6 +5,7 @@ import { HelpCircle } from 'lucide-react';
 import { useKpisV2 } from '@/hooks/payment/usePaymentDataV2';
 import { useStableData } from '@/hooks/useStableData';
 import { formatRM, formatDays } from '@/lib/payment/format';
+import { AnalyzeIcon } from '@/components/ai-insight/AnalyzeIcon';
 import type { DashboardFiltersV2 } from '@/hooks/payment/useDashboardFiltersV2';
 
 function InfoTooltip({ children }: { children: React.ReactNode }) {
@@ -79,12 +80,15 @@ export default function PeriodKpiCards({ filters }: PeriodKpiCardsProps) {
         subtitle="avg days to collect payment"
         colorClass={dsoColor}
         extra={
-          <InfoTooltip>
-            <p>Average Collection Days measures how many days, on average, it takes a company to collect payment after making a sale. It&apos;s a cash flow efficiency metric.</p>
-            <p className="font-mono bg-muted/50 rounded px-2 py-1">
-              Collection Days = (Accounts Receivable / Total Invoice Sales) &times; Number of Days
-            </p>
-          </InfoTooltip>
+          <>
+            <InfoTooltip>
+              <p>Average Collection Days measures how many days, on average, it takes a company to collect payment after making a sale. It&apos;s a cash flow efficiency metric.</p>
+              <p className="font-mono bg-muted/50 rounded px-2 py-1">
+                Collection Days = (Accounts Receivable / Total Invoice Sales) &times; Number of Days
+              </p>
+            </InfoTooltip>
+            <AnalyzeIcon sectionKey="payment_collection_trend" componentKey="avg_collection_days" />
+          </>
         }
       />
       <KpiCard
@@ -93,13 +97,16 @@ export default function PeriodKpiCards({ filters }: PeriodKpiCardsProps) {
         subtitle="in selected period"
         colorClass={collColor}
         extra={
-          <InfoTooltip>
-            <p>Collection Rate measures how much of the invoiced amount has been collected in cash payments during the selected period. A rate above 100% means you&apos;re collecting more than you&apos;re billing (clearing older debts).</p>
-            <p className="text-muted-foreground">Note: Offsets between amounts owed and owing are not included as they are non-cash.</p>
-            <p className="font-mono bg-muted/50 rounded px-2 py-1">
-              Collection Rate = (Total Collected &divide; Total Invoiced) &times; 100
-            </p>
-          </InfoTooltip>
+          <>
+            <InfoTooltip>
+              <p>Collection Rate measures how much of the invoiced amount has been collected in cash payments during the selected period. A rate above 100% means you&apos;re collecting more than you&apos;re billing (clearing older debts).</p>
+              <p className="text-muted-foreground">Note: Offsets between amounts owed and owing are not included as they are non-cash.</p>
+              <p className="font-mono bg-muted/50 rounded px-2 py-1">
+                Collection Rate = (Total Collected &divide; Total Invoiced) &times; 100
+              </p>
+            </InfoTooltip>
+            <AnalyzeIcon sectionKey="payment_collection_trend" componentKey="collection_rate" />
+          </>
         }
       />
       <KpiCard
@@ -108,12 +115,15 @@ export default function PeriodKpiCards({ filters }: PeriodKpiCardsProps) {
         subtitle="in selected period"
         colorClass="text-blue-600"
         extra={
-          <InfoTooltip>
-            <p>Average Monthly Collection shows how much cash payment is received per month during the selected period. Useful for forecasting expected cash inflow.</p>
-            <p className="font-mono bg-muted/50 rounded px-2 py-1">
-              Avg Monthly Collection = Total Collected &divide; Months in Period
-            </p>
-          </InfoTooltip>
+          <>
+            <InfoTooltip>
+              <p>Average Monthly Collection shows how much cash payment is received per month during the selected period. Useful for forecasting expected cash inflow.</p>
+              <p className="font-mono bg-muted/50 rounded px-2 py-1">
+                Avg Monthly Collection = Total Collected &divide; Months in Period
+              </p>
+            </InfoTooltip>
+            <AnalyzeIcon sectionKey="payment_collection_trend" componentKey="avg_monthly_collection" />
+          </>
         }
       />
     </div>

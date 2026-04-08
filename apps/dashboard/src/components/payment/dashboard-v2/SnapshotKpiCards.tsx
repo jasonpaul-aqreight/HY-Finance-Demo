@@ -5,6 +5,7 @@ import { HelpCircle } from 'lucide-react';
 import { useKpisV2 } from '@/hooks/payment/usePaymentDataV2';
 import { useStableData } from '@/hooks/useStableData';
 import { formatRM, formatCount } from '@/lib/payment/format';
+import { AnalyzeIcon } from '@/components/ai-insight/AnalyzeIcon';
 import type { DashboardFiltersV2 } from '@/hooks/payment/useDashboardFiltersV2';
 
 function InfoTooltip({ children }: { children: React.ReactNode }) {
@@ -79,9 +80,12 @@ export default function SnapshotKpiCards({ filters }: SnapshotKpiCardsProps) {
         value={formatRM(data.total_outstanding)}
         colorClass="text-orange-600"
         extra={
-          <InfoTooltip>
-            <p>Total unpaid invoice amount across all customers. This is the sum of remaining balances on all open invoices.</p>
-          </InfoTooltip>
+          <>
+            <InfoTooltip>
+              <p>Total unpaid invoice amount across all customers. This is the sum of remaining balances on all open invoices.</p>
+            </InfoTooltip>
+            <AnalyzeIcon sectionKey="payment_outstanding" componentKey="total_outstanding" />
+          </>
         }
       />
       <KpiCard
@@ -90,9 +94,12 @@ export default function SnapshotKpiCards({ filters }: SnapshotKpiCardsProps) {
         subtitle={`${overduePctStr} of total · ${formatCount(data.overdue_customers)} customers`}
         colorClass="text-red-600"
         extra={
-          <InfoTooltip>
-            <p>Total outstanding amount on invoices that have passed their due date. Overdue % shows how much of the total outstanding is past due.</p>
-          </InfoTooltip>
+          <>
+            <InfoTooltip>
+              <p>Total outstanding amount on invoices that have passed their due date. Overdue % shows how much of the total outstanding is past due.</p>
+            </InfoTooltip>
+            <AnalyzeIcon sectionKey="payment_outstanding" componentKey="overdue_amount" />
+          </>
         }
       />
       <KpiCard
@@ -101,9 +108,12 @@ export default function SnapshotKpiCards({ filters }: SnapshotKpiCardsProps) {
         subtitle="customers over limit"
         colorClass={data.credit_limit_breaches > 0 ? 'text-red-600' : 'text-emerald-600'}
         extra={
-          <InfoTooltip>
-            <p>Number of active customers whose total outstanding exceeds their assigned credit limit.</p>
-          </InfoTooltip>
+          <>
+            <InfoTooltip>
+              <p>Number of active customers whose total outstanding exceeds their assigned credit limit.</p>
+            </InfoTooltip>
+            <AnalyzeIcon sectionKey="payment_outstanding" componentKey="credit_limit_breaches" />
+          </>
         }
       />
     </div>

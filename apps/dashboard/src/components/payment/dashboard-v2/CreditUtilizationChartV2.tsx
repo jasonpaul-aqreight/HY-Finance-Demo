@@ -1,6 +1,7 @@
 'use client';
 
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { AnalyzeIcon } from '@/components/ai-insight/AnalyzeIcon';
 import { useCreditUtilizationV2 } from '@/hooks/payment/usePaymentDataV2';
 import { useStableData } from '@/hooks/useStableData';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
@@ -41,7 +42,10 @@ export default function CreditUtilizationChartV2() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Credit Usage</CardTitle>
+        <div className="flex items-center gap-2">
+          <CardTitle>Credit Usage</CardTitle>
+          <AnalyzeIcon sectionKey="payment_outstanding" componentKey="credit_usage_distribution" />
+        </div>
       </CardHeader>
       <CardContent>
         {!data ? (

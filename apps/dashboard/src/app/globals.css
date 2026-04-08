@@ -127,3 +127,30 @@
     @apply font-sans;
   }
 }
+
+/* Manual page table styles */
+.manual-content table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  margin: 1rem 0;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+.manual-content thead {
+  background: var(--muted);
+}
+.manual-content th {
+  padding: 0.625rem 1rem;
+  text-align: left;
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+}
+.manual-content td {
+  padding: 0.625rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+.manual-content tbody tr:last-child td {
+  border-bottom: none;
+}

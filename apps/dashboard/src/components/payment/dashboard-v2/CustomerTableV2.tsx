@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TablePagination, type PageSize } from '@/components/ui/table-pagination';
 import { useCreditHealthV2 } from '@/hooks/payment/usePaymentDataV2';
+import { AnalyzeIcon } from '@/components/ai-insight/AnalyzeIcon';
 import { useStableData } from '@/hooks/useStableData';
 import { formatRM } from '@/lib/payment/format';
 import { riskTierBgColor } from '@/lib/payment/credit-score-v2';
@@ -94,7 +95,10 @@ export default function CustomerTableV2({ initialStartDate, initialEndDate }: { 
     <Card>
       <CardHeader>
         <div>
-          <CardTitle>Customer Credit Health</CardTitle>
+          <div className="flex items-center gap-2">
+            <CardTitle>Customer Credit Health</CardTitle>
+            <AnalyzeIcon sectionKey="payment_outstanding" componentKey="customer_credit_health" />
+          </div>
           <p className="mt-0.5 text-xs text-muted-foreground">
             Overdue calculated as of {today}
           </p>

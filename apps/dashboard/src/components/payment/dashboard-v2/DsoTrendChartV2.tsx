@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { AnalyzeIcon } from '@/components/ai-insight/AnalyzeIcon';
 import { useDsoTrendV2 } from '@/hooks/payment/usePaymentDataV2';
 import { useStableData } from '@/hooks/useStableData';
 import type { DashboardFiltersV2 } from '@/hooks/payment/useDashboardFiltersV2';
@@ -28,7 +29,10 @@ export default function DsoTrendChartV2({ filters }: DsoTrendChartV2Props) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Collection Days Trend</CardTitle>
+        <div className="flex items-center gap-2">
+          <CardTitle>Collection Days Trend</CardTitle>
+          <AnalyzeIcon sectionKey="payment_collection_trend" componentKey="collection_days_trend" />
+        </div>
       </CardHeader>
       <CardContent>
         {!data ? (

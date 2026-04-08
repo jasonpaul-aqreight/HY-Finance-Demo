@@ -1,6 +1,7 @@
 'use client';
 
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { AnalyzeIcon } from '@/components/ai-insight/AnalyzeIcon';
 import { useCollectionTrend, useKpisV2 } from '@/hooks/payment/usePaymentDataV2';
 import { useStableData } from '@/hooks/useStableData';
 import { formatRM } from '@/lib/payment/format';
@@ -23,7 +24,10 @@ export default function CollectionTrendChartV2({ filters }: CollectionTrendChart
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Invoiced vs Collected</CardTitle>
+        <div className="flex items-center gap-2">
+          <CardTitle>Invoiced vs Collected</CardTitle>
+          <AnalyzeIcon sectionKey="payment_collection_trend" componentKey="invoiced_vs_collected" />
+        </div>
       </CardHeader>
       <CardContent>
         {!data ? (
