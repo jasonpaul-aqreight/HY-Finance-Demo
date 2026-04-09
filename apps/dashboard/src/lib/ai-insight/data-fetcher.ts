@@ -37,7 +37,7 @@ const fetchers: Record<string, DataFetcher> = {
     const dsoNum = parseFloat(avg);
     const color = isNaN(dsoNum) ? 'No data' : dsoNum <= 30 ? 'Green (Good)' : dsoNum <= 60 ? 'Yellow (Warning)' : 'Red (Critical)';
 
-    let table = '| Month | DSO |\n|-------|-----|\n';
+    let table = '| Month | Collection Days |\n|-------|----------------|\n';
     for (const r of rows) {
       table += `| ${r.month} | ${r.dso != null ? r.dso + ' days' : 'N/A'} |\n`;
     }
