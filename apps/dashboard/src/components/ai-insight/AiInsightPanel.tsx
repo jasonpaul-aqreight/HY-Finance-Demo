@@ -15,6 +15,7 @@ interface AiInsightPanelProps {
   lockedBy?: string | null;
   onAnalyze: () => void;
   onCancel: () => void;
+  isAdmin?: boolean;
 }
 
 function InsightCard({
@@ -86,6 +87,7 @@ export function AiInsightPanel({
   lockedBy,
   onAnalyze,
   onCancel,
+  isAdmin = true,
 }: AiInsightPanelProps) {
   const [selectedInsight, setSelectedInsight] = useState<{ insight: SummaryInsight; sentiment: 'good' | 'bad' } | null>(null);
 
@@ -244,6 +246,8 @@ export function AiInsightPanel({
             <Button variant="destructive" size="sm" onClick={onCancel}>
               Cancel
             </Button>
+          ) : !isAdmin ? (
+            <span className="text-xs text-foreground/50">Admin role required to analyze</span>
           ) : (
             <Button
               size="sm"

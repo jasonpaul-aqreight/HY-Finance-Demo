@@ -1334,8 +1334,115 @@ Both headers follow the same collapsible pattern as the Payment page sections, w
 |---------|-----------|-------------|-------------------|-----------------------|
 | Payment Collection Trend | 5 + summary | ~24,000 | ~$0.03 | 24,191 tokens, $0.03, 63s |
 | Payment Outstanding | 6 + summary | ~58,000 | ~$0.07 | 58,499 tokens, $0.07, 331s |
-| Sales Trend | 5 + summary | ~24,000 | ~$0.03 | Not yet measured |
-| Sales Breakdown | 4 + summary | ~30,000 | ~$0.04 | Not yet measured |
-| **Total (all 4 sections)** | **24 calls** | **~136,000** | **~$0.17** | — |
+| Sales Trend | 5 + summary | ~24,000 | ~$0.03 | 46,476 tokens, $0.05, 196s |
+| Sales Breakdown | 4 + summary | ~30,000 | ~$0.04 | 29,619 tokens, $0.04, 91s |
+| **Total (all 4 sections)** | **24 calls** | **~136,000** | **~$0.17** | ~155,591 tokens, ~$0.18 |
 
 **Note:** Actual costs depend on tool call depth and data volume. The source authority prompt rule ("use pre-fetched data, don't re-derive totals") reduced tool call frequency significantly — the 2026-04-09 Payment Collection Trend run used 33% fewer tokens and was 3.5x faster compared to the pre-optimization run (36,090 tokens, $0.04, 223s). The `cost_usd` field in the metadata tracks actual spend per run. All observed costs are well under the $0.50/section cap.
+
+## Appendix C: AI Insight Accuracy Verification Procedure
+
+> This procedure verifies that AI Insight values match dashboard values. Run after any change to the data-fetcher, prompts, orchestrator, or AI model configuration. This is the standard QA gate before production deployment.
+
+### Prerequisites
+
+1. Next.js dev server running with current environment variables
+2. Database seeded with production-equivalent data
+3. Role set to **Admin** (Viewer role cannot trigger analysis)
+4. Lock table contains the singleton row (`id=1`) — required for lock acquisition
+
+### Step 1: Reset AI Insight Data
+
+Clear all previous analysis results to ensure a clean run:
+
+```sql
+DELETE FROM ai_insight_section;  -- cascades to ai_insight_component
+-- Do NOT delete from ai_insight_lock; only reset it:
+UPDATE ai_insight_lock SET locked_by = NULL, locked_at = NULL, section_key = NULL WHERE id = 1;
+```
+
+### Step 2: Run Analysis for Each Section
+
+Trigger analysis for all 4 sections, one at a time (global lock prevents parallel runs):
+
+| Order | Page | Section | Section Key |
+|-------|------|---------|-------------|
+| 1 | `/payment` | Payment Collection Trend | `payment_collection_trend` |
+| 2 | `/payment` | Outstanding Payment | `payment_outstanding` |
+| 3 | `/sales` | Sales Trend | `sales_trend` |
+| 4 | `/sales` | Sales Breakdown | `sales_breakdown` |
+
+For each section:
+1. Navigate to the page
+2. Open the "Get Insight" panel
+3. Click "Analyze" and wait for all components to complete
+4. Verify the "Last Updated" timestamp reflects the current run
+
+### Step 3: Verify Summary Panel Values
+
+For each section, compare the AI Insight summary panel (positive/negative cards) against the dashboard KPIs:
+
+**Payment Collection Trend — verify against:**
+- Avg Collection Days (KPI card)
+- Collection Rate (KPI card)
+- Avg Monthly Collection (KPI card)
+- Chart averages (Collection Days Trend, Invoiced vs Collected)
+
+**Outstanding Payment — verify against:**
+- Total Outstanding (KPI card)
+- Overdue Amount and % (KPI card)
+- Credit Limit Breaches count (KPI card)
+- Aging Analysis chart (120+ Days bucket and invoice count)
+- Credit Usage distribution (Over Limit count)
+
+**Sales Trend — verify against:**
+- Net Sales, Invoice Sales, Cash Sales, Credit Notes (all 4 KPI cards)
+- Net Sales Trend chart (monthly bars)
+
+**Sales Breakdown — verify against:**
+- Sales Breakdown table (customer names and Total Sales values)
+- Sales Chart (top 10 horizontal bar chart values)
+
+### Step 4: Verify Each Insight Detail Dialog
+
+Click every insight card in the summary panel to open its detail dialog. For each dialog:
+
+1. **Screenshot** the dialog content
+2. **Compare** the table/metric values against the corresponding dashboard values
+3. **Check** that customer names, amounts, and percentages match the dashboard table/chart
+4. **Confirm** the business narrative makes sense given the data
+
+### Step 5: Document Results
+
+For each section, produce a report with:
+
+| Field | Description |
+|-------|-------------|
+| Section name | Which section was tested |
+| Analysis timestamp | "Last Updated" value from the panel |
+| Value match table | Dashboard value vs AI Insight value, with match status |
+| Insight dialog table | Each insight title, sentiment, key values verified |
+| Verdict | PASS or FAIL with specific discrepancies noted |
+
+### Pass Criteria
+
+- All KPI values in AI Insight dialogs must match dashboard values (within RM 1 rounding tolerance)
+- Customer-specific values (names, amounts, percentages) must match the dashboard table exactly
+- Chart-derived values (averages, trends) may have minor rounding differences but must be directionally correct
+- All 4 sections must PASS for the verification to be considered complete
+
+### Known Considerations
+
+- **Rate limiting:** Anthropic API rate limits may cause retries and longer analysis times. This does not affect accuracy.
+- **Role requirement:** Only the Admin role can trigger analysis. Viewer role clicks are silently ignored.
+- **Lock singleton:** The `ai_insight_lock` table must contain exactly one row with `id=1`. If this row is missing, lock acquisition fails silently (returns 409).
+- **Snapshot sections:** Outstanding Payment is a point-in-time snapshot (no date filter). Values change if underlying data changes between verification runs.
+
+### First Verified Run (Baseline — 2026-04-09)
+
+| Section | Verdict | Key Findings |
+|---------|---------|-------------|
+| Payment Collection Trend | PASS | Collection Rate 84.7% exact match, Avg Collection Days 43.7d vs 44d (rounding), Monthly Collection RM 5,841,378 exact match |
+| Outstanding Payment | PASS | Total Outstanding RM 11,349,862 vs RM 11,349,863 (RM 1 rounding), 3,376 invoices exact match, 21 credit breaches exact match, top 3 customer amounts exact match |
+| Sales Trend | PASS | Invoice Sales RM 83,771,290 exact match, Cash Sales RM 5,534,326 exact match, Credit Notes RM 1,013,268 exact match |
+| Sales Breakdown | PASS | MY HERO RM 21,518,626 exact match, CASH SALES RM 6,529,840 exact match, WONDERFRUITS RM 5,979,004 exact match |

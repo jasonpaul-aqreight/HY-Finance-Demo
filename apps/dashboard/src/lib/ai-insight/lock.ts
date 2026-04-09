@@ -9,6 +9,11 @@ export async function acquireLock(
 ): Promise<{ acquired: boolean; status: LockStatus }> {
   const pool = getPool();
 
+  // Ensure singleton lock row exists (safe for concurrent calls)
+  await pool.query(
+    `INSERT INTO ai_insight_lock (id) VALUES (1) ON CONFLICT (id) DO NOTHING`,
+  );
+
   // Try to acquire lock: only if unlocked or stale
   const result = await pool.query(
     `UPDATE ai_insight_lock

@@ -5,6 +5,7 @@ import { ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { AiInsightPanel } from './AiInsightPanel';
 import { useInsightAnalysis } from '@/hooks/ai-insight/useInsightAnalysis';
+import { useRole } from '@/components/layout/RoleProvider';
 import type { SectionKey, PageKey, DateRange } from '@/lib/ai-insight/types';
 
 interface InsightSectionHeaderProps {
@@ -25,6 +26,7 @@ export function InsightSectionHeader({
   userName = 'User',
 }: InsightSectionHeaderProps) {
   const [expanded, setExpanded] = useState(false);
+  const { isAdmin } = useRole();
   const insight = useInsightAnalysis(page, sectionKey);
 
   const handleAnalyze = () => {
@@ -60,6 +62,7 @@ export function InsightSectionHeader({
           lockedBy={insight.lockStatus?.locked_by}
           onAnalyze={handleAnalyze}
           onCancel={insight.cancel}
+          isAdmin={isAdmin}
         />
       )}
     </div>
