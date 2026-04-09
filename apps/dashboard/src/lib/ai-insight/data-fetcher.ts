@@ -1,6 +1,11 @@
 import { getPool } from '../postgres';
 import type { SectionKey, DateRange } from './types';
 
+// Convert YYYY-MM-DD to YYYY-MM to match pc_ar_monthly.month column format
+function toMonth(date: string): string {
+  return date.substring(0, 7);
+}
+
 // ─── Data fetchers per component ─────────────────────────────────────────────
 // Each returns a formatted string for the user prompt's "Current Values" block.
 
@@ -10,6 +15,8 @@ const fetchers: Record<string, DataFetcher> = {
   // Payment Section 1
   async avg_collection_days(dr) {
     const pool = getPool();
+    const startMonth = toMonth(dr!.start);
+    const endMonth = toMonth(dr!.end);
     const { rows } = await pool.query(
       `SELECT month,
               CASE WHEN invoiced > 0
@@ -18,7 +25,7 @@ const fetchers: Record<string, DataFetcher> = {
        FROM pc_ar_monthly
        WHERE month BETWEEN $1 AND $2
        ORDER BY month`,
-      [dr!.start, dr!.end],
+      [startMonth, endMonth],
     );
     if (rows.length === 0) return 'No data available for selected period.';
 
@@ -44,7 +51,7 @@ const fetchers: Record<string, DataFetcher> = {
               COALESCE(SUM(invoiced), 0) AS total_invoiced
        FROM pc_ar_monthly
        WHERE month BETWEEN $1 AND $2`,
-      [dr!.start, dr!.end],
+      [toMonth(dr!.start), toMonth(dr!.end)],
     );
     const { total_collected, total_invoiced } = rows[0];
     const rate = total_invoiced > 0 ? ((total_collected / total_invoiced) * 100).toFixed(1) : '--';
@@ -60,7 +67,7 @@ const fetchers: Record<string, DataFetcher> = {
       `SELECT COUNT(*) AS months, COALESCE(SUM(collected), 0) AS total_collected
        FROM pc_ar_monthly
        WHERE month BETWEEN $1 AND $2`,
-      [dr!.start, dr!.end],
+      [toMonth(dr!.start), toMonth(dr!.end)],
     );
     const { months, total_collected } = rows[0];
     const avg = months > 0 ? (total_collected / months) : 0;
@@ -78,7 +85,7 @@ const fetchers: Record<string, DataFetcher> = {
        FROM pc_ar_monthly
        WHERE month BETWEEN $1 AND $2
        ORDER BY month`,
-      [dr!.start, dr!.end],
+      [toMonth(dr!.start), toMonth(dr!.end)],
     );
     const valid = rows.filter((r: { dso: number | null }) => r.dso !== null);
     const avg = valid.length > 0
@@ -99,7 +106,7 @@ const fetchers: Record<string, DataFetcher> = {
        FROM pc_ar_monthly
        WHERE month BETWEEN $1 AND $2
        ORDER BY month`,
-      [dr!.start, dr!.end],
+      [toMonth(dr!.start), toMonth(dr!.end)],
     );
     const totalInv = rows.reduce((s: number, r: { invoiced: number }) => s + r.invoiced, 0);
     const totalCol = rows.reduce((s: number, r: { collected: number }) => s + r.collected, 0);
