@@ -1,7 +1,7 @@
 # AI Insight Engine — Requirements Specification
 
 > Scope: Sales Report & Payment Collection pages only.
-> Status: Implemented — Payment sections verified (2026-04-09). Sales sections pending.
+> Status: Implemented — Payment sections verified & active-filter audit complete (2026-04-09). Sales sections pending.
 
 ---
 
@@ -1150,6 +1150,20 @@ This is implemented via a `toMonth(date)` helper in `data-fetcher.ts`. Sales fet
 - `pc_ar_customer_snapshot` stores daily snapshots (one row per customer per `snapshot_date`). All queries **must filter to the latest `snapshot_date`** (`WHERE snapshot_date = (SELECT MAX(snapshot_date) FROM pc_ar_customer_snapshot)`) to avoid duplicate/inflated totals.
 - `pc_ar_aging_history` also stores daily snapshots. Same rule: filter to the latest `snapshot_date`.
 - Both tables should also exclude `company_name ILIKE 'CASH SALES%'` rows (internal walkup accounts, not real customers).
+
+**Important — Active Customer Filtering (`pc_ar_customer_snapshot`):**
+
+The `is_active` column distinguishes active (`'T'`) from inactive (`'F'`) customers. Inactive customers may still have outstanding balances or credit limit breaches from before they were deactivated. The dashboard and data-fetcher queries must align on which population they count:
+
+| Query Purpose | Required Filter | Rationale |
+|---------------|----------------|-----------|
+| Credit Limit Breaches (KPI) | `AND is_active = 'T'` | Only active customer breaches are operationally relevant |
+| Credit Usage Distribution (donut) | `AND (is_active = 'T' OR is_active IS NULL)` | Match the dashboard's donut chart population |
+| Total Outstanding / Overdue Amount | No `is_active` filter needed | Dashboard KPIs also include inactive balances (they still owe money) |
+| Customer Credit Health (table) | `AND (is_active = 'T' OR total_outstanding > 0)` | Show active + any inactive that still owe money |
+| Ad-hoc tool queries (`query_local_table`) | AI should include `is_active = 'T'` when counting credit breaches or categorizing credit usage | The system prompt should guide the AI on when to apply this filter |
+
+> **Audit finding (2026-04-09):** The data-fetcher `credit_limit_breaches` and `credit_usage_distribution` queries were missing `is_active` filters, causing the AI to report 23 credit breaches (including 2 inactive customers) while the dashboard showed 21, and 583 total portfolio vs the dashboard's 365 active customers. Fixed by adding the appropriate `is_active` filters to match dashboard behavior.
 
 #### Blocked Columns (PII — Never Accessible)
 

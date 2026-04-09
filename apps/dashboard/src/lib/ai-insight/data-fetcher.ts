@@ -163,6 +163,7 @@ const fetchers: Record<string, DataFetcher> = {
       `SELECT COUNT(*) AS breach_count
        FROM pc_ar_customer_snapshot
        WHERE snapshot_date = $1 AND credit_limit > 0 AND total_outstanding > credit_limit
+         AND is_active = 'T'
          AND company_name NOT ILIKE 'CASH SALES%'`,
       [latest.d],
     );
@@ -213,7 +214,8 @@ const fetchers: Record<string, DataFetcher> = {
          COUNT(*) FILTER (WHERE credit_limit = 0 OR credit_limit IS NULL) AS no_limit,
          COUNT(*) AS total
        FROM pc_ar_customer_snapshot
-       WHERE snapshot_date = $1 AND company_name NOT ILIKE 'CASH SALES%'`,
+       WHERE snapshot_date = $1 AND (is_active = 'T' OR is_active IS NULL)
+         AND company_name NOT ILIKE 'CASH SALES%'`,
       [latest.d],
     );
     const r = rows[0];
