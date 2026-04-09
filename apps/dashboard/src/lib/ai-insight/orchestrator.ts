@@ -10,6 +10,17 @@ import {
 } from './prompts';
 import { AI_TOOLS, executeToolCall } from './tools';
 import { fetchComponentData } from './data-fetcher';
+import {
+  DEBUG_FILE_ENABLED,
+  initDebugSession,
+  logComponentStart,
+  logApiResponse,
+  logToolResult,
+  logComponentEnd,
+  logSummaryStart,
+  logSummaryResponse,
+  logSessionEnd,
+} from './debug-logger';
 import type { SectionKey, DateRange, ComponentResult, SummaryJson, SummaryInsight, ComponentType } from './types';
 
 const MAX_CONCURRENCY = 2; // Keep low to avoid rate limits on lower-tier API plans
@@ -39,6 +50,12 @@ export async function runSectionAnalysis(
   const components = SECTION_COMPONENTS[sectionKey];
   if (!components) throw new Error(`Unknown section: ${sectionKey}`);
 
+  const logFile = initDebugSession(
+    sectionKey,
+    AI_MODEL,
+    dateRange ? { start: dateRange.start, end: dateRange.end } : null,
+  );
+
   const abortSignal = abortController.signal;
   const startTime = Date.now();
   let totalTokens = 0;
@@ -65,7 +82,7 @@ export async function runSectionAnalysis(
       onProgress(comp.key, 'analyzing');
 
       try {
-        const result = await analyzeComponent(comp.key, comp.name, comp.type, sectionKey, dateRange, abortSignal);
+        const result = await analyzeComponent(comp.key, comp.name, comp.type, sectionKey, dateRange, abortSignal, logFile);
         componentResults.push(result);
         totalTokens += result.token_count;
         totalCost += estimateCost(result.input_tokens, result.output_tokens);
@@ -104,10 +121,12 @@ export async function runSectionAnalysis(
 
     // Step 2: Run summary analysis
     onProgress('summary', 'analyzing');
-    const summary = await runSummaryAnalysis(sectionKey, dateRange, componentResults, abortSignal);
+    const summary = await runSummaryAnalysis(sectionKey, dateRange, componentResults, abortSignal, logFile);
     totalTokens += summary.tokenCount;
     totalCost += estimateCost(summary.inputTokens, summary.outputTokens);
     onProgress('summary', 'complete');
+
+    logSessionEnd(logFile, totalTokens, totalCost, componentResults.length);
 
     return {
       components: componentResults,
@@ -152,6 +171,7 @@ async function analyzeComponent(
   sectionKey: SectionKey,
   dateRange: DateRange | null,
   abortSignal: AbortSignal,
+  logFile: string | null,
 ): Promise<ComponentResult> {
   const client = getAnthropicClient();
 
@@ -181,13 +201,18 @@ async function analyzeComponent(
     console.log(`${'═'.repeat(80)}\n`);
   }
 
+  logComponentStart(logFile, componentKey, componentName, systemPrompt, userPrompt);
+
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
   let toolCallCount = 0;
+  let turnNumber = 0;
 
   // Agent loop: handle tool calls
   while (true) {
     if (abortSignal.aborted) throw new Error('Analysis aborted');
+
+    turnNumber++;
 
     const response = await callWithRetry(
       () => client.messages.create({
@@ -203,14 +228,18 @@ async function analyzeComponent(
     totalInputTokens += response.usage?.input_tokens ?? 0;
     totalOutputTokens += response.usage?.output_tokens ?? 0;
 
+    logApiResponse(logFile, turnNumber, response);
+
     if (response.stop_reason === 'end_turn' || response.stop_reason !== 'tool_use') {
       const textBlock = response.content.find(
         (b): b is Anthropic.TextBlock => b.type === 'text',
       );
+      const analysis = textBlock?.text ?? 'No analysis generated.';
+      logComponentEnd(logFile, componentKey, analysis, totalInputTokens, totalOutputTokens, toolCallCount);
       return {
         component_key: componentKey,
         component_type: componentType,
-        analysis_md: textBlock?.text ?? 'No analysis generated.',
+        analysis_md: analysis,
         token_count: totalInputTokens + totalOutputTokens,
         input_tokens: totalInputTokens,
         output_tokens: totalOutputTokens,
@@ -226,10 +255,12 @@ async function analyzeComponent(
       const textBlock = response.content.find(
         (b): b is Anthropic.TextBlock => b.type === 'text',
       );
+      const analysis = textBlock?.text ?? 'No analysis generated.';
+      logComponentEnd(logFile, componentKey, analysis, totalInputTokens, totalOutputTokens, toolCallCount);
       return {
         component_key: componentKey,
         component_type: componentType,
-        analysis_md: textBlock?.text ?? 'No analysis generated.',
+        analysis_md: analysis,
         token_count: totalInputTokens + totalOutputTokens,
         input_tokens: totalInputTokens,
         output_tokens: totalOutputTokens,
@@ -247,6 +278,7 @@ async function analyzeComponent(
         toolBlock.name,
         toolBlock.input as Parameters<typeof executeToolCall>[1],
       );
+      logToolResult(logFile, turnNumber, toolBlock.name, toolBlock.id, result);
       toolResults.push({
         type: 'tool_result',
         tool_use_id: toolBlock.id,
@@ -259,6 +291,8 @@ async function analyzeComponent(
     // If max tool calls reached, make one final call without tools to get concluding analysis
     if (toolCallCount >= MAX_TOOL_CALLS_PER_COMPONENT) {
       if (abortSignal.aborted) throw new Error('Analysis aborted');
+
+      turnNumber++;
 
       const finalResponse = await callWithRetry(
         () => client.messages.create({
@@ -273,13 +307,17 @@ async function analyzeComponent(
       totalInputTokens += finalResponse.usage?.input_tokens ?? 0;
       totalOutputTokens += finalResponse.usage?.output_tokens ?? 0;
 
+      logApiResponse(logFile, turnNumber, finalResponse);
+
       const textBlock = finalResponse.content.find(
         (b): b is Anthropic.TextBlock => b.type === 'text',
       );
+      const analysis = textBlock?.text ?? 'No analysis generated.';
+      logComponentEnd(logFile, componentKey, analysis, totalInputTokens, totalOutputTokens, toolCallCount);
       return {
         component_key: componentKey,
         component_type: componentType,
-        analysis_md: textBlock?.text ?? 'No analysis generated.',
+        analysis_md: analysis,
         token_count: totalInputTokens + totalOutputTokens,
         input_tokens: totalInputTokens,
         output_tokens: totalOutputTokens,
@@ -295,6 +333,7 @@ async function runSummaryAnalysis(
   dateRange: DateRange | null,
   componentResults: ComponentResult[],
   abortSignal: AbortSignal,
+  logFile: string | null,
 ): Promise<{ json: SummaryJson; tokenCount: number; inputTokens: number; outputTokens: number }> {
   if (abortSignal.aborted) throw new Error('Analysis aborted');
 
@@ -324,6 +363,8 @@ async function runSummaryAnalysis(
     console.log(`${'═'.repeat(80)}\n`);
   }
 
+  logSummaryStart(logFile, sectionKey, getSummarySystemPrompt(), userPrompt);
+
   const response = await callWithRetry(
     () => client.messages.create({
       model: AI_MODEL,
@@ -347,6 +388,8 @@ async function runSummaryAnalysis(
     console.log(`📋 SUMMARY RESPONSE:\n${textBlock.text}`);
     console.log(`${'─'.repeat(80)}\n`);
   }
+
+  logSummaryResponse(logFile, response, textBlock?.text ?? '(no text block)');
 
   if (!textBlock) {
     return { json: { good: [], bad: [] }, tokenCount, inputTokens, outputTokens };
