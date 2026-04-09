@@ -31,7 +31,7 @@ const fetchers: Record<string, DataFetcher> = {
 
     const valid = rows.filter((r: { dso: number | null }) => r.dso !== null);
     const avg = valid.length > 0
-      ? (valid.reduce((s: number, r: { dso: number }) => s + r.dso, 0) / valid.length).toFixed(1)
+      ? (valid.reduce((s: number, r: { dso: number }) => s + Number(r.dso), 0) / valid.length).toFixed(1)
       : '--';
 
     const dsoNum = parseFloat(avg);
@@ -89,7 +89,7 @@ const fetchers: Record<string, DataFetcher> = {
     );
     const valid = rows.filter((r: { dso: number | null }) => r.dso !== null);
     const avg = valid.length > 0
-      ? (valid.reduce((s: number, r: { dso: number }) => s + r.dso, 0) / valid.length).toFixed(1)
+      ? (valid.reduce((s: number, r: { dso: number }) => s + Number(r.dso), 0) / valid.length).toFixed(1)
       : '--';
 
     let table = '| Month | Collection Days |\n|-------|----------------|\n';
@@ -108,13 +108,13 @@ const fetchers: Record<string, DataFetcher> = {
        ORDER BY month`,
       [toMonth(dr!.start), toMonth(dr!.end)],
     );
-    const totalInv = rows.reduce((s: number, r: { invoiced: number }) => s + r.invoiced, 0);
-    const totalCol = rows.reduce((s: number, r: { collected: number }) => s + r.collected, 0);
+    const totalInv = rows.reduce((s: number, r: { invoiced: number }) => s + Number(r.invoiced), 0);
+    const totalCol = rows.reduce((s: number, r: { collected: number }) => s + Number(r.collected), 0);
     const avgCol = rows.length > 0 ? totalCol / rows.length : 0;
 
     let table = '| Month | Invoiced | Collected | Gap |\n|-------|----------|-----------|-----|\n';
     for (const r of rows) {
-      const gap = r.collected - r.invoiced;
+      const gap = Number(r.collected) - Number(r.invoiced);
       table += `| ${r.month} | RM ${Number(r.invoiced).toLocaleString('en-MY')} | RM ${Number(r.collected).toLocaleString('en-MY')} | ${gap >= 0 ? '+' : ''}RM ${Number(gap).toLocaleString('en-MY')} |\n`;
     }
     return `Data points:\n${table}\nAvg Monthly Collection: RM ${Math.round(avgCol).toLocaleString('en-MY')}`;

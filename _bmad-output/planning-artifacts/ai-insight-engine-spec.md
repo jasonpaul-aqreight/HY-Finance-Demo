@@ -1,7 +1,7 @@
 # AI Insight Engine — Requirements Specification
 
 > Scope: Sales Report & Payment Collection pages only.
-> Status: Draft — pending stakeholder approval.
+> Status: Implemented — Payment sections verified (2026-04-09). Sales sections pending.
 
 ---
 
@@ -98,13 +98,16 @@ The Sales page currently has no section headers. Two section headers will be add
 |---------|-------|
 | SDK | `@anthropic-ai/sdk` (standard Anthropic SDK with tool use) |
 | Model | Configurable via `AI_INSIGHT_MODEL` env var (default: `claude-haiku-4-5-20251001`) |
-| Prompt logging | Configurable via `AI_INSIGHT_LOG_PROMPTS` env var (`true`/`false`, default: `false`) — prints all prompts to terminal |
+| Prompt logging (terminal) | Configurable via `AI_INSIGHT_LOG_PROMPTS` env var (`true`/`false`, default: `false`) — prints all prompts to terminal |
+| Debug file logging | Configurable via `AI_INSIGHT_DEBUG_FILE` env var (`true`/`false`, default: `false`) — saves full back-and-forth messages (prompts, responses, tool calls, tool results) to timestamped log files in `apps/dashboard/logs/`. Each analysis run creates one file. Independent of terminal logging. |
 | Max runtime per section | 5 minutes |
 | Max cost per section | $0.50 USD |
-| Estimated cost per section | ~$0.02–0.10 (well within limit) |
+| Estimated cost per section | ~$0.03–0.07 (observed: $0.03 for 5-component section, $0.07 for 6-component section) |
 | Output format | Delimiter-based `===INSIGHT===` blocks (component: Markdown; summary: structured with bold headers + tables) |
 | Tool use | Yes — custom tool definitions for read-only data exploration |
 | Agentic pattern | Multi-step reasoning loop: send → tool_use → execute → tool_result → repeat until done |
+| Max tool calls per component | 3 (then one final call without tools) |
+| Max concurrency | 2 parallel component analyses |
 
 > **Why `@anthropic-ai/sdk` and not `@anthropic-ai/claude-agent-sdk`?**
 > The agent SDK spawns Claude Code CLI subprocesses — designed for code-level tasks (file reads, bash commands). The AI Insight Engine needs custom database query tools with strict guardrails (column whitelists, PII exclusion, row limits). The standard SDK with tool use gives full control over tool definitions, execution, and enforcement while still supporting agentic multi-step reasoning. This also provides a unified foundation for future features (chatbot, ML forecasting) that all share the same API pattern.
@@ -375,12 +378,38 @@ Rules:
 - State facts, not recommendations.
 - Use Malaysian Ringgit (RM) for all monetary values.
 - Format numbers with thousands separators (e.g., RM 5,841,378).
-- Use Markdown for formatting (tables, bold, bullets).
+- Structure your analysis using bullet points for observations and
+  findings. Use Markdown tables for data comparisons.
 - When referencing trends, compare at least 3 data points.
 - If the data is insufficient to draw a conclusion, say so.
 - Do not fabricate numbers — only reference data you have been given or
   have retrieved via tools.
+
+Data source authority:
+- The "Current Values" provided in the user message are the AUTHORITATIVE
+  figures for headline metrics (totals, rates, averages). These come from
+  the same pre-calculated tables that power the dashboard the director
+  is viewing.
+- Use tools ONLY for drill-down investigation — e.g., identifying which
+  customers, products, or months explain a trend. NEVER use tools to
+  re-derive or re-aggregate totals, rates, or averages that were already
+  provided to you.
+- If a tool query returns a total that differs from the provided values,
+  ALWAYS use the provided values. The difference is due to aggregation
+  methodology, not an error.
+
+Self-verification (apply before writing your final analysis):
+- Cross-check every number you cite against the data you were given or
+  retrieved. If you state "Total X = RM Y", verify Y appears in your data.
+- Verify arithmetic: if you cite a gap (A minus B), confirm A - B equals
+  the gap you stated.
+- Do not confuse different metrics — e.g., "cumulative collection gap"
+  (total invoiced minus total collected) is not the same as "current
+  outstanding balance" (receivables at period end).
+- If you cannot verify a number, do not include it.
 ```
+
+> **Why source authority and self-verification?** A verification audit (2026-04-09) found that the AI was using tool calls to re-derive totals from RDS tables, producing figures that conflicted with the pre-fetched `pc_*` data (e.g., RM 82M vs RM 77M invoiced from different sources). The AI also confused "cumulative collection gap" with "current outstanding balance" (arithmetic error). These two prompt rules eliminated all discrepancies — the AI now produces numbers that exactly match the dashboard KPIs.
 
 ### 6.2 Payment Section 1: Component System Prompts
 
@@ -1077,7 +1106,17 @@ CREATE TABLE ai_insight_component (
 
 The AI agent has read-only tools to explore data when the user prompt values are insufficient.
 
-### 9.1 Exploration Rules
+### 9.1 Data-Fetcher Date Format Rule
+
+The `pc_ar_monthly.month` column stores values in `YYYY-MM` format (e.g., `'2024-11'`). The date range from the frontend arrives as `YYYY-MM-DD` (e.g., `'2024-11-01'`).
+
+**All data-fetcher queries on `pc_ar_monthly` must convert dates to `YYYY-MM` before use in `BETWEEN` clauses.** If the full `YYYY-MM-DD` format is used, string comparison silently excludes the first month of the range (e.g., `'2024-11' < '2024-11-01'` is true lexicographically), causing the AI to analyze fewer months than the dashboard displays.
+
+This is implemented via a `toMonth(date)` helper in `data-fetcher.ts`. Sales fetchers query `doc_date` (a proper DATE column) and do not need conversion.
+
+> **Audit finding (2026-04-09):** This bug caused the AI to report 84.3% collection rate (11 months) while the dashboard showed 84.7% (12 months). Fixed by converting all payment fetcher params to YYYY-MM format.
+
+### 9.2 Exploration Rules (Tool Use)
 
 1. **Always query `pc_*` tables first** — they are pre-aggregated and fast
 2. **Only hit RDS if `pc_*` data is insufficient** for a meaningful insight
@@ -1277,14 +1316,12 @@ Both headers follow the same collapsible pattern as the Payment page sections, w
 
 ## Appendix B: Estimated Cost Model
 
-| Section | Components | Est. Input Tokens | Est. Output Tokens | Est. Cost (Haiku) |
-|---------|-----------|-------------------|--------------------|--------------------|
-| Payment Collection Trend | 5 + summary | ~8,000 | ~3,000 | ~$0.01 |
-| Payment Outstanding | 6 + summary | ~12,000 | ~4,000 | ~$0.02 |
-| Sales Trend | 5 + summary | ~8,000 | ~3,000 | ~$0.01 |
-| Sales Breakdown | 4 + summary | ~15,000 | ~5,000 | ~$0.02 |
-| **Total (all 4 sections)** | **24 calls** | **~43,000** | **~15,000** | **~$0.06** |
+| Section | Components | Est. Tokens | Est. Cost (Haiku) | Observed (2026-04-09) |
+|---------|-----------|-------------|-------------------|-----------------------|
+| Payment Collection Trend | 5 + summary | ~24,000 | ~$0.03 | 24,191 tokens, $0.03, 63s |
+| Payment Outstanding | 6 + summary | ~58,000 | ~$0.07 | 58,499 tokens, $0.07, 331s |
+| Sales Trend | 5 + summary | ~24,000 | ~$0.03 | Not yet measured |
+| Sales Breakdown | 4 + summary | ~30,000 | ~$0.04 | Not yet measured |
+| **Total (all 4 sections)** | **24 calls** | **~136,000** | **~$0.17** | — |
 
-With tool use (deeper exploration), costs may increase 2-3x but remain well under the $0.50/section cap.
-
-**Note:** Costs are estimates based on Claude Haiku pricing. Actual costs depend on tool call depth and data volume. The `cost_usd` field in the metadata tracks actual spend per run.
+**Note:** Actual costs depend on tool call depth and data volume. The source authority prompt rule ("use pre-fetched data, don't re-derive totals") reduced tool call frequency significantly — the 2026-04-09 Payment Collection Trend run used 33% fewer tokens and was 3.5x faster compared to the pre-optimization run (36,090 tokens, $0.04, 223s). The `cost_usd` field in the metadata tracks actual spend per run. All observed costs are well under the $0.50/section cap.
