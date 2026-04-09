@@ -10,7 +10,7 @@ import {
 } from './prompts';
 import { AI_TOOLS, executeToolCall } from './tools';
 import { fetchComponentData } from './data-fetcher';
-import type { SectionKey, DateRange, ComponentResult, SummaryJson, ComponentType } from './types';
+import type { SectionKey, DateRange, ComponentResult, SummaryJson, SummaryInsight, ComponentType } from './types';
 
 const MAX_CONCURRENCY = 2; // Keep low to avoid rate limits on lower-tier API plans
 const MAX_TOOL_CALLS_PER_COMPONENT = 3;
@@ -352,34 +352,77 @@ async function runSummaryAnalysis(
     return { json: { good: [], bad: [] }, tokenCount, inputTokens, outputTokens };
   }
 
-  try {
-    // Extract JSON from response (may be wrapped in markdown code blocks)
-    let jsonStr = textBlock.text.trim();
-    const jsonMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (jsonMatch) jsonStr = jsonMatch[1].trim();
+  // Parse delimiter-based format: ===INSIGHT=== ... ===END===
+  const rawText = textBlock.text;
+  const insightBlocks = rawText.split('===INSIGHT===').slice(1); // skip text before first delimiter
 
-    const parsed = JSON.parse(jsonStr) as SummaryJson;
+  const good: SummaryInsight[] = [];
+  const bad: SummaryInsight[] = [];
 
-    // Enforce max 3 good + 3 bad
-    return {
-      json: {
-        good: (parsed.good ?? []).slice(0, 3),
-        bad: (parsed.bad ?? []).slice(0, 3),
-      },
-      tokenCount,
-      inputTokens,
-      outputTokens,
-    };
-  } catch {
-    console.error('Failed to parse summary JSON:', textBlock.text);
-    return {
-      json: {
-        good: [{ title: 'Summary generated', detail: textBlock.text }],
-        bad: [],
-      },
-      tokenCount,
-      inputTokens,
-      outputTokens,
-    };
+  for (const block of insightBlocks) {
+    const endIdx = block.indexOf('===END===');
+    const content = endIdx >= 0 ? block.slice(0, endIdx) : block;
+
+    // Parse header fields (before ---DETAIL---)
+    const detailSplit = content.split('---DETAIL---');
+    const header = detailSplit[0] ?? '';
+    const detail = (detailSplit[1] ?? '').trim();
+
+    const sentimentMatch = header.match(/sentiment:\s*(good|bad)/i);
+    const titleMatch = header.match(/title:\s*(.+)/i);
+    const metricMatch = header.match(/metric:\s*(.+)/i);
+
+    const sentiment = sentimentMatch?.[1]?.trim().toLowerCase() ?? 'good';
+    const title = titleMatch?.[1]?.trim() ?? 'Insight';
+    const metric = metricMatch?.[1]?.trim();
+
+    const insight: SummaryInsight = { title, detail };
+    if (metric) insight.metric = metric;
+
+    if (sentiment === 'bad') {
+      bad.push(insight);
+    } else {
+      good.push(insight);
+    }
   }
+
+  // Fallback: if no insights parsed, try JSON parse (backward compat)
+  if (good.length === 0 && bad.length === 0) {
+    try {
+      let jsonStr = rawText.trim();
+      const jsonMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
+      if (jsonMatch) jsonStr = jsonMatch[1].trim();
+      const parsed = JSON.parse(jsonStr) as SummaryJson;
+      return {
+        json: {
+          good: (parsed.good ?? []).slice(0, 3),
+          bad: (parsed.bad ?? []).slice(0, 3),
+        },
+        tokenCount,
+        inputTokens,
+        outputTokens,
+      };
+    } catch {
+      console.error('Failed to parse summary response:', rawText.slice(0, 500));
+      return {
+        json: {
+          good: [{ title: 'Summary generated', detail: rawText }],
+          bad: [],
+        },
+        tokenCount,
+        inputTokens,
+        outputTokens,
+      };
+    }
+  }
+
+  return {
+    json: {
+      good: good.slice(0, 3),
+      bad: bad.slice(0, 3),
+    },
+    tokenCount,
+    inputTokens,
+    outputTokens,
+  };
 }

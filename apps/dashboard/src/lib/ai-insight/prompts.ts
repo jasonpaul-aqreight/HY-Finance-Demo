@@ -20,7 +20,7 @@ const COMPONENT_PROMPTS: Record<string, string> = {
   // Payment Section 1: Payment Collection Trend
   avg_collection_days: `You are analyzing the "Avg Collection Days" KPI.
 
-What it measures: The average number of days it takes to collect payment after invoicing. Also known as Days Sales Outstanding (DSO).
+What it measures: The average number of days it takes to collect payment after invoicing.
 
 Formula: For each month: (AR Outstanding at month-end / Monthly Credit Sales) x Days in that month. The KPI shows the average across all valid months in the selected period. Months with zero credit sales are excluded.
 
@@ -59,7 +59,7 @@ Provide a concise analysis of this metric.`,
 
   collection_days_trend: `You are analyzing the "Avg Collection Days Trend" line chart.
 
-What it shows: Monthly collection days (DSO) plotted over time with a dashed reference line at the period average.
+What it shows: Monthly collection days plotted over time with a dashed reference line at the period average.
 
 How to read it:
 - Rising trend = collection is slowing down (bad)
@@ -317,37 +317,55 @@ const SUMMARY_SYSTEM = `You are a senior financial analyst producing a summary f
 
 Below are the individual analyses for each component in this section. Review them all and produce a summary.
 
-Rules:
-- Output exactly this JSON structure (no other text):
+Output format — use this EXACT delimiter structure (no JSON, no code blocks):
 
-{
-  "good": [
-    {
-      "title": "One-line insight (max 80 chars)",
-      "metric": "Short metric area label, e.g. Collection Rate, DSO, Net Sales (max 25 chars)",
-      "detail": "Detailed markdown explanation — see detail rules below"
-    }
-  ],
-  "bad": [
-    {
-      "title": "One-line insight (max 80 chars)",
-      "metric": "Short metric area label (max 25 chars)",
-      "detail": "Detailed markdown explanation — see detail rules below"
-    }
-  ]
-}
+===INSIGHT===
+sentiment: good
+title: Short punchy headline (max 50 chars)
+metric: Key number e.g. 84.3%, 43 days, RM 2.1M (max 25 chars)
+---DETAIL---
+Full markdown analysis here (see detail rules below)
+===END===
 
-- Maximum 3 good insights and 3 bad insights.
-- Rank by business impact — most important first.
-- Each title must be self-explanatory in one line.
-- The metric field identifies which dashboard area the insight relates to (e.g. "DSO", "Collection Rate", "Aging", "Net Sales", "Credit Notes", "By Customer").
+Repeat ===INSIGHT=== ... ===END=== for each insight. Maximum 3 good + 3 bad insights. Rank by business impact — most important first.
+
+Title rules:
+- Maximum 50 characters. Be punchy and direct like a newspaper headline.
+- Examples: "Tuesday Sales Peak", "Strong Collection Recovery", "Credit Note Spike"
+- Do NOT write full sentences as titles. No verbs like "is", "has", "shows".
+
+Metric rules:
+- Show the actual key number — e.g. "84.3%", "43 days", "RM 2.1M", "35%".
+- If no single number fits, use the metric area label — e.g. "Collection Days", "Aging", "By Customer".
 
 Detail rules:
-- The detail must tell the COMPLETE STORY — a director who reads only this summary should understand the full situation without checking individual components.
-- ALWAYS structure the detail as Markdown bullet points (start each line with "- "). Use Markdown tables when comparing data across periods or categories.
-- Include specific numbers, percentages, and trend data as evidence.
-- Connect the dots: explain WHY the metric is good/bad and what business context it reflects.
-- Aim for 100-200 words per detail — thorough but not verbose.
+- The detail is the FULL ANALYST REPORT. A director who reads only this should understand the complete situation.
+- Structure using bold section headers. Follow this template:
+
+**Overall Performance:** One paragraph summarizing the headline metric with actual numbers.
+
+**Key Observations:**
+
+| Metric | Value |
+|--------|-------|
+| Row 1  | Data  |
+| Row 2  | Data  |
+
+**Trend Analysis:** What direction is this moving? Include specific period comparisons.
+
+**Business Context:** Why does this matter? What does it mean for operations?
+
+**Conclusion:** One sentence bottom-line assessment.
+
+- You may adapt the section headers to fit the insight (e.g. "Geographic Spread" instead of "Trend Analysis" for outlet data).
+- ALWAYS include a Markdown table with at least 3 rows of supporting data.
+- Include specific numbers, percentages, RM amounts, and period references as evidence.
+- Cross-reference multiple components when relevant — synthesize, don't isolate.
+- Aim for 300-500 words per detail. This is the deep analysis, not a quick summary.
+
+Terminology rules:
+- Use ONLY the exact metric names shown on the dashboard (e.g. "Avg Collection Days", "Collection Rate", "Net Sales").
+- Do NOT introduce financial jargon or acronyms not on the dashboard (e.g. do NOT say "DSO", "AR turnover", "DPO"). The audience is non-financial executives.
 
 Quality rules:
 - Do not produce a good insight and a bad insight that contradict each other. If the same metric has both positive and negative aspects, pick the dominant signal or merge into one nuanced insight.
@@ -450,7 +468,7 @@ ${components}
 
 ---
 
-Produce the JSON summary now.`;
+Produce the summary now using the ===INSIGHT=== delimiter format.`;
 }
 
 export function buildComponentUserPrompt(params: {

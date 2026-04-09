@@ -14,7 +14,7 @@ export const COMPONENT_INFO: Record<string, ComponentInfo> = {
   // ═══ Payment Collection Trend ═══
   avg_collection_days: {
     name: 'Avg Collection Days',
-    whatItMeasures: 'The average number of days it takes to collect payment after invoicing. Also known as Days Sales Outstanding (DSO).',
+    whatItMeasures: 'The average number of days it takes to collect payment after invoicing.',
     formula: '(AR Outstanding at month-end ÷ Monthly Credit Sales) × Days in that month. KPI shows the average across all valid months.',
     indicator: '≤30 days = Good (green)\n≤60 days = Warning (yellow)\n>60 days = Critical (red)',
   },
@@ -32,7 +32,7 @@ export const COMPONENT_INFO: Record<string, ComponentInfo> = {
   },
   collection_days_trend: {
     name: 'Avg Collection Days Trend',
-    whatItMeasures: 'Monthly collection days (DSO) plotted over time with a reference line at the period average.',
+    whatItMeasures: 'Monthly collection days plotted over time with a reference line at the period average.',
     indicator: 'Rising trend = collection slowing (bad)\nFalling trend = collection improving (good)\nSpikes above 60 days = critical months',
   },
   invoiced_vs_collected: {

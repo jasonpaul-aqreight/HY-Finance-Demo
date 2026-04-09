@@ -43,7 +43,7 @@ function InsightCard({
       />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className={`text-sm font-semibold ${isGood ? 'text-green-800' : 'text-red-800'}`}>
+          <span className={`text-base font-semibold ${isGood ? 'text-green-800' : 'text-red-800'}`}>
             {insight.title}
           </span>
           {insight.metric && (
@@ -59,8 +59,18 @@ function InsightCard({
           )}
         </div>
         {insight.detail && (
-          <p className="text-xs text-foreground/70 mt-1 line-clamp-2">
-            {insight.detail.replace(/[*#|`\-\n]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120)}...
+          <p className="text-sm text-foreground mt-1 line-clamp-1">
+            {(() => {
+              // Strip bold headers like "**Overall Performance:**" and get first content sentence
+              const cleaned = insight.detail
+                .replace(/\*\*[^*]+:\*\*/g, '')  // remove bold headers
+                .replace(/[#|`\n]/g, ' ')         // strip markdown chars
+                .replace(/\s+/g, ' ')
+                .trim();
+              // Split on period followed by space or end — avoids cutting "84.3%"
+              const match = cleaned.match(/^(.+?\.\s)/);
+              return match ? match[1].trim() : cleaned.slice(0, 120);
+            })()}
           </p>
         )}
       </div>

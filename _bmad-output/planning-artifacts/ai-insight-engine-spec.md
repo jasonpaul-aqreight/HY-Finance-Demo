@@ -102,7 +102,7 @@ The Sales page currently has no section headers. Two section headers will be add
 | Max runtime per section | 5 minutes |
 | Max cost per section | $0.50 USD |
 | Estimated cost per section | ~$0.02–0.10 (well within limit) |
-| Output format | Markdown (bullet points for observations, tables for data comparisons) |
+| Output format | Delimiter-based `===INSIGHT===` blocks (component: Markdown; summary: structured with bold headers + tables) |
 | Tool use | Yes — custom tool definitions for read-only data exploration |
 | Agentic pattern | Multi-step reasoning loop: send → tool_use → execute → tool_result → repeat until done |
 
@@ -190,7 +190,7 @@ Each section has a header bar that doubles as the AI Insight Panel toggle.
 ```
 
 - **Two-column layout:** POSITIVE (left) and NEGATIVE (right), separated visually
-- Each insight is a card with: green/red dot + **bold title** + **metric badge** (e.g., "Collection Rate", "DSO") + truncated description preview
+- Each insight is a card with: green/red dot + **bold title** + **metric badge** (e.g., "84.3%", "43 days") + one-line description preview
 - Clicking a card opens the **Insight Detail Dialog** (Section 4.4)
 - Maximum: **3 positive + 3 negative** insights displayed
 - Empty column shows "No positive highlights found." or "No concerns found."
@@ -247,8 +247,12 @@ Opened when clicking a good/bad insight line in the AI Panel.
 ```
 
 - **Dialog size: 90vw × 90vh** (matches Customer Profile dialog for consistency — end users are older executives who need large, readable content)
-- Header bar is color-coded: red for bad, green for good
-- Body is rendered Markdown (supports tables, bold, bullets, code blocks)
+- Header bar is color-coded: red for bad, green for good (with emoji: 👍 / 👎)
+- Body is rendered Markdown — rich analyst report with:
+  - **Bold section headers** (Overall Performance, Key Observations, Trend Analysis, Business Context, Conclusion)
+  - **Markdown tables** with supporting data (at least 3 rows)
+  - Specific numbers, RM amounts, percentages, and period comparisons
+  - 300-500 words per insight — thorough but structured
 - Close button (✕) in top-right corner
 
 ### 4.5 Component Insight Dialog (Popup — From Analyze Icon Click)
@@ -348,6 +352,13 @@ Step 8: Update UI with results
 - If analysis exceeds 5 minutes, auto-cancel with message: "Analysis timed out. Please try again."
 - Same behavior as manual cancellation — full discard, lock release
 
+### 5.5 Known Limitation: Navigation During Analysis
+
+- **Problem:** If the user navigates away from the page while analysis is running, the SSE stream disconnects but the server continues processing. The global lock remains held until the analysis completes on the server.
+- **Effect:** When the user returns, clicking "Analyze" shows "Analysis is currently running by [User]. Please wait." The lock auto-releases when the server-side analysis finishes (typically 1-3 minutes).
+- **Mitigation:** Users are warned in the User Manual to stay on the page during analysis. The stale lock timeout (6 minutes) acts as a safety net.
+- **Future improvement:** Reconnect to in-progress analysis on page return (check lock status, poll for completion). Deferred — acceptable for current experiment scope.
+
 ---
 
 ## 6. Prompt Templates
@@ -379,7 +390,7 @@ Rules:
 You are analyzing the "Avg Collection Days" KPI.
 
 What it measures: The average number of days it takes to collect payment
-after invoicing. Also known as Days Sales Outstanding (DSO).
+after invoicing.
 
 Formula: For each month: (AR Outstanding at month-end ÷ Monthly Credit
 Sales) × Days in that month. The KPI shows the average across all valid
@@ -438,7 +449,7 @@ Provide a concise analysis of this metric.
 ```
 You are analyzing the "Avg Collection Days Trend" line chart.
 
-What it shows: Monthly collection days (DSO) plotted over time with a
+What it shows: Monthly collection days plotted over time with a
 dashed reference line at the period average.
 
 How to read it:
@@ -792,6 +803,8 @@ Provide a concise analysis.
 
 ### 6.6 Summary Prompt (Used in Step 5 — Same for All Sections)
 
+> **Architecture note:** The summary uses a delimiter-based output format (`===INSIGHT===` blocks) instead of JSON. This avoids the fragile problem of LLMs producing invalid JSON when embedding rich Markdown (tables with `|` pipes, bold with `**`, newlines) inside JSON string values. The orchestrator parses the delimiters reliably and falls back to JSON parsing for backward compatibility.
+
 ```
 You are a senior financial analyst producing a summary for a section
 of the Hoi-Yong Finance dashboard. You are speaking to a senior
@@ -800,38 +813,57 @@ director who may only read this summary and skip individual details.
 Below are the individual analyses for each component in this section.
 Review them all and produce a summary.
 
-Rules:
-- Output exactly this JSON structure (no other text):
+Output format — use this EXACT delimiter structure (no JSON, no code blocks):
 
-{
-  "good": [
-    {
-      "title": "One-line insight (max 80 chars)",
-      "metric": "Short metric area label (max 25 chars)",
-      "detail": "Detailed markdown explanation — see detail rules"
-    }
-  ],
-  "bad": [
-    {
-      "title": "One-line insight (max 80 chars)",
-      "metric": "Short metric area label (max 25 chars)",
-      "detail": "Detailed markdown explanation — see detail rules"
-    }
-  ]
-}
+===INSIGHT===
+sentiment: good
+title: Short punchy headline (max 50 chars)
+metric: Key number e.g. 84.3%, 43 days, RM 2.1M (max 25 chars)
+---DETAIL---
+Full markdown analysis here (see detail rules below)
+===END===
 
-- Maximum 3 good insights and 3 bad insights.
-- Rank by business impact — most important first.
-- Each title must be self-explanatory in one line.
-- The metric field identifies the dashboard area (e.g., "DSO",
-  "Collection Rate", "Aging", "Net Sales", "By Customer").
+Repeat ===INSIGHT=== ... ===END=== for each insight.
+Maximum 3 good + 3 bad insights.
+Rank by business impact — most important first.
+
+Title rules:
+- Maximum 50 characters. Punchy like a newspaper headline.
+- Examples: "Strong Collection Recovery", "Credit Note Spike"
+- No full sentences. No verbs like "is", "has", "shows".
+
+Metric rules:
+- Show the actual key number — e.g. "84.3%", "43 days", "RM 2.1M".
+- If no single number fits, use the dashboard metric label — e.g.
+  "Collection Days", "Aging", "By Customer".
 
 Detail rules:
-- Tell the COMPLETE STORY — a director reading only this summary
-  should understand the full situation without checking components.
-- Use bullet points for observations, Markdown tables for data.
-- Include specific numbers, percentages, and trend evidence.
-- Aim for 100-200 words per detail.
+- The detail is the FULL ANALYST REPORT (300-500 words).
+- Structure using bold section headers:
+
+**Overall Performance:** Summarize with actual numbers.
+
+**Key Observations:**
+
+| Metric | Value |
+|--------|-------|
+| Row 1  | Data  |
+| Row 2  | Data  |
+
+**Trend Analysis:** Direction with period comparisons.
+
+**Business Context:** Why this matters for operations.
+
+**Conclusion:** One sentence bottom-line assessment.
+
+- ALWAYS include a Markdown table with at least 3 rows.
+- Cross-reference multiple components when relevant.
+
+Terminology rules:
+- Use ONLY exact metric names from the dashboard (e.g. "Avg Collection
+  Days", "Collection Rate", "Net Sales").
+- Do NOT introduce jargon or acronyms not on the dashboard
+  (e.g. do NOT say "DSO", "AR turnover", "DPO").
 
 Quality rules:
 - Do not produce contradicting good and bad insights for the same
@@ -852,7 +884,7 @@ Generated: {current_datetime}
 ---
 
 Below are the completed analyses for each component in this section.
-Synthesize them into a high-level summary.
+Synthesize them into a summary.
 
 ### Component 1: {component_name_1} ({component_type})
 {ai_analysis_output_1}
@@ -860,53 +892,11 @@ Synthesize them into a high-level summary.
 ### Component 2: {component_name_2} ({component_type})
 {ai_analysis_output_2}
 
-### Component 3: {component_name_3} ({component_type})
-{ai_analysis_output_3}
-
 ... (all components in the section)
 
 ---
 
-Produce the JSON summary now.
-```
-
-**Example (Payment Collection Trend — 5 component results concatenated):**
-
-```
-Section: Payment Collection Trend
-Page: Payment
-Date Range: 2024-11-01 to 2025-10-31 (12 months)
-Generated: 2026-04-08 14:32
-
----
-
-Below are the completed analyses for each component in this section.
-Synthesize them into a high-level summary.
-
-### Component 1: Avg Collection Days (kpi)
-Current value is 44 days, placing it in the yellow/warning zone.
-While not critical, collection has slowed from 39 days in Sep to 44
-days in Oct — a 12.8% increase in a single month...
-
-### Component 2: Collection Rate (kpi)
-Collection rate at 84.7% is in the green/healthy zone. The business
-is converting invoices to cash at a strong rate...
-
-### Component 3: Avg Monthly Collection (kpi)
-Average monthly collection of RM 5,841,378 is stable. No significant
-deviation from the 12-month trend...
-
-### Component 4: Avg Collection Days Trend (chart)
-The trend shows fluctuation between 35-48 days over 12 months with
-no sustained improvement or deterioration...
-
-### Component 5: Invoiced vs Collected (chart)
-Collected (blue bars) have fallen below invoiced (red line) in 3 of
-the last 4 months, indicating growing receivables accumulation...
-
----
-
-Produce the JSON summary now.
+Produce the summary now using the ===INSIGHT=== delimiter format.
 ```
 
 ### 6.7 User Prompt Template (Dynamic — Same Structure for All Components)
