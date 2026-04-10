@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/dialog';
 import { COMPONENT_INFO } from '@/lib/ai-insight/component-info';
 import { MarkdownRenderer } from './MarkdownRenderer';
-import { Loader2 } from 'lucide-react';
+import { BookOpen, BrainCircuit, Loader2 } from 'lucide-react';
 import type { SectionKey } from '@/lib/ai-insight/types';
 
 interface ComponentInsightDialogProps {
@@ -56,67 +56,66 @@ export function ComponentInsightDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-[90vw] h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>About: {info?.name || componentKey}</DialogTitle>
+      <DialogContent className="sm:max-w-[60vw] max-h-[90vh] flex flex-col p-0 gap-0">
+        {/* Header — sticky branded blue bar */}
+        <DialogHeader className="bg-[#1F4E79] px-6 py-4 rounded-t-xl shrink-0">
+          <DialogTitle className="text-white text-base font-semibold">
+            {info?.name || componentKey}
+          </DialogTitle>
         </DialogHeader>
 
-        {/* Static info section */}
-        {info && (
-          <div className="space-y-3 text-sm text-foreground">
-            <div>
-              <p className="font-semibold mb-1">What it measures:</p>
-              <p>{info.whatItMeasures}</p>
+        {/* Scrollable content */}
+        <div className="overflow-y-auto flex-1 min-h-0 px-6 py-5 space-y-5">
+          {/* About section — card with icon */}
+          {info?.about && (
+            <div className="rounded-lg border bg-muted/30 p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <BookOpen className="h-4 w-4 text-[#1F4E79]" />
+                <p className="text-sm font-semibold text-[#1F4E79]">About</p>
+              </div>
+              <div className="text-sm text-foreground leading-[1.5] space-y-0">
+                {info.about.split('\n\n').map((block, i) => (
+                  <p key={i} className="whitespace-pre-line my-0 first:mt-0 [&:not(:first-child)]:mt-3">
+                    {block}
+                  </p>
+                ))}
+              </div>
             </div>
-            {info.formula && (
-              <div>
-                <p className="font-semibold mb-1">Formula:</p>
-                <p>{info.formula}</p>
+          )}
+
+          {/* AI analysis section */}
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <BrainCircuit className="h-4 w-4 text-[#1F4E79]" />
+              <p className="text-sm font-semibold text-[#1F4E79]">AI Analysis</p>
+            </div>
+            {loading && (
+              <div className="flex items-center gap-2 py-4 text-foreground/60">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="text-sm">Loading analysis...</span>
               </div>
             )}
-            {info.indicator && (
-              <div>
-                <p className="font-semibold mb-1">Indicator:</p>
-                <p className="whitespace-pre-line">{info.indicator}</p>
-              </div>
+            {!loading && componentData?.analysis_md && (
+              <MarkdownRenderer content={componentData.analysis_md} />
+            )}
+            {!loading && !componentData && (
+              <p className="text-sm text-foreground/60 py-2">
+                No analysis available. Run &quot;Analyze&quot; from the section panel.
+              </p>
             )}
           </div>
-        )}
-
-        {/* Divider */}
-        <hr className="border-foreground/10" />
-
-        {/* AI analysis section */}
-        <div>
-          <p className="font-semibold text-sm mb-2 text-foreground">Analysis:</p>
-          {loading && (
-            <div className="flex items-center gap-2 py-4 text-foreground/60">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span className="text-sm">Loading analysis...</span>
-            </div>
-          )}
-          {!loading && componentData?.analysis_md && (
-            <MarkdownRenderer content={componentData.analysis_md} />
-          )}
-          {!loading && !componentData && (
-            <p className="text-sm text-foreground/60 py-2">
-              No analysis available. Run &quot;Analyze&quot; from the section panel.
-            </p>
-          )}
         </div>
 
-        {/* Footer metadata */}
+        {/* Footer metadata — sticky at bottom */}
         {componentData && (
-          <DialogFooter>
-            <div className="flex gap-4 text-xs text-foreground/50 w-full">
-              {componentData.generated_at && (
-                <span>Last Updated: {new Date(componentData.generated_at).toLocaleString()}</span>
-              )}
-              {componentData.generated_by && (
-                <span>By: {componentData.generated_by}</span>
-              )}
-            </div>
-          </DialogFooter>
+          <div className="border-t bg-background px-6 py-3 flex gap-4 text-xs text-foreground/50 shrink-0">
+            {componentData.generated_at && (
+              <span>Last Updated: {new Date(componentData.generated_at).toLocaleString()}</span>
+            )}
+            {componentData.generated_by && (
+              <span>By: {componentData.generated_by}</span>
+            )}
+          </div>
         )}
       </DialogContent>
     </Dialog>

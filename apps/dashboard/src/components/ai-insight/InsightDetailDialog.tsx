@@ -25,22 +25,23 @@ export function InsightDetailDialog({
 }: InsightDetailDialogProps) {
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-[90vw] h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <div
-            className={`-mx-4 -mt-4 px-4 py-3 rounded-t-xl ${
-              sentiment === 'good'
-                ? 'bg-green-600 text-white'
-                : 'bg-red-600 text-white'
-            }`}
-          >
-            <DialogTitle className="text-white text-base font-semibold">
-              {sentiment === 'good' ? '👍 ' : '👎 '}
-              {title}
-            </DialogTitle>
-          </div>
+      <DialogContent className="sm:max-w-[60vw] max-h-[90vh] flex flex-col p-0 gap-0">
+        {/* Header — sticky colored banner */}
+        <DialogHeader
+          className={`px-6 py-4 rounded-t-xl shrink-0 ${
+            sentiment === 'good'
+              ? 'bg-green-600'
+              : 'bg-red-600'
+          }`}
+        >
+          <DialogTitle className="text-white text-base font-semibold">
+            {sentiment === 'good' ? '👍 ' : '👎 '}
+            {title}
+          </DialogTitle>
         </DialogHeader>
-        <div className="mt-2">
+
+        {/* Scrollable content */}
+        <div className="overflow-y-auto flex-1 min-h-0 px-6 py-5">
           <MarkdownRenderer content={detail} />
         </div>
       </DialogContent>

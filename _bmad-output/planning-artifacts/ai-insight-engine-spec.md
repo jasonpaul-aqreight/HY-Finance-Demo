@@ -107,6 +107,7 @@ The Sales page currently has no section headers. Two section headers will be add
 | Tool use | Yes — custom tool definitions for read-only data exploration |
 | Agentic pattern | Multi-step reasoning loop: send → tool_use → execute → tool_result → repeat until done |
 | Max tool calls per component | 3 (then one final call without tools) |
+| Max tool calls per summary | 2 (scoped drill-down only — see Section 6.6) |
 | Max concurrency | 2 parallel component analyses |
 
 > **Why `@anthropic-ai/sdk` and not `@anthropic-ai/claude-agent-sdk`?**
@@ -143,7 +144,7 @@ Each section has a header bar that doubles as the AI Insight Panel toggle.
 │     Click "Analyze" to generate AI insights.            │
 │                                                         │
 ├─────────────────────────────────────────────────────────┤
-│  Analysis Time: -    Token Used: -    Analysis Cost: -  │
+│  Analysis Time: -    Token Used: -    Est. Cost: -  │
 │  Last Updated: -                      By whom: -        │
 │                                              [Analyze]  │
 └─────────────────────────────────────────────────────────┘
@@ -162,7 +163,7 @@ Each section has a header bar that doubles as the AI Insight Panel toggle.
 │  Analyzing Invoiced vs Collected chart...               │
 │                                                         │
 ├─────────────────────────────────────────────────────────┤
-│  Analysis Time: -    Token Used: -    Analysis Cost: -  │
+│  Analysis Time: -    Token Used: -    Est. Cost: -  │
 │  Last Updated: -                      By whom: -        │
 │                                               [Cancel]  │
 └─────────────────────────────────────────────────────────┘
@@ -187,7 +188,7 @@ Each section has a header bar that doubles as the AI Insight Panel toggle.
 │                              │                                     │
 ├──────────────────────────────┴──────────────────────────────────────┤
 │  Analyzed: Nov 2024 – Oct 2025 (12 months)                         │
-│  Analysis Time: 68s   Tokens: 23,494   Cost: $0.03                │
+│  Analysis Time: 68s   Tokens: 23,494   Est. Cost: $0.03           │
 │  Last Updated: 2026-04-08 14:32      By: Jason          [Analyze] │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -213,7 +214,7 @@ Each section has a header bar that doubles as the AI Insight Panel toggle.
 
 ### 4.3 Individual Component Analyze Icon
 
-Every KPI card, chart, and table has a small analyze icon (🔍📊) in its header area.
+Every KPI card, chart, and table has a single analyze icon (🔍) in its header area. There is no separate help/question-mark icon — the About explanation and AI analysis are combined in one dialog.
 
 ```
   Avg Collection Days 🔍
@@ -223,6 +224,7 @@ Every KPI card, chart, and table has a small analyze icon (🔍📊) in its head
 - Clicking the icon opens the **Component Insight Dialog** (Section 4.5)
 - The icon is always visible but the dialog content depends on whether analysis has been run
 - Does **NOT** trigger a new API call — it shows stored results from the last section-level analysis
+- The dialog replaces the need for a separate tooltip — it serves as both quick-reference manual and AI analysis viewer
 
 ### 4.4 Insight Detail Dialog (Popup — From AI Panel Click)
 
@@ -249,10 +251,12 @@ Opened when clicking a good/bad insight line in the AI Panel.
 └─────────────────────────────────────────────────────┘
 ```
 
-- **Dialog size: 90vw × 90vh** (matches Customer Profile dialog for consistency — end users are older executives who need large, readable content)
-- Header bar is color-coded: red for bad, green for good (with emoji: 👍 / 👎)
-- Body is rendered Markdown — rich analyst report with:
-  - **Bold section headers** (Overall Performance, Key Observations, Trend Analysis, Business Context, Conclusion)
+- **Dialog size: 60vw max, auto-height up to 90vh** — narrower and content-fitted for readability
+- **Header bar:** color-coded full-width banner — green (`bg-green-600`) for good, red (`bg-red-600`) for bad — with white text and sentiment emoji
+- **Sticky header & footer:** header and footer remain fixed while content scrolls
+- Body is rendered Markdown via `MarkdownRenderer` with typography optimised for senior directors:
+  - **Underlined bold subtitles** (e.g., `**Overall Performance:**`) with large top spacing (`pt-6`) to create clear visual blocks
+  - **Tight line spacing within blocks** (`my-0` on paragraphs, `leading-[1.7]`) — lines within a section are close together
   - **Markdown tables** with supporting data (at least 3 rows)
   - Specific numbers, RM amounts, percentages, and period comparisons
   - 300-500 words per insight — thorough but structured
@@ -260,26 +264,22 @@ Opened when clicking a good/bad insight line in the AI Panel.
 
 ### 4.5 Component Insight Dialog (Popup — From Analyze Icon Click)
 
-Opened when clicking the 🔍 icon on any KPI, chart, or table.
+Opened when clicking the 🔍 icon on any KPI, chart, or table. This dialog combines the manual-style explanation (replacing the old `?` tooltip) with the AI analysis in one place.
 
 ```
 ┌─────────────────────────────────────────────────────┐
 │  About: Avg Collection Days                      ✕  │
 ├─────────────────────────────────────────────────────┤
 │                                                     │
-│  **What it measures:**                              │
-│  How many days on average it takes to collect       │
-│  payment after invoicing.                           │
+│  Average Collection Days measures how many days,    │
+│  on average, it takes to collect payment after      │
+│  making a sale. It's a cash flow efficiency metric. │
 │                                                     │
-│  **Formula:**                                       │
-│  (AR Outstanding at month-end ÷ Monthly Credit      │
-│  Sales) × Days in that month. KPI shows the average │
-│  across all valid months.                           │
+│  Collection Days = (Accounts Receivable / Total     │
+│  Invoice Sales) × Number of Days                    │
 │                                                     │
-│  **Indicator:**                                     │
-│  ≤30 days = Good (green)                            │
-│  ≤60 days = Warning (yellow)                        │
-│  >60 days = Critical (red)                          │
+│  ≤30 days = Good · ≤60 days = Warning               │
+│  >60 days = Critical                                │
 │                                                     │
 │  ─────────────────────────────────────────────────  │
 │                                                     │
@@ -292,11 +292,13 @@ Opened when clicking the 🔍 icon on any KPI, chart, or table.
 └─────────────────────────────────────────────────────┘
 ```
 
-- **Dialog size: 90vw × 90vh** (matches Customer Profile dialog and Insight Detail Dialog for consistency)
-- Top section: static content hardcoded from PRD (what it is, formula, good/bad indicator)
-- Bottom section: AI-generated analysis from the last section-level "Analyze" run
+- **Dialog size: 60vw max, auto-height up to 90vh** — narrower and content-fitted for readability. Short components (e.g., Cash Sales) get a compact dialog; long analyses scroll naturally.
+- **Sticky header & footer:** Blue branded header (`bg-[#1F4E79]`) with component name stays fixed at top. Metadata footer with border-top stays fixed at bottom. Only the middle content scrolls.
+- **About section (top):** Displayed in a bordered card (`bg-muted/30`) with a BookOpen icon and "About" label. Contains concise, manual-style plain-language explanation stored in `component-info.ts` as an `about` field. Written for end users (senior directors) — includes what the metric means, formula (where applicable), and thresholds. This replaces both the old `?` tooltip and the structured `whatItMeasures`/`formula`/`indicator` breakdown. The content mirrors what would otherwise be in the user manual, so the manual pages for these metrics can link here instead of duplicating the explanation.
+- **AI Analysis section (bottom):** Labelled with a BrainCircuit icon and "AI Analysis" heading. AI-generated analysis from the last section-level "Analyze" run, rendered via `MarkdownRenderer` with the same typography rules as the Insight Detail Dialog (underlined subtitles, tight blocks, spaced sections).
 - If analysis has never been run: bottom section shows "No analysis available. Run 'Analyze' from the section panel."
 - Metadata footer shows the same last-updated info as the AI Panel
+- **Implementation note:** The `about` field is separate from `whatItMeasures`/`formula`/`indicator` which are still used in AI system prompts. The About section is for human readers; the structured fields are for the AI prompt context.
 
 ---
 
@@ -316,21 +318,29 @@ Step 2: Fetch current dashboard data for this section
         → Call the same API endpoints the dashboard uses
         → This becomes the "user prompt" data
 
-Step 3: Run parallel component analyses (all at once)
+Step 3: Run parallel component analyses (concurrency pool)
         → For each component in the section:
            • Build system prompt (hardcoded from PRD)
            • Build user prompt (dynamic data from Step 2)
            • Call Claude Haiku with tool access
            • Stream progress logs to the panel
-        → Run with concurrency pool (max 3-4 parallel calls)
+        → Run with concurrency pool (max 2 parallel calls, configurable)
         → Remaining calls queued until a slot opens
+        → Why 2: higher concurrency triggers Anthropic API rate limits,
+          causing retries that make total time worse. Tested with 3-4
+          during experiment — 2 was the most reliable.
 
 Step 4: Collect all component results
 
-Step 5: Run summary analysis
-        → System prompt: summarize instructions + thresholds
+Step 5: Run summary analysis (with scoped tool access)
+        → System prompt: summarize instructions + root-cause drill-down
         → User prompt: all component results concatenated
-        → Output: max 3 good + max 3 bad, each one-line + detail
+        → Tools: same tools as component analysis (query_local_table,
+          query_rds_table) — max 2 tool calls total
+        → The summary AI identifies gaps in component analyses where
+          the "why" is missing, then drills down to find root causes
+        → Output: max 3 good + max 3 bad, each with evidence-backed
+          root-cause analysis where applicable
 
 Step 6: Store everything in DB (see Section 8)
 
@@ -552,7 +562,12 @@ Evaluate:
 - Whether the overdue amount is concentrated in a few large customers
   or spread across many
 
-Provide a concise analysis of this metric.
+Root-cause investigation:
+If overdue amount is >30% of total outstanding, use tools to identify
+the top overdue customers — query pc_ar_customer_snapshot for the
+largest overdue_amount values. Report customer names and amounts.
+
+Provide a concise analysis of this metric with evidence.
 ```
 
 #### Credit Limit Breaches (KPI)
@@ -718,8 +733,15 @@ Performance thresholds:
 
 Gross sales = Invoice Sales + Cash Sales (before credit notes).
 
-Provide a concise analysis. If credit notes are high, suggest
-potential causes (product quality, order accuracy, customer disputes).
+Root-cause investigation (IMPORTANT):
+If credit notes spike in any month (>2x the period average), use tools
+to find out WHY:
+1. Query dbo.CN for that month (filter by DocDate and Cancelled='F')
+   to identify which customers and what descriptions drove the spike.
+2. Report the actual breakdown — customer names, RM amounts, CN types.
+Do not guess "possible causes" — investigate and report facts.
+
+Provide a concise analysis with evidence-backed root causes.
 ```
 
 #### Net Sales Trend (Chart)
@@ -743,7 +765,13 @@ Performance thresholds for trend:
 Look for: seasonal spikes (e.g., festive periods), unusual credit note
 months, the ratio of cash vs invoice changing over time.
 
-Provide a concise analysis of the sales trend pattern.
+Root-cause investigation:
+If any month shows a significant anomaly (spike or drop >20% from
+average), use tools to investigate what drove it — e.g., query
+pc_sales_daily for that month's breakdown, or dbo.IV/dbo.CN for
+specific transaction patterns.
+
+Provide a concise analysis of the sales trend pattern with evidence.
 ```
 
 ### 6.5 Sales Section 4 (Sales Breakdown): Component System Prompts
@@ -834,6 +862,8 @@ Provide a concise analysis.
 
 > **Architecture note:** The summary uses a delimiter-based output format (`===INSIGHT===` blocks) instead of JSON. This avoids the fragile problem of LLMs producing invalid JSON when embedding rich Markdown (tables with `|` pipes, bold with `**`, newlines) inside JSON string values. The orchestrator parses the delimiters reliably and falls back to JSON parsing for backward compatibility.
 
+> **Root-cause drill-down (added 2026-04-09):** The summary now has tool access (max 2 calls) to investigate the "why" behind anomalies that component analyses identified but didn't explain. Directors need actionable root causes, not just descriptions of what happened. For example, "Credit Notes spiked in Feb" becomes "Feb CN spike was driven by 12 returns from MY HERO (RM 52K — Chinese oranges, quality returns)." The summary's data source authority rules match the component rules (Section 6.1) — tools are for drill-down only, not for re-deriving totals.
+
 ```
 You are a senior financial analyst producing a summary for a section
 of the Hoi-Yong Finance dashboard. You are speaking to a senior
@@ -842,7 +872,32 @@ director who may only read this summary and skip individual details.
 Below are the individual analyses for each component in this section.
 Review them all and produce a summary.
 
-Output format — use this EXACT delimiter structure (no JSON, no code blocks):
+IMPORTANT — Root-cause drill-down:
+- For each NEGATIVE insight, ask yourself: "Does the component analysis
+  explain WHY this happened?" If the answer is no — use the available
+  tools to investigate.
+- Examples of drill-down questions:
+  • Credit notes spiked in month X → query dbo.CN for that month to
+    find which customers and products drove the spike
+  • Collection days worsened → query pc_ar_monthly to find which months
+    drove the increase, then dbo.ARInvoice for overdue patterns
+  • A customer dominates revenue → query their credit note ratio and
+    payment history to assess risk
+- Maximum 2 tool calls total. Use them on the highest-impact negative
+  insights only.
+- When reporting drill-down findings, cite the specific data: customer
+  names, product names, RM amounts, counts.
+
+Data source authority (same rules as component analysis):
+- The component analyses below contain the AUTHORITATIVE figures. Do
+  not re-derive totals via tools.
+- Use tools ONLY for investigating root causes — e.g., "which specific
+  customers or products explain this anomaly?"
+- If a tool returns a total that differs from the component analyses,
+  use the component analysis figures.
+
+Output format — use this EXACT delimiter structure (no JSON, no code
+blocks):
 
 ===INSIGHT===
 sentiment: good
@@ -881,12 +936,20 @@ Detail rules:
 
 **Trend Analysis:** Direction with period comparisons.
 
+**Root Cause** (for negative insights where tools were used):
+What specifically drove the anomaly — name customers, products,
+agents, or months with RM amounts. This is the "why" that the
+director needs to take action.
+
 **Business Context:** Why this matters for operations.
 
 **Conclusion:** One sentence bottom-line assessment.
 
 - ALWAYS include a Markdown table with at least 3 rows.
 - Cross-reference multiple components when relevant.
+- For negative insights with drill-down data, the Root Cause section
+  should include a table showing the specific contributors (e.g.,
+  top 3 customers by credit note amount, top products returned).
 
 Terminology rules:
 - Use ONLY exact metric names from the dashboard (e.g. "Avg Collection
@@ -1033,12 +1096,14 @@ INSERT INTO ai_insight_lock (id) VALUES (1);
 
 ## 8. Storage Schema
 
+> **Multi-dashboard ready:** The schema is designed to support AI Insight across multiple dashboards (Finance Sales, Finance Payment, HR, etc.) without schema changes. The `page` column in `ai_insight_section` acts as the namespace — adding a new dashboard (e.g., HR Leave Tracker) only requires inserting rows with a new `page` value (e.g., `'hr_leave'`). No migrations, no new tables. The `ai_insight_lock` singleton works globally across all dashboards, and `ai_insight_component` inherits the dashboard scope via its FK to `ai_insight_section`. The PM should account for this when planning HR AI Insight — the storage layer is already designed for it.
+
 ### 8.1 Section-Level Insight (High-Level Summary)
 
 ```sql
 CREATE TABLE ai_insight_section (
   id              SERIAL PRIMARY KEY,
-  page            TEXT NOT NULL,           -- 'payment' | 'sales'
+  page            TEXT NOT NULL,           -- 'payment' | 'sales' (future: 'hr_leave', 'hr_attendance', etc.)
   section_key     TEXT NOT NULL,           -- 'payment_collection_trend' | 'payment_outstanding' | 'sales_trend' | 'sales_breakdown'
   summary_json    JSONB NOT NULL,          -- { good: [...], bad: [...] }
   analysis_time_s NUMERIC(6,1),            -- runtime in seconds
@@ -1199,6 +1264,122 @@ The `is_active` column distinguishes active (`'T'`) from inactive (`'F'`) custom
 - All GL/P&L tables (not relevant)
 - Any table not listed above
 
+### 9.4 Tool Safety Rules (Server-Side Enforcement)
+
+The following rules must be enforced **server-side in code**, not just in AI prompt instructions. LLMs can skip prompt instructions — server-side guards are the last line of defense.
+
+#### Rule 1: Cancelled Record Filter (RDS Queries)
+
+RDS tables with a `Cancelled` column (`dbo.IV`, `dbo.CS`, `dbo.CN`, `dbo.ARInvoice`, `dbo.ARPayment`) must have `Cancelled = 'F'` enforced server-side. If the AI's `where_clause` does not include this filter, the server must inject it automatically before executing the query. Without this, cancelled transactions inflate totals.
+
+> **Why server-side?** The experiment relies on the tool description telling the AI to include `Cancelled = 'F'`. This works most of the time, but LLMs occasionally omit filters — especially under high context load (many tool results in memory). A single missed filter on `dbo.ARInvoice` could include cancelled invoices worth millions of RM.
+
+#### Rule 2: SQL Injection Guard (where_clause / order_by)
+
+The AI generates `where_clause` and `order_by` as raw SQL strings. While the AI is not a malicious user, crafted data in the database (e.g., a customer name containing SQL syntax) could be echoed into a tool call. Production must add a guard that rejects queries containing dangerous patterns: semicolons (`;`), `UNION`, `DROP`, `DELETE`, `INSERT`, `UPDATE`, `--` (comment), or subqueries (`SELECT` inside a WHERE clause).
+
+#### Rule 3: Row Truncation Warning
+
+When a tool query returns exactly the row limit (100 rows), the result message must include a truncation warning: `"100 row(s) returned (LIMIT reached — results may be incomplete. Do not sum these rows as a total.)"`. Without this, the AI may treat 100 rows as the complete dataset and derive incorrect totals.
+
+#### Rule 4: Data Population Labels
+
+Each data-fetcher must include a population label in its output header, describing which records are included. Examples:
+
+- `"Population: active customers only (is_active = 'T')"`
+- `"Population: all customers with outstanding balance > 0 (active + inactive)"`
+- `"Population: active customers + NULL status"`
+
+This prevents the AI from cross-referencing numbers between components that use different populations (e.g., 21 credit breaches from active-only vs total outstanding from all customers) and getting confused by the mismatch.
+
+#### Rule 5: Customer Count Accuracy
+
+Fetchers that report customer counts from daily pre-aggregated tables must use `COUNT(DISTINCT ...)` or a verified unique count — not `SUM(customer_count)` across daily rows, which inflates counts (the same customer appearing on multiple days gets counted multiple times). This applies to any fetcher that joins or aggregates daily `pc_*` tables.
+
+### 9.5 Tool Verification Protocol
+
+Every data-fetcher and tool query must have a companion **truth query** that independently verifies the fetcher's output. This protocol is the standard QA gate for tool accuracy — it must pass before any new page/section goes live.
+
+#### Purpose
+
+The AI Insight Engine's accuracy depends on the data-fetcher giving the AI correct numbers. If the fetcher has a bug (wrong filter, wrong aggregation, wrong date format), the AI will confidently report wrong numbers. The verification protocol catches these bugs before they reach users.
+
+#### How It Works
+
+For each component's data-fetcher:
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  VERIFICATION TEST                                               │
+│                                                                  │
+│  1. Run the data-fetcher function for this component             │
+│     → Extract key metric values from its output                  │
+│                                                                  │
+│  2. Run the truth query (simple, direct SQL)                     │
+│     → Same metric, computed independently with explicit filters  │
+│                                                                  │
+│  3. Compare: fetcher value vs truth value                        │
+│     → PASS if they match (within RM 1 rounding tolerance)        │
+│     → FAIL if they differ — the fetcher has a bug                │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+#### Truth Query Requirements
+
+- **Independent:** Must not call the data-fetcher or reuse its SQL. Write the query from scratch based on what the metric *should* return.
+- **Explicit:** All filters (date range, `is_active`, `snapshot_date`, `CASH SALES%` exclusion) must be written out explicitly — no reliance on defaults or helpers.
+- **Simple:** One query, one metric. No complex joins or CTEs unless the metric genuinely requires them.
+- **Documented:** Each truth query must include a comment explaining what it verifies and which dashboard value it should match.
+
+#### Example: credit_limit_breaches
+
+```sql
+-- Truth query: Count of active customers whose outstanding exceeds credit limit
+-- Should match: Credit Limit Breaches KPI card on Payment page
+-- Data-fetcher: credit_limit_breaches in data-fetcher.ts
+SELECT COUNT(*) AS breach_count
+FROM pc_ar_customer_snapshot
+WHERE snapshot_date = (SELECT MAX(snapshot_date) FROM pc_ar_customer_snapshot)
+  AND is_active = 'T'
+  AND credit_limit > 0
+  AND total_outstanding > credit_limit
+  AND company_name NOT ILIKE 'CASH SALES%';
+-- Expected: must match the fetcher's reported breach count exactly
+```
+
+#### Verification Matrix (Per Section)
+
+Each section must have a completed verification matrix before going live:
+
+| Component | Key Metric | Fetcher Value | Truth Query Value | Dashboard Value | Status |
+|-----------|-----------|---------------|-------------------|-----------------|--------|
+| avg_collection_days | Days value | ___ | ___ | ___ | PASS/FAIL |
+| collection_rate | Percentage | ___ | ___ | ___ | PASS/FAIL |
+| credit_limit_breaches | Count | ___ | ___ | ___ | PASS/FAIL |
+| ... | ... | ... | ... | ... | ... |
+
+**Three-way match required:** The fetcher value, truth query value, and dashboard displayed value must all agree. If only two match, the third has a bug.
+
+#### When to Run
+
+| Trigger | Scope |
+|---------|-------|
+| New page/section added | All components in the new section |
+| Data-fetcher query modified | The modified component + any component sharing the same table |
+| `is_active` or population filter changed | All components in that section |
+| Pre-computed table schema changed | All components using that table |
+| Before production deployment | All sections (full matrix) |
+| Adding AI Insight to a new dashboard (e.g., HR) | All new components — no exceptions |
+
+#### Pass Criteria
+
+- All key metrics match within RM 1 rounding tolerance
+- Customer/invoice counts match exactly (no rounding tolerance)
+- Percentage values match within 0.1%
+- All components in the section must PASS — a single FAIL blocks deployment
+
+> **Lesson learned (2026-04-09):** The `credit_limit_breaches` fetcher reported 23 breaches while the dashboard showed 21. Root cause: missing `is_active = 'T'` filter. A truth query would have caught this immediately — the three-way match (fetcher vs truth vs dashboard) would have shown the fetcher as the outlier.
+
 ---
 
 ## 10. API Design
@@ -1266,6 +1447,8 @@ data: {"section_id": 42, "analysis_time_s": 12.3, "token_count": 3421, "cost_usd
 
 Both roles have identical permissions for the AI Insight Engine.
 
+> **Implementation note:** "Own runs only" means the cancel endpoint must verify that `locked_by` matches the requesting user before aborting. The experiment prototype skips this check (single-user environment). Production must enforce it — otherwise one user can silently kill another user's in-progress analysis.
+
 ---
 
 ## 12. Error Handling
@@ -1285,7 +1468,7 @@ Both roles have identical permissions for the AI Insight Engine.
 
 ### Tech Stack Alignment
 
-- **Frontend:** Next.js App Router + React — SSE via `EventSource` API
+- **Frontend:** Next.js App Router + React — SSE via `fetch()` + `ReadableStream` (not `EventSource`, which only supports GET; the analyze endpoint is POST)
 - **Backend:** Next.js API Routes — SSE response with `ReadableStream`
 - **AI SDK:** `@anthropic-ai/sdk` with custom tool definitions (agentic tool-use loop)
 - **Database:** PostgreSQL (existing) — 3 new tables (lock, section, component)
@@ -1339,6 +1522,8 @@ Both headers follow the same collapsible pattern as the Payment page sections, w
 | **Total (all 4 sections)** | **24 calls** | **~136,000** | **~$0.17** | ~155,591 tokens, ~$0.18 |
 
 **Note:** Actual costs depend on tool call depth and data volume. The source authority prompt rule ("use pre-fetched data, don't re-derive totals") reduced tool call frequency significantly — the 2026-04-09 Payment Collection Trend run used 33% fewer tokens and was 3.5x faster compared to the pre-optimization run (36,090 tokens, $0.04, 223s). The `cost_usd` field in the metadata tracks actual spend per run. All observed costs are well under the $0.50/section cap.
+
+**Cost estimation method:** The Anthropic API returns actual token counts (`usage.input_tokens`, `usage.output_tokens`) per request but does **not** return a dollar cost. The `cost_usd` displayed in the UI is calculated client-side by multiplying actual token counts against a hardcoded pricing table (per-model rates in `client.ts`). The UI label reads **"Est. Cost"** to reflect this. The pricing table must be updated when switching models or when Anthropic changes pricing — otherwise the displayed cost will drift from actual billing.
 
 ## Appendix C: AI Insight Accuracy Verification Procedure
 
