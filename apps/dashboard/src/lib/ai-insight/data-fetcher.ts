@@ -117,7 +117,8 @@ const fetchers: Record<string, DataFetcher> = {
       const gap = Number(r.collected) - Number(r.invoiced);
       table += `| ${r.month} | RM ${Number(r.invoiced).toLocaleString('en-MY')} | RM ${Number(r.collected).toLocaleString('en-MY')} | ${gap >= 0 ? '+' : ''}RM ${Number(gap).toLocaleString('en-MY')} |\n`;
     }
-    return `Data points:\n${table}\nAvg Monthly Collection: RM ${Math.round(avgCol).toLocaleString('en-MY')}`;
+    const gap = totalCol - totalInv;
+    return `Period totals:\nTotal Invoiced: RM ${totalInv.toLocaleString('en-MY', { minimumFractionDigits: 2 })}\nTotal Collected: RM ${totalCol.toLocaleString('en-MY', { minimumFractionDigits: 2 })}\nCumulative Gap: ${gap >= 0 ? '+' : ''}RM ${gap.toLocaleString('en-MY', { minimumFractionDigits: 2 })}\nAvg Monthly Collection: RM ${Math.round(avgCol).toLocaleString('en-MY')}\n\nMonthly breakdown:\n${table}`;
   },
 
   // Payment Section 2 (Snapshot — always uses latest snapshot_date)

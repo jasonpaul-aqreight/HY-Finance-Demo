@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { getAnthropicClient, AI_MODEL, MAX_TOKENS, estimateCost, LOG_PROMPTS } from './client';
+import { getAnthropicClient, AI_MODEL, SUMMARY_MODEL, MAX_TOKENS, estimateCost, LOG_PROMPTS } from './client';
 import {
   getComponentSystemPrompt,
   getSummarySystemPrompt,
@@ -24,9 +24,10 @@ import {
 import type { SectionKey, DateRange, ComponentResult, SummaryJson, SummaryInsight, ComponentType } from './types';
 
 const MAX_CONCURRENCY = 2; // Keep low to avoid rate limits on lower-tier API plans
-const MAX_TOOL_CALLS_PER_COMPONENT = 3;
+const MAX_TOOL_CALLS_PER_SUMMARY = 2; // Summary can drill down for root causes
 const MAX_COST_PER_SECTION = 0.50;
 const MAX_RUNTIME_MS = 5 * 60 * 1000; // 5 minutes
+const SUMMARY_MAX_TOKENS = 4096; // Summary needs more tokens for tool reasoning + formatted output
 const RATE_LIMIT_RETRIES = 3;
 const RATE_LIMIT_BASE_DELAY_MS = 15_000; // 15s base backoff for rate limits
 
@@ -123,7 +124,7 @@ export async function runSectionAnalysis(
     onProgress('summary', 'analyzing');
     const summary = await runSummaryAnalysis(sectionKey, dateRange, componentResults, abortSignal, logFile);
     totalTokens += summary.tokenCount;
-    totalCost += estimateCost(summary.inputTokens, summary.outputTokens);
+    totalCost += estimateCost(summary.inputTokens, summary.outputTokens, SUMMARY_MODEL);
     onProgress('summary', 'complete');
 
     logSessionEnd(logFile, totalTokens, totalCost, componentResults.length);
@@ -187,10 +188,6 @@ async function analyzeComponent(
     formattedValues,
   });
 
-  const messages: Anthropic.MessageParam[] = [
-    { role: 'user', content: userPrompt },
-  ];
-
   if (LOG_PROMPTS) {
     console.log(`\n${'═'.repeat(80)}`);
     console.log(`📊 COMPONENT: ${componentName} (${componentKey})`);
@@ -203,23 +200,104 @@ async function analyzeComponent(
 
   logComponentStart(logFile, componentKey, componentName, systemPrompt, userPrompt);
 
+  if (abortSignal.aborted) throw new Error('Analysis aborted');
+
+  // Single LLM call — no tools. Components narrate/interpret the pre-fetched data.
+  const response = await callWithRetry(
+    () => client.messages.create({
+      model: AI_MODEL,
+      max_tokens: MAX_TOKENS,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userPrompt }],
+    }),
+    abortSignal,
+  );
+
+  const inputTokens = response.usage?.input_tokens ?? 0;
+  const outputTokens = response.usage?.output_tokens ?? 0;
+
+  logApiResponse(logFile, 1, response);
+
+  const textBlock = response.content.find(
+    (b): b is Anthropic.TextBlock => b.type === 'text',
+  );
+  const analysis = textBlock?.text ?? 'No analysis generated.';
+  logComponentEnd(logFile, componentKey, analysis, inputTokens, outputTokens, 0);
+
+  return {
+    component_key: componentKey,
+    component_type: componentType,
+    analysis_md: analysis,
+    token_count: inputTokens + outputTokens,
+    input_tokens: inputTokens,
+    output_tokens: outputTokens,
+  };
+}
+
+// ─── Summary analysis ────────────────────────────────────────────────────────
+
+async function runSummaryAnalysis(
+  sectionKey: SectionKey,
+  dateRange: DateRange | null,
+  componentResults: ComponentResult[],
+  abortSignal: AbortSignal,
+  logFile: string | null,
+): Promise<{ json: SummaryJson; tokenCount: number; inputTokens: number; outputTokens: number }> {
+  if (abortSignal.aborted) throw new Error('Analysis aborted');
+
+  const client = getAnthropicClient();
+  const components = SECTION_COMPONENTS[sectionKey];
+
+  const systemPrompt = getSummarySystemPrompt();
+  const userPrompt = buildSummaryUserPrompt({
+    sectionKey,
+    dateRange,
+    componentResults: componentResults.map(cr => {
+      const compDef = components.find(c => c.key === cr.component_key);
+      return {
+        name: compDef?.name ?? cr.component_key,
+        type: compDef?.type ?? cr.component_type,
+        analysis: cr.analysis_md,
+      };
+    }),
+  });
+
+  if (LOG_PROMPTS) {
+    console.log(`\n${'═'.repeat(80)}`);
+    console.log(`📋 SUMMARY GENERATION: ${sectionKey}`);
+    console.log(`${'─'.repeat(80)}`);
+    console.log(`SYSTEM PROMPT:\n${systemPrompt}`);
+    console.log(`${'─'.repeat(80)}`);
+    console.log(`USER PROMPT:\n${userPrompt}`);
+    console.log(`${'═'.repeat(80)}\n`);
+  }
+
+  logSummaryStart(logFile, sectionKey, systemPrompt, userPrompt, SUMMARY_MODEL);
+
+  const messages: Anthropic.MessageParam[] = [
+    { role: 'user', content: userPrompt },
+  ];
+
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
   let toolCallCount = 0;
   let turnNumber = 0;
 
-  // Agent loop: handle tool calls
+  // Agent loop: summary can use tools to drill down for root causes
   while (true) {
     if (abortSignal.aborted) throw new Error('Analysis aborted');
 
     turnNumber++;
 
+    const isLastTurn = toolCallCount >= MAX_TOOL_CALLS_PER_SUMMARY;
+
     const response = await callWithRetry(
       () => client.messages.create({
-        model: AI_MODEL,
-        max_tokens: MAX_TOKENS,
+        model: SUMMARY_MODEL,
+        max_tokens: SUMMARY_MAX_TOKENS,
         system: systemPrompt,
-        tools: AI_TOOLS,
+        // Remove tools on final turn to force text output
+        ...(isLastTurn ? {} : { tools: AI_TOOLS }),
         messages,
       }),
       abortSignal,
@@ -230,20 +308,22 @@ async function analyzeComponent(
 
     logApiResponse(logFile, turnNumber, response);
 
+    // If end_turn or no tool_use, extract text and return
     if (response.stop_reason === 'end_turn' || response.stop_reason !== 'tool_use') {
       const textBlock = response.content.find(
         (b): b is Anthropic.TextBlock => b.type === 'text',
       );
-      const analysis = textBlock?.text ?? 'No analysis generated.';
-      logComponentEnd(logFile, componentKey, analysis, totalInputTokens, totalOutputTokens, toolCallCount);
-      return {
-        component_key: componentKey,
-        component_type: componentType,
-        analysis_md: analysis,
-        token_count: totalInputTokens + totalOutputTokens,
-        input_tokens: totalInputTokens,
-        output_tokens: totalOutputTokens,
-      };
+
+      if (LOG_PROMPTS && textBlock) {
+        console.log(`\n${'─'.repeat(80)}`);
+        console.log(`📋 SUMMARY RESPONSE:\n${textBlock.text}`);
+        console.log(`${'─'.repeat(80)}\n`);
+      }
+
+      logSummaryResponse(logFile, response, textBlock?.text ?? '(no text block)');
+
+      const tokenCount = totalInputTokens + totalOutputTokens;
+      return parseSummaryResponse(textBlock, tokenCount, totalInputTokens, totalOutputTokens);
     }
 
     // Handle tool use
@@ -255,16 +335,17 @@ async function analyzeComponent(
       const textBlock = response.content.find(
         (b): b is Anthropic.TextBlock => b.type === 'text',
       );
-      const analysis = textBlock?.text ?? 'No analysis generated.';
-      logComponentEnd(logFile, componentKey, analysis, totalInputTokens, totalOutputTokens, toolCallCount);
-      return {
-        component_key: componentKey,
-        component_type: componentType,
-        analysis_md: analysis,
-        token_count: totalInputTokens + totalOutputTokens,
-        input_tokens: totalInputTokens,
-        output_tokens: totalOutputTokens,
-      };
+
+      if (LOG_PROMPTS && textBlock) {
+        console.log(`\n${'─'.repeat(80)}`);
+        console.log(`📋 SUMMARY RESPONSE:\n${textBlock.text}`);
+        console.log(`${'─'.repeat(80)}\n`);
+      }
+
+      logSummaryResponse(logFile, response, textBlock?.text ?? '(no text block)');
+
+      const tokenCount = totalInputTokens + totalOutputTokens;
+      return parseSummaryResponse(textBlock, tokenCount, totalInputTokens, totalOutputTokens);
     }
 
     // Add assistant message with tool use
@@ -288,109 +369,24 @@ async function analyzeComponent(
 
     messages.push({ role: 'user', content: toolResults });
 
-    // If max tool calls reached, make one final call without tools to get concluding analysis
-    if (toolCallCount >= MAX_TOOL_CALLS_PER_COMPONENT) {
-      if (abortSignal.aborted) throw new Error('Analysis aborted');
-
-      turnNumber++;
-
-      const finalResponse = await callWithRetry(
-        () => client.messages.create({
-          model: AI_MODEL,
-          max_tokens: MAX_TOKENS,
-          system: systemPrompt,
-          messages,
-        }),
-        abortSignal,
-      );
-
-      totalInputTokens += finalResponse.usage?.input_tokens ?? 0;
-      totalOutputTokens += finalResponse.usage?.output_tokens ?? 0;
-
-      logApiResponse(logFile, turnNumber, finalResponse);
-
-      const textBlock = finalResponse.content.find(
-        (b): b is Anthropic.TextBlock => b.type === 'text',
-      );
-      const analysis = textBlock?.text ?? 'No analysis generated.';
-      logComponentEnd(logFile, componentKey, analysis, totalInputTokens, totalOutputTokens, toolCallCount);
-      return {
-        component_key: componentKey,
-        component_type: componentType,
-        analysis_md: analysis,
-        token_count: totalInputTokens + totalOutputTokens,
-        input_tokens: totalInputTokens,
-        output_tokens: totalOutputTokens,
-      };
+    // If tool calls are now exhausted, add a nudge to produce final output
+    if (toolCallCount >= MAX_TOOL_CALLS_PER_SUMMARY) {
+      messages.push({
+        role: 'user',
+        content: 'You have used all available tool calls. Now produce your final summary using the ===INSIGHT=== delimiter format. Do not request more data — work with what you have.',
+      });
     }
   }
 }
 
-// ─── Summary analysis ────────────────────────────────────────────────────────
+// ─── Summary response parser ────────────────────────────────────────────────
 
-async function runSummaryAnalysis(
-  sectionKey: SectionKey,
-  dateRange: DateRange | null,
-  componentResults: ComponentResult[],
-  abortSignal: AbortSignal,
-  logFile: string | null,
-): Promise<{ json: SummaryJson; tokenCount: number; inputTokens: number; outputTokens: number }> {
-  if (abortSignal.aborted) throw new Error('Analysis aborted');
-
-  const client = getAnthropicClient();
-  const components = SECTION_COMPONENTS[sectionKey];
-
-  const userPrompt = buildSummaryUserPrompt({
-    sectionKey,
-    dateRange,
-    componentResults: componentResults.map(cr => {
-      const compDef = components.find(c => c.key === cr.component_key);
-      return {
-        name: compDef?.name ?? cr.component_key,
-        type: compDef?.type ?? cr.component_type,
-        analysis: cr.analysis_md,
-      };
-    }),
-  });
-
-  if (LOG_PROMPTS) {
-    console.log(`\n${'═'.repeat(80)}`);
-    console.log(`📋 SUMMARY GENERATION: ${sectionKey}`);
-    console.log(`${'─'.repeat(80)}`);
-    console.log(`SYSTEM PROMPT:\n${getSummarySystemPrompt()}`);
-    console.log(`${'─'.repeat(80)}`);
-    console.log(`USER PROMPT:\n${userPrompt}`);
-    console.log(`${'═'.repeat(80)}\n`);
-  }
-
-  logSummaryStart(logFile, sectionKey, getSummarySystemPrompt(), userPrompt);
-
-  const response = await callWithRetry(
-    () => client.messages.create({
-      model: AI_MODEL,
-      max_tokens: MAX_TOKENS,
-      system: getSummarySystemPrompt(),
-      messages: [{ role: 'user', content: userPrompt }],
-    }),
-    abortSignal,
-  );
-
-  const inputTokens = response.usage?.input_tokens ?? 0;
-  const outputTokens = response.usage?.output_tokens ?? 0;
-  const tokenCount = inputTokens + outputTokens;
-
-  const textBlock = response.content.find(
-    (b): b is Anthropic.TextBlock => b.type === 'text',
-  );
-
-  if (LOG_PROMPTS && textBlock) {
-    console.log(`\n${'─'.repeat(80)}`);
-    console.log(`📋 SUMMARY RESPONSE:\n${textBlock.text}`);
-    console.log(`${'─'.repeat(80)}\n`);
-  }
-
-  logSummaryResponse(logFile, response, textBlock?.text ?? '(no text block)');
-
+function parseSummaryResponse(
+  textBlock: Anthropic.TextBlock | undefined,
+  tokenCount: number,
+  inputTokens: number,
+  outputTokens: number,
+): { json: SummaryJson; tokenCount: number; inputTokens: number; outputTokens: number } {
   if (!textBlock) {
     return { json: { good: [], bad: [] }, tokenCount, inputTokens, outputTokens };
   }

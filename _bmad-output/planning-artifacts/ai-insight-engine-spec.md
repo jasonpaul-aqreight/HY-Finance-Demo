@@ -97,17 +97,19 @@ The Sales page currently has no section headers. Two section headers will be add
 | Setting | Value |
 |---------|-------|
 | SDK | `@anthropic-ai/sdk` (standard Anthropic SDK with tool use) |
-| Model | Configurable via `AI_INSIGHT_MODEL` env var (default: `claude-haiku-4-5-20251001`) |
+| Component model | Configurable via `AI_INSIGHT_MODEL` env var (default: `claude-haiku-4-5-20251001`) — used for narration-only component calls |
+| Summary model | Configurable via `AI_INSIGHT_SUMMARY_MODEL` env var (default: `claude-sonnet-4-6`) — used for summary synthesis + tool calls |
 | Prompt logging (terminal) | Configurable via `AI_INSIGHT_LOG_PROMPTS` env var (`true`/`false`, default: `false`) — prints all prompts to terminal |
 | Debug file logging | Configurable via `AI_INSIGHT_DEBUG_FILE` env var (`true`/`false`, default: `false`) — saves full back-and-forth messages (prompts, responses, tool calls, tool results) to timestamped log files in `apps/dashboard/logs/`. Each analysis run creates one file. Independent of terminal logging. |
 | Max runtime per section | 5 minutes |
 | Max cost per section | $0.50 USD |
-| Estimated cost per section | ~$0.03–0.07 (observed: $0.03 for 5-component section, $0.07 for 6-component section) |
+| Estimated cost per section | ~$0.06–0.10 (Haiku components + Sonnet summary; observed: $0.08 for 5-component section) |
 | Output format | Delimiter-based `===INSIGHT===` blocks (component: Markdown; summary: structured with bold headers + tables) |
 | Tool use | Yes — custom tool definitions for read-only data exploration |
-| Agentic pattern | Multi-step reasoning loop: send → tool_use → execute → tool_result → repeat until done |
-| Max tool calls per component | 3 (then one final call without tools) |
-| Max tool calls per summary | 2 (scoped drill-down only — see Section 6.6) |
+| Agentic pattern | Components: single LLM call (narration only). Summary: multi-step reasoning loop with tools for root-cause drill-down |
+| Max tool calls per component | 0 (components narrate pre-fetched data, no tools) |
+| Max tool calls per summary | 2 (scoped drill-down for root causes) |
+| Summary max tokens | 4096 (separate from component's 2048, needed for tool reasoning + formatted output) |
 | Max concurrency | 2 parallel component analyses |
 
 > **Why `@anthropic-ai/sdk` and not `@anthropic-ai/claude-agent-sdk`?**
@@ -1190,7 +1192,8 @@ This is implemented via a `toMonth(date)` helper in `data-fetcher.ts`. Sales fet
 5. **Read-only** — SELECT only, no INSERT/UPDATE/DELETE
 6. **No JOINs across RDS tables** — prevents accidental PII assembly
 7. **RDS queries must include** `Cancelled = 'F'` and date bounds
-8. **Max 3 tool calls per component analysis** — prevents cost explosion
+8. **Components have no tool access** — they narrate pre-fetched data only
+9. **Max 2 tool calls per summary analysis** — focused root-cause drill-down
 
 ### 9.2 Tier 1: Local `pc_*` Tables
 
@@ -1502,6 +1505,69 @@ Both headers follow the same collapsible pattern as the Payment page sections, w
 
 ---
 
+## 12. Implementation Patterns & Lessons (added 2026-04-10)
+
+> These patterns were discovered during spike implementation and validated through accuracy testing. They are **mandatory** for production — skipping any of them reintroduces bugs that were already caught and fixed.
+
+### 12.1 Dual-Model Architecture
+
+Components use a fast, cheap model (Haiku) for narration. Summary uses a smarter model (Sonnet) for synthesis + tool use. **Do not use the same model for both.**
+
+| Role | Model | Why |
+|------|-------|-----|
+| Component analysis | Haiku | Single LLM call, no tools. Narrates pre-fetched data. Haiku is sufficient and 4x cheaper. |
+| Summary analysis | Sonnet | Tool use + synthesis across 4-6 components. Haiku failed at: (a) arithmetic on 12-row tables, (b) following `===INSIGHT===` format after tool calls, (c) distinguishing "collection gap" from "outstanding balance". |
+| Summary analysis | Opus | **Overkill.** 5x more expensive than Sonnet for marginal quality gain. Reserve for future complex features (cross-section strategic analysis, chatbot). |
+
+**Production config:** Set `AI_INSIGHT_MODEL` (components) and `AI_INSIGHT_SUMMARY_MODEL` (summary) independently. The pricing table in `client.ts` must include entries for both models.
+
+### 12.2 Component Output Length Limit
+
+Component prompts include: *"Keep your analysis under 150 words."* This is critical because:
+- All component analyses are concatenated into the summary user prompt
+- Verbose components (200-400 words each × 5-6 components) overwhelm the summary context
+- Long components can contain contradictory derived numbers that confuse the summary model
+- Components should also NOT re-derive totals or sums — use the pre-fetched values as given
+
+### 12.3 Pre-Calculated Totals in Data Fetchers
+
+Data fetchers that pass monthly breakdowns **must also include pre-calculated totals** in the prompt output. Example: `invoiced_vs_collected` includes `Period totals: Total Invoiced: RM X, Total Collected: RM Y, Cumulative Gap: RM Z` above the monthly table.
+
+**Why:** Haiku summed 12 monthly values incorrectly (said RM 87.16M when actual was RM 82.76M). Pre-calculating prevents the AI from doing arithmetic.
+
+### 12.4 Tool Call Exhaustion Nudge
+
+When the summary uses all `MAX_TOOL_CALLS_PER_SUMMARY` calls, the orchestrator injects a user message:
+
+> *"You have used all available tool calls. Now produce your final summary using the ===INSIGHT=== delimiter format. Do not request more data — work with what you have."*
+
+**Why:** Without this nudge, the model outputs reasoning text ("Let me now check...") instead of the required `===INSIGHT===` format, causing the parser to fall back to a generic "Summary generated" output.
+
+### 12.5 Snapshot Table Deduplication
+
+The `pc_ar_customer_snapshot` table contains multiple rows per customer (one per snapshot date). Tool queries against this table are **automatically deduplicated** by the tool executor:
+- Filter to latest `snapshot_date`
+- Apply `DISTINCT ON (debtor_code)`
+
+**Why:** Without deduplication, a "top 10 customers" query returns 10 rows of the same 2 customers, making the summary's root-cause analysis useless.
+
+### 12.6 Summary Tool Call Guidance
+
+The summary prompt explicitly instructs:
+- **DO NOT** query `pc_ar_monthly` — that data is already in the component analyses
+- Use tools ONLY for data NOT in the components (e.g., `pc_ar_customer_snapshot` for customer drill-down, `dbo.CN` for credit note detail)
+- The column whitelist is injected into the summary system prompt with actual table/column names
+
+**Why:** Without this guidance, the summary wastes both tool calls re-querying monthly data already available from the components, then has no calls left for actual root-cause investigation.
+
+### 12.7 Cost Estimation with Dual Models
+
+The `estimateCost()` function accepts an optional `model` parameter. Summary cost is calculated using the summary model's pricing, not the component model's pricing. The pricing table in `client.ts` must be kept in sync with Anthropic's actual rates.
+
+**Why:** Sonnet is ~4x more expensive per token than Haiku. Without model-aware cost estimation, the displayed "Est. Cost" would underreport by ~60%.
+
+---
+
 ## Appendix A: Section Key Reference
 
 | Section Key | Page | Section Name | Date Filtered |
@@ -1513,17 +1579,21 @@ Both headers follow the same collapsible pattern as the Payment page sections, w
 
 ## Appendix B: Estimated Cost Model
 
-| Section | Components | Est. Tokens | Est. Cost (Haiku) | Observed (2026-04-09) |
-|---------|-----------|-------------|-------------------|-----------------------|
-| Payment Collection Trend | 5 + summary | ~24,000 | ~$0.03 | 24,191 tokens, $0.03, 63s |
-| Payment Outstanding | 6 + summary | ~58,000 | ~$0.07 | 58,499 tokens, $0.07, 331s |
-| Sales Trend | 5 + summary | ~24,000 | ~$0.03 | 46,476 tokens, $0.05, 196s |
-| Sales Breakdown | 4 + summary | ~30,000 | ~$0.04 | 29,619 tokens, $0.04, 91s |
-| **Total (all 4 sections)** | **24 calls** | **~136,000** | **~$0.17** | ~155,591 tokens, ~$0.18 |
+| Section | Components | Est. Tokens | Est. Cost (Haiku+Sonnet) | Observed (2026-04-10, dual-model) |
+|---------|-----------|-------------|--------------------------|-----------------------------------|
+| Payment Collection Trend | 5 + summary | ~18,000 | ~$0.08 | 18,159 tokens, $0.08, 63.5s |
+| Payment Outstanding | 6 + summary | ~20,000 | ~$0.09 | Not yet tested with dual-model |
+| Sales Trend | 5 + summary | ~18,000 | ~$0.08 | Not yet tested with dual-model |
+| Sales Breakdown | 4 + summary | ~16,000 | ~$0.07 | Not yet tested with dual-model |
+| **Total (all 4 sections)** | **24 calls** | **~72,000** | **~$0.32** | Pending full test |
 
-**Note:** Actual costs depend on tool call depth and data volume. The source authority prompt rule ("use pre-fetched data, don't re-derive totals") reduced tool call frequency significantly — the 2026-04-09 Payment Collection Trend run used 33% fewer tokens and was 3.5x faster compared to the pre-optimization run (36,090 tokens, $0.04, 223s). The `cost_usd` field in the metadata tracks actual spend per run. All observed costs are well under the $0.50/section cap.
+**Note (updated 2026-04-10):** Costs changed significantly with the dual-model architecture:
+- **Components are cheaper:** No tool calls → single LLM call per component → fewer tokens than before
+- **Summary is more expensive:** Sonnet ($3/$15 per 1M tokens) vs Haiku ($0.80/$4) → ~4x per-token premium on summary
+- **Net effect:** Total tokens dropped ~50% (no component tool loops), but dollar cost roughly doubled due to Sonnet summary pricing
+- The 150-word component limit further reduces tokens by keeping component outputs concise
 
-**Cost estimation method:** The Anthropic API returns actual token counts (`usage.input_tokens`, `usage.output_tokens`) per request but does **not** return a dollar cost. The `cost_usd` displayed in the UI is calculated client-side by multiplying actual token counts against a hardcoded pricing table (per-model rates in `client.ts`). The UI label reads **"Est. Cost"** to reflect this. The pricing table must be updated when switching models or when Anthropic changes pricing — otherwise the displayed cost will drift from actual billing.
+**Cost estimation method:** The Anthropic API returns actual token counts (`usage.input_tokens`, `usage.output_tokens`) per request but does **not** return a dollar cost. The `cost_usd` displayed in the UI is calculated client-side by multiplying actual token counts against a hardcoded pricing table (per-model rates in `client.ts`). The `estimateCost()` function accepts a `model` parameter to calculate correctly for the dual-model setup. The UI label reads **"Est. Cost"** to reflect this. The pricing table must be updated when switching models or when Anthropic changes pricing — otherwise the displayed cost will drift from actual billing.
 
 ## Appendix C: AI Insight Accuracy Verification Procedure
 

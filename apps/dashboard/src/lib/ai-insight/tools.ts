@@ -145,6 +145,30 @@ async function executeLocalQuery(input: QueryInput): Promise<string> {
   if (error) return error;
 
   const limit = Math.min(input.limit ?? ROW_LIMIT, ROW_LIMIT);
+
+  // Auto-deduplicate snapshot table: use latest snapshot_date and DISTINCT ON debtor_code
+  if (input.table === 'pc_ar_customer_snapshot') {
+    const pool = getPool();
+    const { rows: [latest] } = await pool.query(`SELECT MAX(snapshot_date) AS d FROM pc_ar_customer_snapshot`);
+    const snapshotDate = latest?.d;
+    const snapshotFilter = snapshotDate ? `snapshot_date = '${snapshotDate}'` : null;
+    const cols = input.columns.map(c => `"${c}"`).join(', ');
+    let sql = `SELECT DISTINCT ON ("debtor_code") ${cols} FROM ${input.table}`;
+    const conditions: string[] = [];
+    if (snapshotFilter) conditions.push(snapshotFilter);
+    if (input.where_clause) conditions.push(input.where_clause);
+    if (conditions.length > 0) sql += ` WHERE ${conditions.join(' AND ')}`;
+    sql += ` ORDER BY "debtor_code"`;
+    if (input.order_by) {
+      // Wrap in subquery to allow custom ordering on deduplicated results
+      sql = `SELECT * FROM (${sql}) sub ORDER BY ${input.order_by}`;
+    }
+    sql += ` LIMIT ${limit}`;
+    const { rows } = await pool.query(sql, input.params ?? []);
+    if (rows.length === 0) return 'No rows returned.';
+    return formatRowsAsTable(rows);
+  }
+
   let sql = `SELECT ${input.columns.map(c => `"${c}"`).join(', ')} FROM ${input.table}`;
   if (input.where_clause) sql += ` WHERE ${input.where_clause}`;
   if (input.order_by) sql += ` ORDER BY ${input.order_by}`;

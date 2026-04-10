@@ -11,7 +11,10 @@ export function getAnthropicClient(): Anthropic {
   return client;
 }
 
+// Component analysis: fast, cheap model for narration (no tools)
 export const AI_MODEL = process.env.AI_INSIGHT_MODEL || 'claude-haiku-4-5-20251001';
+// Summary analysis: smarter model for synthesis + tool use
+export const SUMMARY_MODEL = process.env.AI_INSIGHT_SUMMARY_MODEL || 'claude-sonnet-4-6';
 export const MAX_TOKENS = 2048;
 export const LOG_PROMPTS = process.env.AI_INSIGHT_LOG_PROMPTS === 'true';
 
@@ -19,11 +22,11 @@ export const LOG_PROMPTS = process.env.AI_INSIGHT_LOG_PROMPTS === 'true';
 const PRICING: Record<string, { input: number; output: number }> = {
   'claude-haiku-4-5-20251001': { input: 0.80, output: 4.00 },
   'claude-sonnet-4-5-20250514': { input: 3.00, output: 15.00 },
-  'claude-sonnet-4-6-20250725': { input: 3.00, output: 15.00 },
+  'claude-sonnet-4-6': { input: 3.00, output: 15.00 },
 };
 
-export function estimateCost(inputTokens: number, outputTokens: number): number {
-  const pricing = PRICING[AI_MODEL] ?? { input: 0.80, output: 4.00 };
+export function estimateCost(inputTokens: number, outputTokens: number, model?: string): number {
+  const pricing = PRICING[model ?? AI_MODEL] ?? { input: 0.80, output: 4.00 };
   return (inputTokens / 1_000_000) * pricing.input +
          (outputTokens / 1_000_000) * pricing.output;
 }

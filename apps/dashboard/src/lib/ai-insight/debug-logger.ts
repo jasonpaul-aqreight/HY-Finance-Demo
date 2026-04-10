@@ -152,12 +152,14 @@ export function logSummaryStart(
   sectionKey: string,
   systemPrompt: string,
   userPrompt: string,
+  summaryModel?: string,
 ) {
   if (!logFile) return;
   append(logFile, [
     '',
     DIVIDER,
     `SUMMARY GENERATION: ${sectionKey}`,
+    ...(summaryModel ? [`Summary Model: ${summaryModel}`] : []),
     DIVIDER,
     '',
     '[SYSTEM PROMPT]',
