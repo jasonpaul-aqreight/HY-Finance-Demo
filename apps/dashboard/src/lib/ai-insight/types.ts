@@ -44,6 +44,7 @@ export interface SummaryJson {
 export interface ComponentResult {
   component_key: string;
   component_type: ComponentType;
+  raw_data_md: string;
   analysis_md: string;
   token_count: number;
   input_tokens: number;

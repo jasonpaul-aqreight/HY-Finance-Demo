@@ -227,6 +227,7 @@ async function analyzeComponent(
   return {
     component_key: componentKey,
     component_type: componentType,
+    raw_data_md: formattedValues,
     analysis_md: analysis,
     token_count: inputTokens + outputTokens,
     input_tokens: inputTokens,
@@ -257,7 +258,7 @@ async function runSummaryAnalysis(
       return {
         name: compDef?.name ?? cr.component_key,
         type: compDef?.type ?? cr.component_type,
-        analysis: cr.analysis_md,
+        rawData: cr.raw_data_md,
       };
     }),
   });

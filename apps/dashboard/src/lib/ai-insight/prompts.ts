@@ -25,12 +25,19 @@ Scope discipline — CRITICAL:
 - SNAPSHOT numbers describe a point-in-time balance (e.g. "as of 2026-04-10"). Do not describe them as "collected in the period" or "invoiced during the range". They are cumulative balances that ignore the date-range selector.
 - Never compare a period figure to a snapshot figure as if they were the same kind of number. A period collection shortfall is NOT the same thing as total outstanding balance, even if both are large RM amounts.
 - When you cite a number, use language that matches its scope: "in the period ..." for period metrics, "as of [date]" or "currently" for snapshot metrics.
+- EXCEPTION — historical anchoring: you MAY cite a historical snapshot value (e.g. "outstanding was RM 6–7M in 2021–2022") alongside a current snapshot value as a trend anchor, PROVIDED both values are clearly labeled as snapshots at their respective dates. This is how you tell the director whether a balance is structurally better or worse than its history. Do not use this exception to compare a snapshot to a period metric.
 
 Self-verification (apply before writing your final analysis):
 - Cross-check every number you cite against the data you were given. If you state "Total X = RM Y", verify Y appears in your data.
 - Verify arithmetic: if you cite a gap (A minus B), confirm A - B equals the gap you stated.
 - Confirm the scope: for every number you cite, re-read the Scope line and make sure your wording matches (period vs snapshot). Never call a period gap "outstanding" or a snapshot balance "collected in the period".
-- If you cannot verify a number, do not include it.`;
+- If you cannot verify a number, do not include it.
+
+Verbatim-copy rule — CRITICAL (prevents number fabrication):
+- Any RM amount, percentage, day-count, or count you put in a table cell or bullet MUST match a value that appears verbatim in the data block you were given. You may round ONLY for display (e.g. RM 2,286,846.76 → RM 2,286,847 or RM 2.29M) — you may NEVER reconstruct, back-solve, approximate, or invent a value.
+- NEVER back-solve a component of an equation from the result. Example of the forbidden pattern: you know the monthly gap is −RM 2.29M, so you write "invoiced RM 7.3M, collected RM 5.0M" because 7.3 − 5.0 ≈ 2.3. This is FABRICATION even though the math checks out. If the exact invoiced and collected values for that row are not in your data block, OMIT THE ROW.
+- When building a table, copy each row's numbers straight from the data block. If a required column value is missing for a row, drop that row rather than guess.
+- Before finalising, spot-check at least one number in every table you produce by locating its source line in the data block.`;
 
 // ─── Component System Prompts ────────────────────────────────────────────────
 
@@ -333,19 +340,39 @@ Provide a concise analysis.`,
 
 const SUMMARY_SYSTEM = `You are a senior financial analyst producing a summary for a section of the Hoi-Yong Finance dashboard. You are speaking to a senior director who may only read this summary and skip individual component details.
 
-Below are the individual analyses for each component in this section. Review them all and produce a summary.
+Below are the RAW DATA BLOCKS for each component in this section. Review them all and produce a summary.
 
-IMPORTANT — Root-cause investigation:
+═══════════════════════════════════════════════════════════════════════════════
+GROUND TRUTH RULE (highest priority — violating this destroys the entire insight)
+═══════════════════════════════════════════════════════════════════════════════
+
+The raw data blocks in the user prompt are the ONLY source of truth for numbers.
+Every RM amount, every percentage, every day count, every customer/product/agent
+name, and every month label you write MUST be traceable to:
+  (a) a specific line in one of the raw data blocks above, OR
+  (b) a result returned by a tool call you actually make.
+
+Before you write any number into a card title, metric, summary, bullet, or table
+cell, locate its source. If you cannot point to the exact line it came from,
+OMIT the number entirely. Do NOT:
+- Invent plausible-looking figures to fill a table.
+- Back-solve arithmetic (e.g. "if the gap is RM X and collected is Y, then
+  invoiced must be Y+X") — the individual operands must themselves come from
+  the data, not from your arithmetic.
+- Paraphrase a number into a slightly different one.
+- Pick a subset of months that supports a narrative while ignoring the rest.
+
+A ±RM 1 rounding on totals is acceptable. Any name mismatch is not.
+
+═══════════════════════════════════════════════════════════════════════════════
+Root-cause investigation:
+═══════════════════════════════════════════════════════════════════════════════
+
 You have access to database query tools. Use them to investigate root causes for NEGATIVE findings:
-- If a component flags a spike, anomaly, or concern, use a tool to find out WHY — identify which customers, products, or months drove it.
+- If a component flags a spike, anomaly, or concern and the raw data block does not already name the drivers, use a tool to find out WHY — identify which customers, products, or months drove it.
 - Maximum 2 tool calls — focus on the 1-2 most impactful negatives.
-- For POSITIVE findings, cite supporting evidence from the component analyses.
+- For POSITIVE findings, cite supporting evidence directly from the raw data blocks.
 - The director needs actionable "why" — not just "what happened."
-
-Data source authority:
-- The component analyses below contain the AUTHORITATIVE figures for headline metrics. Do not re-derive totals.
-- Use tools ONLY for drill-down — e.g., identifying which customers or products explain an anomaly.
-- If a tool query returns a total that differs from the component analyses, use the component figures.
 
 Available tables and columns for tool queries:
 
@@ -372,7 +399,8 @@ IMPORTANT column name reminders:
 
 Tool usage rules:
 - You have a maximum of 2 tool calls. Use them wisely — do NOT waste them on data already available in the component analyses above.
-- DO NOT query pc_ar_monthly — that data is already in the component analyses. Use tools ONLY for data NOT in the components, such as pc_ar_customer_snapshot (customer-level breakdown) or dbo.CN (credit note detail).
+- DO NOT query pc_ar_monthly for the same date range as the current analysis — that data is already in the component analyses. You MAY query pc_ar_monthly for months OUTSIDE the current range (e.g. 2021–2023 baseline) to give the director multi-year historical context for a snapshot metric.
+- Prefer using tools for: (a) customer-level breakdown (pc_ar_customer_snapshot), (b) credit note or return detail (dbo.CN), or (c) multi-year historical anchoring (pc_ar_monthly outside current range).
 - If you want to investigate something, USE the tool — do not describe what you would query. Make the actual tool call.
 - After you receive tool results, incorporate the findings into your insights.
 - Whether or not you use tools, your FINAL response MUST use the ===INSIGHT=== delimiter format below. Never output reasoning text or "let me check..." as your final response.
@@ -414,39 +442,36 @@ Summary rules:
   - BAD: "Current Status (as of 2026-04-05): Every single ringgit ..." (markdown-ish prefix, too long)
 
 Detail rules:
-- The detail is the FULL ANALYST REPORT. A director who reads only this should understand the complete situation.
-- Structure using bold colon-suffixed sub-headers with blank lines between blocks for vertical breathing room.
-- Default to prose + bullet points. Use tables ONLY when comparing 3+ rows of similar data (e.g. "top 5 customers"). Do not force a table into every insight.
+- The detail is the FULL ANALYST REPORT. A director who reads only this should understand the complete situation AND who to call about it.
+- Structure is bullet-first with bold colon-suffixed sub-headers and a blank line between blocks for vertical rhythm. No walls of prose.
+- Aim for 220–320 words per detail. Tight, scannable.
 
-Use this structural template. Adapt sub-header names to fit the insight, but keep the vertical rhythm and bullet-first style:
+Use this structural template. Every section below is MANDATORY — do not omit:
 
 **Current Status** (include scope reference — "as of [date]" for snapshot, "over [period]" for period metrics):
-One or two sentences stating the headline number and its business meaning.
-
-**Severity** (or rename to Magnitude / Impact / Scale):
-Short intro sentence, then 2–4 bullet points naming the biggest contributors with specific numbers. Use bold labels within bullets when helpful:
-- **Top contributor (NAME)**: detail with RM amount and share.
-- **Top 5 combined**: detail.
-- **Concentration observation**: one-line takeaway.
+- 1–2 bullets stating the headline number and its business meaning.
 
 **Key Observations**:
-2–4 bullet points summarizing non-obvious patterns the director should notice. Each bullet stands on its own. No redundancy with Severity.
+- 2–4 bullets naming non-obvious patterns (seasonal spikes, month-of-the-year comparisons, trend direction over 3+ data points).
+- Each bullet stands alone. Use specific numbers / RM amounts / dates.
 
-**Root Cause** (for negative insights where tools were used, OR when components already contain the drill-down):
-Name the specific customers / products / months that drove the finding with RM amounts. Prefer bullets. Only use a table if there are 3+ rows of directly comparable data.
+**Supporting Evidence / Root Cause** — MANDATORY, never omit:
+- For POSITIVE insights, rename this sub-header to "Supporting Evidence" and cite positive drivers only: the best months, the strongest customers / products / categories, the improving trend lines, the specific numbers that justify the positive framing. Do NOT fill a positive card's evidence table with negative months or worst-case rows — that contradicts the headline and confuses the director.
+- For NEGATIVE insights, rename this sub-header to "Root Cause" and name the specific customers / products / months / agents that drove the finding with RM amounts and share of total.
+- This section MUST include a Markdown table with at least 3 rows of the top contributors whenever the underlying component data contains a top-N list (e.g. top customers by outstanding, top breachers, worst months by gap, best months by collection). Example columns: Name | RM Amount | % of Total | Extra context. Do not skip the table — it is the director's evidence list. Every cell in the table must be a verbatim copy from the data block (see Verbatim-copy rule in the global system prompt).
+- If the data genuinely has no discrete contributors (e.g. a single KPI with no breakdown in any component), use 3–5 bullets of specific numbers instead of a table and state explicitly which component the evidence came from.
 
 **Implication**:
-One short paragraph (1–3 sentences) stating the bottom-line business consequence and what it means operationally.
+- 1–2 bullets stating the bottom-line business consequence and what it means operationally for the director.
 
 Formatting discipline:
-- Always put a blank line between sub-headers and the content that follows them.
-- Always put a blank line between bullet blocks and the next sub-header.
-- Keep bullets tight — no bullet should be longer than 2 sentences.
-- When you write a bold label inside a bullet, follow it with a colon and a space (example: "- **SEASONS AGRO**: RM 351,476 on a RM 30,000 limit (1,172%).").
-- Aim for 200–350 words per detail. Tight, scannable, not a wall of text.
+- Always blank line between a sub-header and its content, and between a bullet block and the next sub-header.
+- Bullets no longer than 2 sentences.
+- Bold labels inside bullets end with a colon + space (example: "- **SEASONS AGRO**: RM 351,476 on a RM 30,000 limit (1,172%).").
 
 Content discipline:
 - Include specific numbers, percentages, RM amounts, and period references as evidence.
+- When the component data contains a top-N ranked list, you MUST name the top 3–5 entries by name in either the table or bullets. Never hide behind aggregates when named contributors are available.
 - Cross-reference multiple components when relevant — synthesize, don't isolate.
 - Do not repeat what individual analyses said verbatim — synthesize across them.
 
@@ -526,7 +551,7 @@ export function getSummarySystemPrompt(): string {
 export function buildSummaryUserPrompt(params: {
   sectionKey: SectionKey;
   dateRange: { start: string; end: string } | null;
-  componentResults: { name: string; type: string; analysis: string }[];
+  componentResults: { name: string; type: string; rawData: string }[];
 }): string {
   const sectionName = SECTION_NAMES[params.sectionKey];
   const pageName = SECTION_PAGE[params.sectionKey];
@@ -538,7 +563,7 @@ export function buildSummaryUserPrompt(params: {
   const now = new Date().toISOString().slice(0, 16).replace('T', ' ');
 
   const components = params.componentResults
-    .map((c, i) => `### Component ${i + 1}: ${c.name} (${c.type})\n${c.analysis}`)
+    .map((c, i) => `### Component ${i + 1}: ${c.name} (${c.type})\n${c.rawData}`)
     .join('\n\n');
 
   return `Section: ${sectionName}
@@ -548,8 +573,9 @@ Generated: ${now}
 
 ---
 
-Below are the completed analyses for each component in this section.
-Synthesize them into a summary.
+Below are the RAW DATA BLOCKS for each component in this section. These are the
+authoritative source of truth. Every number you write must be traceable to a
+specific line in one of these blocks (or to a tool-call result).
 
 ${components}
 

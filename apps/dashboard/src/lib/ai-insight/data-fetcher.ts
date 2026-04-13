@@ -37,11 +37,31 @@ const fetchers: Record<string, DataFetcher> = {
     const dsoNum = parseFloat(avg);
     const color = isNaN(dsoNum) ? 'No data' : dsoNum <= 30 ? 'Green (Good)' : dsoNum <= 60 ? 'Yellow (Warning)' : 'Red (Critical)';
 
+    // Rule C — pre-computed arithmetic (no LLM math)
+    const daysAboveGood = isNaN(dsoNum) ? null : +(dsoNum - 30).toFixed(1);
+    const daysAboveWarning = isNaN(dsoNum) ? null : +(dsoNum - 60).toFixed(1);
+    const dsoValues = valid.map((r: { dso: number }) => Number(r.dso));
+    const minDso = dsoValues.length ? Math.min(...dsoValues) : null;
+    const maxDso = dsoValues.length ? Math.max(...dsoValues) : null;
+    const minRow = valid.find((r: { dso: number }) => Number(r.dso) === minDso);
+    const maxRow = valid.find((r: { dso: number }) => Number(r.dso) === maxDso);
+    const monthsAbove60 = dsoValues.filter((d: number) => d > 60).length;
+    const monthsAbove30 = dsoValues.filter((d: number) => d > 30).length;
+
     let table = '| Month | Collection Days |\n|-------|----------------|\n';
     for (const r of rows) {
       table += `| ${r.month} | ${r.dso != null ? r.dso + ' days' : 'N/A'} |\n`;
     }
-    return `Value: ${avg} days\nColor: ${color}\n\nMonthly breakdown:\n${table}`;
+    const preCalc =
+      `Pre-calculated gaps (use these values directly — do not recompute):\n` +
+      `- Period average: ${avg} days\n` +
+      (daysAboveGood !== null ? `- Days above 30-day (Good) benchmark: ${daysAboveGood > 0 ? '+' : ''}${daysAboveGood} days\n` : '') +
+      (daysAboveWarning !== null ? `- Days above 60-day (Warning) benchmark: ${daysAboveWarning > 0 ? '+' : ''}${daysAboveWarning} days\n` : '') +
+      (minRow ? `- Best month: ${minRow.month} at ${minDso} days\n` : '') +
+      (maxRow ? `- Worst month: ${maxRow.month} at ${maxDso} days\n` : '') +
+      `- Months above 30-day benchmark: ${monthsAbove30} of ${dsoValues.length}\n` +
+      `- Months above 60-day benchmark: ${monthsAbove60} of ${dsoValues.length}\n`;
+    return `Value: ${avg} days\nColor: ${color}\n\n${preCalc}\nMonthly breakdown:\n${table}`;
   },
 
   async collection_rate(dr) {
@@ -112,13 +132,48 @@ const fetchers: Record<string, DataFetcher> = {
     const totalCol = rows.reduce((s: number, r: { collected: number }) => s + Number(r.collected), 0);
     const avgCol = rows.length > 0 ? totalCol / rows.length : 0;
 
+    // Rule C — pre-computed per-month gap array + min/max/worst
+    type GapRow = { month: string; invoiced: number; collected: number; gap: number };
+    const gapRows: GapRow[] = rows.map((r: { month: string; invoiced: number; collected: number }) => ({
+      month: r.month,
+      invoiced: Number(r.invoiced),
+      collected: Number(r.collected),
+      gap: Number(r.collected) - Number(r.invoiced),
+    }));
+    const negMonths = gapRows.filter((r) => r.gap < 0);
+    const posMonths = gapRows.filter((r) => r.gap >= 0);
+    const worst = negMonths.length
+      ? negMonths.reduce((a, b) => (a.gap < b.gap ? a : b))
+      : null;
+    const secondWorst = negMonths.length > 1
+      ? negMonths.filter((r) => r !== worst).reduce((a, b) => (a.gap < b.gap ? a : b))
+      : null;
+    const best = posMonths.length
+      ? posMonths.reduce((a, b) => (a.gap > b.gap ? a : b))
+      : null;
+    const negSum = negMonths.reduce((s, r) => s + r.gap, 0);
+    const worstTwoPct =
+      worst && secondWorst && negSum < 0
+        ? (((worst.gap + secondWorst.gap) / negSum) * 100).toFixed(1)
+        : null;
+
     let table = '| Month | Invoiced | Collected | Gap |\n|-------|----------|-----------|-----|\n';
-    for (const r of rows) {
-      const gap = Number(r.collected) - Number(r.invoiced);
-      table += `| ${r.month} | RM ${Number(r.invoiced).toLocaleString('en-MY')} | RM ${Number(r.collected).toLocaleString('en-MY')} | ${gap >= 0 ? '+' : ''}RM ${Number(gap).toLocaleString('en-MY')} |\n`;
+    for (const r of gapRows) {
+      table += `| ${r.month} | RM ${r.invoiced.toLocaleString('en-MY')} | RM ${r.collected.toLocaleString('en-MY')} | ${r.gap >= 0 ? '+' : ''}RM ${r.gap.toLocaleString('en-MY')} |\n`;
     }
     const gap = totalCol - totalInv;
-    return `Period totals:\nTotal Invoiced: RM ${totalInv.toLocaleString('en-MY', { minimumFractionDigits: 2 })}\nTotal Collected: RM ${totalCol.toLocaleString('en-MY', { minimumFractionDigits: 2 })}\nCumulative Gap: ${gap >= 0 ? '+' : ''}RM ${gap.toLocaleString('en-MY', { minimumFractionDigits: 2 })}\nAvg Monthly Collection: RM ${Math.round(avgCol).toLocaleString('en-MY')}\n\nMonthly breakdown:\n${table}`;
+
+    const preCalc =
+      `Pre-calculated monthly gap analysis (use these values directly — do not cherry-pick a rosy sub-range):\n` +
+      `- Months with negative gap (collected < invoiced): ${negMonths.length} of ${gapRows.length}\n` +
+      `- Months with positive gap (collected >= invoiced): ${posMonths.length} of ${gapRows.length}\n` +
+      (worst ? `- Worst single month: ${worst.month} at ${worst.gap >= 0 ? '+' : ''}RM ${worst.gap.toLocaleString('en-MY')}\n` : '') +
+      (secondWorst ? `- Second-worst month: ${secondWorst.month} at ${secondWorst.gap >= 0 ? '+' : ''}RM ${secondWorst.gap.toLocaleString('en-MY')}\n` : '') +
+      (best ? `- Best month: ${best.month} at ${best.gap >= 0 ? '+' : ''}RM ${best.gap.toLocaleString('en-MY')}\n` : '') +
+      (worstTwoPct ? `- Worst two months combined = ${worstTwoPct}% of the full-period negative gap\n` : '') +
+      `- Period total negative gap: RM ${negSum.toLocaleString('en-MY', { minimumFractionDigits: 2 })}\n`;
+
+    return `Period totals:\nTotal Invoiced: RM ${totalInv.toLocaleString('en-MY', { minimumFractionDigits: 2 })}\nTotal Collected: RM ${totalCol.toLocaleString('en-MY', { minimumFractionDigits: 2 })}\nCumulative Gap: ${gap >= 0 ? '+' : ''}RM ${gap.toLocaleString('en-MY', { minimumFractionDigits: 2 })}\nAvg Monthly Collection: RM ${Math.round(avgCol).toLocaleString('en-MY')}\n\n${preCalc}\nMonthly breakdown:\n${table}`;
   },
 
   // Payment Section 2 (Snapshot — always uses latest snapshot_date)
