@@ -82,13 +82,39 @@ The Sales page currently has no section headers. Two section headers will be add
 
 **AI calls:** 4 parallel component analyses + 1 summary = **5 total**
 
-### Totals
+### Totals (v1 — shipped)
 
 | | Sections | Components | AI Calls per Full Run |
 |-|----------|------------|----------------------|
 | Payment | 2 | 11 | 13 |
 | Sales | 2 | 9 | 11 |
 | **Grand Total** | **4** | **20** | **24** |
+
+### 2.3 v2 Roll-Out — All Dashboard Pages (added 2026-04-13)
+
+Following the Phase 1+2 stability fixes (§12.9–12.11), the AI Insight Engine is approved for roll-out across **every analytical page** in the dashboard. The same architecture (pre-fetched data block → component narration → summary with section-aware tools + numeric guard) applies uniformly.
+
+**Pages in scope:**
+
+| Page | Route | Status | Candidate Sections (TBD per page-spec workshop) |
+|------|-------|--------|--------------------------------------------------|
+| Payment | `/payment` | **Shipped (v1)** | Payment Collection Trend, Outstanding Payment |
+| Sales | `/sales` | **Shipped (v1)** | Sales Trend, Sales Breakdown |
+| Customer Margin | `/customer-margin` | v2 — not yet specified | e.g. `customer_margin_overview`, `customer_margin_breakdown` |
+| Supplier Performance | `/supplier-performance` | v2 — not yet specified | e.g. `supplier_margin_trend`, `supplier_concentration` |
+| Returns | `/return` | v2 — not yet specified | e.g. `return_trend`, `return_breakdown` |
+| Expenses | `/expenses` | v2 — not yet specified | e.g. `expense_trend`, `expense_breakdown` |
+| Financial (P&L) | `/financial` | v2 — not yet specified | e.g. `pnl_overview`, `pnl_drivers` |
+
+**Pages explicitly out of scope:** `/admin`, `/manual`, `/preview`, `/experiment-growth` (configuration / docs / experimental — not analytical).
+
+**v2 acceptance bar:** every new section must satisfy the same checkpoint as v1:
+- 0 CRITICAL fabrications across any cards
+- Numeric guard reports `passed: true` on first or second generation
+- Cost ≤ $0.15/section, latency ≤ 120s
+- `npm run build` and `npm run lint` clean for the touched files
+
+The exact section key, component list, and prompt template for each v2 page are produced via the **§14 Extending to a New Page** playbook below — one short workshop per page is the canonical entry point.
 
 ---
 
@@ -1511,6 +1537,151 @@ Both headers follow the same collapsible pattern as the Payment page sections, w
 
 ---
 
+## 14. Extending to a New Page (Playbook) — added 2026-04-13
+
+This is the canonical recipe for adding AI Insight to a new dashboard page. Every step is mandatory; the order is load-bearing because each step builds on the previous.
+
+### Step 0 — Page workshop (1 hour, with stakeholder)
+
+Before touching code, agree on:
+
+1. **Section breakdown.** A page becomes 1–3 *sections*. Each section is a coherent narrative unit (a single insight card group). Heuristic: if two component groups would tell unrelated stories, split them.
+2. **Per-section scope:** date-filtered (`period`) or current-state (`snapshot`). Mixing the two in one section is forbidden.
+3. **Per-section components:** the exact KPI / chart / table / breakdown items that go into the data block.
+4. **Per-section tool policy:** which database drill-down does this section legitimately need?
+   - Pure trend section → `none`
+   - Aggregate-only roll-up → `aggregate_only`
+   - Customer / product / agent drill-down section → `full`
+5. **Date-range source.** Period sections must read the same date range the user picked on the dashboard.
+
+### Step 1 — Register the section key
+
+In `apps/dashboard/src/lib/ai-insight/types.ts`:
+
+```ts
+export type SectionKey =
+  | 'payment_collection_trend'
+  | 'payment_outstanding'
+  | 'sales_trend'
+  | 'sales_breakdown'
+  | 'customer_margin_overview'   // NEW
+  | 'customer_margin_breakdown'; // NEW
+```
+
+Section keys are the load-bearing identity for routing, locks, storage rows, prompts, tool policy, and scope. Naming convention: `<page>_<sub>` snake_case.
+
+### Step 2 — Wire the section → component map
+
+In `apps/dashboard/src/lib/ai-insight/prompts.ts`, extend `SECTION_COMPONENTS`, `SECTION_PAGE`, and `SECTION_NAMES`:
+
+```ts
+SECTION_COMPONENTS: {
+  ...
+  customer_margin_overview: [
+    { key: 'cm_total_margin',     name: 'Total Margin',     type: 'kpi' },
+    { key: 'cm_margin_pct',       name: 'Margin %',         type: 'kpi' },
+    { key: 'cm_margin_trend',     name: 'Margin Trend',     type: 'chart' },
+  ],
+}
+SECTION_PAGE.customer_margin_overview = 'Customer Margin';
+SECTION_NAMES.customer_margin_overview = 'Customer Margin Overview';
+```
+
+### Step 3 — Author component prompts
+
+For each new component key, add a focused narration prompt to `COMPONENT_PROMPTS` in `prompts.ts`. Follow the pattern of existing prompts: state what the metric measures, the formula, the threshold colors, and a single instruction to narrate the pre-fetched values. **No tool-use instructions in component prompts** — components do not have tools.
+
+### Step 4 — Implement the data fetcher (the most important step)
+
+In `apps/dashboard/src/lib/ai-insight/data-fetcher.ts`, add an entry to the `fetchers` record for **each** new component key. Each fetcher must return a `FetcherResult`:
+
+```ts
+async cm_total_margin(dr) {
+  // 1. Query the DB for the canonical values
+  const { rows } = await pool.query(/* SQL using dr.start/dr.end */);
+
+  // 2. Build the prompt string (the markdown the LLM will read)
+  const prompt = `Value: RM ${total.toLocaleString('en-MY')}\n...`;
+
+  // 3. Build the allowed whitelist — every numeric value visible in the
+  //    prompt MUST appear in `allowed`, OR be a date / safe small integer.
+  const allowed: AllowedValue[] = [
+    rm('total margin', total),
+    pct('margin pct', marginPct),
+    cnt('customer count', customerCount),
+    // ... one entry per pre-computed value rendered into the prompt
+  ];
+
+  return { prompt, allowed };
+},
+```
+
+**Whitelist discipline:** if it's printed in the prompt and it isn't a date or year, it must be in `allowed`. The numeric guard will catch any oversight on the next live run — fix in this fetcher rather than tuning the guard.
+
+### Step 5 — Set the section scope
+
+In the same file, extend `SECTION_SCOPE`:
+
+```ts
+const SECTION_SCOPE: Record<SectionKey, ScopeType> = {
+  ...
+  customer_margin_overview: 'period',
+  customer_margin_breakdown: 'period',
+};
+```
+
+The scope label is auto-prepended to every fetcher output.
+
+### Step 6 — Declare the tool policy
+
+In `apps/dashboard/src/lib/ai-insight/tool-policy.ts`, extend `SECTION_POLICY`:
+
+```ts
+const SECTION_POLICY: Record<SectionKey, ToolPolicy> = {
+  ...
+  customer_margin_overview: 'aggregate_only',
+  customer_margin_breakdown: 'full',
+};
+```
+
+If your section needs a new aggregate table not yet listed in `AGGREGATE_LOCAL_TABLES`, add it there.
+
+### Step 7 — Wire the UI panel
+
+The dashboard component for the new page imports the existing `<AIInsightPanel sectionKey="..." />` (or whatever the v1 component is named) and drops it into the section header. No new React work is needed beyond the new instances.
+
+### Step 8 — Validate via Appendix C playbook
+
+Run the procedure in **Appendix C** for each new section in turn:
+1. Reset DB (`DELETE FROM ai_insight_section`)
+2. POST to `/api/ai-insight/analyze` with the new `section_key`
+3. Check `summary_json.numericGuard.passed === true` via `/api/ai-insight/section/<key>`
+4. Inspect the debug log under `apps/dashboard/logs/` for any `tool_use` blocks that violate the declared policy
+5. Spot-check 5–10 numeric claims against the underlying SQL
+
+If guard fails, the unmatched list is your TODO: each entry is either (a) a real fabrication (good — guard caught it; tighten the prompt or accept the retry), or (b) a legitimate value the fetcher forgot to whitelist (add one line to the fetcher's `allowed` array and rerun).
+
+### Step 9 — Update spec & commit
+
+- Add the new section's row to **§2.3 v2 Roll-Out** and **Appendix A**.
+- Add an estimated cost row to **Appendix B**.
+- Commit with `feat: add AI insight for <page> (<section_keys>)`.
+
+### Files touched per new section (checklist)
+
+```
+apps/dashboard/src/lib/ai-insight/types.ts          (SectionKey)
+apps/dashboard/src/lib/ai-insight/prompts.ts        (SECTION_COMPONENTS, SECTION_PAGE, SECTION_NAMES, COMPONENT_PROMPTS)
+apps/dashboard/src/lib/ai-insight/data-fetcher.ts   (fetchers, SECTION_SCOPE)
+apps/dashboard/src/lib/ai-insight/tool-policy.ts    (SECTION_POLICY)
+apps/dashboard/src/components/<page>/...            (UI panel mount)
+_bmad-output/planning-artifacts/ai-insight-engine-spec.md  (§2.3 + Appendix A/B)
+```
+
+No changes are required in `orchestrator.ts`, `tools.ts`, `numeric-guard.ts`, or any other shared infrastructure file. If you find yourself editing those, stop and ask why — the architecture should absorb new sections without core changes.
+
+---
+
 ## 12. Implementation Patterns & Lessons (added 2026-04-10)
 
 > These patterns were discovered during spike implementation and validated through accuracy testing. They are **mandatory** for production — skipping any of them reintroduces bugs that were already caught and fixed.
@@ -1605,6 +1776,138 @@ The `estimateCost()` function accepts an optional `model` parameter. Summary cos
 **A verifier pass (second Sonnet call that fact-checks the draft and strips failed claims) was prototyped and explicitly rejected** in favor of this fix alone. The verifier doubled cost and latency, introduced false-positive strips of true-but-tool-derived claims (e.g. avg payment days from `pc_ar_customer_snapshot`), and did not reliably catch semantic pairing errors. Part 1 alone achieved zero hard fabrications across ~115 claims — the verifier would be defense-in-depth against a problem that no longer exists.
 
 **Commit:** `06e592e` on `feature/v2-finance-spike-s1-auth`.
+
+---
+
+### 12.9 Section-Aware Tool Policy (added 2026-04-13)
+
+**Rule:** Each section declares an explicit *tool policy* that constrains what database queries the summary agent can issue. Policy is enforced both as a tool schema filter (Claude only sees allowed tools) and as a runtime gate in the orchestrator (defence-in-depth against schema bypass).
+
+**Why (the bug class this fixed):** Run #2 on `payment_collection_trend` produced a fabricated customer drill-down: `MY HERO HYPERMARKET RM 617K` cited as a top contributor. The fabrication came from the LLM issuing an unsolicited `query_local_table` call against `pc_sales_by_customer` to invent a customer narrative — even though `payment_collection_trend` is a trend section that should never name individual customers. Prompt rules ("don't query unless needed") were stochastic and routinely violated.
+
+**The fix:** A new module `apps/dashboard/src/lib/ai-insight/tool-policy.ts` exports:
+
+```ts
+export type ToolPolicy = 'none' | 'aggregate_only' | 'full';
+
+policyForSection(sectionKey)        // → ToolPolicy
+toolsForSection(sectionKey)         // → filtered Anthropic.Tool[]
+validateToolForSection(sectionKey, toolName, input) // → error string | null
+```
+
+**Per-section policy table:**
+
+| Section | Policy | Rationale |
+|---|---|---|
+| `payment_collection_trend` | `none` | Pure trend narration; no customer drill-down justified. |
+| `payment_outstanding` | `full` | Snapshot of customer book — drill-down is the whole point. |
+| `sales_trend` | `aggregate_only` | May query `pc_sales_daily` / `pc_ar_monthly` / `pc_ar_aging_history` but **not** by-customer/product/outlet tables. |
+| `sales_breakdown` | `full` | Per-customer/product/agent breakdown is the section's purpose. |
+
+**Architectural notes:**
+- For policy `none`, the orchestrator omits the `tools` parameter entirely from the API call — Claude has no tool capability for that section, period.
+- For `aggregate_only`, the `query_local_table` enum of allowed tables is replaced with the aggregate subset before being sent to Claude. A runtime guard in `runSummaryAgentLoop` rejects any tool call that slips past (returns the error as the tool result instead of executing).
+- The aggregate set: `pc_sales_daily`, `pc_ar_monthly`, `pc_ar_aging_history`. Add new aggregate tables here as the model expands.
+
+**Validation (2026-04-13):** A live run of `payment_collection_trend` on the post-fix branch produced **zero `tool_use` blocks** in the debug log. This eliminates the entire fabricated-customer class of bugs for trend sections.
+
+**Commit:** Phase 1 of the AI Insight stability fix on `feature/v2-finance-spike-s1-auth`.
+
+### 12.10 Numeric Guard + Fetcher Whitelist (added 2026-04-13)
+
+**Rule:** Every numeric value in the summary's final response is mechanically checked against a per-section whitelist of "values the fetchers actually emitted." Unmatched numbers force a retry; the second failure ships the card with a `numericGuardFailed` flag.
+
+**Why (the bug class this fixed):** Even with the ground-truth-rule and verbatim-copy prompt patches, validator runs continued to catch fabricated percentages, fabricated month rows, fabricated counts (e.g., "7 of 12 months", "44%"). Every previous fix was prompt-based — they nudged probability without removing possibility. Sonnet rolled fresh dice on every click. The validator kept finding new bugs in new places.
+
+**The fix:** Move correctness into code.
+
+**1. New types** (in `types.ts`):
+
+```ts
+export type AllowedValueUnit = 'RM' | 'pct' | 'days' | 'count';
+
+export interface AllowedValue {
+  label: string;          // human-readable description
+  value: number;          // raw numeric value
+  tolerance?: number;     // absolute tolerance (defaults applied by guard)
+  unit?: AllowedValueUnit;
+}
+
+export interface FetcherResult {
+  prompt: string;
+  allowed: AllowedValue[];
+}
+```
+
+**2. Fetcher interface upgrade** (in `data-fetcher.ts`): every fetcher now returns `FetcherResult`. Each pre-computed value the fetcher renders into the prompt string is also pushed onto its `allowed` array, with helpers `rm() / pct() / days() / cnt()`. `fetchComponentData()` aggregates the scope label into the prompt and returns `{ prompt, allowed }`.
+
+**3. ComponentResult carries the whitelist:** `ComponentResult.allowed: AllowedValue[]` is set by `analyzeComponent()` and surfaces to the orchestrator after all components finish.
+
+**4. Numeric guard module** (`apps/dashboard/src/lib/ai-insight/numeric-guard.ts`):
+- `extractNumbers(text)` parses RM amounts (incl. K/M suffixes and ranges like "RM 7–8M"), percentages, day counts, and bare integer counts. Date-like patterns (`2025-04-12`, `Mar 2025`, year tokens) are pre-filtered.
+- `runNumericGuard(text, allowed)` walks every extracted number and checks against `allowed`:
+  - direct match within unit-specific tolerance (default ±RM 1, ±0.1pp, ±0.1d, ±0.5 count)
+  - relative tolerance (±5%) for K/M-rounded RM displays
+  - absolute-value match for RM (so `−RM 1,013,268.22` matches a whitelisted positive `cnAbs`)
+  - derived-percentage helper accepts `round(a/b * 100, 1)` for any pair of allowed values
+  - safe small integers (`0..12`, plus `30/60/80/90/100/120/365`) are auto-allowed
+
+**5. Retry loop** (in `runSummaryAnalysis`):
+- Attempt 1 → run agent loop → run guard.
+- If `unmatched.length > 0`: append the failed assistant turn + a `formatGuardError(unmatched)` user message, run agent loop again.
+- Attempt 2 → run guard again; if still failing, ship with `summary_json.numericGuard = { passed: false, attempts: 2, unmatched: [...] }` so the UI can flag the card.
+- Maximum 2 attempts. No third pass.
+
+**Edge cases handled:**
+- Date-like numbers (`2024`, `2025-02`, `Mar 2025`) excluded from validation.
+- Rounded RM forms (`RM 82.8M` vs raw `82,763,453`) — relative tolerance.
+- RM ranges (`RM 7–8M per month`) — both endpoints emitted, both must independently match.
+- Sign mismatches between displayed credit-note values (`−RM 1,013,268.22`) and unsigned `cnAbs` whitelist entries.
+- Derived percentages (`84.7% = 70.1M / 82.8M`) — accepted without explicit whitelisting.
+
+**Validation:**
+- Smoke test on synthesised text: guard correctly flags `RM -771K`, `44%`, `RM 617K`, ignores `2024`, `2025`, `Feb`, accepts `RM -1,101,767` etc.
+- Live runs (2026-04-13):
+  - `payment_collection_trend`: passed on attempt 2 (attempt 1 cited "RM -3,981,963 combined" as a back-solved sum → guard rejected → attempt 2 used verbatim values).
+  - `sales_breakdown`: passed on attempt 2.
+  - `payment_outstanding` and `sales_trend`: initially failed — fixed in §12.11.
+
+**Commit:** Phase 1 of the AI Insight stability fix on `feature/v2-finance-spike-s1-auth`.
+
+### 12.11 Dynamic Tool-Result Whitelisting (added 2026-04-13)
+
+**Rule:** Numbers that appear in a `tool_result` block during the summary agent loop are dynamically appended to the section's `allowed` list before the guard runs. The LLM is allowed to cite anything it queried live from the database.
+
+**Why (the bug class this fixed):** Sections with `full` tool policy (`payment_outstanding`, `sales_breakdown`) produced fully-grounded outputs that nonetheless tripped the guard. The unmatched values (`172%`, `594%`, `832 days`, customer counts) were 100% legitimate — they came from `pc_ar_customer_snapshot` rows the LLM queried via `query_local_table`. The fetcher's static whitelist only knew about the top-5 customers it pre-computed; everything below the top 5 was off the list.
+
+The naive fix would be to dump all 200+ customers into every fetcher's `allowed` array. That bloats memory, slows the matcher, and still misses non-customer dimensions (aging by agent, by debtor type, etc.).
+
+**The fix:** Capture tool results live and feed them into the guard.
+
+```ts
+// inside runSummaryAgentLoop
+toolResultTexts.push(result);  // alongside the existing logToolResult call
+
+// inside runSummaryAnalysis, after each agent loop iteration
+for (const trText of loopResult.toolResultTexts) {
+  for (const f of extractNumbers(trText)) {
+    allAllowed.push({ label: `tool result: ${f.raw}`, value: f.value, unit: f.unit });
+  }
+}
+```
+
+The same `extractNumbers` parser used by the guard is applied to the markdown table the tool returned. Every RM amount, percentage, day count, and count from the live query becomes a legal citation for the summary.
+
+**Why this is safe:**
+- Tool results are deterministic database queries against whitelisted columns (Section 9). They are by definition ground truth.
+- The whitelist additions are scoped to the current section's analysis — they don't leak across sections.
+- The guard still rejects anything the LLM invents *outside* of what it queried (back-solved arithmetic, fabricated subtotals).
+
+**Sign-insensitive RM matching (companion patch):** `matchesAllowed()` now compares `Math.abs(found.value)` to `Math.abs(av.value)` for RM unit. This handles credit-note display (`−RM 1,013,268.22`) matching unsigned fetcher whitelist entries (`cnAbs = 1,013,268.22`) without forcing every fetcher to emit signed duplicates.
+
+**Validation (2026-04-13):** With these patches, all four sections are expected to pass on the first or second attempt; final cross-section live validation is pending the next API top-up.
+
+**Commit:** Phase 2 of the AI Insight stability fix on `feature/v2-finance-spike-s1-auth`.
 
 ---
 
