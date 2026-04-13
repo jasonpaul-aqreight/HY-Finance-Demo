@@ -245,11 +245,13 @@ const fetchers: Record<string, DataFetcher> = {
       [latest.d],
     );
     const totalCustomers = summary.reduce((s: number, r: { count: string }) => s + parseInt(r.count), 0);
+    const totalOutstanding = summary.reduce((s: number, r: { total_outstanding: number }) => s + Number(r.total_outstanding), 0);
 
-    let riskTable = '| Risk Tier | Count | % | Outstanding |\n|-----------|-------|---|-------------|\n';
+    let riskTable = '| Risk Tier | Count | % of Customers | Outstanding | % of Outstanding |\n|-----------|-------|----------------|-------------|------------------|\n';
     for (const r of summary) {
-      const pct = ((parseInt(r.count) / totalCustomers) * 100).toFixed(0);
-      riskTable += `| ${r.risk_tier} | ${r.count} | ${pct}% | RM ${Number(r.total_outstanding).toLocaleString('en-MY')} |\n`;
+      const custPct = ((parseInt(r.count) / totalCustomers) * 100).toFixed(0);
+      const outPct = totalOutstanding > 0 ? ((Number(r.total_outstanding) / totalOutstanding) * 100).toFixed(1) : '0';
+      riskTable += `| ${r.risk_tier} | ${r.count} | ${custPct}% | RM ${Number(r.total_outstanding).toLocaleString('en-MY')} | ${outPct}% |\n`;
     }
 
     let topTable = '| Customer | Outstanding | Score | Risk |\n|----------|-------------|-------|------|\n';
@@ -412,11 +414,14 @@ const fetchers: Record<string, DataFetcher> = {
        ORDER BY SUM(total_sales) DESC`,
       [dr!.start, dr!.end],
     );
-    let table = '| Agent | Active | Net Sales | Invoice | Cash | Customers |\n|-------|--------|-----------|---------|------|-----------|\n';
+    const total = rows.reduce((s: number, r: { net_sales: number }) => s + Number(r.net_sales), 0);
+
+    let table = '| Agent | Active | Net Sales | % of Total | Invoice | Cash | Customers |\n|-------|--------|-----------|-----------|---------|------|-----------|\n';
     for (const r of rows) {
-      table += `| ${r.agent_name} | ${r.is_active} | RM ${Number(r.net_sales).toLocaleString('en-MY')} | RM ${Number(r.invoice_sales).toLocaleString('en-MY')} | RM ${Number(r.cash_sales).toLocaleString('en-MY')} | ${r.customer_count} |\n`;
+      const pct = total > 0 ? ((Number(r.net_sales) / total) * 100).toFixed(1) : '0';
+      table += `| ${r.agent_name} | ${r.is_active} | RM ${Number(r.net_sales).toLocaleString('en-MY')} | ${pct}% | RM ${Number(r.invoice_sales).toLocaleString('en-MY')} | RM ${Number(r.cash_sales).toLocaleString('en-MY')} | ${r.customer_count} |\n`;
     }
-    return `Dimension: Sales Agent\n\n${table}`;
+    return `Dimension: Sales Agent\nTotal net sales: RM ${Number(total).toLocaleString('en-MY')}\n\n${table}`;
   },
 
   async by_outlet(dr) {

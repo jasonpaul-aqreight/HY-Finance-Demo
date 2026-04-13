@@ -1535,6 +1535,11 @@ Data fetchers that pass monthly breakdowns **must also include pre-calculated to
 
 **Why:** Haiku summed 12 monthly values incorrectly (said RM 87.16M when actual was RM 82.76M). Pre-calculating prevents the AI from doing arithmetic.
 
+This applies to **all ratios and percentages**, not just sums. If a table has a value and a total, the data fetcher must pre-calculate the percentage — Haiku will hallucinate percentages when forced to mentally divide (e.g., it claimed 95% when the actual was 58% for risk tier outstanding share). Affected fetchers:
+- `customer_credit_health`: `% of Outstanding` column added alongside `% of Customers`
+- `by_agent`: `% of Total` column added for each agent's net sales share
+- `by_customer`, `by_product`, `by_outlet`, `aging_analysis`: already had pre-calculated percentages
+
 ### 12.4 Tool Call Exhaustion Nudge
 
 When the summary uses all `MAX_TOOL_CALLS_PER_SUMMARY` calls, the orchestrator injects a user message:
@@ -1633,9 +1638,66 @@ For each section:
 3. Click "Analyze" and wait for all components to complete
 4. Verify the "Last Updated" timestamp reflects the current run
 
-### Step 3: Verify Summary Panel Values
+### Step 3: Establish DB Ground Truth (Independent Baseline)
 
-For each section, compare the AI Insight summary panel (positive/negative cards) against the dashboard KPIs:
+Before comparing against the dashboard UI, query the database directly to establish an independent ground truth. This catches bugs that would be invisible if you only compared AI output vs. dashboard (e.g., if the data-fetcher and dashboard query share the same filter bug).
+
+Run the ground truth SQL for each section against the same database the AI Insight Engine uses (connection string from `DATABASE_URL`). The AI Insight values **MUST** match the DB ground truth, not just the dashboard.
+
+**Ground Truth Queries (reference — adapt date range to match the section's selected window):**
+
+```sql
+-- payment_collection_trend (pc_ar_monthly) — replace dates with section's selected range
+SELECT month,
+       CASE WHEN invoiced > 0
+         THEN ROUND((total_outstanding::numeric / invoiced) * 30, 1)
+         ELSE NULL END AS dso,
+       invoiced, collected, (collected - invoiced) AS gap
+FROM pc_ar_monthly
+WHERE month BETWEEN '<start_ym>' AND '<end_ym>'
+ORDER BY month;
+
+SELECT SUM(invoiced) AS total_invoiced,
+       SUM(collected) AS total_collected,
+       ROUND(SUM(collected)::numeric / NULLIF(SUM(invoiced), 0) * 100, 1) AS collection_rate_pct
+FROM pc_ar_monthly WHERE month BETWEEN '<start_ym>' AND '<end_ym>';
+
+-- payment_outstanding (snapshot tables)
+SELECT SUM(total_outstanding) AS total, SUM(overdue_amount) AS overdue,
+       COUNT(*) FILTER (WHERE overdue_amount > 0) AS overdue_customers,
+       COUNT(*) AS total_customers
+FROM pc_ar_customer_snapshot
+WHERE snapshot_date = (SELECT MAX(snapshot_date) FROM pc_ar_customer_snapshot)
+  AND total_outstanding > 0 AND company_name NOT ILIKE 'CASH SALES%';
+
+SELECT bucket, SUM(invoice_count) AS invoices, SUM(total_outstanding) AS amount
+FROM pc_ar_aging_history
+WHERE snapshot_date = (SELECT MAX(snapshot_date) FROM pc_ar_aging_history)
+  AND dimension = 'all' GROUP BY bucket;
+
+SELECT risk_tier, COUNT(*), SUM(total_outstanding)
+FROM pc_ar_customer_snapshot
+WHERE snapshot_date = (SELECT MAX(snapshot_date) FROM pc_ar_customer_snapshot)
+  AND (is_active = 'T' OR total_outstanding > 0)
+  AND company_name NOT ILIKE 'CASH SALES%'
+GROUP BY risk_tier;
+
+-- sales_trend (pc_sales_daily)
+SELECT SUM(invoice_total) AS invoice_sales, SUM(cash_total) AS cash_sales,
+       SUM(cn_total) AS credit_notes, SUM(net_revenue) AS net_sales
+FROM pc_sales_daily WHERE doc_date BETWEEN '<start>' AND '<end>';
+
+-- sales_breakdown (pc_sales_by_customer / pc_sales_by_fruit / pc_sales_by_outlet)
+SELECT company_name, SUM(total_sales) AS net_sales
+FROM pc_sales_by_customer WHERE doc_date BETWEEN '<start>' AND '<end>'
+GROUP BY company_name ORDER BY SUM(total_sales) DESC LIMIT 15;
+```
+
+Record the ground truth values in a working document. These are the authoritative numbers — every AI Insight claim must match these to pass.
+
+### Step 4: Verify Summary Panel Values
+
+For each section, compare the AI Insight summary panel (positive/negative cards) against **both** the DB ground truth (primary) and the dashboard KPIs (secondary):
 
 **Payment Collection Trend — verify against:**
 - Avg Collection Days (KPI card)
@@ -1658,33 +1720,72 @@ For each section, compare the AI Insight summary panel (positive/negative cards)
 - Sales Breakdown table (customer names and Total Sales values)
 - Sales Chart (top 10 horizontal bar chart values)
 
-### Step 4: Verify Each Insight Detail Dialog
+### Step 5: Verify Summary Detail Dialogs
 
 Click every insight card in the summary panel to open its detail dialog. For each dialog:
 
 1. **Screenshot** the dialog content
-2. **Compare** the table/metric values against the corresponding dashboard values
-3. **Check** that customer names, amounts, and percentages match the dashboard table/chart
-4. **Confirm** the business narrative makes sense given the data
+2. **Extract** every number, customer name, percentage, and date reference the AI cites
+3. **Verify** each extracted value against the DB ground truth from Step 3
+4. **Confirm** the business narrative is logically consistent with the data (not just numerically correct)
 
-### Step 5: Document Results
+### Step 6: Verify Component Detail Dialogs
 
-For each section, produce a report with:
+For each of the 5–6 components in the section, click the `?` (View AI insight) icon next to the component title. For each component dialog:
 
-| Field | Description |
-|-------|-------------|
-| Section name | Which section was tested |
-| Analysis timestamp | "Last Updated" value from the panel |
-| Value match table | Dashboard value vs AI Insight value, with match status |
-| Insight dialog table | Each insight title, sentiment, key values verified |
-| Verdict | PASS or FAIL with specific discrepancies noted |
+1. **Screenshot** the dialog content
+2. **Verify** the component's claimed values against the DB ground truth (NOT against the dashboard — the fetcher feeds both)
+3. **Flag** any component that punts with "insufficient data" when the data IS available in the section
+4. **Flag** any cross-component contradictions (e.g., one component says "concentration risk" while another says "risk is spread across all customers")
 
-### Pass Criteria
+Alternatively, read component analyses directly from the DB to avoid UI navigation:
 
-- All KPI values in AI Insight dialogs must match dashboard values (within RM 1 rounding tolerance)
-- Customer-specific values (names, amounts, percentages) must match the dashboard table exactly
-- Chart-derived values (averages, trends) may have minor rounding differences but must be directionally correct
-- All 4 sections must PASS for the verification to be considered complete
+```sql
+SELECT component_key, analysis_md
+FROM ai_insight_component
+WHERE section_id = (SELECT id FROM ai_insight_section
+                    WHERE section_key = '<section_key>'
+                    ORDER BY generated_at DESC LIMIT 1)
+ORDER BY component_key;
+```
+
+### Step 7: Produce Structured Validation Report
+
+For each section, produce a report with three clearly separated sections:
+
+**1. MAKES SENSE (What checks out)**
+- A table mapping every AI claim to the DB ground truth with a Match/No Match verdict
+- All numbers, customer names, percentages, dates must be listed
+- Qualitative observations (threshold classifications, trend direction, business context) must also be validated
+
+**2. DISCREPANCIES**
+- Any number, name, percentage, or date that does not match the DB ground truth — even by RM 1
+- Any arithmetic error (e.g., "95% of debt" when DB shows 58%)
+- Any contradiction between components or between summary and components
+- Any unsupported claim (e.g., calling out specific customers as "the worst" when the DB shows others are worse)
+- Severity tag: CRITICAL / MODERATE / MINOR
+
+**3. INSIGHTFUL (Value assessment)**
+- Summary-level quality score out of 10 with justification
+- Component-level quality score out of 10 with justification
+- What root-cause drill-down worked; what was missed
+- Whether a director reading only the summary would learn the right things
+
+### Pass Criteria — 100% Accuracy Required
+
+**The accuracy MUST AND SHALL be 100%. There is no rounding tolerance.**
+
+- Every RM value cited by the AI must match the DB ground truth to the cent (when the AI shows cents) or to the RM (when the AI rounds to RM)
+- Every percentage must match the DB to the stated precision (if AI shows "58%", DB must compute to 57.5–58.4%; if AI shows "58.0%", DB must be 57.95–58.04%)
+- Every count (customers, invoices, breaches) must match exactly
+- Every customer name cited must exist in the DB with the values the AI claims for it
+- Every overdue day count, credit limit, utilization percentage must match the `pc_ar_customer_snapshot` row exactly
+- Any discrepancy — however small — is a FAIL for that section
+- Any cross-component contradiction is a FAIL
+- Any arithmetic error in a component analysis is a FAIL
+- All 4 sections must PASS for the verification to be considered complete before production deployment
+
+**Rationale:** Directors will trust the AI Insight output and take action on the numbers cited. A single incorrect customer name or amount could lead to wrong recovery prioritization, wrong credit policy decisions, or wrong escalations. 100% accuracy is the only acceptable standard for production.
 
 ### Known Considerations
 
