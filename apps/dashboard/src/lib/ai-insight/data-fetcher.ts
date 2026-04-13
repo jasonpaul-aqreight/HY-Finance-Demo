@@ -157,6 +157,28 @@ const fetchers: Record<string, DataFetcher> = {
         ? (((worst.gap + secondWorst.gap) / negSum) * 100).toFixed(1)
         : null;
 
+    // Rule C — pre-computed half-period averages (prevents the LLM from
+    // inventing sub-period averages or cherry-picking month ranges).
+    // Split the period into two equal halves by month count; for odd N, H2 gets the extra month.
+    const halfIdx = Math.floor(gapRows.length / 2);
+    const h1Rows = gapRows.slice(0, halfIdx);
+    const h2Rows = gapRows.slice(halfIdx);
+    const avgOf = (rs: GapRow[]) => rs.length ? rs.reduce((s, r) => s + r.gap, 0) / rs.length : 0;
+    const h1Avg = avgOf(h1Rows);
+    const h2Avg = avgOf(h2Rows);
+    const h1Min = h1Rows.length ? h1Rows.reduce((a, b) => (a.gap < b.gap ? a : b)) : null;
+    const h1Max = h1Rows.length ? h1Rows.reduce((a, b) => (a.gap > b.gap ? a : b)) : null;
+    const h2Min = h2Rows.length ? h2Rows.reduce((a, b) => (a.gap < b.gap ? a : b)) : null;
+    const h2Max = h2Rows.length ? h2Rows.reduce((a, b) => (a.gap > b.gap ? a : b)) : null;
+    const fmtSigned = (n: number) =>
+      `${n >= 0 ? '+' : ''}RM ${n.toLocaleString('en-MY', { maximumFractionDigits: 0 })}`;
+    const h1MonthList = h1Rows.map(r => r.month).join(', ');
+    const h2MonthList = h2Rows.map(r => r.month).join(', ');
+    const direction =
+      h1Rows.length && h2Rows.length
+        ? (Math.abs(h2Avg) < Math.abs(h1Avg) ? 'narrowing' : Math.abs(h2Avg) > Math.abs(h1Avg) ? 'widening' : 'flat')
+        : 'n/a';
+
     let table = '| Month | Invoiced | Collected | Gap |\n|-------|----------|-----------|-----|\n';
     for (const r of gapRows) {
       table += `| ${r.month} | RM ${r.invoiced.toLocaleString('en-MY')} | RM ${r.collected.toLocaleString('en-MY')} | ${r.gap >= 0 ? '+' : ''}RM ${r.gap.toLocaleString('en-MY')} |\n`;
@@ -171,7 +193,15 @@ const fetchers: Record<string, DataFetcher> = {
       (secondWorst ? `- Second-worst month: ${secondWorst.month} at ${secondWorst.gap >= 0 ? '+' : ''}RM ${secondWorst.gap.toLocaleString('en-MY')}\n` : '') +
       (best ? `- Best month: ${best.month} at ${best.gap >= 0 ? '+' : ''}RM ${best.gap.toLocaleString('en-MY')}\n` : '') +
       (worstTwoPct ? `- Worst two months combined = ${worstTwoPct}% of the full-period negative gap\n` : '') +
-      `- Period total negative gap: RM ${negSum.toLocaleString('en-MY', { minimumFractionDigits: 2 })}\n`;
+      `- Period total negative gap: RM ${negSum.toLocaleString('en-MY', { minimumFractionDigits: 2 })}\n` +
+      `\nPre-calculated half-period averages (use these ONLY — do NOT compute your own H1/H2/"first half"/"last 4 months" or any other sub-period averages):\n` +
+      (h1Rows.length ? `- H1 months (${h1Rows.length}): ${h1MonthList}\n` : '') +
+      (h1Rows.length ? `- H1 avg gap: ${fmtSigned(h1Avg)}/month\n` : '') +
+      (h1Min && h1Max ? `- H1 gap range: ${fmtSigned(h1Min.gap)} (${h1Min.month}) .. ${fmtSigned(h1Max.gap)} (${h1Max.month})\n` : '') +
+      (h2Rows.length ? `- H2 months (${h2Rows.length}): ${h2MonthList}\n` : '') +
+      (h2Rows.length ? `- H2 avg gap: ${fmtSigned(h2Avg)}/month\n` : '') +
+      (h2Min && h2Max ? `- H2 gap range: ${fmtSigned(h2Min.gap)} (${h2Min.month}) .. ${fmtSigned(h2Max.gap)} (${h2Max.month})\n` : '') +
+      `- H1→H2 direction: ${direction} (based on |H2 avg| vs |H1 avg|)\n`;
 
     return `Period totals:\nTotal Invoiced: RM ${totalInv.toLocaleString('en-MY', { minimumFractionDigits: 2 })}\nTotal Collected: RM ${totalCol.toLocaleString('en-MY', { minimumFractionDigits: 2 })}\nCumulative Gap: ${gap >= 0 ? '+' : ''}RM ${gap.toLocaleString('en-MY', { minimumFractionDigits: 2 })}\nAvg Monthly Collection: RM ${Math.round(avgCol).toLocaleString('en-MY')}\n\n${preCalc}\nMonthly breakdown:\n${table}`;
   },

@@ -110,6 +110,14 @@ How to read it:
 
 Look for: widening/narrowing gaps, months where collection dropped sharply, seasonal collection patterns.
 
+**Sub-period averaging is BANNED in this component.** The data block contains pre-computed H1/H2 averages, H1/H2 ranges, and an H1→H2 direction line. You may quote those verbatim. You may NOT:
+- Define your own sub-period (e.g. "Jul-Oct", "Q3-Q4", "last 4 months", "second half") and average its gaps yourself.
+- Cite a range ("RM -X to RM -Y") that excludes any month inside the stated sub-period.
+- Narrate a "narrowing", "widening", "tightening", or "improving" trend that is contradicted by any month inside the sub-period.
+- Do mental arithmetic on the monthly gap values.
+
+Describe trends month-by-month, or use the pre-computed H1/H2 lines. Anything else is a fabrication.
+
 Provide a concise analysis of the invoiced vs collected relationship.`,
 
   // Payment Section 2: Outstanding Payment
@@ -361,6 +369,26 @@ OMIT the number entirely. Do NOT:
   the data, not from your arithmetic.
 - Paraphrase a number into a slightly different one.
 - Pick a subset of months that supports a narrative while ignoring the rest.
+
+**Sub-period citation rule (hard constraint — violating this is how past
+runs fabricated the "Jul–Oct averaged RM -771K" bug):**
+- If you want to cite a sub-period AVERAGE (e.g. "H2 averaged RM -X/month",
+  "first half averaged Y", "Jul-Oct averaged Z"), you MUST copy it verbatim
+  from a "Pre-calculated half-period averages" line in the raw data block.
+  You may NOT define your own sub-period (e.g. "Jul–Oct", "Q3-Q4",
+  "second half of the year") and average it yourself. Mental arithmetic on
+  monthly values is forbidden.
+- If you want to cite a sub-period RANGE ("gaps ranged from RM -A to RM -B"),
+  the range must include EVERY month in the named sub-period and the stated
+  min/max must be the actual extremes of that set. You may NOT omit a month
+  that breaks your narrative. Prefer the pre-computed H1/H2 range lines.
+- If you want to narrate a TREND ("narrowing", "widening", "improving",
+  "tightening gaps"), only use the pre-computed "H1→H2 direction" line when
+  available. Never claim a direction that is contradicted by an individual
+  month inside the sub-period.
+- If the raw data does not give you a pre-computed figure for the sub-period
+  you want to cite, drop the claim. Describe month-by-month direction
+  instead, or cite the full-period average.
 
 A ±RM 1 rounding on totals is acceptable. Any name mismatch is not.
 
