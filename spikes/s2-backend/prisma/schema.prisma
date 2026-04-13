@@ -1,0 +1,44 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  schemas  = ["spike_s2"]
+}
+
+// Minimal models to validate Prisma 6 — throwaway spike
+model spike_user {
+  id              String   @id @default(uuid())
+  name            String
+  email           String   @unique
+  phone           String?
+  role            String   @default("finance")
+  department_code String?
+  employee_code   String?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+  deleted_at      DateTime?
+
+  @@schema("spike_s2")
+}
+
+model spike_pc_sales_daily {
+  id          String   @id @default(uuid())
+  doc_date    DateTime
+  net_total   Decimal  @db.Decimal(18, 2)
+  doc_type    String
+  customer_id String?
+  created_at  DateTime @default(now())
+
+  @@schema("spike_s2")
+}
+
+model spike_app_setting {
+  id    String @id @default(uuid())
+  key   String @unique
+  value String
+
+  @@schema("spike_s2")
+}

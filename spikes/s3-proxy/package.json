@@ -1,0 +1,25 @@
+{
+  "name": "s3-proxy-spike",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Spike S3: Validate catch-all API proxy pattern (Next.js → Express backend)",
+  "scripts": {
+    "dev": "next dev --turbopack --port 3098",
+    "build": "next build",
+    "start": "next start --port 3098",
+    "validate": "tsx src/validate-s3.ts"
+  },
+  "dependencies": {
+    "next": "16.1.7",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "next-auth": "4.24.13"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.0"
+  }
+}

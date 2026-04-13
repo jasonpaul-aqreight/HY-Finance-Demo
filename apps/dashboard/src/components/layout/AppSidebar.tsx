@@ -13,6 +13,7 @@ import {
   RefreshCw,
   PanelLeftClose,
   PanelLeft,
+  BookOpen,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSidebar } from './SidebarProvider';
@@ -30,6 +31,10 @@ const navItems = [
   { href: '/expenses', label: 'Expenses', icon: Receipt },
   { href: '/customer-margin', label: 'Customer Margin', icon: Users },
   { href: '/supplier-performance', label: 'Supplier Performance', icon: Truck },
+];
+
+const resourceItems = [
+  { href: '/manual', label: 'User Manual', icon: BookOpen },
 ];
 
 const adminItems = [
@@ -98,6 +103,50 @@ export function AppSidebar() {
 
           return link;
         })}
+
+        {/* Resources section */}
+        <div className="pt-3 mt-3 border-t border-sidebar-accent">
+          {!collapsed && (
+            <span className="px-3 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/50">
+              Resources
+            </span>
+          )}
+          <div className="mt-1 space-y-1">
+            {resourceItems.map((item) => {
+              const isActive = pathname.startsWith(item.href);
+              const Icon = item.icon;
+
+              const link = (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                    isActive
+                      ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                      : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                  )}
+                >
+                  <Icon size={18} className="shrink-0" />
+                  {!collapsed && <span className="truncate">{item.label}</span>}
+                </Link>
+              );
+
+              if (collapsed) {
+                return (
+                  <Tooltip key={item.href}>
+                    <TooltipTrigger render={<span />}>{link}</TooltipTrigger>
+                    <TooltipContent side="right" sideOffset={10}>
+                      {item.label}
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              }
+
+              return link;
+            })}
+          </div>
+        </div>
 
         {/* Admin section */}
         <div className="pt-3 mt-3 border-t border-sidebar-accent">

@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { AnalyzeIcon } from '@/components/ai-insight/AnalyzeIcon';
 import { useAging, useAgingByDimension } from '@/hooks/payment/usePaymentDataV2';
 import { useStableData } from '@/hooks/useStableData';
 import { formatRM } from '@/lib/payment/format';
@@ -84,7 +85,10 @@ export default function AgingChartV2() {
     <Card>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
-          <CardTitle>Aging Analysis</CardTitle>
+          <div className="flex items-center gap-2">
+            <CardTitle>Aging Analysis</CardTitle>
+            <AnalyzeIcon sectionKey="payment_outstanding" componentKey="aging_analysis" />
+          </div>
           <div className="flex border rounded-md overflow-hidden">
             {([
               { key: 'all', label: 'All' },

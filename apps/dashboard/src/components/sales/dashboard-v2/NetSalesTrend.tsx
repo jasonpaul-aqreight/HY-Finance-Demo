@@ -6,6 +6,7 @@ import type { DashboardFiltersV2 } from '@/hooks/sales/useDashboardFiltersV2';
 import type { Granularity } from '@/hooks/sales/useDashboardFiltersV2';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { AnalyzeIcon } from '@/components/ai-insight/AnalyzeIcon';
 import { formatRM } from '@/lib/format';
 import {
   ComposedChart,
@@ -90,7 +91,10 @@ export function NetSalesTrend({ filters, setFilters }: NetSalesTrendProps) {
     <Card>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
-          <CardTitle>Net Sales Trend</CardTitle>
+          <div className="flex items-center gap-2">
+            <CardTitle>Net Sales Trend</CardTitle>
+            <AnalyzeIcon sectionKey="sales_trend" componentKey="net_sales_trend" />
+          </div>
           <div className="flex items-center gap-2">
             <div className="flex border rounded-md overflow-hidden">
               {(['daily', 'weekly', 'monthly'] as const).map((g) => (

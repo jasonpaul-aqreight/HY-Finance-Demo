@@ -8,6 +8,7 @@ import type { DashboardFiltersV2 } from '@/hooks/sales/useDashboardFiltersV2';
 import type { GroupByDimension, GroupByRow } from '@/lib/sales/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { AnalyzeIcon } from '@/components/ai-insight/AnalyzeIcon';
 import {
   Select,
   SelectContent,
@@ -28,6 +29,14 @@ const GROUP_OPTIONS: { value: GroupByDimension; label: string }[] = [
   { value: 'agent', label: 'Sales Agent' },
   { value: 'outlet', label: 'Outlet' },
 ];
+
+const GROUPBY_TO_COMPONENT_KEY: Record<GroupByDimension, string> = {
+  customer: 'by_customer',
+  'customer-type': 'by_customer',
+  fruit: 'by_product',
+  agent: 'by_agent',
+  outlet: 'by_outlet',
+};
 
 /** Unique row key — for fruit uses composite, others use name */
 function rowKey(row: GroupByRow, group: GroupByDimension): string {
@@ -191,7 +200,10 @@ export function GroupBySection({ filters, setFilters }: GroupBySectionProps) {
     <Card>
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between flex-wrap gap-3">
-          <CardTitle>Sales Breakdown</CardTitle>
+          <div className="flex items-center gap-2">
+            <CardTitle>Sales Breakdown</CardTitle>
+            <AnalyzeIcon sectionKey="sales_breakdown" componentKey={GROUPBY_TO_COMPONENT_KEY[filters.groupBy]} />
+          </div>
           <div className="flex flex-col items-end gap-2">
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">Group by:</span>

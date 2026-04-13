@@ -4,22 +4,31 @@ import { useRevenueSummary } from '@/hooks/sales/useRevenueSummary';
 import { useStableData } from '@/hooks/useStableData';
 import type { DashboardFiltersV2 } from '@/hooks/sales/useDashboardFiltersV2';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { AnalyzeIcon } from '@/components/ai-insight/AnalyzeIcon';
 import { formatRM } from '@/lib/format';
+import type { SectionKey } from '@/lib/ai-insight/types';
 
 interface KpiCardProps {
   title: string;
   value: string;
   subtitle?: string;
   negative?: boolean;
+  sectionKey?: SectionKey;
+  componentKey?: string;
 }
 
-function KpiCard({ title, value, subtitle, negative }: KpiCardProps) {
+function KpiCard({ title, value, subtitle, negative, sectionKey, componentKey }: KpiCardProps) {
   return (
     <Card>
       <CardHeader className="pb-1 pt-4 px-4">
-        <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-          {title}
-        </CardTitle>
+        <div className="flex items-center gap-1">
+          <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            {title}
+          </CardTitle>
+          {sectionKey && componentKey && (
+            <AnalyzeIcon sectionKey={sectionKey} componentKey={componentKey} />
+          )}
+        </div>
       </CardHeader>
       <CardContent className="px-4 pb-4">
         <div className={`text-2xl font-bold tabular-nums ${negative ? 'text-red-600' : ''}`}>
@@ -78,22 +87,30 @@ export function KpiCardsV2({ filters }: { filters: DashboardFiltersV2 }) {
         title="Net Sales"
         value={formatRM(current.net_revenue)}
         subtitle="Invoice + Cash Sales − Credit Notes"
+        sectionKey="sales_trend"
+        componentKey="net_sales"
       />
       <KpiCard
         title="Invoice Sales"
         value={formatRM(current.invoice_revenue)}
         subtitle="Billed on credit terms to customer"
+        sectionKey="sales_trend"
+        componentKey="invoice_sales"
       />
       <KpiCard
         title="Cash Sales"
         value={formatRM(current.cashsales_revenue)}
         subtitle="Immediate payment"
+        sectionKey="sales_trend"
+        componentKey="cash_sales"
       />
       <KpiCard
         title="Credit Notes"
         value={formatRM(Math.abs(current.credit_notes))}
         subtitle="Goods returns & adjustments"
         negative
+        sectionKey="sales_trend"
+        componentKey="credit_notes"
       />
     </div>
   );
