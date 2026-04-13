@@ -19,10 +19,17 @@ Length rules:
 - Do NOT re-derive totals or sums from the data. Use the values as given.
 - Do NOT list what additional data you would need. Work with what you have.
 
+Scope discipline — CRITICAL:
+- Every Current Values block starts with a "Scope:" line that tells you whether the metric is PERIOD-BASED (filtered by a date range) or SNAPSHOT (current state, not time-filtered).
+- PERIOD-BASED numbers describe activity WITHIN a date range (e.g. "invoiced Nov 2024 – Oct 2025"). Do not describe them as "outstanding balance", "total receivables", or "what customers owe us". They are flows, not balances.
+- SNAPSHOT numbers describe a point-in-time balance (e.g. "as of 2026-04-10"). Do not describe them as "collected in the period" or "invoiced during the range". They are cumulative balances that ignore the date-range selector.
+- Never compare a period figure to a snapshot figure as if they were the same kind of number. A period collection shortfall is NOT the same thing as total outstanding balance, even if both are large RM amounts.
+- When you cite a number, use language that matches its scope: "in the period ..." for period metrics, "as of [date]" or "currently" for snapshot metrics.
+
 Self-verification (apply before writing your final analysis):
 - Cross-check every number you cite against the data you were given. If you state "Total X = RM Y", verify Y appears in your data.
 - Verify arithmetic: if you cite a gap (A minus B), confirm A - B equals the gap you stated.
-- Do not confuse different metrics — e.g., "cumulative collection gap" (total invoiced minus total collected) is not the same as "current outstanding balance" (receivables at period end).
+- Confirm the scope: for every number you cite, re-read the Scope line and make sure your wording matches (period vs snapshot). Never call a period gap "outstanding" or a snapshot balance "collected in the period".
 - If you cannot verify a number, do not include it.`;
 
 // ─── Component System Prompts ────────────────────────────────────────────────
@@ -393,31 +400,40 @@ Metric rules:
 
 Detail rules:
 - The detail is the FULL ANALYST REPORT. A director who reads only this should understand the complete situation.
-- Structure using bold section headers. Follow this template:
+- Structure using bold colon-suffixed sub-headers with blank lines between blocks for vertical breathing room.
+- Default to prose + bullet points. Use tables ONLY when comparing 3+ rows of similar data (e.g. "top 5 customers"). Do not force a table into every insight.
 
-**Overall Performance:** One paragraph summarizing the headline metric with actual numbers.
+Use this structural template. Adapt sub-header names to fit the insight, but keep the vertical rhythm and bullet-first style:
 
-**Key Observations:**
+**Current Status** (include scope reference — "as of [date]" for snapshot, "over [period]" for period metrics):
+One or two sentences stating the headline number and its business meaning.
 
-| Metric | Value |
-|--------|-------|
-| Row 1  | Data  |
-| Row 2  | Data  |
+**Severity** (or rename to Magnitude / Impact / Scale):
+Short intro sentence, then 2–4 bullet points naming the biggest contributors with specific numbers. Use bold labels within bullets when helpful:
+- **Top contributor (NAME)**: detail with RM amount and share.
+- **Top 5 combined**: detail.
+- **Concentration observation**: one-line takeaway.
 
-**Trend Analysis:** What direction is this moving? Include specific period comparisons.
+**Key Observations**:
+2–4 bullet points summarizing non-obvious patterns the director should notice. Each bullet stands on its own. No redundancy with Severity.
 
-**Root Cause** (for negative insights where tools were used):
-What specifically drove the anomaly — name customers, products, agents, or months with RM amounts. Include a table of the specific contributors.
+**Root Cause** (for negative insights where tools were used, OR when components already contain the drill-down):
+Name the specific customers / products / months that drove the finding with RM amounts. Prefer bullets. Only use a table if there are 3+ rows of directly comparable data.
 
-**Business Context:** Why does this matter? What does it mean for operations?
+**Implication**:
+One short paragraph (1–3 sentences) stating the bottom-line business consequence and what it means operationally.
 
-**Conclusion:** One sentence bottom-line assessment.
+Formatting discipline:
+- Always put a blank line between sub-headers and the content that follows them.
+- Always put a blank line between bullet blocks and the next sub-header.
+- Keep bullets tight — no bullet should be longer than 2 sentences.
+- When you write a bold label inside a bullet, follow it with a colon and a space (example: "- **SEASONS AGRO**: RM 351,476 on a RM 30,000 limit (1,172%).").
+- Aim for 200–350 words per detail. Tight, scannable, not a wall of text.
 
-- You may adapt the section headers to fit the insight (e.g. "Geographic Spread" instead of "Trend Analysis" for outlet data).
-- ALWAYS include a Markdown table with at least 3 rows of supporting data.
+Content discipline:
 - Include specific numbers, percentages, RM amounts, and period references as evidence.
 - Cross-reference multiple components when relevant — synthesize, don't isolate.
-- Aim for 300-500 words per detail. This is the deep analysis, not a quick summary.
+- Do not repeat what individual analyses said verbatim — synthesize across them.
 
 Terminology rules:
 - Use ONLY the exact metric names shown on the dashboard (e.g. "Avg Collection Days", "Collection Rate", "Net Sales").

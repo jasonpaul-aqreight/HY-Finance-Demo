@@ -133,7 +133,28 @@ const fetchers: Record<string, DataFetcher> = {
          AND company_name NOT ILIKE 'CASH SALES%'`,
       [latest.d],
     );
-    return `Value: RM ${Number(rows[0].total).toLocaleString('en-MY')}`;
+    const total = Number(rows[0].total);
+
+    const { rows: top5 } = await pool.query(
+      `SELECT company_name, total_outstanding
+       FROM pc_ar_customer_snapshot
+       WHERE snapshot_date = $1 AND total_outstanding > 0
+         AND company_name NOT ILIKE 'CASH SALES%'
+       ORDER BY total_outstanding DESC
+       LIMIT 5`,
+      [latest.d],
+    );
+
+    let top5Share = 0;
+    let topTable = '| Rank | Customer | Outstanding | % of Total |\n|------|----------|-------------|------------|\n';
+    top5.forEach((r: { company_name: string; total_outstanding: number }, i: number) => {
+      const amt = Number(r.total_outstanding);
+      const pct = total > 0 ? (amt / total) * 100 : 0;
+      top5Share += pct;
+      topTable += `| ${i + 1} | ${r.company_name} | RM ${amt.toLocaleString('en-MY')} | ${pct.toFixed(1)}% |\n`;
+    });
+
+    return `Value: RM ${total.toLocaleString('en-MY')}\n\nTop 5 contributors (${top5Share.toFixed(1)}% of total):\n${topTable}`;
   },
 
   async overdue_amount() {
@@ -153,7 +174,26 @@ const fetchers: Record<string, DataFetcher> = {
     const { total, overdue, overdue_customers, total_customers } = rows[0];
     const pct = total > 0 ? ((overdue / total) * 100).toFixed(1) : '0';
 
-    return `Value: RM ${Number(overdue).toLocaleString('en-MY')}\nPercentage of total: ${pct}%\nOverdue customers: ${overdue_customers}\nTotal customers: ${total_customers}`;
+    const { rows: top5 } = await pool.query(
+      `SELECT company_name, overdue_amount, max_overdue_days
+       FROM pc_ar_customer_snapshot
+       WHERE snapshot_date = $1 AND overdue_amount > 0
+         AND company_name NOT ILIKE 'CASH SALES%'
+       ORDER BY overdue_amount DESC
+       LIMIT 5`,
+      [latest.d],
+    );
+
+    const overdueTotal = Number(overdue);
+    let topTable = '| Rank | Customer | Overdue Amount | Max Overdue Days | % of Overdue |\n|------|----------|----------------|-------------------|--------------|\n';
+    top5.forEach((r: { company_name: string; overdue_amount: number; max_overdue_days: number | null }, i: number) => {
+      const amt = Number(r.overdue_amount);
+      const sharePct = overdueTotal > 0 ? ((amt / overdueTotal) * 100).toFixed(1) : '0';
+      const days = r.max_overdue_days != null ? `${r.max_overdue_days} days` : 'N/A';
+      topTable += `| ${i + 1} | ${r.company_name} | RM ${amt.toLocaleString('en-MY')} | ${days} | ${sharePct}% |\n`;
+    });
+
+    return `Value: RM ${Number(overdue).toLocaleString('en-MY')}\nPercentage of total: ${pct}%\nOverdue customers: ${overdue_customers}\nTotal customers: ${total_customers}\n\nTop 5 overdue customers:\n${topTable}`;
   },
 
   async credit_limit_breaches() {
@@ -171,7 +211,30 @@ const fetchers: Record<string, DataFetcher> = {
     const count = parseInt(rows[0].breach_count);
     const color = count === 0 ? 'Green (Good)' : 'Red (Concern)';
 
-    return `Value: ${count} customers\nColor: ${color}`;
+    if (count === 0) {
+      return `Value: ${count} customers\nColor: ${color}`;
+    }
+
+    const { rows: breaches } = await pool.query(
+      `SELECT company_name, credit_limit, total_outstanding, utilization_pct
+       FROM pc_ar_customer_snapshot
+       WHERE snapshot_date = $1 AND credit_limit > 0 AND total_outstanding > credit_limit
+         AND is_active = 'T'
+         AND company_name NOT ILIKE 'CASH SALES%'
+       ORDER BY utilization_pct DESC NULLS LAST
+       LIMIT 10`,
+      [latest.d],
+    );
+
+    let breachTable = '| Rank | Customer | Credit Limit | Outstanding | Utilization |\n|------|----------|--------------|-------------|-------------|\n';
+    breaches.forEach((r: { company_name: string; credit_limit: number; total_outstanding: number; utilization_pct: number | null }, i: number) => {
+      const util = r.utilization_pct != null ? `${Number(r.utilization_pct).toFixed(0)}%` : 'N/A';
+      breachTable += `| ${i + 1} | ${r.company_name} | RM ${Number(r.credit_limit).toLocaleString('en-MY')} | RM ${Number(r.total_outstanding).toLocaleString('en-MY')} | ${util} |\n`;
+    });
+
+    const showing = Math.min(count, 10);
+    const heading = count > 10 ? `Top ${showing} breaching customers (of ${count}) by utilization:` : `Breaching customers (${count}) by utilization:`;
+    return `Value: ${count} customers\nColor: ${color}\n\n${heading}\n${breachTable}`;
   },
 
   async aging_analysis() {
@@ -236,11 +299,31 @@ const fetchers: Record<string, DataFetcher> = {
        ORDER BY CASE risk_tier WHEN 'High' THEN 0 WHEN 'Moderate' THEN 1 WHEN 'Low' THEN 2 END`,
       [latest.d],
     );
-    const { rows: top5 } = await pool.query(
+    const { rows: topByOutstanding } = await pool.query(
       `SELECT company_name, total_outstanding, credit_score, risk_tier
        FROM pc_ar_customer_snapshot
-       WHERE snapshot_date = $1 AND company_name NOT ILIKE 'CASH SALES%'
+       WHERE snapshot_date = $1 AND total_outstanding > 0
+         AND company_name NOT ILIKE 'CASH SALES%'
        ORDER BY total_outstanding DESC
+       LIMIT 5`,
+      [latest.d],
+    );
+    const { rows: topByOverdueDays } = await pool.query(
+      `SELECT company_name, max_overdue_days, total_outstanding, risk_tier
+       FROM pc_ar_customer_snapshot
+       WHERE snapshot_date = $1 AND total_outstanding > 0
+         AND max_overdue_days IS NOT NULL
+         AND company_name NOT ILIKE 'CASH SALES%'
+       ORDER BY max_overdue_days DESC
+       LIMIT 5`,
+      [latest.d],
+    );
+    const { rows: topByUtilization } = await pool.query(
+      `SELECT company_name, utilization_pct, credit_limit, total_outstanding, risk_tier
+       FROM pc_ar_customer_snapshot
+       WHERE snapshot_date = $1 AND credit_limit > 0 AND total_outstanding > 0
+         AND company_name NOT ILIKE 'CASH SALES%'
+       ORDER BY utilization_pct DESC NULLS LAST
        LIMIT 5`,
       [latest.d],
     );
@@ -254,12 +337,23 @@ const fetchers: Record<string, DataFetcher> = {
       riskTable += `| ${r.risk_tier} | ${r.count} | ${custPct}% | RM ${Number(r.total_outstanding).toLocaleString('en-MY')} | ${outPct}% |\n`;
     }
 
-    let topTable = '| Customer | Outstanding | Score | Risk |\n|----------|-------------|-------|------|\n';
-    for (const r of top5) {
-      topTable += `| ${r.company_name} | RM ${Number(r.total_outstanding).toLocaleString('en-MY')} | ${r.credit_score} | ${r.risk_tier} |\n`;
+    let outstandingTable = '| Customer | Outstanding | Score | Risk |\n|----------|-------------|-------|------|\n';
+    for (const r of topByOutstanding) {
+      outstandingTable += `| ${r.company_name} | RM ${Number(r.total_outstanding).toLocaleString('en-MY')} | ${r.credit_score} | ${r.risk_tier} |\n`;
     }
 
-    return `Summary:\n- Total customers: ${totalCustomers}\n\nRisk distribution:\n${riskTable}\nTop 5 by outstanding:\n${topTable}`;
+    let overdueTable = '| Customer | Max Overdue Days | Outstanding | Risk |\n|----------|-------------------|-------------|------|\n';
+    for (const r of topByOverdueDays) {
+      overdueTable += `| ${r.company_name} | ${r.max_overdue_days} days | RM ${Number(r.total_outstanding).toLocaleString('en-MY')} | ${r.risk_tier} |\n`;
+    }
+
+    let utilTable = '| Customer | Utilization | Credit Limit | Outstanding | Risk |\n|----------|-------------|--------------|-------------|------|\n';
+    for (const r of topByUtilization) {
+      const util = r.utilization_pct != null ? `${Number(r.utilization_pct).toFixed(0)}%` : 'N/A';
+      utilTable += `| ${r.company_name} | ${util} | RM ${Number(r.credit_limit).toLocaleString('en-MY')} | RM ${Number(r.total_outstanding).toLocaleString('en-MY')} | ${r.risk_tier} |\n`;
+    }
+
+    return `Summary:\n- Total customers: ${totalCustomers}\n\nRisk distribution:\n${riskTable}\nTop 5 by outstanding amount:\n${outstandingTable}\nTop 5 by max overdue days (most delinquent):\n${overdueTable}\nTop 5 by utilization % (most over credit limit):\n${utilTable}`;
   },
 
   // Sales Section 3
@@ -361,18 +455,43 @@ const fetchers: Record<string, DataFetcher> = {
       [dr!.start, dr!.end],
     );
     const { rows: totals } = await pool.query(
-      `SELECT SUM(total_sales) AS total_net FROM pc_sales_by_customer WHERE doc_date BETWEEN $1 AND $2`,
+      `SELECT SUM(total_sales) AS total_net,
+              COUNT(DISTINCT debtor_code) AS customer_count
+       FROM pc_sales_by_customer
+       WHERE doc_date BETWEEN $1 AND $2`,
       [dr!.start, dr!.end],
     );
-    const totalNet = totals[0]?.total_net ?? 0;
+    const totalNet = Number(totals[0]?.total_net ?? 0);
+    const customerCount = Number(totals[0]?.customer_count ?? 0);
+
+    const { rows: typeMix } = await pool.query(
+      `SELECT COALESCE(NULLIF(debtor_type, ''), '(Unknown)') AS debtor_type,
+              COUNT(DISTINCT debtor_code) AS cust_count,
+              SUM(total_sales) AS net_sales
+       FROM pc_sales_by_customer
+       WHERE doc_date BETWEEN $1 AND $2
+       GROUP BY COALESCE(NULLIF(debtor_type, ''), '(Unknown)')
+       ORDER BY SUM(total_sales) DESC`,
+      [dr!.start, dr!.end],
+    );
 
     let table = '| Rank | Customer | Type | Net Sales | % of Total |\n|------|----------|------|-----------|------------|\n';
+    let top5Share = 0;
+    let top10Share = 0;
     rows.forEach((r: Record<string, unknown>, i: number) => {
-      const pct = totalNet > 0 ? ((Number(r.net_sales) / totalNet) * 100).toFixed(1) : '0';
-      table += `| ${i + 1} | ${r.company_name} | ${r.debtor_type || '(Unknown)'} | RM ${Number(r.net_sales).toLocaleString('en-MY')} | ${pct}% |\n`;
+      const pct = totalNet > 0 ? (Number(r.net_sales) / totalNet) * 100 : 0;
+      if (i < 5) top5Share += pct;
+      if (i < 10) top10Share += pct;
+      table += `| ${i + 1} | ${r.company_name} | ${r.debtor_type || '(Unknown)'} | RM ${Number(r.net_sales).toLocaleString('en-MY')} | ${pct.toFixed(1)}% |\n`;
     });
 
-    return `Dimension: Customer\nTotal net sales: RM ${Number(totalNet).toLocaleString('en-MY')}\n\nTop 15 by net sales:\n${table}`;
+    let typeTable = '| Type | Customers | Net Sales | % of Total |\n|------|-----------|-----------|------------|\n';
+    for (const t of typeMix) {
+      const pct = totalNet > 0 ? ((Number(t.net_sales) / totalNet) * 100).toFixed(1) : '0';
+      typeTable += `| ${t.debtor_type} | ${t.cust_count} | RM ${Number(t.net_sales).toLocaleString('en-MY')} | ${pct}% |\n`;
+    }
+
+    return `Dimension: Customer\nTotal net sales: RM ${totalNet.toLocaleString('en-MY')}\nActive customers in period: ${customerCount}\n\nConcentration risk (pre-calculated):\n- Top 5 customers: ${top5Share.toFixed(1)}% of total revenue\n- Top 10 customers: ${top10Share.toFixed(1)}% of total revenue\n\nTop 15 by net sales:\n${table}\nCustomer type mix:\n${typeTable}`;
   },
 
   async by_product(dr) {
@@ -447,18 +566,50 @@ const fetchers: Record<string, DataFetcher> = {
   },
 };
 
+// ─── Scope classification ────────────────────────────────────────────────────
+// Every component is either period-based (filtered by date range) or snapshot-based
+// (current state, not time-filtered). The scope label is prepended to all fetcher
+// output so the LLM cannot conflate period metrics with snapshot metrics.
+
+type ScopeType = 'period' | 'snapshot';
+
+const SECTION_SCOPE: Record<SectionKey, ScopeType> = {
+  payment_collection_trend: 'period',
+  payment_outstanding: 'snapshot',
+  sales_trend: 'period',
+  sales_breakdown: 'period',
+};
+
+async function buildScopeLabel(scope: ScopeType, dateRange: DateRange | null): Promise<string> {
+  if (scope === 'period') {
+    if (!dateRange) return 'Scope: Period-based metric (no date range provided).';
+    return `Scope: PERIOD-BASED metric — filtered to ${dateRange.start} through ${dateRange.end}. All figures reflect activity WITHIN this date range only. Do NOT describe these numbers as "outstanding balance" or "total receivables" — they are period flows, not point-in-time balances.`;
+  }
+  // Snapshot: fetch latest snapshot_date once for the label
+  try {
+    const pool = getPool();
+    const { rows } = await pool.query(`SELECT MAX(snapshot_date) AS d FROM pc_ar_customer_snapshot`);
+    const d = rows[0]?.d ? new Date(rows[0].d).toISOString().slice(0, 10) : 'unknown';
+    return `Scope: SNAPSHOT metric — current state as of ${d}. These are point-in-time balances NOT filtered by any date range. Do NOT describe these numbers as "period collection" or "invoiced in the period" — they are cumulative balances. Do NOT apply any date-range context to these numbers.`;
+  } catch {
+    return 'Scope: SNAPSHOT metric — current state. Point-in-time balances, not filtered by date range.';
+  }
+}
+
 // ─── Public API ──────────────────────────────────────────────────────────────
 
 export async function fetchComponentData(
   componentKey: string,
-  _sectionKey: SectionKey,
+  sectionKey: SectionKey,
   dateRange: DateRange | null,
 ): Promise<string> {
   const fetcher = fetchers[componentKey];
   if (!fetcher) return `No data fetcher defined for component: ${componentKey}`;
 
   try {
-    return await fetcher(dateRange);
+    const body = await fetcher(dateRange);
+    const scopeLabel = await buildScopeLabel(SECTION_SCOPE[sectionKey], dateRange);
+    return `${scopeLabel}\n\n${body}`;
   } catch (err) {
     console.error(`Data fetch error for ${componentKey}:`, err);
     return `Error fetching data: ${err instanceof Error ? err.message : String(err)}`;
