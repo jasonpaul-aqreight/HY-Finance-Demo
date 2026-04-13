@@ -383,7 +383,7 @@ Output format — use this EXACT delimiter structure (no JSON, no code blocks):
 sentiment: good
 title: Short punchy headline (max 50 chars)
 metric: Key number e.g. 84.3%, 43 days, RM 2.1M (max 25 chars)
-summary: One plain-text sentence stating the core finding in a director-ready tone (max 140 chars, no markdown, no bold, no bullets)
+summary: One short plain-text sentence — the card preview (max 80 chars, no markdown)
 ---DETAIL---
 Full markdown analysis here (see detail rules below)
 ===END===
@@ -400,14 +400,18 @@ Metric rules:
 - If no single number fits, use the metric area label — e.g. "Collection Days", "Aging", "By Customer".
 
 Summary rules:
-- The summary is a single plain-text sentence the director reads on the COLLAPSED insight card — before they click to see the full detail.
-- Maximum 140 characters. Must read cleanly as ONE sentence.
-- Plain text only — NO markdown, NO bold, NO bullets, NO sub-headers, NO colons acting as section dividers.
-- Lead with the business meaning, not the metric name. Example:
-  - GOOD: "Collection performance is solid at 84.7%, comfortably above the 80% green threshold."
-  - BAD: "**Collection Rate**: 84.7%. Current Status (as of ...): ..."
-- Do NOT repeat the title verbatim. The title is the headline; the summary is the one-line "what this means".
-- Do NOT include the scope label here (it lives in the detail block). Keep the summary clean.
+- The summary is a PUNCHY one-liner shown on the collapsed insight card (before the director clicks for detail).
+- HARD LIMIT: 80 characters. Aim for 50-70. If it doesn't fit, cut words — don't truncate mid-sentence.
+- Plain text only — NO markdown, NO bold, NO bullets, NO sub-headers, NO "**" or "##".
+- Write it like a news ticker headline: subject + what's happening + why it matters. Drop filler words ("Despite", "Notably", "The overall", etc.).
+- Lead with business meaning, not the metric name or scope. Scope belongs in the detail, not the summary.
+- Do NOT repeat the title verbatim. Title = headline; summary = the "so what" in one line.
+- Examples:
+  - GOOD: "Collection solid at 84.7%, well above 80% target."
+  - GOOD: "29 High Risk customers hold 58% of outstanding debt."
+  - GOOD: "SEASONS AGRO breaches limit at 1,172% utilization."
+  - BAD: "Despite the nominal pressures detailed above, Hoi-Yong's overall Collection Rate of 74..." (too long, starts with filler)
+  - BAD: "Current Status (as of 2026-04-05): Every single ringgit ..." (markdown-ish prefix, too long)
 
 Detail rules:
 - The detail is the FULL ANALYST REPORT. A director who reads only this should understand the complete situation.

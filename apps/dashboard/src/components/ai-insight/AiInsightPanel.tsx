@@ -31,25 +31,28 @@ function InsightCard({
   return (
     <button
       onClick={onClick}
-      className={`flex items-start gap-3 text-left w-full rounded-lg border px-3 py-2.5 transition-colors cursor-pointer ${
+      className={`flex items-start gap-2 text-left w-full rounded-lg border px-3 py-2 transition-colors cursor-pointer ${
         isGood
           ? 'border-green-200 hover:bg-green-50'
           : 'border-red-200 hover:bg-red-50'
       }`}
     >
       <span
-        className={`mt-1 shrink-0 h-3 w-3 rounded-full ${
+        className={`mt-1.5 shrink-0 h-2.5 w-2.5 rounded-full ${
           isGood ? 'bg-green-500' : 'bg-red-500'
         }`}
       />
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className={`text-base font-semibold ${isGood ? 'text-green-800' : 'text-red-800'}`}>
+        <div className="flex items-center gap-2 min-w-0">
+          <span
+            className={`text-sm font-semibold truncate ${isGood ? 'text-green-800' : 'text-red-800'}`}
+            title={insight.title}
+          >
             {insight.title}
           </span>
           {insight.metric && (
             <span
-              className={`inline-block text-xs font-medium px-1.5 py-0.5 rounded ${
+              className={`shrink-0 inline-block text-[11px] font-medium px-1.5 py-0.5 rounded ${
                 isGood
                   ? 'bg-green-100 text-green-700'
                   : 'bg-red-100 text-red-700'
@@ -60,7 +63,10 @@ function InsightCard({
           )}
         </div>
         {(insight.summary || insight.detail) && (
-          <p className="text-sm text-foreground mt-1 line-clamp-1">
+          <p
+            className="text-xs text-foreground/80 mt-0.5 line-clamp-1"
+            title={insight.summary ?? undefined}
+          >
             {insight.summary
               ? insight.summary
               : (() => {
