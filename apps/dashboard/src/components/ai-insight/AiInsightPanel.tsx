@@ -59,19 +59,23 @@ function InsightCard({
             </span>
           )}
         </div>
-        {insight.detail && (
+        {(insight.summary || insight.detail) && (
           <p className="text-sm text-foreground mt-1 line-clamp-1">
-            {(() => {
-              // Strip bold headers like "**Overall Performance:**" and get first content sentence
-              const cleaned = insight.detail
-                .replace(/\*\*[^*]+:\*\*/g, '')  // remove bold headers
-                .replace(/[#|`\n]/g, ' ')         // strip markdown chars
-                .replace(/\s+/g, ' ')
-                .trim();
-              // Split on period followed by space or end — avoids cutting "84.3%"
-              const match = cleaned.match(/^(.+?\.\s)/);
-              return match ? match[1].trim() : cleaned.slice(0, 120);
-            })()}
+            {insight.summary
+              ? insight.summary
+              : (() => {
+                  // Fallback for insights without a dedicated summary field — strip markdown
+                  // from detail and pick first sentence. Handles both old "**Header:**" and
+                  // new "**Header** (scope):" patterns.
+                  const cleaned = insight.detail
+                    .replace(/\*\*[^*]+?\*\*\s*(?:\([^)]*\))?\s*:?/g, '') // new format: **Header** (scope):
+                    .replace(/\*\*[^*]+:\*\*/g, '')                        // old format: **Header:**
+                    .replace(/[#|`\n]/g, ' ')
+                    .replace(/\s+/g, ' ')
+                    .trim();
+                  const match = cleaned.match(/^(.+?\.\s)/);
+                  return match ? match[1].trim() : cleaned.slice(0, 120);
+                })()}
           </p>
         )}
       </div>

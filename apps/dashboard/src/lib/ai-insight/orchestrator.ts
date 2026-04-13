@@ -410,13 +410,16 @@ function parseSummaryResponse(
     const sentimentMatch = header.match(/sentiment:\s*(good|bad)/i);
     const titleMatch = header.match(/title:\s*(.+)/i);
     const metricMatch = header.match(/metric:\s*(.+)/i);
+    const summaryMatch = header.match(/summary:\s*(.+)/i);
 
     const sentiment = sentimentMatch?.[1]?.trim().toLowerCase() ?? 'good';
     const title = titleMatch?.[1]?.trim() ?? 'Insight';
     const metric = metricMatch?.[1]?.trim();
+    const summary = summaryMatch?.[1]?.trim();
 
     const insight: SummaryInsight = { title, detail };
     if (metric) insight.metric = metric;
+    if (summary) insight.summary = summary;
 
     if (sentiment === 'bad') {
       bad.push(insight);

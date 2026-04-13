@@ -383,6 +383,7 @@ Output format — use this EXACT delimiter structure (no JSON, no code blocks):
 sentiment: good
 title: Short punchy headline (max 50 chars)
 metric: Key number e.g. 84.3%, 43 days, RM 2.1M (max 25 chars)
+summary: One plain-text sentence stating the core finding in a director-ready tone (max 140 chars, no markdown, no bold, no bullets)
 ---DETAIL---
 Full markdown analysis here (see detail rules below)
 ===END===
@@ -397,6 +398,16 @@ Title rules:
 Metric rules:
 - Show the actual key number — e.g. "84.3%", "43 days", "RM 2.1M", "35%".
 - If no single number fits, use the metric area label — e.g. "Collection Days", "Aging", "By Customer".
+
+Summary rules:
+- The summary is a single plain-text sentence the director reads on the COLLAPSED insight card — before they click to see the full detail.
+- Maximum 140 characters. Must read cleanly as ONE sentence.
+- Plain text only — NO markdown, NO bold, NO bullets, NO sub-headers, NO colons acting as section dividers.
+- Lead with the business meaning, not the metric name. Example:
+  - GOOD: "Collection performance is solid at 84.7%, comfortably above the 80% green threshold."
+  - BAD: "**Collection Rate**: 84.7%. Current Status (as of ...): ..."
+- Do NOT repeat the title verbatim. The title is the headline; the summary is the one-line "what this means".
+- Do NOT include the scope label here (it lives in the detail block). Keep the summary clean.
 
 Detail rules:
 - The detail is the FULL ANALYST REPORT. A director who reads only this should understand the complete situation.
