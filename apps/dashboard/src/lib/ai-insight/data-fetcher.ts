@@ -1,15 +1,23 @@
 import { getPool } from '../postgres';
-import type { SectionKey, DateRange } from './types';
+import type { SectionKey, DateRange, AllowedValue, FetcherResult } from './types';
 
 // Convert YYYY-MM-DD to YYYY-MM to match pc_ar_monthly.month column format
 function toMonth(date: string): string {
   return date.substring(0, 7);
 }
 
-// ─── Data fetchers per component ─────────────────────────────────────────────
-// Each returns a formatted string for the user prompt's "Current Values" block.
+// ─── Allowed-value helpers (mechanical whitelisting for the numeric guard) ──
 
-type DataFetcher = (dateRange: DateRange | null) => Promise<string>;
+const rm = (label: string, value: number): AllowedValue => ({ label, value, unit: 'RM' });
+const pct = (label: string, value: number): AllowedValue => ({ label, value, unit: 'pct' });
+const days = (label: string, value: number): AllowedValue => ({ label, value, unit: 'days' });
+const cnt = (label: string, value: number): AllowedValue => ({ label, value, unit: 'count' });
+
+// ─── Data fetchers per component ─────────────────────────────────────────────
+// Each returns the formatted prompt block AND an `allowed` whitelist of every
+// numeric value that legally appears in (or could be derived from) the prompt.
+
+type DataFetcher = (dateRange: DateRange | null) => Promise<FetcherResult>;
 
 const fetchers: Record<string, DataFetcher> = {
   // Payment Section 1
@@ -27,7 +35,9 @@ const fetchers: Record<string, DataFetcher> = {
        ORDER BY month`,
       [startMonth, endMonth],
     );
-    if (rows.length === 0) return 'No data available for selected period.';
+    if (rows.length === 0) {
+      return { prompt: 'No data available for selected period.', allowed: [] };
+    }
 
     const valid = rows.filter((r: { dso: number | null }) => r.dso !== null);
     const avg = valid.length > 0
@@ -37,7 +47,6 @@ const fetchers: Record<string, DataFetcher> = {
     const dsoNum = parseFloat(avg);
     const color = isNaN(dsoNum) ? 'No data' : dsoNum <= 30 ? 'Green (Good)' : dsoNum <= 60 ? 'Yellow (Warning)' : 'Red (Critical)';
 
-    // Rule C — pre-computed arithmetic (no LLM math)
     const daysAboveGood = isNaN(dsoNum) ? null : +(dsoNum - 30).toFixed(1);
     const daysAboveWarning = isNaN(dsoNum) ? null : +(dsoNum - 60).toFixed(1);
     const dsoValues = valid.map((r: { dso: number }) => Number(r.dso));
@@ -61,7 +70,26 @@ const fetchers: Record<string, DataFetcher> = {
       (maxRow ? `- Worst month: ${maxRow.month} at ${maxDso} days\n` : '') +
       `- Months above 30-day benchmark: ${monthsAbove30} of ${dsoValues.length}\n` +
       `- Months above 60-day benchmark: ${monthsAbove60} of ${dsoValues.length}\n`;
-    return `Value: ${avg} days\nColor: ${color}\n\n${preCalc}\nMonthly breakdown:\n${table}`;
+
+    const allowed: AllowedValue[] = [];
+    allowed.push(days('30-day benchmark', 30));
+    allowed.push(days('60-day benchmark', 60));
+    if (!isNaN(dsoNum)) allowed.push(days('period avg collection days', dsoNum));
+    if (daysAboveGood !== null) allowed.push(days('days above 30-day benchmark', daysAboveGood));
+    if (daysAboveWarning !== null) allowed.push(days('days above 60-day benchmark', daysAboveWarning));
+    if (minDso !== null) allowed.push(days('best month days', minDso));
+    if (maxDso !== null) allowed.push(days('worst month days', maxDso));
+    allowed.push(cnt('months above 30-day benchmark', monthsAbove30));
+    allowed.push(cnt('months above 60-day benchmark', monthsAbove60));
+    allowed.push(cnt('total months in period', dsoValues.length));
+    for (const r of rows) {
+      if (r.dso != null) allowed.push(days(`${r.month} dso`, Number(r.dso)));
+    }
+
+    return {
+      prompt: `Value: ${avg} days\nColor: ${color}\n\n${preCalc}\nMonthly breakdown:\n${table}`,
+      allowed,
+    };
   },
 
   async collection_rate(dr) {
@@ -73,12 +101,24 @@ const fetchers: Record<string, DataFetcher> = {
        WHERE month BETWEEN $1 AND $2`,
       [toMonth(dr!.start), toMonth(dr!.end)],
     );
-    const { total_collected, total_invoiced } = rows[0];
+    const total_collected = Number(rows[0].total_collected);
+    const total_invoiced = Number(rows[0].total_invoiced);
     const rate = total_invoiced > 0 ? ((total_collected / total_invoiced) * 100).toFixed(1) : '--';
     const rateNum = parseFloat(rate);
     const color = isNaN(rateNum) ? 'No data' : rateNum >= 80 ? 'Green (Good)' : rateNum >= 50 ? 'Yellow (Warning)' : 'Red (Critical)';
 
-    return `Value: ${rate}%\nColor: ${color}\nTotal Collected: RM ${Number(total_collected).toLocaleString('en-MY')}\nTotal Invoiced: RM ${Number(total_invoiced).toLocaleString('en-MY')}`;
+    const allowed: AllowedValue[] = [
+      pct('collection rate', isNaN(rateNum) ? 0 : rateNum),
+      pct('good threshold', 80),
+      pct('warning threshold', 50),
+      rm('total collected', total_collected),
+      rm('total invoiced', total_invoiced),
+    ];
+
+    return {
+      prompt: `Value: ${rate}%\nColor: ${color}\nTotal Collected: RM ${total_collected.toLocaleString('en-MY')}\nTotal Invoiced: RM ${total_invoiced.toLocaleString('en-MY')}`,
+      allowed,
+    };
   },
 
   async avg_monthly_collection(dr) {
@@ -89,10 +129,20 @@ const fetchers: Record<string, DataFetcher> = {
        WHERE month BETWEEN $1 AND $2`,
       [toMonth(dr!.start), toMonth(dr!.end)],
     );
-    const { months, total_collected } = rows[0];
+    const months = Number(rows[0].months);
+    const total_collected = Number(rows[0].total_collected);
     const avg = months > 0 ? (total_collected / months) : 0;
 
-    return `Value: RM ${Math.round(avg).toLocaleString('en-MY')}\nMonths in range: ${months}\nTotal Collected: RM ${Number(total_collected).toLocaleString('en-MY')}`;
+    const allowed: AllowedValue[] = [
+      rm('avg monthly collection', Math.round(avg)),
+      cnt('months in range', months),
+      rm('total collected', total_collected),
+    ];
+
+    return {
+      prompt: `Value: RM ${Math.round(avg).toLocaleString('en-MY')}\nMonths in range: ${months}\nTotal Collected: RM ${total_collected.toLocaleString('en-MY')}`,
+      allowed,
+    };
   },
 
   async collection_days_trend(dr) {
@@ -108,15 +158,23 @@ const fetchers: Record<string, DataFetcher> = {
       [toMonth(dr!.start), toMonth(dr!.end)],
     );
     const valid = rows.filter((r: { dso: number | null }) => r.dso !== null);
-    const avg = valid.length > 0
-      ? (valid.reduce((s: number, r: { dso: number }) => s + Number(r.dso), 0) / valid.length).toFixed(1)
-      : '--';
+    const avgNum = valid.length > 0
+      ? valid.reduce((s: number, r: { dso: number }) => s + Number(r.dso), 0) / valid.length
+      : NaN;
+    const avg = isNaN(avgNum) ? '--' : avgNum.toFixed(1);
 
     let table = '| Month | Collection Days |\n|-------|----------------|\n';
     for (const r of rows) {
       table += `| ${r.month} | ${r.dso != null ? r.dso + ' days' : 'N/A'} |\n`;
     }
-    return `Data points:\n${table}\nAverage: ${avg} days`;
+
+    const allowed: AllowedValue[] = [];
+    if (!isNaN(avgNum)) allowed.push(days('period avg collection days', avgNum));
+    for (const r of rows) {
+      if (r.dso != null) allowed.push(days(`${r.month} dso`, Number(r.dso)));
+    }
+
+    return { prompt: `Data points:\n${table}\nAverage: ${avg} days`, allowed };
   },
 
   async invoiced_vs_collected(dr) {
@@ -132,7 +190,6 @@ const fetchers: Record<string, DataFetcher> = {
     const totalCol = rows.reduce((s: number, r: { collected: number }) => s + Number(r.collected), 0);
     const avgCol = rows.length > 0 ? totalCol / rows.length : 0;
 
-    // Rule C — pre-computed per-month gap array + min/max/worst
     type GapRow = { month: string; invoiced: number; collected: number; gap: number };
     const gapRows: GapRow[] = rows.map((r: { month: string; invoiced: number; collected: number }) => ({
       month: r.month,
@@ -152,14 +209,12 @@ const fetchers: Record<string, DataFetcher> = {
       ? posMonths.reduce((a, b) => (a.gap > b.gap ? a : b))
       : null;
     const negSum = negMonths.reduce((s, r) => s + r.gap, 0);
-    const worstTwoPct =
+    const worstTwoPctNum =
       worst && secondWorst && negSum < 0
-        ? (((worst.gap + secondWorst.gap) / negSum) * 100).toFixed(1)
+        ? ((worst.gap + secondWorst.gap) / negSum) * 100
         : null;
+    const worstTwoPct = worstTwoPctNum != null ? worstTwoPctNum.toFixed(1) : null;
 
-    // Rule C — pre-computed half-period averages (prevents the LLM from
-    // inventing sub-period averages or cherry-picking month ranges).
-    // Split the period into two equal halves by month count; for odd N, H2 gets the extra month.
     const halfIdx = Math.floor(gapRows.length / 2);
     const h1Rows = gapRows.slice(0, halfIdx);
     const h2Rows = gapRows.slice(halfIdx);
@@ -203,14 +258,49 @@ const fetchers: Record<string, DataFetcher> = {
       (h2Min && h2Max ? `- H2 gap range: ${fmtSigned(h2Min.gap)} (${h2Min.month}) .. ${fmtSigned(h2Max.gap)} (${h2Max.month})\n` : '') +
       `- H1→H2 direction: ${direction} (based on |H2 avg| vs |H1 avg|)\n`;
 
-    return `Period totals:\nTotal Invoiced: RM ${totalInv.toLocaleString('en-MY', { minimumFractionDigits: 2 })}\nTotal Collected: RM ${totalCol.toLocaleString('en-MY', { minimumFractionDigits: 2 })}\nCumulative Gap: ${gap >= 0 ? '+' : ''}RM ${gap.toLocaleString('en-MY', { minimumFractionDigits: 2 })}\nAvg Monthly Collection: RM ${Math.round(avgCol).toLocaleString('en-MY')}\n\n${preCalc}\nMonthly breakdown:\n${table}`;
+    const allowed: AllowedValue[] = [];
+    allowed.push(rm('total invoiced', totalInv));
+    allowed.push(rm('total collected', totalCol));
+    allowed.push(rm('cumulative gap', gap));
+    allowed.push(rm('avg monthly collection', Math.round(avgCol)));
+    allowed.push(rm('avg monthly collection (raw)', avgCol));
+    allowed.push(cnt('months with negative gap', negMonths.length));
+    allowed.push(cnt('months with positive gap', posMonths.length));
+    allowed.push(cnt('total months', gapRows.length));
+    if (worst) allowed.push(rm(`worst month gap (${worst.month})`, worst.gap));
+    if (secondWorst) allowed.push(rm(`second-worst month gap (${secondWorst.month})`, secondWorst.gap));
+    if (best) allowed.push(rm(`best month gap (${best.month})`, best.gap));
+    if (worstTwoPctNum != null) allowed.push(pct('worst two months share of negative gap', worstTwoPctNum));
+    allowed.push(rm('period total negative gap', negSum));
+    if (h1Rows.length) {
+      allowed.push(rm('H1 avg gap', h1Avg));
+      allowed.push(cnt('H1 month count', h1Rows.length));
+    }
+    if (h2Rows.length) {
+      allowed.push(rm('H2 avg gap', h2Avg));
+      allowed.push(cnt('H2 month count', h2Rows.length));
+    }
+    if (h1Min) allowed.push(rm(`H1 min gap (${h1Min.month})`, h1Min.gap));
+    if (h1Max) allowed.push(rm(`H1 max gap (${h1Max.month})`, h1Max.gap));
+    if (h2Min) allowed.push(rm(`H2 min gap (${h2Min.month})`, h2Min.gap));
+    if (h2Max) allowed.push(rm(`H2 max gap (${h2Max.month})`, h2Max.gap));
+    for (const r of gapRows) {
+      allowed.push(rm(`${r.month} invoiced`, r.invoiced));
+      allowed.push(rm(`${r.month} collected`, r.collected));
+      allowed.push(rm(`${r.month} gap`, r.gap));
+    }
+
+    return {
+      prompt: `Period totals:\nTotal Invoiced: RM ${totalInv.toLocaleString('en-MY', { minimumFractionDigits: 2 })}\nTotal Collected: RM ${totalCol.toLocaleString('en-MY', { minimumFractionDigits: 2 })}\nCumulative Gap: ${gap >= 0 ? '+' : ''}RM ${gap.toLocaleString('en-MY', { minimumFractionDigits: 2 })}\nAvg Monthly Collection: RM ${Math.round(avgCol).toLocaleString('en-MY')}\n\n${preCalc}\nMonthly breakdown:\n${table}`,
+      allowed,
+    };
   },
 
   // Payment Section 2 (Snapshot — always uses latest snapshot_date)
   async total_outstanding() {
     const pool = getPool();
     const { rows: [latest] } = await pool.query(`SELECT MAX(snapshot_date) AS d FROM pc_ar_customer_snapshot`);
-    if (!latest?.d) return 'No snapshot data available.';
+    if (!latest?.d) return { prompt: 'No snapshot data available.', allowed: [] };
     const { rows } = await pool.query(
       `SELECT COALESCE(SUM(total_outstanding), 0) AS total
        FROM pc_ar_customer_snapshot
@@ -230,22 +320,29 @@ const fetchers: Record<string, DataFetcher> = {
       [latest.d],
     );
 
+    const allowed: AllowedValue[] = [rm('total outstanding', total)];
     let top5Share = 0;
     let topTable = '| Rank | Customer | Outstanding | % of Total |\n|------|----------|-------------|------------|\n';
     top5.forEach((r: { company_name: string; total_outstanding: number }, i: number) => {
       const amt = Number(r.total_outstanding);
-      const pct = total > 0 ? (amt / total) * 100 : 0;
-      top5Share += pct;
-      topTable += `| ${i + 1} | ${r.company_name} | RM ${amt.toLocaleString('en-MY')} | ${pct.toFixed(1)}% |\n`;
+      const sharePct = total > 0 ? (amt / total) * 100 : 0;
+      top5Share += sharePct;
+      topTable += `| ${i + 1} | ${r.company_name} | RM ${amt.toLocaleString('en-MY')} | ${sharePct.toFixed(1)}% |\n`;
+      allowed.push(rm(`${r.company_name} outstanding`, amt));
+      allowed.push(pct(`${r.company_name} share of total`, sharePct));
     });
+    allowed.push(pct('top 5 share of total', top5Share));
 
-    return `Value: RM ${total.toLocaleString('en-MY')}\n\nTop 5 contributors (${top5Share.toFixed(1)}% of total):\n${topTable}`;
+    return {
+      prompt: `Value: RM ${total.toLocaleString('en-MY')}\n\nTop 5 contributors (${top5Share.toFixed(1)}% of total):\n${topTable}`,
+      allowed,
+    };
   },
 
   async overdue_amount() {
     const pool = getPool();
     const { rows: [latest] } = await pool.query(`SELECT MAX(snapshot_date) AS d FROM pc_ar_customer_snapshot`);
-    if (!latest?.d) return 'No snapshot data available.';
+    if (!latest?.d) return { prompt: 'No snapshot data available.', allowed: [] };
     const { rows } = await pool.query(
       `SELECT COALESCE(SUM(total_outstanding), 0) AS total,
               COALESCE(SUM(overdue_amount), 0) AS overdue,
@@ -256,8 +353,12 @@ const fetchers: Record<string, DataFetcher> = {
          AND company_name NOT ILIKE 'CASH SALES%'`,
       [latest.d],
     );
-    const { total, overdue, overdue_customers, total_customers } = rows[0];
-    const pct = total > 0 ? ((overdue / total) * 100).toFixed(1) : '0';
+    const total = Number(rows[0].total);
+    const overdue = Number(rows[0].overdue);
+    const overdue_customers = Number(rows[0].overdue_customers);
+    const total_customers = Number(rows[0].total_customers);
+    const pctNum = total > 0 ? (overdue / total) * 100 : 0;
+    const pctStr = total > 0 ? pctNum.toFixed(1) : '0';
 
     const { rows: top5 } = await pool.query(
       `SELECT company_name, overdue_amount, max_overdue_days
@@ -269,22 +370,35 @@ const fetchers: Record<string, DataFetcher> = {
       [latest.d],
     );
 
-    const overdueTotal = Number(overdue);
+    const allowed: AllowedValue[] = [
+      rm('total outstanding', total),
+      rm('total overdue', overdue),
+      pct('overdue % of outstanding', pctNum),
+      cnt('overdue customers', overdue_customers),
+      cnt('total customers', total_customers),
+    ];
+
     let topTable = '| Rank | Customer | Overdue Amount | Max Overdue Days | % of Overdue |\n|------|----------|----------------|-------------------|--------------|\n';
     top5.forEach((r: { company_name: string; overdue_amount: number; max_overdue_days: number | null }, i: number) => {
       const amt = Number(r.overdue_amount);
-      const sharePct = overdueTotal > 0 ? ((amt / overdueTotal) * 100).toFixed(1) : '0';
-      const days = r.max_overdue_days != null ? `${r.max_overdue_days} days` : 'N/A';
-      topTable += `| ${i + 1} | ${r.company_name} | RM ${amt.toLocaleString('en-MY')} | ${days} | ${sharePct}% |\n`;
+      const sharePct = overdue > 0 ? (amt / overdue) * 100 : 0;
+      const days_ = r.max_overdue_days != null ? `${r.max_overdue_days} days` : 'N/A';
+      topTable += `| ${i + 1} | ${r.company_name} | RM ${amt.toLocaleString('en-MY')} | ${days_} | ${sharePct.toFixed(1)}% |\n`;
+      allowed.push(rm(`${r.company_name} overdue`, amt));
+      allowed.push(pct(`${r.company_name} share of overdue`, sharePct));
+      if (r.max_overdue_days != null) allowed.push(days(`${r.company_name} max overdue days`, Number(r.max_overdue_days)));
     });
 
-    return `Value: RM ${Number(overdue).toLocaleString('en-MY')}\nPercentage of total: ${pct}%\nOverdue customers: ${overdue_customers}\nTotal customers: ${total_customers}\n\nTop 5 overdue customers:\n${topTable}`;
+    return {
+      prompt: `Value: RM ${overdue.toLocaleString('en-MY')}\nPercentage of total: ${pctStr}%\nOverdue customers: ${overdue_customers}\nTotal customers: ${total_customers}\n\nTop 5 overdue customers:\n${topTable}`,
+      allowed,
+    };
   },
 
   async credit_limit_breaches() {
     const pool = getPool();
     const { rows: [latest] } = await pool.query(`SELECT MAX(snapshot_date) AS d FROM pc_ar_customer_snapshot`);
-    if (!latest?.d) return 'No snapshot data available.';
+    if (!latest?.d) return { prompt: 'No snapshot data available.', allowed: [] };
     const { rows } = await pool.query(
       `SELECT COUNT(*) AS breach_count
        FROM pc_ar_customer_snapshot
@@ -296,8 +410,10 @@ const fetchers: Record<string, DataFetcher> = {
     const count = parseInt(rows[0].breach_count);
     const color = count === 0 ? 'Green (Good)' : 'Red (Concern)';
 
+    const allowed: AllowedValue[] = [cnt('breach count', count)];
+
     if (count === 0) {
-      return `Value: ${count} customers\nColor: ${color}`;
+      return { prompt: `Value: ${count} customers\nColor: ${color}`, allowed };
     }
 
     const { rows: breaches } = await pool.query(
@@ -313,19 +429,27 @@ const fetchers: Record<string, DataFetcher> = {
 
     let breachTable = '| Rank | Customer | Credit Limit | Outstanding | Utilization |\n|------|----------|--------------|-------------|-------------|\n';
     breaches.forEach((r: { company_name: string; credit_limit: number; total_outstanding: number; utilization_pct: number | null }, i: number) => {
-      const util = r.utilization_pct != null ? `${Number(r.utilization_pct).toFixed(0)}%` : 'N/A';
+      const utilNum = r.utilization_pct != null ? Number(r.utilization_pct) : null;
+      const util = utilNum != null ? `${utilNum.toFixed(0)}%` : 'N/A';
       breachTable += `| ${i + 1} | ${r.company_name} | RM ${Number(r.credit_limit).toLocaleString('en-MY')} | RM ${Number(r.total_outstanding).toLocaleString('en-MY')} | ${util} |\n`;
+      allowed.push(rm(`${r.company_name} credit limit`, Number(r.credit_limit)));
+      allowed.push(rm(`${r.company_name} outstanding`, Number(r.total_outstanding)));
+      if (utilNum != null) allowed.push(pct(`${r.company_name} utilization`, utilNum));
     });
 
     const showing = Math.min(count, 10);
     const heading = count > 10 ? `Top ${showing} breaching customers (of ${count}) by utilization:` : `Breaching customers (${count}) by utilization:`;
-    return `Value: ${count} customers\nColor: ${color}\n\n${heading}\n${breachTable}`;
+    allowed.push(cnt('breaches shown', showing));
+    return {
+      prompt: `Value: ${count} customers\nColor: ${color}\n\n${heading}\n${breachTable}`,
+      allowed,
+    };
   },
 
   async aging_analysis() {
     const pool = getPool();
     const { rows: [latest] } = await pool.query(`SELECT MAX(snapshot_date) AS d FROM pc_ar_aging_history`);
-    if (!latest?.d) return 'No aging data available.';
+    if (!latest?.d) return { prompt: 'No aging data available.', allowed: [] };
     const { rows } = await pool.query(
       `SELECT bucket, SUM(invoice_count) AS invoices, SUM(total_outstanding) AS amount
        FROM pc_ar_aging_history
@@ -341,20 +465,28 @@ const fetchers: Record<string, DataFetcher> = {
        END`,
       [latest.d],
     );
-    const total = rows.reduce((s: number, r: { amount: number }) => s + r.amount, 0);
+    const total = rows.reduce((s: number, r: { amount: number }) => s + Number(r.amount), 0);
 
+    const allowed: AllowedValue[] = [rm('total outstanding (aging)', total)];
     let table = '| Bucket | Amount | % of Total | Invoices |\n|--------|--------|-----------|----------|\n';
     for (const r of rows) {
-      const pct = total > 0 ? ((r.amount / total) * 100).toFixed(1) : '0';
-      table += `| ${r.bucket} | RM ${Number(r.amount).toLocaleString('en-MY')} | ${pct}% | ${r.invoices} |\n`;
+      const amt = Number(r.amount);
+      const sharePct = total > 0 ? (amt / total) * 100 : 0;
+      table += `| ${r.bucket} | RM ${amt.toLocaleString('en-MY')} | ${sharePct.toFixed(1)}% | ${r.invoices} |\n`;
+      allowed.push(rm(`${r.bucket} amount`, amt));
+      allowed.push(pct(`${r.bucket} share`, sharePct));
+      allowed.push(cnt(`${r.bucket} invoices`, Number(r.invoices)));
     }
-    return `Data:\n${table}\nTotal Outstanding: RM ${Number(total).toLocaleString('en-MY')}`;
+    return {
+      prompt: `Data:\n${table}\nTotal Outstanding: RM ${total.toLocaleString('en-MY')}`,
+      allowed,
+    };
   },
 
   async credit_usage_distribution() {
     const pool = getPool();
     const { rows: [latest] } = await pool.query(`SELECT MAX(snapshot_date) AS d FROM pc_ar_customer_snapshot`);
-    if (!latest?.d) return 'No snapshot data available.';
+    if (!latest?.d) return { prompt: 'No snapshot data available.', allowed: [] };
     const { rows } = await pool.query(
       `SELECT
          COUNT(*) FILTER (WHERE credit_limit > 0 AND utilization_pct < 80) AS within_limit,
@@ -368,13 +500,23 @@ const fetchers: Record<string, DataFetcher> = {
       [latest.d],
     );
     const r = rows[0];
-    return `Categories:\n- Within Limit (< 80%): ${r.within_limit} customers\n- Near Limit (80-99%): ${r.near_limit} customers\n- Over Limit (>= 100%): ${r.over_limit} customers\n- No Limit Set: ${r.no_limit} customers\nTotal: ${r.total} customers`;
+    const allowed: AllowedValue[] = [
+      cnt('within limit customers', Number(r.within_limit)),
+      cnt('near limit customers', Number(r.near_limit)),
+      cnt('over limit customers', Number(r.over_limit)),
+      cnt('no limit customers', Number(r.no_limit)),
+      cnt('total customers', Number(r.total)),
+    ];
+    return {
+      prompt: `Categories:\n- Within Limit (< 80%): ${r.within_limit} customers\n- Near Limit (80-99%): ${r.near_limit} customers\n- Over Limit (>= 100%): ${r.over_limit} customers\n- No Limit Set: ${r.no_limit} customers\nTotal: ${r.total} customers`,
+      allowed,
+    };
   },
 
   async customer_credit_health() {
     const pool = getPool();
     const { rows: [latest] } = await pool.query(`SELECT MAX(snapshot_date) AS d FROM pc_ar_customer_snapshot`);
-    if (!latest?.d) return 'No snapshot data available.';
+    if (!latest?.d) return { prompt: 'No snapshot data available.', allowed: [] };
     const { rows: summary } = await pool.query(
       `SELECT risk_tier, COUNT(*) AS count, SUM(total_outstanding) AS total_outstanding
        FROM pc_ar_customer_snapshot
@@ -415,30 +557,52 @@ const fetchers: Record<string, DataFetcher> = {
     const totalCustomers = summary.reduce((s: number, r: { count: string }) => s + parseInt(r.count), 0);
     const totalOutstanding = summary.reduce((s: number, r: { total_outstanding: number }) => s + Number(r.total_outstanding), 0);
 
+    const allowed: AllowedValue[] = [
+      cnt('total customers', totalCustomers),
+      rm('total outstanding', totalOutstanding),
+    ];
+
     let riskTable = '| Risk Tier | Count | % of Customers | Outstanding | % of Outstanding |\n|-----------|-------|----------------|-------------|------------------|\n';
     for (const r of summary) {
-      const custPct = ((parseInt(r.count) / totalCustomers) * 100).toFixed(0);
-      const outPct = totalOutstanding > 0 ? ((Number(r.total_outstanding) / totalOutstanding) * 100).toFixed(1) : '0';
-      riskTable += `| ${r.risk_tier} | ${r.count} | ${custPct}% | RM ${Number(r.total_outstanding).toLocaleString('en-MY')} | ${outPct}% |\n`;
+      const c = parseInt(r.count);
+      const out = Number(r.total_outstanding);
+      const custPct = totalCustomers > 0 ? (c / totalCustomers) * 100 : 0;
+      const outPct = totalOutstanding > 0 ? (out / totalOutstanding) * 100 : 0;
+      riskTable += `| ${r.risk_tier} | ${c} | ${custPct.toFixed(0)}% | RM ${out.toLocaleString('en-MY')} | ${outPct.toFixed(1)}% |\n`;
+      allowed.push(cnt(`${r.risk_tier} risk count`, c));
+      allowed.push(pct(`${r.risk_tier} risk customer share`, custPct));
+      allowed.push(rm(`${r.risk_tier} risk outstanding`, out));
+      allowed.push(pct(`${r.risk_tier} risk outstanding share`, outPct));
     }
 
     let outstandingTable = '| Customer | Outstanding | Score | Risk |\n|----------|-------------|-------|------|\n';
     for (const r of topByOutstanding) {
       outstandingTable += `| ${r.company_name} | RM ${Number(r.total_outstanding).toLocaleString('en-MY')} | ${r.credit_score} | ${r.risk_tier} |\n`;
+      allowed.push(rm(`${r.company_name} outstanding`, Number(r.total_outstanding)));
+      if (r.credit_score != null) allowed.push(cnt(`${r.company_name} credit score`, Number(r.credit_score)));
     }
 
     let overdueTable = '| Customer | Max Overdue Days | Outstanding | Risk |\n|----------|-------------------|-------------|------|\n';
     for (const r of topByOverdueDays) {
       overdueTable += `| ${r.company_name} | ${r.max_overdue_days} days | RM ${Number(r.total_outstanding).toLocaleString('en-MY')} | ${r.risk_tier} |\n`;
+      allowed.push(days(`${r.company_name} max overdue days`, Number(r.max_overdue_days)));
+      allowed.push(rm(`${r.company_name} outstanding`, Number(r.total_outstanding)));
     }
 
     let utilTable = '| Customer | Utilization | Credit Limit | Outstanding | Risk |\n|----------|-------------|--------------|-------------|------|\n';
     for (const r of topByUtilization) {
-      const util = r.utilization_pct != null ? `${Number(r.utilization_pct).toFixed(0)}%` : 'N/A';
+      const utilNum = r.utilization_pct != null ? Number(r.utilization_pct) : null;
+      const util = utilNum != null ? `${utilNum.toFixed(0)}%` : 'N/A';
       utilTable += `| ${r.company_name} | ${util} | RM ${Number(r.credit_limit).toLocaleString('en-MY')} | RM ${Number(r.total_outstanding).toLocaleString('en-MY')} | ${r.risk_tier} |\n`;
+      if (utilNum != null) allowed.push(pct(`${r.company_name} utilization`, utilNum));
+      allowed.push(rm(`${r.company_name} credit limit`, Number(r.credit_limit)));
+      allowed.push(rm(`${r.company_name} outstanding`, Number(r.total_outstanding)));
     }
 
-    return `Summary:\n- Total customers: ${totalCustomers}\n\nRisk distribution:\n${riskTable}\nTop 5 by outstanding amount:\n${outstandingTable}\nTop 5 by max overdue days (most delinquent):\n${overdueTable}\nTop 5 by utilization % (most over credit limit):\n${utilTable}`;
+    return {
+      prompt: `Summary:\n- Total customers: ${totalCustomers}\n\nRisk distribution:\n${riskTable}\nTop 5 by outstanding amount:\n${outstandingTable}\nTop 5 by max overdue days (most delinquent):\n${overdueTable}\nTop 5 by utilization % (most over credit limit):\n${utilTable}`,
+      allowed,
+    };
   },
 
   // Sales Section 3
@@ -454,7 +618,20 @@ const fetchers: Record<string, DataFetcher> = {
       [dr!.start, dr!.end],
     );
     const r = rows[0];
-    return `Value: RM ${Number(r.net_sales).toLocaleString('en-MY')}\nInvoice Sales: RM ${Number(r.invoice_sales).toLocaleString('en-MY')}\nCash Sales: RM ${Number(r.cash_sales).toLocaleString('en-MY')}\nCredit Notes: -RM ${Number(Math.abs(r.credit_notes)).toLocaleString('en-MY')}`;
+    const inv = Number(r.invoice_sales);
+    const cash = Number(r.cash_sales);
+    const cn = Number(r.credit_notes);
+    const net = Number(r.net_sales);
+    const allowed: AllowedValue[] = [
+      rm('net sales', net),
+      rm('invoice sales', inv),
+      rm('cash sales', cash),
+      rm('credit notes', Math.abs(cn)),
+    ];
+    return {
+      prompt: `Value: RM ${net.toLocaleString('en-MY')}\nInvoice Sales: RM ${inv.toLocaleString('en-MY')}\nCash Sales: RM ${cash.toLocaleString('en-MY')}\nCredit Notes: -RM ${Math.abs(cn).toLocaleString('en-MY')}`,
+      allowed,
+    };
   },
 
   async invoice_sales(dr) {
@@ -467,8 +644,13 @@ const fetchers: Record<string, DataFetcher> = {
       [dr!.start, dr!.end],
     );
     const r = rows[0];
-    const pct = r.net_sales > 0 ? ((r.invoice_sales / r.net_sales) * 100).toFixed(1) : '0';
-    return `Value: RM ${Number(r.invoice_sales).toLocaleString('en-MY')}\nAs % of net sales: ${pct}%`;
+    const inv = Number(r.invoice_sales);
+    const net = Number(r.net_sales);
+    const sharePct = net > 0 ? (inv / net) * 100 : 0;
+    return {
+      prompt: `Value: RM ${inv.toLocaleString('en-MY')}\nAs % of net sales: ${sharePct.toFixed(1)}%`,
+      allowed: [rm('invoice sales', inv), rm('net sales', net), pct('invoice share of net', sharePct)],
+    };
   },
 
   async cash_sales(dr) {
@@ -481,8 +663,13 @@ const fetchers: Record<string, DataFetcher> = {
       [dr!.start, dr!.end],
     );
     const r = rows[0];
-    const pct = r.net_sales > 0 ? ((r.cash_sales / r.net_sales) * 100).toFixed(1) : '0';
-    return `Value: RM ${Number(r.cash_sales).toLocaleString('en-MY')}\nAs % of net sales: ${pct}%`;
+    const cash = Number(r.cash_sales);
+    const net = Number(r.net_sales);
+    const sharePct = net > 0 ? (cash / net) * 100 : 0;
+    return {
+      prompt: `Value: RM ${cash.toLocaleString('en-MY')}\nAs % of net sales: ${sharePct.toFixed(1)}%`,
+      allowed: [rm('cash sales', cash), rm('net sales', net), pct('cash share of net', sharePct)],
+    };
   },
 
   async credit_notes(dr) {
@@ -495,11 +682,15 @@ const fetchers: Record<string, DataFetcher> = {
       [dr!.start, dr!.end],
     );
     const r = rows[0];
-    const cnAbs = Math.abs(r.credit_notes);
-    const pct = r.gross_sales > 0 ? ((cnAbs / r.gross_sales) * 100).toFixed(2) : '0';
-    const color = parseFloat(pct) <= 1 ? 'Green (Good)' : parseFloat(pct) <= 3 ? 'Yellow (Monitor)' : 'Red (Concern)';
+    const cnAbs = Math.abs(Number(r.credit_notes));
+    const gross = Number(r.gross_sales);
+    const sharePct = gross > 0 ? (cnAbs / gross) * 100 : 0;
+    const color = sharePct <= 1 ? 'Green (Good)' : sharePct <= 3 ? 'Yellow (Monitor)' : 'Red (Concern)';
 
-    return `Value: -RM ${cnAbs.toLocaleString('en-MY')}\nAs % of gross sales: ${pct}%\nColor: ${color}`;
+    return {
+      prompt: `Value: -RM ${cnAbs.toLocaleString('en-MY')}\nAs % of gross sales: ${sharePct.toFixed(2)}%\nColor: ${color}`,
+      allowed: [rm('credit notes', cnAbs), rm('gross sales', gross), pct('cn share of gross', sharePct)],
+    };
   },
 
   async net_sales_trend(dr) {
@@ -516,11 +707,20 @@ const fetchers: Record<string, DataFetcher> = {
        ORDER BY month`,
       [dr!.start, dr!.end],
     );
+    const allowed: AllowedValue[] = [];
     let table = '| Month | Invoice Sales | Cash Sales | Credit Notes | Net Sales |\n|-------|-------------|-----------|-------------|----------|\n';
     for (const r of rows) {
-      table += `| ${r.month} | RM ${Number(r.invoice_sales).toLocaleString('en-MY')} | RM ${Number(r.cash_sales).toLocaleString('en-MY')} | -RM ${Number(Math.abs(r.credit_notes)).toLocaleString('en-MY')} | RM ${Number(r.net_sales).toLocaleString('en-MY')} |\n`;
+      const inv = Number(r.invoice_sales);
+      const cash = Number(r.cash_sales);
+      const cn = Number(r.credit_notes);
+      const net = Number(r.net_sales);
+      table += `| ${r.month} | RM ${inv.toLocaleString('en-MY')} | RM ${cash.toLocaleString('en-MY')} | -RM ${Math.abs(cn).toLocaleString('en-MY')} | RM ${net.toLocaleString('en-MY')} |\n`;
+      allowed.push(rm(`${r.month} invoice sales`, inv));
+      allowed.push(rm(`${r.month} cash sales`, cash));
+      allowed.push(rm(`${r.month} credit notes`, Math.abs(cn)));
+      allowed.push(rm(`${r.month} net sales`, net));
     }
-    return `Data points:\n${table}`;
+    return { prompt: `Data points:\n${table}`, allowed };
   },
 
   // Sales Section 4: Breakdown
@@ -560,23 +760,39 @@ const fetchers: Record<string, DataFetcher> = {
       [dr!.start, dr!.end],
     );
 
+    const allowed: AllowedValue[] = [
+      rm('total net sales', totalNet),
+      cnt('customer count', customerCount),
+    ];
     let table = '| Rank | Customer | Type | Net Sales | % of Total |\n|------|----------|------|-----------|------------|\n';
     let top5Share = 0;
     let top10Share = 0;
     rows.forEach((r: Record<string, unknown>, i: number) => {
-      const pct = totalNet > 0 ? (Number(r.net_sales) / totalNet) * 100 : 0;
-      if (i < 5) top5Share += pct;
-      if (i < 10) top10Share += pct;
-      table += `| ${i + 1} | ${r.company_name} | ${r.debtor_type || '(Unknown)'} | RM ${Number(r.net_sales).toLocaleString('en-MY')} | ${pct.toFixed(1)}% |\n`;
+      const ns = Number(r.net_sales);
+      const sharePct = totalNet > 0 ? (ns / totalNet) * 100 : 0;
+      if (i < 5) top5Share += sharePct;
+      if (i < 10) top10Share += sharePct;
+      table += `| ${i + 1} | ${r.company_name} | ${r.debtor_type || '(Unknown)'} | RM ${ns.toLocaleString('en-MY')} | ${sharePct.toFixed(1)}% |\n`;
+      allowed.push(rm(`${r.company_name} net sales`, ns));
+      allowed.push(pct(`${r.company_name} share of total`, sharePct));
     });
+    allowed.push(pct('top 5 customer share', top5Share));
+    allowed.push(pct('top 10 customer share', top10Share));
 
     let typeTable = '| Type | Customers | Net Sales | % of Total |\n|------|-----------|-----------|------------|\n';
     for (const t of typeMix) {
-      const pct = totalNet > 0 ? ((Number(t.net_sales) / totalNet) * 100).toFixed(1) : '0';
-      typeTable += `| ${t.debtor_type} | ${t.cust_count} | RM ${Number(t.net_sales).toLocaleString('en-MY')} | ${pct}% |\n`;
+      const ns = Number(t.net_sales);
+      const sharePct = totalNet > 0 ? (ns / totalNet) * 100 : 0;
+      typeTable += `| ${t.debtor_type} | ${t.cust_count} | RM ${ns.toLocaleString('en-MY')} | ${sharePct.toFixed(1)}% |\n`;
+      allowed.push(rm(`${t.debtor_type} type net sales`, ns));
+      allowed.push(pct(`${t.debtor_type} type share`, sharePct));
+      allowed.push(cnt(`${t.debtor_type} type customer count`, Number(t.cust_count)));
     }
 
-    return `Dimension: Customer\nTotal net sales: RM ${totalNet.toLocaleString('en-MY')}\nActive customers in period: ${customerCount}\n\nConcentration risk (pre-calculated):\n- Top 5 customers: ${top5Share.toFixed(1)}% of total revenue\n- Top 10 customers: ${top10Share.toFixed(1)}% of total revenue\n\nTop 15 by net sales:\n${table}\nCustomer type mix:\n${typeTable}`;
+    return {
+      prompt: `Dimension: Customer\nTotal net sales: RM ${totalNet.toLocaleString('en-MY')}\nActive customers in period: ${customerCount}\n\nConcentration risk (pre-calculated):\n- Top 5 customers: ${top5Share.toFixed(1)}% of total revenue\n- Top 10 customers: ${top10Share.toFixed(1)}% of total revenue\n\nTop 15 by net sales:\n${table}\nCustomer type mix:\n${typeTable}`,
+      allowed,
+    };
   },
 
   async by_product(dr) {
@@ -595,15 +811,24 @@ const fetchers: Record<string, DataFetcher> = {
       `SELECT SUM(total_sales) AS total_net FROM pc_sales_by_fruit WHERE doc_date BETWEEN $1 AND $2`,
       [dr!.start, dr!.end],
     );
-    const totalNet = totals[0]?.total_net ?? 0;
+    const totalNet = Number(totals[0]?.total_net ?? 0);
 
+    const allowed: AllowedValue[] = [rm('total net sales', totalNet)];
     let table = '| Rank | Product | Country | Net Sales | % | Qty |\n|------|---------|---------|-----------|---|-----|\n';
     rows.forEach((r: Record<string, unknown>, i: number) => {
-      const pct = totalNet > 0 ? ((Number(r.net_sales) / totalNet) * 100).toFixed(1) : '0';
-      table += `| ${i + 1} | ${r.fruit_name} | ${r.fruit_country || '-'} | RM ${Number(r.net_sales).toLocaleString('en-MY')} | ${pct}% | ${Number(r.qty).toLocaleString('en-MY')} |\n`;
+      const ns = Number(r.net_sales);
+      const qty = Number(r.qty);
+      const sharePct = totalNet > 0 ? (ns / totalNet) * 100 : 0;
+      table += `| ${i + 1} | ${r.fruit_name} | ${r.fruit_country || '-'} | RM ${ns.toLocaleString('en-MY')} | ${sharePct.toFixed(1)}% | ${qty.toLocaleString('en-MY')} |\n`;
+      allowed.push(rm(`${r.fruit_name} net sales`, ns));
+      allowed.push(pct(`${r.fruit_name} share`, sharePct));
+      allowed.push(cnt(`${r.fruit_name} qty`, qty));
     });
 
-    return `Dimension: Product\nTotal net sales: RM ${Number(totalNet).toLocaleString('en-MY')}\n\nTop 15 by net sales:\n${table}`;
+    return {
+      prompt: `Dimension: Product\nTotal net sales: RM ${totalNet.toLocaleString('en-MY')}\n\nTop 15 by net sales:\n${table}`,
+      allowed,
+    };
   },
 
   async by_agent(dr) {
@@ -620,12 +845,25 @@ const fetchers: Record<string, DataFetcher> = {
     );
     const total = rows.reduce((s: number, r: { net_sales: number }) => s + Number(r.net_sales), 0);
 
+    const allowed: AllowedValue[] = [rm('total net sales', total)];
     let table = '| Agent | Active | Net Sales | % of Total | Invoice | Cash | Customers |\n|-------|--------|-----------|-----------|---------|------|-----------|\n';
     for (const r of rows) {
-      const pct = total > 0 ? ((Number(r.net_sales) / total) * 100).toFixed(1) : '0';
-      table += `| ${r.agent_name} | ${r.is_active} | RM ${Number(r.net_sales).toLocaleString('en-MY')} | ${pct}% | RM ${Number(r.invoice_sales).toLocaleString('en-MY')} | RM ${Number(r.cash_sales).toLocaleString('en-MY')} | ${r.customer_count} |\n`;
+      const ns = Number(r.net_sales);
+      const inv = Number(r.invoice_sales);
+      const cash = Number(r.cash_sales);
+      const custCount = Number(r.customer_count);
+      const sharePct = total > 0 ? (ns / total) * 100 : 0;
+      table += `| ${r.agent_name} | ${r.is_active} | RM ${ns.toLocaleString('en-MY')} | ${sharePct.toFixed(1)}% | RM ${inv.toLocaleString('en-MY')} | RM ${cash.toLocaleString('en-MY')} | ${custCount} |\n`;
+      allowed.push(rm(`${r.agent_name} net sales`, ns));
+      allowed.push(pct(`${r.agent_name} share`, sharePct));
+      allowed.push(rm(`${r.agent_name} invoice sales`, inv));
+      allowed.push(rm(`${r.agent_name} cash sales`, cash));
+      allowed.push(cnt(`${r.agent_name} customer count`, custCount));
     }
-    return `Dimension: Sales Agent\nTotal net sales: RM ${Number(total).toLocaleString('en-MY')}\n\n${table}`;
+    return {
+      prompt: `Dimension: Sales Agent\nTotal net sales: RM ${total.toLocaleString('en-MY')}\n\n${table}`,
+      allowed,
+    };
   },
 
   async by_outlet(dr) {
@@ -640,21 +878,31 @@ const fetchers: Record<string, DataFetcher> = {
        ORDER BY SUM(total_sales) DESC`,
       [dr!.start, dr!.end],
     );
-    const total = rows.reduce((s: number, r: { net_sales: number }) => s + r.net_sales, 0);
+    const total = rows.reduce((s: number, r: { net_sales: number }) => s + Number(r.net_sales), 0);
 
+    const allowed: AllowedValue[] = [rm('total net sales', total)];
     let table = '| Outlet | Net Sales | % | Invoice | Cash | Credit Notes |\n|--------|-----------|---|---------|------|--------------|\n';
     for (const r of rows) {
-      const pct = total > 0 ? ((r.net_sales / total) * 100).toFixed(1) : '0';
-      table += `| ${r.outlet} | RM ${Number(r.net_sales).toLocaleString('en-MY')} | ${pct}% | RM ${Number(r.invoice_sales).toLocaleString('en-MY')} | RM ${Number(r.cash_sales).toLocaleString('en-MY')} | -RM ${Number(Math.abs(r.credit_notes)).toLocaleString('en-MY')} |\n`;
+      const ns = Number(r.net_sales);
+      const inv = Number(r.invoice_sales);
+      const cash = Number(r.cash_sales);
+      const cn = Number(r.credit_notes);
+      const sharePct = total > 0 ? (ns / total) * 100 : 0;
+      table += `| ${r.outlet} | RM ${ns.toLocaleString('en-MY')} | ${sharePct.toFixed(1)}% | RM ${inv.toLocaleString('en-MY')} | RM ${cash.toLocaleString('en-MY')} | -RM ${Math.abs(cn).toLocaleString('en-MY')} |\n`;
+      allowed.push(rm(`${r.outlet} net sales`, ns));
+      allowed.push(pct(`${r.outlet} share`, sharePct));
+      allowed.push(rm(`${r.outlet} invoice sales`, inv));
+      allowed.push(rm(`${r.outlet} cash sales`, cash));
+      allowed.push(rm(`${r.outlet} credit notes`, Math.abs(cn)));
     }
-    return `Dimension: Outlet\nTotal net sales: RM ${Number(total).toLocaleString('en-MY')}\n\n${table}`;
+    return {
+      prompt: `Dimension: Outlet\nTotal net sales: RM ${total.toLocaleString('en-MY')}\n\n${table}`,
+      allowed,
+    };
   },
 };
 
 // ─── Scope classification ────────────────────────────────────────────────────
-// Every component is either period-based (filtered by date range) or snapshot-based
-// (current state, not time-filtered). The scope label is prepended to all fetcher
-// output so the LLM cannot conflate period metrics with snapshot metrics.
 
 type ScopeType = 'period' | 'snapshot';
 
@@ -670,7 +918,6 @@ async function buildScopeLabel(scope: ScopeType, dateRange: DateRange | null): P
     if (!dateRange) return 'Scope: Period-based metric (no date range provided).';
     return `Scope: PERIOD-BASED metric — filtered to ${dateRange.start} through ${dateRange.end}. All figures reflect activity WITHIN this date range only. Do NOT describe these numbers as "outstanding balance" or "total receivables" — they are period flows, not point-in-time balances.`;
   }
-  // Snapshot: fetch latest snapshot_date once for the label
   try {
     const pool = getPool();
     const { rows } = await pool.query(`SELECT MAX(snapshot_date) AS d FROM pc_ar_customer_snapshot`);
@@ -687,16 +934,21 @@ export async function fetchComponentData(
   componentKey: string,
   sectionKey: SectionKey,
   dateRange: DateRange | null,
-): Promise<string> {
+): Promise<FetcherResult> {
   const fetcher = fetchers[componentKey];
-  if (!fetcher) return `No data fetcher defined for component: ${componentKey}`;
+  if (!fetcher) {
+    return { prompt: `No data fetcher defined for component: ${componentKey}`, allowed: [] };
+  }
 
   try {
-    const body = await fetcher(dateRange);
+    const { prompt, allowed } = await fetcher(dateRange);
     const scopeLabel = await buildScopeLabel(SECTION_SCOPE[sectionKey], dateRange);
-    return `${scopeLabel}\n\n${body}`;
+    return { prompt: `${scopeLabel}\n\n${prompt}`, allowed };
   } catch (err) {
     console.error(`Data fetch error for ${componentKey}:`, err);
-    return `Error fetching data: ${err instanceof Error ? err.message : String(err)}`;
+    return {
+      prompt: `Error fetching data: ${err instanceof Error ? err.message : String(err)}`,
+      allowed: [],
+    };
   }
 }

@@ -6,12 +6,12 @@ import {
   buildComponentUserPrompt,
   buildSummaryUserPrompt,
   SECTION_COMPONENTS,
-  SECTION_NAMES,
 } from './prompts';
-import { AI_TOOLS, executeToolCall } from './tools';
+import { executeToolCall } from './tools';
+import { toolsForSection, validateToolForSection } from './tool-policy';
+import { runNumericGuard, formatGuardError, extractNumbers } from './numeric-guard';
 import { fetchComponentData } from './data-fetcher';
 import {
-  DEBUG_FILE_ENABLED,
   initDebugSession,
   logComponentStart,
   logApiResponse,
@@ -21,7 +21,7 @@ import {
   logSummaryResponse,
   logSessionEnd,
 } from './debug-logger';
-import type { SectionKey, DateRange, ComponentResult, SummaryJson, SummaryInsight, ComponentType } from './types';
+import type { SectionKey, DateRange, ComponentResult, SummaryJson, SummaryInsight, ComponentType, AllowedValue } from './types';
 
 const MAX_CONCURRENCY = 2; // Keep low to avoid rate limits on lower-tier API plans
 const MAX_TOOL_CALLS_PER_SUMMARY = 2; // Summary can drill down for root causes
@@ -58,7 +58,6 @@ export async function runSectionAnalysis(
   );
 
   const abortSignal = abortController.signal;
-  const startTime = Date.now();
   let totalTokens = 0;
   let totalCost = 0;
   let timedOut = false;
@@ -177,7 +176,7 @@ async function analyzeComponent(
   const client = getAnthropicClient();
 
   // Fetch dashboard data for this component
-  const formattedValues = await fetchComponentData(componentKey, sectionKey, dateRange);
+  const { prompt: formattedValues, allowed } = await fetchComponentData(componentKey, sectionKey, dateRange);
 
   const systemPrompt = getComponentSystemPrompt(componentKey);
   const userPrompt = buildComponentUserPrompt({
@@ -229,6 +228,7 @@ async function analyzeComponent(
     component_type: componentType,
     raw_data_md: formattedValues,
     analysis_md: analysis,
+    allowed,
     token_count: inputTokens + outputTokens,
     input_tokens: inputTokens,
     output_tokens: outputTokens,
@@ -281,98 +281,180 @@ async function runSummaryAnalysis(
 
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
-  let toolCallCount = 0;
-  let turnNumber = 0;
 
-  // Agent loop: summary can use tools to drill down for root causes
-  while (true) {
+  const sectionTools = toolsForSection(sectionKey);
+  const toolsAllowed = sectionTools.length > 0;
+
+  // Aggregate every fetcher's allowed values into one whitelist for the guard.
+  const allAllowed: AllowedValue[] = componentResults.flatMap(c => c.allowed ?? []);
+
+  const MAX_GUARD_ATTEMPTS = 2;
+  let attempt = 0;
+  let lastText = '';
+  let parsed: ReturnType<typeof parseSummaryResponse> | null = null;
+  let unmatched: ReturnType<typeof runNumericGuard>['unmatched'] = [];
+
+  while (attempt < MAX_GUARD_ATTEMPTS) {
+    attempt++;
     if (abortSignal.aborted) throw new Error('Analysis aborted');
 
-    turnNumber++;
-
-    const isLastTurn = toolCallCount >= MAX_TOOL_CALLS_PER_SUMMARY;
-
-    const response = await callWithRetry(
-      () => client.messages.create({
-        model: SUMMARY_MODEL,
-        max_tokens: SUMMARY_MAX_TOKENS,
-        system: systemPrompt,
-        // Remove tools on final turn to force text output
-        ...(isLastTurn ? {} : { tools: AI_TOOLS }),
-        messages,
-      }),
+    const loopResult = await runSummaryAgentLoop({
+      client,
+      sectionKey,
+      messages,
+      systemPrompt,
+      sectionTools,
+      toolsAllowed,
       abortSignal,
+      logFile,
+    });
+
+    totalInputTokens += loopResult.inputTokens;
+    totalOutputTokens += loopResult.outputTokens;
+    lastText = loopResult.textBlock?.text ?? '';
+
+    parsed = parseSummaryResponse(
+      loopResult.textBlock,
+      totalInputTokens + totalOutputTokens,
+      totalInputTokens,
+      totalOutputTokens,
     );
 
-    totalInputTokens += response.usage?.input_tokens ?? 0;
-    totalOutputTokens += response.usage?.output_tokens ?? 0;
+    // Whitelist any number that appeared in a tool_result this attempt — it's
+    // ground truth pulled live from the DB and the LLM is allowed to cite it.
+    for (const trText of loopResult.toolResultTexts) {
+      for (const f of extractNumbers(trText)) {
+        allAllowed.push({ label: `tool result: ${f.raw}`, value: f.value, unit: f.unit });
+      }
+    }
 
-    logApiResponse(logFile, turnNumber, response);
+    const guard = runNumericGuard(lastText, allAllowed);
+    unmatched = guard.unmatched;
 
-    // If end_turn or no tool_use, extract text and return
-    if (response.stop_reason === 'end_turn' || response.stop_reason !== 'tool_use') {
+    if (guard.ok) break;
+
+    // Flag and reject on final attempt; otherwise issue corrective and retry.
+    if (attempt >= MAX_GUARD_ATTEMPTS) break;
+
+    messages.push({ role: 'assistant', content: lastText });
+    messages.push({ role: 'user', content: formatGuardError(guard.unmatched) });
+  }
+
+  if (!parsed) {
+    parsed = parseSummaryResponse(undefined, 0, 0, 0);
+  }
+
+  parsed.json.numericGuard = {
+    passed: unmatched.length === 0,
+    attempts: attempt,
+    unmatched: unmatched.map(u => ({ raw: u.raw, value: u.value, unit: u.unit })),
+  };
+
+  return {
+    json: parsed.json,
+    tokenCount: totalInputTokens + totalOutputTokens,
+    inputTokens: totalInputTokens,
+    outputTokens: totalOutputTokens,
+  };
+}
+
+// ─── Inner agent loop (one summary attempt, with tool use) ───────────────────
+
+interface AgentLoopParams {
+  client: Anthropic;
+  sectionKey: SectionKey;
+  messages: Anthropic.MessageParam[];
+  systemPrompt: string;
+  sectionTools: Anthropic.Tool[];
+  toolsAllowed: boolean;
+  abortSignal: AbortSignal;
+  logFile: string | null;
+}
+
+interface AgentLoopResult {
+  textBlock: Anthropic.TextBlock | undefined;
+  inputTokens: number;
+  outputTokens: number;
+  toolResultTexts: string[];
+}
+
+async function runSummaryAgentLoop(p: AgentLoopParams): Promise<AgentLoopResult> {
+  let inputTokens = 0;
+  let outputTokens = 0;
+  let toolCallCount = 0;
+  let turnNumber = 0;
+  const toolResultTexts: string[] = [];
+
+  while (true) {
+    if (p.abortSignal.aborted) throw new Error('Analysis aborted');
+
+    turnNumber++;
+    const isLastTurn = toolCallCount >= MAX_TOOL_CALLS_PER_SUMMARY;
+    const includeTools = p.toolsAllowed && !isLastTurn;
+
+    const response = await callWithRetry(
+      () => p.client.messages.create({
+        model: SUMMARY_MODEL,
+        max_tokens: SUMMARY_MAX_TOKENS,
+        system: p.systemPrompt,
+        ...(includeTools ? { tools: p.sectionTools } : {}),
+        messages: p.messages,
+      }),
+      p.abortSignal,
+    );
+
+    inputTokens += response.usage?.input_tokens ?? 0;
+    outputTokens += response.usage?.output_tokens ?? 0;
+    logApiResponse(p.logFile, turnNumber, response);
+
+    const finalize = (): AgentLoopResult => {
       const textBlock = response.content.find(
         (b): b is Anthropic.TextBlock => b.type === 'text',
       );
-
       if (LOG_PROMPTS && textBlock) {
         console.log(`\n${'─'.repeat(80)}`);
         console.log(`📋 SUMMARY RESPONSE:\n${textBlock.text}`);
         console.log(`${'─'.repeat(80)}\n`);
       }
+      logSummaryResponse(p.logFile, response, textBlock?.text ?? '(no text block)');
+      return { textBlock, inputTokens, outputTokens, toolResultTexts };
+    };
 
-      logSummaryResponse(logFile, response, textBlock?.text ?? '(no text block)');
+    if (response.stop_reason !== 'tool_use') return finalize();
 
-      const tokenCount = totalInputTokens + totalOutputTokens;
-      return parseSummaryResponse(textBlock, tokenCount, totalInputTokens, totalOutputTokens);
-    }
-
-    // Handle tool use
     const toolBlocks = response.content.filter(
       (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use',
     );
+    if (toolBlocks.length === 0) return finalize();
 
-    if (toolBlocks.length === 0) {
-      const textBlock = response.content.find(
-        (b): b is Anthropic.TextBlock => b.type === 'text',
-      );
+    p.messages.push({ role: 'assistant', content: response.content });
 
-      if (LOG_PROMPTS && textBlock) {
-        console.log(`\n${'─'.repeat(80)}`);
-        console.log(`📋 SUMMARY RESPONSE:\n${textBlock.text}`);
-        console.log(`${'─'.repeat(80)}\n`);
-      }
-
-      logSummaryResponse(logFile, response, textBlock?.text ?? '(no text block)');
-
-      const tokenCount = totalInputTokens + totalOutputTokens;
-      return parseSummaryResponse(textBlock, tokenCount, totalInputTokens, totalOutputTokens);
-    }
-
-    // Add assistant message with tool use
-    messages.push({ role: 'assistant', content: response.content });
-
-    // Execute tools and add results
     const toolResults: Anthropic.ToolResultBlockParam[] = [];
     for (const toolBlock of toolBlocks) {
       toolCallCount++;
-      const result = await executeToolCall(
+      const policyError = validateToolForSection(
+        p.sectionKey,
         toolBlock.name,
-        toolBlock.input as Parameters<typeof executeToolCall>[1],
+        toolBlock.input as { table?: string },
       );
-      logToolResult(logFile, turnNumber, toolBlock.name, toolBlock.id, result);
+      const result = policyError
+        ? policyError
+        : await executeToolCall(
+            toolBlock.name,
+            toolBlock.input as Parameters<typeof executeToolCall>[1],
+          );
+      logToolResult(p.logFile, turnNumber, toolBlock.name, toolBlock.id, result);
+      toolResultTexts.push(result);
       toolResults.push({
         type: 'tool_result',
         tool_use_id: toolBlock.id,
         content: result,
       });
     }
+    p.messages.push({ role: 'user', content: toolResults });
 
-    messages.push({ role: 'user', content: toolResults });
-
-    // If tool calls are now exhausted, add a nudge to produce final output
     if (toolCallCount >= MAX_TOOL_CALLS_PER_SUMMARY) {
-      messages.push({
+      p.messages.push({
         role: 'user',
         content: 'You have used all available tool calls. Now produce your final summary using the ===INSIGHT=== delimiter format. Do not request more data — work with what you have.',
       });

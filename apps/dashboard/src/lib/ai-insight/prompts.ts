@@ -484,7 +484,7 @@ Use this structural template. Every section below is MANDATORY — do not omit:
 - Each bullet stands alone. Use specific numbers / RM amounts / dates.
 
 **Supporting Evidence / Root Cause** — MANDATORY, never omit:
-- For POSITIVE insights, rename this sub-header to "Supporting Evidence" and cite positive drivers only: the best months, the strongest customers / products / categories, the improving trend lines, the specific numbers that justify the positive framing. Do NOT fill a positive card's evidence table with negative months or worst-case rows — that contradicts the headline and confuses the director.
+- For POSITIVE insights, rename this sub-header to "Supporting Evidence" and cite positive drivers: the best months, the strongest customers / products / categories, the improving trend lines, the specific numbers that justify the positive framing.
 - For NEGATIVE insights, rename this sub-header to "Root Cause" and name the specific customers / products / months / agents that drove the finding with RM amounts and share of total.
 - This section MUST include a Markdown table with at least 3 rows of the top contributors whenever the underlying component data contains a top-N list (e.g. top customers by outstanding, top breachers, worst months by gap, best months by collection). Example columns: Name | RM Amount | % of Total | Extra context. Do not skip the table — it is the director's evidence list. Every cell in the table must be a verbatim copy from the data block (see Verbatim-copy rule in the global system prompt).
 - If the data genuinely has no discrete contributors (e.g. a single KPI with no breakdown in any component), use 3–5 bullets of specific numbers instead of a table and state explicitly which component the evidence came from.

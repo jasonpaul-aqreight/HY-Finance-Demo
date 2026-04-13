@@ -36,9 +36,30 @@ export interface SummaryInsight {
   detail: string;
 }
 
+export interface NumericGuardReport {
+  passed: boolean;
+  attempts: number;
+  unmatched: { raw: string; value: number; unit: string }[];
+}
+
 export interface SummaryJson {
   good: SummaryInsight[];
   bad: SummaryInsight[];
+  numericGuard?: NumericGuardReport;
+}
+
+export type AllowedValueUnit = 'RM' | 'pct' | 'days' | 'count';
+
+export interface AllowedValue {
+  label: string;          // human-readable description, e.g. "H1 avg neg gap"
+  value: number;          // raw numeric value (RM = ringgit, pct = 0-100, days, count)
+  tolerance?: number;     // absolute tolerance; defaults applied by guard if omitted
+  unit?: AllowedValueUnit;
+}
+
+export interface FetcherResult {
+  prompt: string;
+  allowed: AllowedValue[];
 }
 
 export interface ComponentResult {
@@ -46,6 +67,7 @@ export interface ComponentResult {
   component_type: ComponentType;
   raw_data_md: string;
   analysis_md: string;
+  allowed: AllowedValue[];
   token_count: number;
   input_tokens: number;
   output_tokens: number;
