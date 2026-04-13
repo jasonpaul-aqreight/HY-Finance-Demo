@@ -106,7 +106,7 @@ The Sales page currently has no section headers. Two section headers will be add
 | Estimated cost per section | ~$0.06–0.10 (Haiku components + Sonnet summary; observed: $0.08 for 5-component section) |
 | Output format | Delimiter-based `===INSIGHT===` blocks (component: Markdown; summary: structured with bold headers + tables) |
 | Tool use | Yes — custom tool definitions for read-only data exploration |
-| Agentic pattern | Components: single LLM call (narration only). Summary: multi-step reasoning loop with tools for root-cause drill-down |
+| Agentic pattern | Components: single LLM call (narration only — powers per-KPI "View AI insight" dialogs). Summary: multi-step reasoning loop with tools for root-cause drill-down. Summary reads the raw fetcher data blocks directly, NOT the component narrations. |
 | Max tool calls per component | 0 (components narrate pre-fetched data, no tools) |
 | Max tool calls per summary | 2 (scoped drill-down for root causes) |
 | Summary max tokens | 4096 (separate from component's 2048, needed for tool reasoning + formatted output) |
@@ -335,12 +335,18 @@ Step 3: Run parallel component analyses (concurrency pool)
 Step 4: Collect all component results
 
 Step 5: Run summary analysis (with scoped tool access)
-        → System prompt: summarize instructions + root-cause drill-down
-        → User prompt: all component results concatenated
+        → System prompt: ground-truth rule (verbatim-copy from raw data
+          blocks) + summary instructions + root-cause drill-down
+        → User prompt: the RAW FETCHER DATA BLOCKS for every component
+          in the section — NOT the Haiku narrations. The component
+          narrations are retained separately to power the per-KPI
+          "View AI insight" dialogs, but are NOT fed to the summary
+          stage (see §12.8).
         → Tools: same tools as component analysis (query_local_table,
           query_rds_table) — max 2 tool calls total
-        → The summary AI identifies gaps in component analyses where
-          the "why" is missing, then drills down to find root causes
+        → The summary AI copies numbers verbatim from the raw blocks,
+          then drills down via tools for customer/product attribution
+          not already present in the raw data
         → Output: max 3 good + max 3 bad, each with evidence-backed
           root-cause analysis where applicable
 
@@ -1515,18 +1521,17 @@ Components use a fast, cheap model (Haiku) for narration. Summary uses a smarter
 
 | Role | Model | Why |
 |------|-------|-----|
-| Component analysis | Haiku | Single LLM call, no tools. Narrates pre-fetched data. Haiku is sufficient and 4x cheaper. |
-| Summary analysis | Sonnet | Tool use + synthesis across 4-6 components. Haiku failed at: (a) arithmetic on 12-row tables, (b) following `===INSIGHT===` format after tool calls, (c) distinguishing "collection gap" from "outstanding balance". |
+| Component narration | Haiku | Single LLM call, no tools. Narrates pre-fetched data. Output powers the per-KPI "View AI insight" dialogs on the dashboard — NOT consumed by the summary stage (see §12.8). Haiku is sufficient and 4x cheaper for this narration-only role. |
+| Summary analysis | Sonnet | Tool use + synthesis across 4-6 components. Reads the raw fetcher data blocks directly. Haiku failed at: (a) arithmetic on 12-row tables, (b) following `===INSIGHT===` format after tool calls, (c) distinguishing "collection gap" from "outstanding balance". |
 | Summary analysis | Opus | **Overkill.** 5x more expensive than Sonnet for marginal quality gain. Reserve for future complex features (cross-section strategic analysis, chatbot). |
 
 **Production config:** Set `AI_INSIGHT_MODEL` (components) and `AI_INSIGHT_SUMMARY_MODEL` (summary) independently. The pricing table in `client.ts` must include entries for both models.
 
 ### 12.2 Component Output Length Limit
 
-Component prompts include: *"Keep your analysis under 150 words."* This is critical because:
-- All component analyses are concatenated into the summary user prompt
-- Verbose components (200-400 words each × 5-6 components) overwhelm the summary context
-- Long components can contain contradictory derived numbers that confuse the summary model
+Component prompts include: *"Keep your analysis under 150 words."* This was originally critical because component narrations were concatenated into the summary prompt. After §12.8, the summary no longer reads narrations — but the 150-word limit is still enforced because:
+- Component narrations are shown verbatim in the per-KPI "View AI insight" dialog on the dashboard; long walls of text are unreadable in that UI context
+- Long narrations cost more Haiku tokens with no upside
 - Components should also NOT re-derive totals or sums — use the pre-fetched values as given
 
 ### 12.3 Pre-Calculated Totals in Data Fetchers
@@ -1559,17 +1564,47 @@ The `pc_ar_customer_snapshot` table contains multiple rows per customer (one per
 ### 12.6 Summary Tool Call Guidance
 
 The summary prompt explicitly instructs:
-- **DO NOT** query `pc_ar_monthly` — that data is already in the component analyses
-- Use tools ONLY for data NOT in the components (e.g., `pc_ar_customer_snapshot` for customer drill-down, `dbo.CN` for credit note detail)
+- **DO NOT** query `pc_ar_monthly` for months inside the current date range — that data is already in the raw fetcher block for `invoiced_vs_collected`. You MAY query it for months OUTSIDE the range (e.g. multi-year historical anchoring).
+- Use tools ONLY for data NOT in the raw blocks (e.g., `pc_ar_customer_snapshot` for customer drill-down, `dbo.CN` for credit note detail)
 - The column whitelist is injected into the summary system prompt with actual table/column names
 
-**Why:** Without this guidance, the summary wastes both tool calls re-querying monthly data already available from the components, then has no calls left for actual root-cause investigation.
+**Why:** Without this guidance, the summary wastes both tool calls re-querying monthly data already available in the raw blocks, then has no calls left for actual root-cause investigation.
 
 ### 12.7 Cost Estimation with Dual Models
 
 The `estimateCost()` function accepts an optional `model` parameter. Summary cost is calculated using the summary model's pricing, not the component model's pricing. The pricing table in `client.ts` must be kept in sync with Anthropic's actual rates.
 
 **Why:** Sonnet is ~4x more expensive per token than Haiku. Without model-aware cost estimation, the displayed "Est. Cost" would underreport by ~60%.
+
+### 12.8 Summary Reads Raw Fetcher Data, Not Component Narrations (added 2026-04-13)
+
+**Rule:** The summary stage receives the raw fetcher markdown blocks (the same formatted string each component originally saw) — NOT the Haiku component narrations.
+
+**Why (the bug class this fixed):** Three consecutive validator runs on `payment_collection_trend` caught three different fabrications of the same kind:
+
+| Run | Fabrication |
+|-----|-------------|
+| #1 | Invented 95% risk-concentration figure |
+| #2 | "6–7 days slower than target" arithmetic + cherry-picked Jul–Oct window + "met every month" overclaim |
+| #3 | Invented Jan/May invoiced + collected rows that back-solved to the known gap |
+
+**Root cause:** The summary (Sonnet) previously received only the Haiku narration for each component (~150 words per component, a paraphrase of the data). When Sonnet needed to fill a table cell or cite a specific row-level number, it had no ground truth to copy from — so it back-solved or invented a plausible figure. Every patch (verbatim-copy rule, mandatory table rule, pre-computed arithmetic in fetcher) attacked a symptom while leaving the mechanism — *summary writing numbers it doesn't have* — in place.
+
+**The fix:** The `ComponentResult` type carries a `raw_data_md` field populated from `fetchComponentData()` output. `buildSummaryUserPrompt` renders those raw blocks under a "RAW DATA BLOCKS (ground truth)" header. `SUMMARY_SYSTEM` carries a top-priority **GROUND TRUTH RULE** stating that every number must be traceable to a specific line in the raw blocks (or to a tool-call result); anything un-traceable must be omitted — never invented, never back-solved.
+
+**What this implies architecturally:**
+- Haiku narrations are still generated per component (for the per-KPI "View AI insight" dialogs), but they are a dead-end from the summary's perspective.
+- The summary's input token count goes up modestly (raw blocks are slightly larger than narrations — ~200–500 tokens per component vs ~150 for a narration).
+- No change to cost or latency in practice: validated on both `payment_collection_trend` ($0.08 / 62s) and `payment_outstanding` ($0.10 / 75s), identical to pre-fix baseline.
+
+**Validation (2026-04-13):**
+- `payment_collection_trend`: 3 cards, ~60 numeric claims fact-checked against raw data + tool results → 0 fabrications
+- `payment_outstanding`: 3 cards, ~55 numeric claims → 0 fabrications
+- The exact run #3 failure pattern ("Jan & May 31% / RM 3.98M") now traces verbatim to the pre-computed `Worst two months combined = 31.0% of the full-period negative gap` line in the fetcher block.
+
+**A verifier pass (second Sonnet call that fact-checks the draft and strips failed claims) was prototyped and explicitly rejected** in favor of this fix alone. The verifier doubled cost and latency, introduced false-positive strips of true-but-tool-derived claims (e.g. avg payment days from `pc_ar_customer_snapshot`), and did not reliably catch semantic pairing errors. Part 1 alone achieved zero hard fabrications across ~115 claims — the verifier would be defense-in-depth against a problem that no longer exists.
+
+**Commit:** `06e592e` on `feature/v2-finance-spike-s1-auth`.
 
 ---
 
@@ -1771,21 +1806,21 @@ For each section, produce a report with three clearly separated sections:
 - What root-cause drill-down worked; what was missed
 - Whether a director reading only the summary would learn the right things
 
-### Pass Criteria — 100% Accuracy Required
+### Pass Criteria — 100% Accuracy Required (RM 1 Rounding Tolerance)
 
-**The accuracy MUST AND SHALL be 100%. There is no rounding tolerance.**
+**The accuracy MUST AND SHALL be 100%, subject only to RM 1 rounding tolerance on monetary values.**
 
-- Every RM value cited by the AI must match the DB ground truth to the cent (when the AI shows cents) or to the RM (when the AI rounds to RM)
+- Every RM value cited by the AI must match the DB ground truth within ±RM 1 (accounts for rounding when the AI rounds to whole ringgit)
 - Every percentage must match the DB to the stated precision (if AI shows "58%", DB must compute to 57.5–58.4%; if AI shows "58.0%", DB must be 57.95–58.04%)
-- Every count (customers, invoices, breaches) must match exactly
+- Every count (customers, invoices, breaches) must match exactly — no tolerance on counts
 - Every customer name cited must exist in the DB with the values the AI claims for it
 - Every overdue day count, credit limit, utilization percentage must match the `pc_ar_customer_snapshot` row exactly
-- Any discrepancy — however small — is a FAIL for that section
+- Any discrepancy beyond RM 1 rounding is a FAIL for that section
 - Any cross-component contradiction is a FAIL
-- Any arithmetic error in a component analysis is a FAIL
+- Any arithmetic error in a component analysis (e.g., "95% of debt" when DB shows 58%) is a FAIL
 - All 4 sections must PASS for the verification to be considered complete before production deployment
 
-**Rationale:** Directors will trust the AI Insight output and take action on the numbers cited. A single incorrect customer name or amount could lead to wrong recovery prioritization, wrong credit policy decisions, or wrong escalations. 100% accuracy is the only acceptable standard for production.
+**Rationale:** Directors will trust the AI Insight output and take action on the numbers cited. A single incorrect customer name or wrong amount could lead to wrong recovery prioritization, wrong credit policy decisions, or wrong escalations. 100% accuracy (within RM 1 rounding) is the only acceptable standard for production.
 
 ### Known Considerations
 
