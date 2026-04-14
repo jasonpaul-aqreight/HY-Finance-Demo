@@ -276,6 +276,54 @@ export const COMPONENT_INFO: Record<string, ComponentInfo> = {
     indicator: 'Margin spread > 10 pp across suppliers = Arbitrage opportunity · Cheapest supplier carries < 20% of qty = Misaligned procurement · Any supplier margin < 0 = Loss-making on that item',
     about: 'This panel lets you pick any item and see how each supplier compares on price and estimated margin. The AI analysis is anchored to a single item — the highest-revenue item in the selected period — and looks at:\n\n• Whether the volume leader is also the price leader (aligned procurement) or not (arbitrage risk)\n• How wide the price spread is across suppliers for the same item\n• The cross-supplier margin % spread — a wide spread means shifting volume could improve margin\n\nThe estimated sell price comes from raw invoice + cash-sale line items (or the pre-compute fallback when raw tables are unavailable). Conclusions are framed to the anchor item specifically — the summary layer may drill other items.',
   },
+  // ═══ Return Trend ═══
+  rt_total_returns: {
+    name: 'Total Returns',
+    whatItMeasures: 'Total return value (RM) and number of return credit notes issued in the selected period.',
+    formula: 'SUM(cn_total), SUM(cn_count) from pc_return_monthly',
+    indicator: 'Read together with Return % — a RM figure only means something relative to net sales.',
+    about: 'Total Returns shows the period return exposure in two numbers: the RM value of all return credit notes issued, and the count of those CNs.\n\nThis is a period flow — activity within the date range, not a point-in-time balance. It is always read against Net Sales for the same period (see Return %).\n\nAn average return value per CN helps tell whether the exposure is driven by many small returns (process noise) or a few large returns (specific events worth investigating).',
+  },
+  rt_settled: {
+    name: 'Settled',
+    whatItMeasures: 'Total return value resolved during the period — either knocked off against invoices (non-cash) or refunded (cash out).',
+    formula: 'Knocked Off + Refunded',
+    indicator: 'Knock-off % > 70% = Healthy · Refund % > 30% = Concern (cash leakage)',
+    about: 'Settled shows how much of the period return exposure has been resolved. It combines two very different settlement channels:\n\n• Knocked Off — the return is offset against future or outstanding invoices. No cash leaves the door. This is the PREFERRED settlement channel for a distribution business.\n• Refunded — actual cash or cheque paid back to the customer. This is real cash out and erodes working capital.\n\nA healthy mix is knock-off heavy. A refund-heavy mix means the business is draining cash to close out returns — usually because the customer has no upcoming invoices to offset against, or the relationship is ending.',
+  },
+  rt_unsettled: {
+    name: 'Unsettled',
+    whatItMeasures: 'Return value from the period that has not been knocked off or refunded — still open on the books.',
+    formula: 'Total Return Value − Knocked Off − Refunded',
+    indicator: '< 15% of return value = Healthy · 15–30% = Watch · > 30% = Concern',
+    about: 'Unsettled is the piece of the period return exposure that is still open — neither offset nor refunded. This is the portion actively hurting both the P&L and working capital.\n\nThe breakdown splits by CN status:\n• Partial — some resolution, but not complete\n• Outstanding — zero resolution, stuck\n• Reconciled — fully closed out\n\nA high partial count points to process friction (knock-offs taking too long). A high outstanding count points to customer-side blockers. Both are actionable once separated.',
+  },
+  rt_return_pct: {
+    name: 'Return %',
+    whatItMeasures: 'Return value as a percentage of net sales for the period — the single most important return-health ratio.',
+    formula: '(Total Return Value ÷ Total Net Sales) × 100',
+    indicator: '< 2% = Green (Good) · 2–5% = Amber (Watch) · > 5% = Red (Concern)',
+    about: 'Return % normalizes return exposure against sales volume so you can compare periods fairly — a growing RM return figure is only concerning if it is growing faster than sales.\n\nFor a fruit distribution business, a return rate below 2% reflects normal wastage and quality tolerance. Above 5% points to real problems in quality, handling, or sourcing.\n\nThis KPI is the anchor metric for the Returns page — every other return figure should be read in the context of this ratio.',
+  },
+  rt_settlement_breakdown: {
+    name: 'Settlement Breakdown',
+    whatItMeasures: 'Three-channel breakdown of how the period return pool is being resolved — Knocked Off, Refunded, Unsettled — each as an RM amount and a percentage of total return value.',
+    indicator: 'Knock-off % > 70% = Healthy · Refund % > 30% = Concern · Unsettled % > 30% = Concern',
+    about: 'This chart answers a single question: of the returns in the period, how much has been resolved — and through which channel?\n\n• Knocked Off (emerald) — offset against future or outstanding invoices. No cash leaves the door.\n• Refunded (blue) — actual cash or cheque paid back.\n• Unsettled (red) — neither resolved nor refunded. Still open exposure.\n\nA knock-off-dominant mix is cash-efficient and healthy. A refund-dominant mix is cash-draining. A high unsettled slice is a process breakdown signal — the business is neither absorbing nor refunding these returns.',
+  },
+  rt_monthly_trend: {
+    name: 'Monthly Return Trend',
+    whatItMeasures: 'Two series plotted by month for the selected period — total return value (indigo) and unsettled amount (red).',
+    indicator: 'Unsettled rising while return value is flat/falling = Process breakdown · Count growth > 25% MoM = Concern',
+    about: 'The indigo area shows the period return value month-by-month. The red area shows the unsettled slice for the same months. Both are filtered to the selected date range.\n\nWatch for divergence: if the red line rises while the indigo line is flat or falling, returns are not being closed out — a process issue worth investigating. If both rise together, the problem is volume-driven and the fix is upstream (quality, handling, sourcing).',
+  },
+  rt_product_bar: {
+    name: 'Top Returns by Item',
+    whatItMeasures: 'The top 10 items most associated with returns in the period, rankable by frequency (CN count) or value (RM).',
+    indicator: 'Top 1 item > 15% of return value = Severe concentration · Top 10 > 60% = Concentrated · Top 10 < 40% = Diversified',
+    about: 'This chart shows where the return pain actually lands. You can rank items two ways:\n\n• Frequency — which items get returned most often (process noise, breakage, quality)\n• Value (RM) — which items hurt the P&L most when they are returned (high-cost items)\n\nAn item on BOTH lists is a star problem product — it breaks often AND costs a lot when it does. Fixing one of those moves the number.\n\nYou can also drill into Product, Variant, or Country dimensions via the toggle — useful once the item-level view has flagged a suspicious pattern.',
+  },
+
   sm_price_scatter: {
     name: 'Purchase vs Selling Price',
     whatItMeasures: 'Item-level scatter plot of avg purchase price (x) vs avg selling price (y), bubble-sized by revenue.',

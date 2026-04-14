@@ -10,6 +10,7 @@ import {
   BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid,
 } from 'recharts';
 import { formatRM, formatCount } from '@/lib/format';
+import { AnalyzeIcon } from '@/components/ai-insight/AnalyzeIcon';
 
 const DIMENSIONS: { key: ReturnProductDimension; label: string }[] = [
   { key: 'item', label: 'All' },
@@ -77,7 +78,10 @@ export function ProductBarChart({ filters }: { filters: V2Filters }) {
     <Card className="h-full">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between flex-wrap gap-2">
-          <CardTitle className="text-sm">{title}</CardTitle>
+          <div className="flex items-center gap-2">
+            <CardTitle className="text-sm">{title}</CardTitle>
+            <AnalyzeIcon sectionKey="return_trend" componentKey="rt_product_bar" />
+          </div>
           <div className="flex items-center gap-3">
             {/* Metric toggle */}
             <div className="flex items-center gap-1 rounded-md border p-0.5">

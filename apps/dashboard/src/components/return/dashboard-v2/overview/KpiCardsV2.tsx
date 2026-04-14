@@ -6,6 +6,7 @@ import type { V2Filters } from '@/hooks/return/useDashboardFiltersV2';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { HelpCircle } from 'lucide-react';
 import { formatRM, formatCount } from '@/lib/format';
+import { AnalyzeIcon } from '@/components/ai-insight/AnalyzeIcon';
 
 interface KpiCardProps {
   title: string;
@@ -13,14 +14,16 @@ interface KpiCardProps {
   subtitle?: string;
   valueColor?: string;
   extra?: React.ReactNode;
+  componentKey?: string;
 }
 
-function KpiCard({ title, value, subtitle, valueColor, extra }: KpiCardProps) {
+function KpiCard({ title, value, subtitle, valueColor, extra, componentKey }: KpiCardProps) {
   return (
     <Card className={extra ? 'overflow-visible' : undefined}>
       <CardHeader className="pb-1 pt-4 px-4">
         <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1">
           {title}
+          {componentKey && <AnalyzeIcon sectionKey="return_trend" componentKey={componentKey} />}
           {extra}
         </CardTitle>
       </CardHeader>
@@ -93,12 +96,14 @@ export function KpiCardsV2({ filters }: { filters: V2Filters }) {
         title="Total Returns"
         value={formatRM(data.total_return_value)}
         subtitle={`${formatCount(data.return_count)} return credit notes`}
+        componentKey="rt_total_returns"
       />
       <KpiCard
         title="Settled"
         value={formatRM(data.total_knocked_off + data.total_refunded)}
         valueColor="text-emerald-600"
         subtitle={`Knocked Off + Refunded = ${data.total_return_value > 0 ? (((data.total_knocked_off + data.total_refunded) / data.total_return_value) * 100).toFixed(1) : '0'}% of total`}
+        componentKey="rt_settled"
       />
       <KpiCard
         title="Unsettled"
@@ -106,12 +111,14 @@ export function KpiCardsV2({ filters }: { filters: V2Filters }) {
         valueColor={data.total_unresolved > 0 ? 'text-red-600' : 'text-emerald-600'}
         subtitle={`${data.total_return_value > 0 ? ((data.total_unresolved / data.total_return_value) * 100).toFixed(1) : '0'}% of total — ${formatCount(data.partial_count)} partial + ${formatCount(data.outstanding_count)} outstanding`}
         extra={<ReconFormulaTooltip />}
+        componentKey="rt_unsettled"
       />
       <KpiCard
         title="Return %"
         value={`${returnRatePct.toFixed(1)}%`}
         valueColor={returnRatePct > 5 ? 'text-red-600' : returnRatePct > 2 ? 'text-amber-600' : 'text-emerald-600'}
         subtitle="return value ÷ total sales"
+        componentKey="rt_return_pct"
       />
     </div>
   );

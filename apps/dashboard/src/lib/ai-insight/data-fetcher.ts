@@ -19,6 +19,12 @@ import {
   getItemSupplierSummaryV2,
   getPriceSpread,
 } from '../supplier-margin/queries';
+import {
+  getReturnOverview,
+  getReturnTrend,
+  getRefundSummary,
+  getReturnProducts,
+} from '../return/queries';
 import type { SectionKey, DateRange, AllowedValue, FetcherResult } from './types';
 
 // Convert YYYY-MM-DD to YYYY-MM to match pc_ar_monthly.month column format
@@ -2086,6 +2092,258 @@ const fetchers: Record<string, DataFetcher> = {
       allowed,
     };
   },
+
+  // ─── Return Trend (§5) ───────────────────────────────────────────────────
+  async rt_total_returns(dr) {
+    const o = await getReturnOverview(dr!.start, dr!.end);
+    const avgPerCn = o.return_count > 0 ? o.total_return_value / o.return_count : 0;
+    return {
+      prompt:
+        `Population: return credit notes issued in ${dr!.start} to ${dr!.end}.\n\n` +
+        `Total return value: RM ${o.total_return_value.toLocaleString('en-MY')}\n` +
+        `Return count (CNs): ${o.return_count}\n` +
+        `Period net sales (for context): RM ${o.total_sales.toLocaleString('en-MY')}\n` +
+        `Return rate %: ${o.return_rate_pct.toFixed(2)}%\n` +
+        `Avg return value per CN: RM ${Math.round(avgPerCn).toLocaleString('en-MY')}\n` +
+        `Return rate threshold: < 2% Healthy · 2-5% Watch · > 5% Concern`,
+      allowed: [
+        rm('total return value', o.total_return_value),
+        cnt('return count', o.return_count),
+        rm('period net sales', o.total_sales),
+        pct('return rate pct', o.return_rate_pct),
+        rm('avg return per cn', Math.round(avgPerCn)),
+      ],
+    };
+  },
+
+  async rt_settled(dr) {
+    const o = await getReturnOverview(dr!.start, dr!.end);
+    const r = await getRefundSummary(dr!.start, dr!.end);
+    const settled = o.total_knocked_off + o.total_refunded;
+    const settledPct = o.total_return_value > 0 ? (settled / o.total_return_value) * 100 : 0;
+    return {
+      prompt:
+        `Population: return credit notes issued in ${dr!.start} to ${dr!.end}.\n\n` +
+        `Total return value: RM ${o.total_return_value.toLocaleString('en-MY')}\n` +
+        `Total settled (knocked off + refunded): RM ${settled.toLocaleString('en-MY')}\n` +
+        `Settled % of return value: ${settledPct.toFixed(1)}%\n` +
+        `- Knocked off (offset against invoices, NO cash leaves door): RM ${o.total_knocked_off.toLocaleString('en-MY')} (${r.knock_off_pct.toFixed(1)}%)\n` +
+        `- Refunded (cash/cheque out the door): RM ${o.total_refunded.toLocaleString('en-MY')} (${r.refund_pct.toFixed(1)}%)\n` +
+        `Refund transaction count: ${r.refund_count}\n\n` +
+        `Thresholds: Knock-off % > 70% = Healthy · Refund % > 30% = Concern (cash leakage)\n` +
+        `Business context: Knock-off is the PREFERRED settlement channel for a distribution business — it offsets future invoices with no cash out. Refund means actual cash paid back and erodes working capital.`,
+      allowed: [
+        rm('total return value', o.total_return_value),
+        rm('total settled', settled),
+        pct('settled pct', settledPct),
+        rm('knocked off', o.total_knocked_off),
+        pct('knock off pct', r.knock_off_pct),
+        rm('refunded', o.total_refunded),
+        pct('refund pct', r.refund_pct),
+        cnt('refund count', r.refund_count),
+      ],
+    };
+  },
+
+  async rt_unsettled(dr) {
+    const o = await getReturnOverview(dr!.start, dr!.end);
+    const unsettledPct = o.total_return_value > 0 ? (o.total_unresolved / o.total_return_value) * 100 : 0;
+    return {
+      prompt:
+        `Population: return credit notes issued in ${dr!.start} to ${dr!.end}.\n\n` +
+        `Total unsettled: RM ${o.total_unresolved.toLocaleString('en-MY')}\n` +
+        `Unsettled % of return value: ${unsettledPct.toFixed(1)}%\n` +
+        `Total return value: RM ${o.total_return_value.toLocaleString('en-MY')}\n\n` +
+        `CN reconciliation breakdown:\n` +
+        `- Fully reconciled CNs: ${o.reconciled_count}\n` +
+        `- Partially resolved CNs: ${o.partial_count}\n` +
+        `- Outstanding (zero resolution) CNs: ${o.outstanding_count}\n` +
+        `- Total return CNs: ${o.return_count}\n` +
+        `- Reconciliation rate: ${o.reconciliation_rate.toFixed(1)}%\n\n` +
+        `Thresholds (unsettled % of return value): < 15% Healthy · 15-30% Watch · > 30% Concern`,
+      allowed: [
+        rm('total unsettled', o.total_unresolved),
+        pct('unsettled pct', unsettledPct),
+        rm('total return value', o.total_return_value),
+        cnt('reconciled count', o.reconciled_count),
+        cnt('partial count', o.partial_count),
+        cnt('outstanding count', o.outstanding_count),
+        cnt('return count', o.return_count),
+        pct('reconciliation rate', o.reconciliation_rate),
+      ],
+    };
+  },
+
+  async rt_return_pct(dr) {
+    const o = await getReturnOverview(dr!.start, dr!.end);
+    const color =
+      o.return_rate_pct < 2 ? 'Green (Good)' :
+      o.return_rate_pct <= 5 ? 'Amber (Watch)' :
+      'Red (Concern)';
+    return {
+      prompt:
+        `Population: returns vs net sales in ${dr!.start} to ${dr!.end}.\n\n` +
+        `Return rate %: ${o.return_rate_pct.toFixed(2)}%\n` +
+        `Color band: ${color}\n` +
+        `Period return value: RM ${o.total_return_value.toLocaleString('en-MY')}\n` +
+        `Period net sales: RM ${o.total_sales.toLocaleString('en-MY')}\n\n` +
+        `Thresholds: < 2% Green (Good) · 2-5% Amber (Watch) · > 5% Red (Concern)`,
+      allowed: [
+        pct('return rate pct', o.return_rate_pct),
+        rm('period return value', o.total_return_value),
+        rm('period net sales', o.total_sales),
+        pct('good threshold', 2),
+        pct('concern threshold', 5),
+      ],
+    };
+  },
+
+  async rt_settlement_breakdown(dr) {
+    const r = await getRefundSummary(dr!.start, dr!.end);
+    return {
+      prompt:
+        `Population: return credit notes issued in ${dr!.start} to ${dr!.end}.\n\n` +
+        `Total return value: RM ${r.total_return_value.toLocaleString('en-MY')}\n\n` +
+        `Settlement breakdown:\n` +
+        `- Knocked off: RM ${r.total_knocked_off.toLocaleString('en-MY')} (${r.knock_off_pct.toFixed(1)}%)\n` +
+        `- Refunded (cash/cheque): RM ${r.total_refunded.toLocaleString('en-MY')} (${r.refund_pct.toFixed(1)}%)\n` +
+        `- Unsettled: RM ${r.total_unresolved.toLocaleString('en-MY')} (${r.unresolved_pct.toFixed(1)}%)\n` +
+        `- Refund transaction count: ${r.refund_count}\n\n` +
+        `Thresholds:\n` +
+        `- Knock-off % > 70% = Healthy (cash-efficient)\n` +
+        `- Refund % > 30% = Concern (cash-draining)\n` +
+        `- Unsettled % > 30% = Concern (exposure piling up)\n\n` +
+        `Business context: Knock-off is preferred (offsets future invoices, no cash out). Refund is cash out the door — working-capital impact.`,
+      allowed: [
+        rm('total return value', r.total_return_value),
+        rm('knocked off', r.total_knocked_off),
+        pct('knock off pct', r.knock_off_pct),
+        rm('refunded', r.total_refunded),
+        pct('refund pct', r.refund_pct),
+        rm('unsettled', r.total_unresolved),
+        pct('unsettled pct', r.unresolved_pct),
+        cnt('refund count', r.refund_count),
+      ],
+    };
+  },
+
+  async rt_monthly_trend(dr) {
+    const trend = await getReturnTrend(dr!.start, dr!.end);
+    if (trend.length === 0) {
+      return { prompt: 'No monthly return trend data for selected period.', allowed: [] };
+    }
+    const allowed: AllowedValue[] = [];
+    let table =
+      '| Month | Return Value | Unsettled | CN Count |\n' +
+      '|-------|--------------|-----------|----------|\n';
+    let peakValue = { period: trend[0].period, value: 0 };
+    let lowValue = { period: trend[0].period, value: Number.POSITIVE_INFINITY };
+    let peakUnsettled = { period: trend[0].period, value: 0 };
+    for (const r of trend) {
+      const rv = Number(r.return_value);
+      const un = Number(r.unresolved);
+      const ct = Number(r.count);
+      table +=
+        `| ${r.period} ` +
+        `| RM ${rv.toLocaleString('en-MY')} ` +
+        `| RM ${un.toLocaleString('en-MY')} ` +
+        `| ${ct} |\n`;
+      allowed.push(rm(`${r.period} return value`, rv));
+      allowed.push(rm(`${r.period} unsettled`, un));
+      allowed.push(cnt(`${r.period} cn count`, ct));
+      if (rv > peakValue.value) peakValue = { period: r.period, value: rv };
+      if (rv < lowValue.value) lowValue = { period: r.period, value: rv };
+      if (un > peakUnsettled.value) peakUnsettled = { period: r.period, value: un };
+    }
+    const first = trend[0];
+    const last = trend[trend.length - 1];
+    const countGrowthPct = Number(first.count) > 0
+      ? ((Number(last.count) - Number(first.count)) / Number(first.count)) * 100
+      : 0;
+
+    const preCalc =
+      `Population: months with return activity between ${dr!.start} and ${dr!.end}.\n\n` +
+      `Pre-calculated roll-ups (use these values directly — do not recompute):\n` +
+      `- Months in period: ${trend.length}\n` +
+      `- Peak return-value month: ${peakValue.period} at RM ${peakValue.value.toLocaleString('en-MY')}\n` +
+      `- Lowest return-value month: ${lowValue.period} at RM ${lowValue.value.toLocaleString('en-MY')}\n` +
+      `- Peak unsettled month: ${peakUnsettled.period} at RM ${peakUnsettled.value.toLocaleString('en-MY')}\n` +
+      `- MoM return-count growth (first month → last month): ${countGrowthPct.toFixed(1)}%\n\n`;
+
+    allowed.push(cnt('months in period', trend.length));
+    allowed.push(rm('peak return value', peakValue.value));
+    allowed.push(rm('lowest return value', lowValue.value));
+    allowed.push(rm('peak unsettled', peakUnsettled.value));
+    allowed.push(pct('mom count growth pct', countGrowthPct));
+
+    return {
+      prompt: `${preCalc}Monthly trend table:\n${table}`,
+      allowed,
+    };
+  },
+
+  async rt_product_bar(dr) {
+    const [byFreq, byValue] = await Promise.all([
+      getReturnProducts(dr!.start, dr!.end, 'item', 'frequency'),
+      getReturnProducts(dr!.start, dr!.end, 'item', 'value'),
+    ]);
+    const overview = await getReturnOverview(dr!.start, dr!.end);
+    const totalReturnValue = overview.total_return_value;
+    const totalReturnCount = overview.return_count;
+
+    const allowed: AllowedValue[] = [
+      rm('period total return value', totalReturnValue),
+      cnt('period total return count', totalReturnCount),
+    ];
+
+    const buildTable = (rows: typeof byFreq, label: string) => {
+      let t =
+        `Top 10 items by ${label}:\n` +
+        '| # | Item | CN Count | Return Value | Total Qty |\n' +
+        '|---|------|----------|--------------|-----------|\n';
+      rows.forEach((r, i) => {
+        const val = Number(r.total_value);
+        const cnCount = Number(r.cn_count);
+        t +=
+          `| ${i + 1} | ${r.name} | ${cnCount} | RM ${val.toLocaleString('en-MY')} | ${Number(r.total_qty).toLocaleString('en-MY')} |\n`;
+        allowed.push(rm(`${r.name} return value`, val));
+        allowed.push(cnt(`${r.name} cn count`, cnCount));
+      });
+      return t;
+    };
+
+    const top1Share = byValue.length > 0 && totalReturnValue > 0
+      ? (Number(byValue[0].total_value) / totalReturnValue) * 100
+      : 0;
+    const top10ValueSum = byValue.reduce((s, r) => s + Number(r.total_value), 0);
+    const top10Share = totalReturnValue > 0 ? (top10ValueSum / totalReturnValue) * 100 : 0;
+
+    const freqNames = new Set(byFreq.map(r => r.name));
+    const overlap = byValue.filter(r => freqNames.has(r.name)).map(r => r.name);
+
+    allowed.push(pct('top 1 item share of return value', top1Share));
+    allowed.push(pct('top 10 item share of return value', top10Share));
+    allowed.push(rm('top 10 item return value sum', top10ValueSum));
+
+    const preCalc =
+      `Population: items with return activity between ${dr!.start} and ${dr!.end}.\n\n` +
+      `Pre-calculated roll-ups:\n` +
+      `- Period total return value: RM ${totalReturnValue.toLocaleString('en-MY')}\n` +
+      `- Period total return count: ${totalReturnCount}\n` +
+      `- Top 1 item share of return value: ${top1Share.toFixed(1)}%\n` +
+      `- Top 10 items share of return value: ${top10Share.toFixed(1)}% (sum RM ${top10ValueSum.toLocaleString('en-MY')})\n` +
+      `- Items appearing on BOTH top-frequency AND top-value lists: ${overlap.length > 0 ? overlap.join(', ') : 'none'}\n\n` +
+      `Thresholds: Top-1 > 15% severe · Top-10 > 60% concentrated · Top-10 < 40% diversified\n\n`;
+
+    return {
+      prompt:
+        preCalc +
+        buildTable(byFreq, 'Return Frequency (CN count)') +
+        '\n' +
+        buildTable(byValue, 'Return Value (RM)'),
+      allowed,
+    };
+  },
 };
 
 // ─── Scope classification ────────────────────────────────────────────────────
@@ -2101,6 +2359,7 @@ const SECTION_SCOPE: Record<SectionKey, ScopeType> = {
   customer_margin_breakdown: 'period',
   supplier_margin_overview: 'period',
   supplier_margin_breakdown: 'period',
+  return_trend: 'period',
 };
 
 async function buildScopeLabel(scope: ScopeType, dateRange: DateRange | null): Promise<string> {

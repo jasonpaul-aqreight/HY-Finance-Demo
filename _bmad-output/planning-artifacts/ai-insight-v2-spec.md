@@ -1563,6 +1563,7 @@ Four icons to add:
 | `customer_margin_breakdown` | Customer Margin | Customer Margin Breakdown | Yes (period) |
 | `supplier_margin_overview` | Supplier Performance | Supplier Margin Overview | Yes (period) |
 | `supplier_margin_breakdown` | Supplier Performance | Supplier Margin Breakdown | Yes (period) |
+| `return_trend` | Returns | Return Trends | Yes (period) |
 
 ---
 
@@ -1574,17 +1575,155 @@ Four icons to add:
 | Customer Margin Breakdown | 3 + summary | ~18,000 | ~$0.09 | Deferred to Phase B |
 | Supplier Margin Overview | 7 + summary | ~23,000 | ~$0.11 | Deferred to Phase B |
 | Supplier Margin Breakdown | 4 + summary | ~20,000 | ~$0.10 | Deferred to Phase B |
+| Return Trends | 7 + summary | ~16,000 | ~$0.08 | Deferred to Phase B |
+
+**Estimation basis for return trends:** 7 component calls at ~1,500 tokens each on Haiku (KPI fetchers carry small roll-up blocks, charts carry month/item tables) + 1 summary call at ~5,500 tokens on Sonnet. Cheapest section so far because return volume is small relative to sales and the pre-computed tables aggregate monthly.
 
 **Estimation basis for supplier breakdown:** 4 component calls at ~2,500 tokens each on Haiku (the top_bottom fetcher carries 4 lens tables so it sits at the high end) + 1 summary call at ~8,000 tokens on Sonnet. Marginally cheaper than the §3 overview because the breakdown has 4 fetchers vs 7, even though each carries more rows.
 
 ---
 
-## Sections 5–11
+## Section 5 — `return_trend`
 
-To be authored after Section 4 is signed off, implemented, and committed. Each subsequent section follows the same template as Sections 1–4 above — with the mandatory §X.9 per-component icons subsection.
+**Page:** Returns (`/return`)
+**Scope:** `period` (date-filtered)
+**Tool policy:** `aggregate_only` (matches §1 / §3 — first section of a page with only local pre-computes behind it)
+**Data source:** `pc_return_monthly` (local) + `pc_return_products` (local) + `pc_sales_daily` (local, for return rate % denominator)
+**AI calls:** 7 parallel component analyses + 1 summary = **8 total**
+
+> **Naming reminder** — section key is `return_trend`; component prefix is `rt_*`; page route is `/return`; `SECTION_PAGE` label is `'Returns'`; dashboard shell at [DashboardShellV2.tsx](../../apps/dashboard/src/components/return/dashboard-v2/DashboardShellV2.tsx). Layout is hybrid — Section 1 (`return_trend`) is period-filtered, Section 2 (`return_unsettled`, pending) will be snapshot.
+
+> **UI alignment note (2026-04-14)** — the Returns page renders **4 KPI cards** (Total Returns, Settled, Unsettled, Return %), not 5. "Settled" is intentionally a rollup of knocked-off + refunded because the card's narrative is *"how much exposure is resolved"*, and splitting it would lose that story. The component inventory below is 1:1 with the actual UI cards per v1 §4.3 contract. Knocked-off vs refunded is still exposed to the AI inside the `rt_settled` and `rt_settlement_breakdown` prompts and to the user in the SettlementBreakdown chart.
+
+### 5.1 Component Inventory
+
+| # | Component | Type | Data Source | Key Metric |
+|---|-----------|------|-------------|------------|
+| 51 | Total Returns | KPI | `pc_return_monthly` | Total return value (RM) + return CN count |
+| 52 | Settled | KPI | `pc_return_monthly` | Knocked off + refunded (RM), settled % |
+| 53 | Unsettled | KPI | `pc_return_monthly` | Unresolved (RM), reconciliation breakdown |
+| 54 | Return % | KPI | `pc_return_monthly` + `pc_sales_daily` | Return value ÷ net sales |
+| 55 | Settlement Breakdown | Chart (stacked progress bars) | `pc_return_monthly` | Knock-off / refund / unsettled split |
+| 56 | Monthly Return Trend | Chart (area) | `pc_return_monthly` | Monthly return value + unsettled series |
+| 57 | Top Returns by Item | Chart (horizontal bar) | `pc_return_products` | Top 10 items by frequency AND value |
+
+**Component key registry (added to `SECTION_COMPONENTS` in [prompts.ts](../../apps/dashboard/src/lib/ai-insight/prompts.ts)):**
+
+```ts
+return_trend: [
+  { key: 'rt_total_returns',        name: 'Total Returns',        type: 'kpi' },
+  { key: 'rt_settled',              name: 'Settled',              type: 'kpi' },
+  { key: 'rt_unsettled',            name: 'Unsettled',            type: 'kpi' },
+  { key: 'rt_return_pct',           name: 'Return %',             type: 'kpi' },
+  { key: 'rt_settlement_breakdown', name: 'Settlement Breakdown', type: 'chart' },
+  { key: 'rt_monthly_trend',        name: 'Monthly Return Trend', type: 'chart' },
+  { key: 'rt_product_bar',          name: 'Top Returns by Item',  type: 'chart' },
+],
+```
+
+`SECTION_PAGE.return_trend = 'Returns'`
+`SECTION_NAMES.return_trend = 'Return Trends'`
+`PageKey` union extended with `'return'` in [types.ts](../../apps/dashboard/src/lib/ai-insight/types.ts).
+
+### 5.2 Filter Dimensions Available to Prompts
+
+Period endpoints accept `startDate` / `endDate` from `useDashboardFiltersV2`. No per-section dimension filters — the ProductBarChart dimension toggle (Item / Product / Variant / Country) and metric toggle (Frequency / Value) are **local UI state**, not global filters. The AI is given the **item dimension only** with **both metric views (frequency + value)**, and is instructed that drill-downs remain user-driven via the toggles.
+
+### 5.3 Thresholds (used across prompts)
+
+- **Return rate %:** < 2% Healthy · 2–5% Watch · > 5% Concern
+- **Unsettled % of return value:** < 15% Healthy · 15–30% Watch · > 30% Concern
+- **Knock-off % of return value:** > 70% Healthy (cash-efficient settlement)
+- **Refund % of return value:** > 30% Concern (cash-draining settlement)
+- **MoM return-count growth (first → last month):** > 25% Concern
+- **Item concentration:** Top 1 > 15% of return value = Severe · Top 10 > 60% Concentrated · Top 10 < 40% Diversified
+- **Settlement mix rule:** knock-off preferred (offsets invoices, no cash out); refund is working-capital drain (only appropriate for ending relationships or customers with no upcoming invoices).
+
+### 5.4 Component System Prompts
+
+All 7 prompts live in `COMPONENT_PROMPTS` in [prompts.ts](../../apps/dashboard/src/lib/ai-insight/prompts.ts) under the `// ─── Return Trend (§5) ───` block. Prompts narrate pre-fetched values only — no component-level tool access. Summary layer inherits the `aggregate_only` policy and may drill `pc_return_monthly` / `pc_return_products` / `pc_sales_daily` up to 2 tool calls for root-cause investigation.
+
+### 5.5 Data Source + Tool Access
+
+**Local tables newly whitelisted in [tools.ts](../../apps/dashboard/src/lib/ai-insight/tools.ts):**
+
+- `pc_return_monthly`: `month, cn_count, cn_total, knock_off_total, refund_total, unresolved_total, reconciled_count, partial_count, outstanding_count`
+- `pc_return_products`: `month, item_code, item_description, fruit_name, fruit_variant, fruit_country, cn_count, total_qty, total_amount, goods_returned_qty, credit_only_qty`
+
+Both added to `AGGREGATE_LOCAL_TABLES` in [tool-policy.ts](../../apps/dashboard/src/lib/ai-insight/tool-policy.ts) so the `aggregate_only` policy permits them. `pc_sales_daily` is already whitelisted from v1.
+
+**Population label** (every fetcher in this section):
+`"Population: return credit notes issued in {period}"`
+
+**Tool policy:** `'aggregate_only'` in `SECTION_POLICY`.
+
+### 5.6 Fetcher Contracts (per component)
+
+Each fetcher reuses [return/queries.ts](../../apps/dashboard/src/lib/return/queries.ts) functions so the dashboard and the AI see identical numbers — no new SQL was added.
+
+| Component key | Query functions | Values whitelisted in `allowed` |
+|---|---|---|
+| `rt_total_returns` | `getReturnOverview(start, end)` | total return value, return count, period net sales, return rate %, avg return per CN |
+| `rt_settled` | `getReturnOverview` + `getRefundSummary` | total return value, total settled, settled %, knocked off, knock-off %, refunded, refund %, refund count |
+| `rt_unsettled` | `getReturnOverview` | total unsettled, unsettled %, total return value, reconciled count, partial count, outstanding count, return count, reconciliation rate |
+| `rt_return_pct` | `getReturnOverview` | return rate %, period return value, period net sales, good threshold (2), concern threshold (5) |
+| `rt_settlement_breakdown` | `getRefundSummary` | total return value, knocked off, knock-off %, refunded, refund %, unsettled, unsettled %, refund count |
+| `rt_monthly_trend` | `getReturnTrend(start, end)` | per-month return value, unsettled, CN count; months in period, peak / lowest / peak-unsettled month, MoM count growth % |
+| `rt_product_bar` | `getReturnProducts(..., 'item', 'frequency')` + `getReturnProducts(..., 'item', 'value')` + `getReturnOverview` | period total return value, period total return count, per-item return value, per-item CN count, top 1 / top 10 share of return value, top 10 value sum |
+
+**Whitelist discipline (v1 §12.10):** every RM amount, percentage, and count printed in a prompt must appear in `allowed`, except dates/years and safe small integers (0, 1, 2, 5, 10, 15, 20, 30, 50, 60, 70, 100).
+
+**Pre-computed roll-up block (required per v1 §12.8):** the two chart fetchers (`rt_monthly_trend`, `rt_product_bar`) emit a `Pre-calculated roll-ups (use these values directly — do not recompute)` header with aggregate lines the AI cites verbatim. KPI fetchers carry their roll-ups inline.
+
+### 5.7 Truth Queries (per key metric)
+
+To live in `_bmad-output/planning-artifacts/truth-queries/return-trend.sql` (deferred until Phase B verification). Each query must match the fetcher value, the dashboard displayed value, and `queries.ts` function output (±RM 1 tolerance).
+
+**Metrics to verify:**
+
+| Truth query | Matches | Component |
+|---|---|---|
+| T1. Total return value + count (`SUM(cn_total)`, `SUM(cn_count)` from `pc_return_monthly`) | Total Returns KPI | `rt_total_returns` |
+| T2. Knock-off total, refund total, unresolved total | Settled + Unsettled KPIs, SettlementBreakdown | `rt_settled`, `rt_unsettled`, `rt_settlement_breakdown` |
+| T3. Return rate % (return value ÷ net sales from `pc_sales_daily`) | Return % KPI | `rt_return_pct` |
+| T4. Monthly trend (month × return_value × unresolved × cn_count) | Monthly Return Trend | `rt_monthly_trend` |
+| T5. Top 10 items by frequency (`cn_count DESC`) on `pc_return_products` | ProductBarChart Frequency view | `rt_product_bar` |
+| T6. Top 10 items by value (`total_amount DESC`) on `pc_return_products` | ProductBarChart Value view | `rt_product_bar` |
+
+### 5.8 Implementation Checklist (v1 §14 playbook, instantiated) — completed 2026-04-14
+
+- [x] **Step 1** — Add `'return_trend'` to `SectionKey` and `'return'` to `PageKey` in [types.ts](../../apps/dashboard/src/lib/ai-insight/types.ts)
+- [x] **Step 2** — Extend `SECTION_COMPONENTS`, `SECTION_PAGE`, `SECTION_NAMES` in [prompts.ts](../../apps/dashboard/src/lib/ai-insight/prompts.ts)
+- [x] **Step 3** — Add 7 component prompts to `COMPONENT_PROMPTS` in [prompts.ts](../../apps/dashboard/src/lib/ai-insight/prompts.ts)
+- [x] **Step 4** — Add 7 fetchers to the `fetchers` record in [data-fetcher.ts](../../apps/dashboard/src/lib/ai-insight/data-fetcher.ts); each returns `{ prompt, allowed }` per §5.6. Imports `getReturnOverview`, `getReturnTrend`, `getRefundSummary`, `getReturnProducts` from `../return/queries` — no new SQL.
+- [x] **Step 5** — Add `return_trend: 'period'` to `SECTION_SCOPE` in [data-fetcher.ts](../../apps/dashboard/src/lib/ai-insight/data-fetcher.ts)
+- [x] **Step 6** — Add `return_trend: 'aggregate_only'` to `SECTION_POLICY` in [tool-policy.ts](../../apps/dashboard/src/lib/ai-insight/tool-policy.ts). Add `pc_return_monthly` and `pc_return_products` to `AGGREGATE_LOCAL_TABLES` and to `LOCAL_WHITELIST` in [tools.ts](../../apps/dashboard/src/lib/ai-insight/tools.ts).
+- [x] **Step 7** — Replace the bespoke `<SectionHeader>` for Section 1 in [DashboardShellV2.tsx](../../apps/dashboard/src/components/return/dashboard-v2/DashboardShellV2.tsx) with `<InsightSectionHeader page="return" sectionKey="return_trend" ... />`. (The bespoke `<SectionHeader>` is left in place for Section 2 `Unsettled Returns`, which will be wired in §6.)
+- [x] **Step 7b** — Per §5.9, wire per-component `AnalyzeIcon` + add 7 `COMPONENT_INFO` entries.
+- [ ] **Step 8** — Write truth queries to `_bmad-output/planning-artifacts/truth-queries/return-trend.sql` (deferred to Phase B)
+- [x] **Step 9** — `tsc --noEmit` clean; Playwright spot-check in debug mode (no live Anthropic call). Commit with message `feat: AI insight v2 — return trend section`.
+- [ ] **Step 10 (deferred)** — Live LLM verification pending Phase B / Anthropic credits.
+
+### 5.9 Per-Component Analyze Icons (MANDATORY — per §1.9)
+
+Seven icons to add:
+
+- [x] **§5.9.1** — Add 7 entries to `COMPONENT_INFO` in [component-info.ts](../../apps/dashboard/src/lib/ai-insight/component-info.ts): `rt_total_returns`, `rt_settled`, `rt_unsettled`, `rt_return_pct`, `rt_settlement_breakdown`, `rt_monthly_trend`, `rt_product_bar` — each with `name`, `whatItMeasures`, `formula` where relevant, `indicator`, `about`.
+- [x] **§5.9.2** — [KpiCardsV2.tsx](../../apps/dashboard/src/components/return/dashboard-v2/overview/KpiCardsV2.tsx): add `componentKey` prop to `KpiCard` and render `<AnalyzeIcon sectionKey="return_trend" componentKey={componentKey} />` inline with `<CardTitle>` via the existing `flex items-center gap-1` container. Each of the 4 cards passes its component key.
+- [x] **§5.9.3** — [SettlementBreakdown.tsx](../../apps/dashboard/src/components/return/dashboard-v2/refunds/SettlementBreakdown.tsx): wrap `<CardTitle>` in `flex items-center gap-2`; add icon with `componentKey="rt_settlement_breakdown"`.
+- [x] **§5.9.4** — [MonthlyTrendChart.tsx](../../apps/dashboard/src/components/return/dashboard-v2/overview/MonthlyTrendChart.tsx): wrap `<CardTitle>` in `flex items-center gap-2`; add icon with `componentKey="rt_monthly_trend"`. The subtitle paragraph stays below the title row.
+- [x] **§5.9.5** — [ProductBarChart.tsx](../../apps/dashboard/src/components/return/dashboard-v2/products/ProductBarChart.tsx): the header already uses `justify-between`. Wrap `<CardTitle>` in a `flex items-center gap-2` container on the left; add icon with `componentKey="rt_product_bar"`. Right-side metric + dimension toggle clusters stay untouched.
+- [x] **§5.9.6** — Playwright spot-check: 7 icons render on the Return Trends cluster, dialog opens on click, About section populated, AI Analysis area shows the pre-run placeholder.
+
+**Page total after §5 ships:** 7 icons on the Returns page (Section 2 `return_unsettled` will add more in §6).
+
+---
+
+## Sections 6–11
+
+To be authored after Section 5 is signed off, implemented, and committed. Each subsequent section follows the same template as Sections 1–5 above — with the mandatory §X.9 per-component icons subsection.
 
 **Pending spec authoring:**
-- Section 5 — `return_trend`
 - Section 6 — `return_unsettled`
 - Section 7 — `expense_overview`
 - Section 8 — `expense_breakdown`

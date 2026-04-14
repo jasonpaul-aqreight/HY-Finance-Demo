@@ -8,6 +8,7 @@ import {
   AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid, Legend,
 } from 'recharts';
 import { formatRM } from '@/lib/format';
+import { AnalyzeIcon } from '@/components/ai-insight/AnalyzeIcon';
 
 export function MonthlyTrendChart({ filters }: { filters: V2Filters }) {
   const { data: rawData } = useReturnTrend(filters);
@@ -25,7 +26,10 @@ export function MonthlyTrendChart({ filters }: { filters: V2Filters }) {
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm">Monthly Return Trend</CardTitle>
+        <div className="flex items-center gap-2">
+          <CardTitle className="text-sm">Monthly Return Trend</CardTitle>
+          <AnalyzeIcon sectionKey="return_trend" componentKey="rt_monthly_trend" />
+        </div>
         <p className="text-xs text-muted-foreground">Return value vs unsettled amount over time</p>
       </CardHeader>
       <CardContent>

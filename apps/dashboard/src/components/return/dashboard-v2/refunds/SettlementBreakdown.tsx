@@ -5,6 +5,7 @@ import { useStableData } from '@/hooks/useStableData';
 import type { V2Filters } from '@/hooks/return/useDashboardFiltersV2';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatRM } from '@/lib/format';
+import { AnalyzeIcon } from '@/components/ai-insight/AnalyzeIcon';
 
 function ProgressRow({ label, amount, pct, color }: { label: string; amount: number; pct: number; color: string }) {
   return (
@@ -41,8 +42,10 @@ export function SettlementBreakdown({ filters }: { filters: V2Filters }) {
   return (
     <Card className="w-full flex flex-col">
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm">Settlement Breakdown</CardTitle>
-
+        <div className="flex items-center gap-2">
+          <CardTitle className="text-sm">Settlement Breakdown</CardTitle>
+          <AnalyzeIcon sectionKey="return_trend" componentKey="rt_settlement_breakdown" />
+        </div>
       </CardHeader>
       <CardContent className="space-y-4 px-4 flex-1 flex flex-col justify-center">
         <ProgressRow

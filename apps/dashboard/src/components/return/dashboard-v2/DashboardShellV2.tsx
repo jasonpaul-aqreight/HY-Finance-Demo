@@ -9,6 +9,7 @@ import { MonthlyTrendChart } from './overview/MonthlyTrendChart';
 import { TopDebtorsTable } from './overview/TopDebtorsTable';
 import { SettlementBreakdown } from './refunds/SettlementBreakdown';
 import { ProductBarChart } from './products/ProductBarChart';
+import { InsightSectionHeader } from '@/components/ai-insight/InsightSectionHeader';
 
 function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
@@ -36,7 +37,13 @@ export function DashboardShellV2() {
   return (
     <main className="max-w-[1600px] mx-auto px-6 py-6">
       {/* ═══ Section 1: Return Trends (date-filtered) ═══ */}
-      <SectionHeader title="Return Trends" subtitle="Filtered by date range" />
+      <InsightSectionHeader
+        title="Return Trends"
+        subtitle="Filtered by date range"
+        page="return"
+        sectionKey="return_trend"
+        dateRange={{ start: filters.startDate, end: filters.endDate }}
+      />
 
       <div className="mt-4">
         <DateRangeFilterV2 filters={filters} onUpdate={setFilters} bounds={bounds} />

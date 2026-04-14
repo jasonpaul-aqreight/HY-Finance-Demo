@@ -13,6 +13,8 @@ const LOCAL_WHITELIST: Record<string, string[]> = {
   pc_ar_aging_history: ['snapshot_date', 'bucket', 'dimension', 'dimension_key', 'invoice_count', 'total_outstanding'],
   pc_customer_margin: ['month', 'debtor_code', 'company_name', 'debtor_type', 'sales_agent', 'is_active', 'iv_revenue', 'dn_revenue', 'cn_revenue', 'iv_cost', 'dn_cost', 'cn_cost', 'iv_count', 'cn_count'],
   pc_supplier_margin: ['month', 'creditor_code', 'creditor_name', 'item_code', 'item_group', 'is_active', 'sales_revenue', 'attributed_cogs', 'purchase_qty', 'purchase_value'],
+  pc_return_monthly: ['month', 'cn_count', 'cn_total', 'knock_off_total', 'refund_total', 'unresolved_total', 'reconciled_count', 'partial_count', 'outstanding_count'],
+  pc_return_products: ['month', 'item_code', 'item_description', 'fruit_name', 'fruit_variant', 'fruit_country', 'cn_count', 'total_qty', 'total_amount', 'goods_returned_qty', 'credit_only_qty'],
 };
 
 const RDS_WHITELIST: Record<string, string[]> = {

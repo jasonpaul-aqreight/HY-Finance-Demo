@@ -811,6 +811,197 @@ Evaluate:
 Cite items by name from the pre-fetched top-50 block. Do not invent.
 
 Provide a concise analysis focused on loss-making items, price-spread outliers, and the shape of the margin distribution.`,
+
+  // ─── Return Trend (§5) ───────────────────────────────────────────────────
+  rt_total_returns: `You are analyzing the "Total Returns" KPI on the Returns page.
+
+What it measures: Total return value (RM) in the selected period, plus the number of return credit notes issued. This is a period flow — activity within the date range, not a point-in-time balance.
+
+The pre-fetched data gives you:
+- Total return value (RM) in the period
+- Return count (number of credit notes)
+- Period net sales (RM) for context
+- Return rate % (return value ÷ net sales)
+- Avg return value per CN (RM)
+
+Performance thresholds (return rate %):
+- < 2% = Healthy — normal wastage / quality tolerance for fruit distribution
+- 2% to 5% = Watch — investigate if rising
+- > 5% = Concern — quality, sourcing, or handling problem
+
+Evaluate:
+- Scale of returns relative to net sales (the return rate % is the anchor)
+- Whether the return count implies small-frequent or large-infrequent returns (avg per CN)
+- Whether the period is unusually high or low vs a typical fruit-distribution wastage rate
+
+Cite the return value, count, and return rate verbatim from the data block.
+
+Provide a concise analysis of period return exposure.`,
+
+  rt_settled: `You are analyzing the "Settled" KPI on the Returns page.
+
+What it measures: How much of the total return exposure has been resolved — either by knocking it off against future invoices (non-cash) or by refunding cash / cheque.
+
+The pre-fetched data gives you:
+- Total settled (RM) = knocked off + refunded
+- Total knocked off (RM) — offset against outstanding or future invoices, NO cash leaves the door
+- Total refunded (RM) — actual cash / cheque paid back to the customer
+- Settled % of return value
+- Knock-off % and Refund % individually
+- Refund count (number of refund transactions)
+
+Thresholds:
+- Knock-off % > 70% of return value = Healthy settlement mix (no cash leakage)
+- Refund % > 30% of return value = Concern — returns are draining cash rather than being absorbed into future invoices
+- Any refund-dominant mix with a high absolute refund total = flag as working-capital pressure
+
+Business context — CRITICAL:
+- Knock-off is the PREFERRED settlement channel for a distribution business. It converts the return into an offset against future sales — no cash leaves the bank.
+- Refund means actual cash paid back. It erodes working capital and is only appropriate when the customer relationship is ending or the customer has no upcoming invoices.
+
+Evaluate:
+- The balance between knock-off and refund — is the mix cash-efficient (knock-off heavy) or cash-draining (refund heavy)?
+- The settled % overall — is the business closing out return exposure or letting it linger?
+
+Cite RM values and percentages verbatim from the data block.
+
+Provide a concise analysis focused on settlement channel mix and cash-flow implications.`,
+
+  rt_unsettled: `You are analyzing the "Unsettled" KPI on the Returns page.
+
+What it measures: Return value from the selected period that has NOT been knocked off or refunded — still open on the books. This is the piece of the return exposure that is actively hurting the P&L and the working capital.
+
+The pre-fetched data gives you:
+- Total unsettled (RM)
+- Unsettled % of total return value
+- Partial count (return CNs that are partially resolved)
+- Outstanding count (return CNs with zero resolution)
+- Reconciled count (return CNs fully resolved)
+- Reconciliation rate (%) across the period
+
+Thresholds (unsettled % of return value):
+- < 15% = Healthy — most returns closed out
+- 15% to 30% = Watch
+- > 30% = Concern — return exposure is piling up unresolved
+
+Evaluate:
+- Scale of unsettled RM against the total return pool
+- Whether the problem is many partially-resolved CNs (process friction) or many fully-outstanding CNs (stuck on customer action)
+- The reconciliation rate as an overall health signal
+
+Cite RM values and counts verbatim from the data block.
+
+Provide a concise analysis focused on unresolved exposure and reconciliation health.`,
+
+  rt_return_pct: `You are analyzing the "Return %" KPI on the Returns page.
+
+What it measures: Total return value divided by total net sales in the period, expressed as a percentage. This is the single most important return-health ratio — it normalizes return exposure against sales volume so you can compare periods fairly.
+
+The pre-fetched data gives you:
+- Return rate % for the period
+- Period return value (RM)
+- Period net sales (RM)
+- Color band (Green / Amber / Red)
+
+Thresholds:
+- < 2% = Green (Good) — normal fruit-distribution wastage tolerance
+- 2% to 5% = Amber (Watch) — acceptable but monitor direction
+- > 5% = Red (Concern) — indicates quality, handling, or sourcing issues
+
+Evaluate:
+- Which band the current value sits in
+- What the implied scale is (a 3% return rate on RM 10M sales is RM 300K — make it concrete)
+- Whether the ratio alone is actionable or whether a trend view is needed (the MonthlyTrendChart and the trend-based components carry that context)
+
+Cite the return rate, return value, and net sales verbatim from the data block.
+
+Provide a concise analysis of return health relative to sales volume.`,
+
+  rt_settlement_breakdown: `You are analyzing the "Settlement Breakdown" chart on the Returns page.
+
+What it shows: Three horizontal progress bars for the period — Knocked Off (emerald), Refunded (blue), Unsettled (red) — each as an RM amount and as a percentage of total return value.
+
+The pre-fetched data gives you:
+- Total return value (RM)
+- Knocked off (RM) and knock-off %
+- Refunded (RM) and refund %
+- Unsettled (RM) and unsettled %
+- Refund transaction count (actual cash-out events)
+
+Thresholds:
+- Knock-off % > 70% = Healthy settlement mix (cash-efficient)
+- Refund % > 30% = Concern (cash-draining settlement)
+- Unsettled % > 30% = Concern (exposure is piling up)
+- Knock-off % < 50% AND Refund % > Knock-off % = Flag (refund-dominant mix)
+
+Business context — CRITICAL:
+- Knock-off is preferred: no cash leaves the door, the return offsets future invoices.
+- Refund is last-resort: it is real cash out, impacts working capital, and is only appropriate for ending relationships or customers with no upcoming invoices.
+- Unsettled is where the process breaks: these returns are neither absorbed nor refunded — they are open exposure.
+
+Evaluate:
+- The shape of the mix — is it knock-off dominant (good), refund dominant (cash pressure), or unsettled dominant (process breakdown)?
+- Which channel carries the majority of the resolved piece
+- Whether the unsettled slice is large enough to warrant investigation
+
+Cite RM values and percentages verbatim from the data block. Do NOT invent.
+
+Provide a concise analysis focused on settlement mix quality and unresolved exposure.`,
+
+  rt_monthly_trend: `You are analyzing the "Monthly Return Trend" chart on the Returns page.
+
+What it shows: Two area series over time for the selected period — Return Value (indigo) and Unsettled (red) — plotted by month. The chart respects the date filter.
+
+The pre-fetched data gives you a month-by-month table with:
+- Month
+- Return value (RM)
+- Unsettled (RM)
+- CN count
+
+Pre-calculated roll-ups you may cite directly:
+- Total months in the period
+- Highest / lowest month by return value (month + RM)
+- MoM growth in return count between the first and last month of the period
+- Peak unsettled month (month + RM)
+
+Thresholds:
+- Month-over-month return count growth > 25% between first and last month = Concern
+- Unsettled rising while return value is flat or falling = Process breakdown (returns are not being closed out)
+- Return value and unsettled moving together = Volume-driven exposure
+
+Evaluate:
+- Direction: are returns trending up, flat, or down across the period?
+- Whether the unsettled line is tracking return value (normal) or diverging (process issue)
+- Any month that stands out as an outlier (spike in count, spike in value, or spike in unsettled)
+
+Describe the trend month-by-month or via the pre-calculated roll-ups. Do NOT invent months, values, or averages that are not in the data block.
+
+Provide a concise analysis of the monthly pattern.`,
+
+  rt_product_bar: `You are analyzing the "Top Returns by Item" chart on the Returns page.
+
+What it shows: A horizontal bar chart of the top 10 items most associated with returns in the period. The UI exposes toggles for dimension (All / Product / Variant / Country) and metric (Frequency ↔ Value). For this analysis the AI is given BOTH metric views on the default item dimension — it should cover both.
+
+The pre-fetched data gives you:
+(A) Top 10 items by RETURN FREQUENCY (CN count) — which items break or get returned most often
+(B) Top 10 items by RETURN VALUE (total_value RM) — which items hurt the P&L most when they are returned
+(C) Period totals for context: total return value, total return count, top-1 item share of return value, top-10 item share of return value
+
+Thresholds:
+- Top 1 item > 15% of period return value = Severe concentration (one item moving the number)
+- Top 10 items > 60% of period return value = Concentrated (few items driving the problem — fixable)
+- Top 10 items < 40% of period return value = Diversified (broad quality issue — harder to fix)
+- An item appearing on BOTH the top-frequency AND top-value lists = Star problem product (high occurrence AND high cost per return)
+
+Evaluate:
+- Concentration: is the return problem one or two items, or spread across many?
+- Frequency vs value: do the top frequency items also dominate by value (consistent story), or are they different (some items break often but cost little, others rarely but big)?
+- Name the items appearing on both lists explicitly — those are the highest-leverage fixes.
+- Note that the user can drill into Product / Variant / Country dimensions via UI toggles — your analysis is on the item level only; drill-downs remain user-driven.
+
+Cite item names and values verbatim from the data block. Do not invent.
+
+Provide a concise analysis focused on item concentration and the frequency-vs-value pattern.`,
 };
 
 // ─── Summary Prompt ──────────────────────────────────────────────────────────
@@ -1044,6 +1235,15 @@ export const SECTION_COMPONENTS: Record<SectionKey, { key: string; name: string;
     { key: 'sm_item_pricing',   name: 'Item Price Comparison',        type: 'breakdown' },
     { key: 'sm_price_scatter',  name: 'Purchase vs Selling Price',    type: 'chart' },
   ],
+  return_trend: [
+    { key: 'rt_total_returns',        name: 'Total Returns',        type: 'kpi' },
+    { key: 'rt_settled',              name: 'Settled',              type: 'kpi' },
+    { key: 'rt_unsettled',            name: 'Unsettled',            type: 'kpi' },
+    { key: 'rt_return_pct',           name: 'Return %',             type: 'kpi' },
+    { key: 'rt_settlement_breakdown', name: 'Settlement Breakdown', type: 'chart' },
+    { key: 'rt_monthly_trend',        name: 'Monthly Return Trend', type: 'chart' },
+    { key: 'rt_product_bar',          name: 'Top Returns by Item',  type: 'chart' },
+  ],
 };
 
 export const SECTION_PAGE: Record<SectionKey, string> = {
@@ -1055,6 +1255,7 @@ export const SECTION_PAGE: Record<SectionKey, string> = {
   customer_margin_breakdown: 'Customer Margin',
   supplier_margin_overview: 'Supplier Performance',
   supplier_margin_breakdown: 'Supplier Performance',
+  return_trend: 'Returns',
 };
 
 export const SECTION_NAMES: Record<SectionKey, string> = {
@@ -1066,6 +1267,7 @@ export const SECTION_NAMES: Record<SectionKey, string> = {
   customer_margin_breakdown: 'Customer Margin Breakdown',
   supplier_margin_overview: 'Supplier Margin Overview',
   supplier_margin_breakdown: 'Supplier Margin Breakdown',
+  return_trend: 'Return Trends',
 };
 
 // ─── Public API ──────────────────────────────────────────────────────────────
