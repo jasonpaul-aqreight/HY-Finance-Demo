@@ -14,6 +14,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { formatRM, getCategoryColor } from '@/lib/expenses/format';
+import { AnalyzeIcon } from '@/components/ai-insight/AnalyzeIcon';
 
 function formatYAxis(v: number) {
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
@@ -102,7 +103,10 @@ export function CostTrendChart({ filters, onCategories }: CostTrendChartProps) {
 
   return (
     <div>
-      <div className="font-semibold text-sm pb-1">Cost Trend</div>
+      <div className="flex items-center gap-2 pb-1">
+        <div className="font-semibold text-sm">Cost Trend</div>
+        <AnalyzeIcon sectionKey="expense_overview" componentKey="ex_cost_trend" />
+      </div>
       <ResponsiveContainer width="100%" height={360}>
         <BarChart data={chartData} margin={{ top: 8, right: 16, bottom: 8, left: 16 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />

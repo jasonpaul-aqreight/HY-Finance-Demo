@@ -27,6 +27,14 @@ import {
   getReturnAging,
   getAllCustomerReturnsAll,
 } from '../return/queries';
+import {
+  getCostKpisV2,
+  getCostTrendV2,
+  getCostCompositionV2,
+  getCogsBreakdown,
+  getOpexBreakdown,
+  getTopExpensesByType,
+} from '../expenses/queries';
 import type { SectionKey, DateRange, AllowedValue, FetcherResult } from './types';
 
 // Convert YYYY-MM-DD to YYYY-MM to match pc_ar_monthly.month column format
@@ -2478,6 +2486,324 @@ const fetchers: Record<string, DataFetcher> = {
       allowed,
     };
   },
+
+  // ─── Expense Overview (§7) ──────────────────────────────────────────────
+  async ex_total_costs(dr) {
+    const k = await getCostKpisV2(dr!.start, dr!.end);
+    const total = k.current.total_costs;
+    const cogsPct = total > 0 ? (k.current.cogs / total) * 100 : 0;
+    const opexPct = total > 0 ? (k.current.opex / total) * 100 : 0;
+    const yoy = k.yoy_pct ?? 0;
+    const yoyLabel = k.yoy_pct != null
+      ? (yoy < 0 ? 'Healthy (costs down)' : yoy <= 5 ? 'Watch' : yoy <= 10 ? 'Concern' : 'Severe')
+      : 'No prior-year data';
+    return {
+      prompt:
+        `Population: expense GL postings in ${dr!.start} to ${dr!.end}.\n\n` +
+        `Total Costs (COGS + OpEx): RM ${Math.round(total).toLocaleString('en-MY')}\n` +
+        `- Cost of Sales (COGS): RM ${Math.round(k.current.cogs).toLocaleString('en-MY')} (${cogsPct.toFixed(1)}% of total)\n` +
+        `- Operating Costs (OpEx): RM ${Math.round(k.current.opex).toLocaleString('en-MY')} (${opexPct.toFixed(1)}% of total)\n` +
+        `Prior-year total costs (same period): RM ${Math.round(k.previous.total_costs).toLocaleString('en-MY')}\n` +
+        `YoY total-cost growth: ${yoy.toFixed(1)}% — ${yoyLabel}\n\n` +
+        `Thresholds (YoY total-cost growth): < 0% Healthy · 0-5% Watch · 5-10% Concern · > 10% Severe\n` +
+        `COGS share thresholds: 60-80% Typical · > 85% COGS-dominated · < 50% OpEx-dominated`,
+      allowed: [
+        rm('total costs', Math.round(total)),
+        rm('cogs', Math.round(k.current.cogs)),
+        rm('opex', Math.round(k.current.opex)),
+        pct('cogs pct of total', cogsPct),
+        pct('opex pct of total', opexPct),
+        rm('prior year total costs', Math.round(k.previous.total_costs)),
+        pct('yoy total cost growth', yoy),
+      ],
+    };
+  },
+
+  async ex_cogs(dr) {
+    const k = await getCostKpisV2(dr!.start, dr!.end);
+    const breakdown = await getCogsBreakdown(dr!.start, dr!.end);
+    const total = k.current.total_costs;
+    const cogsPct = total > 0 ? (k.current.cogs / total) * 100 : 0;
+    const cogsYoy = k.previous.cogs !== 0
+      ? ((k.current.cogs - k.previous.cogs) / Math.abs(k.previous.cogs)) * 100
+      : 0;
+    const cogsYoyLabel = cogsYoy < 0 ? 'Healthy (COGS down)' : cogsYoy <= 10 ? 'Watch' : 'Concern (verify vs sales growth)';
+
+    const top3 = breakdown.slice(0, 3);
+    const allowed: AllowedValue[] = [
+      rm('cogs', Math.round(k.current.cogs)),
+      rm('total costs', Math.round(total)),
+      pct('cogs pct of total', cogsPct),
+      rm('prior year cogs', Math.round(k.previous.cogs)),
+      pct('cogs yoy growth', cogsYoy),
+    ];
+    let top3Block = '';
+    top3.forEach((r, i) => {
+      const share = k.current.cogs > 0 ? (r.net_cost / k.current.cogs) * 100 : 0;
+      top3Block += `${i + 1}. ${r.account_name} (${r.acc_no}): RM ${Math.round(r.net_cost).toLocaleString('en-MY')} (${share.toFixed(1)}% of COGS)\n`;
+      allowed.push(rm(`${r.account_name} cogs amount`, Math.round(r.net_cost)));
+      allowed.push(pct(`${r.account_name} share of cogs`, share));
+    });
+
+    return {
+      prompt:
+        `Population: COGS (acc_type = 'CO') GL postings in ${dr!.start} to ${dr!.end}.\n\n` +
+        `Cost of Sales (COGS): RM ${Math.round(k.current.cogs).toLocaleString('en-MY')}\n` +
+        `COGS % of total costs: ${cogsPct.toFixed(1)}%\n` +
+        `Prior-year COGS: RM ${Math.round(k.previous.cogs).toLocaleString('en-MY')}\n` +
+        `COGS YoY growth: ${cogsYoy.toFixed(1)}% — ${cogsYoyLabel}\n\n` +
+        (top3Block ? `Top 3 COGS accounts:\n${top3Block}\n` : '') +
+        `Thresholds: COGS share 60-80% Typical · > 85% margin-pressure risk\n` +
+        `Business context: COGS is variable — YoY growth is acceptable if sales volume also grew. Flag COGS YoY > 15% if sales are flat or declining.`,
+      allowed,
+    };
+  },
+
+  async ex_opex(dr) {
+    const k = await getCostKpisV2(dr!.start, dr!.end);
+    const breakdown = await getOpexBreakdown(dr!.start, dr!.end);
+    const total = k.current.total_costs;
+    const opexPct = total > 0 ? (k.current.opex / total) * 100 : 0;
+    const opexYoy = k.previous.opex !== 0
+      ? ((k.current.opex - k.previous.opex) / Math.abs(k.previous.opex)) * 100
+      : 0;
+    const opexYoyLabel = opexYoy < 0 ? 'Healthy (OpEx down)' : opexYoy <= 10 ? 'Watch' : 'Concern (investigate structural cost changes)';
+
+    const top3 = breakdown.slice(0, 3);
+    const allowed: AllowedValue[] = [
+      rm('opex', Math.round(k.current.opex)),
+      rm('total costs', Math.round(total)),
+      pct('opex pct of total', opexPct),
+      rm('prior year opex', Math.round(k.previous.opex)),
+      pct('opex yoy growth', opexYoy),
+    ];
+    let top3Block = '';
+    top3.forEach((r, i) => {
+      const share = k.current.opex > 0 ? (r.net_cost / k.current.opex) * 100 : 0;
+      top3Block += `${i + 1}. ${r.account_name} (${r.acc_no}): RM ${Math.round(r.net_cost).toLocaleString('en-MY')} (${share.toFixed(1)}% of OpEx)\n`;
+      allowed.push(rm(`${r.account_name} opex amount`, Math.round(r.net_cost)));
+      allowed.push(pct(`${r.account_name} share of opex`, share));
+    });
+
+    return {
+      prompt:
+        `Population: OpEx (acc_type = 'EP') GL postings in ${dr!.start} to ${dr!.end}.\n\n` +
+        `Operating Costs (OpEx): RM ${Math.round(k.current.opex).toLocaleString('en-MY')}\n` +
+        `OpEx % of total costs: ${opexPct.toFixed(1)}%\n` +
+        `Prior-year OpEx: RM ${Math.round(k.previous.opex).toLocaleString('en-MY')}\n` +
+        `OpEx YoY growth: ${opexYoy.toFixed(1)}% — ${opexYoyLabel}\n\n` +
+        (top3Block ? `Top 3 OpEx accounts:\n${top3Block}\n` : '') +
+        `Thresholds: OpEx YoY > 10% Concern (semi-fixed; should grow slower than revenue)\n` +
+        `Business context: OpEx is semi-fixed and scales only with structural decisions (headcount, rent, tooling). Unexplained OpEx jumps warrant investigation.`,
+      allowed,
+    };
+  },
+
+  async ex_yoy_costs(dr) {
+    const k = await getCostKpisV2(dr!.start, dr!.end);
+    const totalYoy = k.yoy_pct ?? 0;
+    const cogsYoy = k.previous.cogs !== 0
+      ? ((k.current.cogs - k.previous.cogs) / Math.abs(k.previous.cogs)) * 100
+      : 0;
+    const opexYoy = k.previous.opex !== 0
+      ? ((k.current.opex - k.previous.opex) / Math.abs(k.previous.opex)) * 100
+      : 0;
+    const band = k.yoy_pct == null
+      ? 'No prior-year data'
+      : totalYoy < 0 ? 'Green (Healthy — costs falling)'
+      : totalYoy <= 5 ? 'Amber (Watch)'
+      : totalYoy <= 10 ? 'Red (Concern)'
+      : 'Severe (costs outpacing typical inflation)';
+
+    return {
+      prompt:
+        `Population: expense GL postings in ${dr!.start} to ${dr!.end} vs same period prior year.\n\n` +
+        `Current-period total costs: RM ${Math.round(k.current.total_costs).toLocaleString('en-MY')}\n` +
+        `Prior-period total costs: RM ${Math.round(k.previous.total_costs).toLocaleString('en-MY')}\n` +
+        `YoY total-cost growth: ${totalYoy.toFixed(1)}% — ${band}\n\n` +
+        `Cost-type breakdown of YoY:\n` +
+        `- COGS: RM ${Math.round(k.current.cogs).toLocaleString('en-MY')} vs RM ${Math.round(k.previous.cogs).toLocaleString('en-MY')} (YoY ${cogsYoy.toFixed(1)}%)\n` +
+        `- OpEx: RM ${Math.round(k.current.opex).toLocaleString('en-MY')} vs RM ${Math.round(k.previous.opex).toLocaleString('en-MY')} (YoY ${opexYoy.toFixed(1)}%)\n\n` +
+        `Thresholds: < 0% Healthy · 0-5% Watch · 5-10% Concern · > 10% Severe\n` +
+        `Business context: OpEx YoY > 10% is the more worrying signal because OpEx is semi-fixed. COGS YoY growth is acceptable if sales volume grew proportionally.`,
+      allowed: [
+        rm('current total costs', Math.round(k.current.total_costs)),
+        rm('prior total costs', Math.round(k.previous.total_costs)),
+        pct('yoy total cost growth', totalYoy),
+        rm('current cogs', Math.round(k.current.cogs)),
+        rm('prior cogs', Math.round(k.previous.cogs)),
+        pct('cogs yoy growth', cogsYoy),
+        rm('current opex', Math.round(k.current.opex)),
+        rm('prior opex', Math.round(k.previous.opex)),
+        pct('opex yoy growth', opexYoy),
+      ],
+    };
+  },
+
+  async ex_cost_trend(dr) {
+    const trend = await getCostTrendV2(dr!.start, dr!.end);
+    if (trend.current.length === 0) {
+      return { prompt: 'No monthly cost trend data for selected period.', allowed: [] };
+    }
+    const allowed: AllowedValue[] = [];
+    let table =
+      '| Month | COGS | OpEx | Total |\n' +
+      '|-------|------|------|-------|\n';
+    let peak = { month: trend.current[0].month, total: 0 };
+    let low = { month: trend.current[0].month, total: Number.POSITIVE_INFINITY };
+    for (const r of trend.current) {
+      const total = r.cogs + r.opex;
+      table +=
+        `| ${r.month} ` +
+        `| RM ${Math.round(r.cogs).toLocaleString('en-MY')} ` +
+        `| RM ${Math.round(r.opex).toLocaleString('en-MY')} ` +
+        `| RM ${Math.round(total).toLocaleString('en-MY')} |\n`;
+      allowed.push(rm(`${r.month} cogs`, Math.round(r.cogs)));
+      allowed.push(rm(`${r.month} opex`, Math.round(r.opex)));
+      allowed.push(rm(`${r.month} total`, Math.round(total)));
+      if (total > peak.total) peak = { month: r.month, total };
+      if (total < low.total) low = { month: r.month, total };
+    }
+    const first = trend.current[0];
+    const last = trend.current[trend.current.length - 1];
+    const firstTotal = first.cogs + first.opex;
+    const lastTotal = last.cogs + last.opex;
+    const momGrowth = firstTotal > 0 ? ((lastTotal - firstTotal) / firstTotal) * 100 : 0;
+
+    const priorTotal = trend.previous.reduce((s, r) => s + r.cogs + r.opex, 0);
+    const currTotal = trend.current.reduce((s, r) => s + r.cogs + r.opex, 0);
+    const periodYoy = priorTotal > 0 ? ((currTotal - priorTotal) / priorTotal) * 100 : 0;
+
+    allowed.push(cnt('months in period', trend.current.length));
+    allowed.push(rm('peak month total', Math.round(peak.total)));
+    allowed.push(rm('lowest month total', Math.round(low.total)));
+    allowed.push(pct('mom growth first to last month', momGrowth));
+    allowed.push(rm('current period total', Math.round(currTotal)));
+    allowed.push(rm('prior period total', Math.round(priorTotal)));
+    allowed.push(pct('period yoy growth', periodYoy));
+
+    const preCalc =
+      `Population: months with expense activity between ${dr!.start} and ${dr!.end}.\n\n` +
+      `Pre-calculated roll-ups (use these values directly — do not recompute):\n` +
+      `- Months in period: ${trend.current.length}\n` +
+      `- Peak total-cost month: ${peak.month} at RM ${Math.round(peak.total).toLocaleString('en-MY')}\n` +
+      `- Lowest total-cost month: ${low.month} at RM ${Math.round(low.total).toLocaleString('en-MY')}\n` +
+      `- MoM cost growth (first month → last month): ${momGrowth.toFixed(1)}%\n` +
+      `- Current-period total: RM ${Math.round(currTotal).toLocaleString('en-MY')}\n` +
+      `- Prior-year same-period total: RM ${Math.round(priorTotal).toLocaleString('en-MY')}\n` +
+      `- Period YoY growth: ${periodYoy.toFixed(1)}%\n\n` +
+      `Thresholds (MoM first-to-last): > 15% Concern · > 25% Severe\n\n`;
+
+    return {
+      prompt: `${preCalc}Monthly cost trend:\n${table}`,
+      allowed,
+    };
+  },
+
+  async ex_cost_composition(dr) {
+    const comp = await getCostCompositionV2(dr!.start, dr!.end);
+    const k = await getCostKpisV2(dr!.start, dr!.end);
+
+    const cogs = comp.find(c => c.type === 'CO')?.amount ?? k.current.cogs;
+    const opex = comp.find(c => c.type === 'EP')?.amount ?? k.current.opex;
+    const total = cogs + opex;
+    const cogsPct = total > 0 ? (cogs / total) * 100 : 0;
+    const opexPct = total > 0 ? (opex / total) * 100 : 0;
+
+    const priorTotal = k.previous.cogs + k.previous.opex;
+    const priorCogsPct = priorTotal > 0 ? (k.previous.cogs / priorTotal) * 100 : 0;
+    const priorOpexPct = priorTotal > 0 ? (k.previous.opex / priorTotal) * 100 : 0;
+    const cogsDrift = cogsPct - priorCogsPct;
+
+    const mixLabel =
+      cogsPct >= 85 ? 'COGS-dominated (margin-pressure risk)' :
+      cogsPct < 50 ? 'OpEx-dominated (scaling inefficiency risk)' :
+      cogsPct >= 60 && cogsPct <= 80 ? 'Typical fruit-distribution mix' :
+      'Mixed';
+
+    const preCalc =
+      `Population: expense GL postings in ${dr!.start} to ${dr!.end}.\n\n` +
+      `Pre-calculated roll-ups (use these values directly — do not recompute):\n` +
+      `- Total cost: RM ${Math.round(total).toLocaleString('en-MY')}\n` +
+      `- COGS: RM ${Math.round(cogs).toLocaleString('en-MY')} (${cogsPct.toFixed(1)}% of total)\n` +
+      `- OpEx: RM ${Math.round(opex).toLocaleString('en-MY')} (${opexPct.toFixed(1)}% of total)\n` +
+      `- Mix classification: ${mixLabel}\n` +
+      `- Prior-year composition: COGS ${priorCogsPct.toFixed(1)}% · OpEx ${priorOpexPct.toFixed(1)}%\n` +
+      `- COGS share drift (pp, current − prior): ${cogsDrift.toFixed(1)} pp\n\n` +
+      `Thresholds: 60-80% COGS = Typical · > 85% COGS-dominated · < 50% OpEx-dominated\n` +
+      `Business context: A rising COGS share (positive drift) combined with flat sales indicates margin compression. A falling COGS share (negative drift) can mean either margin improvement OR under-investment in inventory.`;
+
+    return {
+      prompt: preCalc,
+      allowed: [
+        rm('total cost', Math.round(total)),
+        rm('cogs', Math.round(cogs)),
+        pct('cogs pct of total', cogsPct),
+        rm('opex', Math.round(opex)),
+        pct('opex pct of total', opexPct),
+        pct('prior cogs pct', priorCogsPct),
+        pct('prior opex pct', priorOpexPct),
+        pct('cogs share drift pp', cogsDrift),
+      ],
+    };
+  },
+
+  async ex_top_expenses(dr) {
+    const rows = await getTopExpensesByType(dr!.start, dr!.end, 'all', 'desc');
+    const k = await getCostKpisV2(dr!.start, dr!.end);
+    const total = k.current.total_costs;
+
+    if (rows.length === 0) {
+      return { prompt: 'No expense rows for selected period.', allowed: [] };
+    }
+
+    const allowed: AllowedValue[] = [rm('total costs', Math.round(total))];
+    let table =
+      '| # | Account | Acc No | Cost Type | Net Cost | % of Total |\n' +
+      '|---|---------|--------|-----------|----------|------------|\n';
+    rows.slice(0, 10).forEach((r, i) => {
+      const share = total > 0 ? (Math.abs(r.net_cost) / total) * 100 : 0;
+      table +=
+        `| ${i + 1} | ${r.account_name} | ${r.acc_no} | ${r.cost_type} ` +
+        `| RM ${Math.round(r.net_cost).toLocaleString('en-MY')} | ${share.toFixed(1)}% |\n`;
+      allowed.push(rm(`${r.account_name} net cost`, Math.round(r.net_cost)));
+      allowed.push(pct(`${r.account_name} share of total`, share));
+    });
+
+    const top1Share = total > 0 ? (Math.abs(rows[0].net_cost) / total) * 100 : 0;
+    const top10Sum = rows.slice(0, 10).reduce((s, r) => s + Math.abs(r.net_cost), 0);
+    const top10Share = total > 0 ? (top10Sum / total) * 100 : 0;
+    const cogsInTop10 = rows.slice(0, 10).filter(r => r.cost_type === 'COGS').length;
+    const opexInTop10 = rows.slice(0, 10).filter(r => r.cost_type === 'OPEX').length;
+
+    const concentrationLabel =
+      top1Share > 30 ? 'Severe (single-account risk)' :
+      top1Share > 15 ? 'Concentrated' :
+      top10Share > 75 ? 'Concentrated (top 10 > 75%)' :
+      top10Share < 50 ? 'Diversified' :
+      'Moderate';
+
+    allowed.push(pct('top 1 account share', top1Share));
+    allowed.push(pct('top 10 account share', top10Share));
+    allowed.push(rm('top 10 sum', Math.round(top10Sum)));
+    allowed.push(cnt('cogs accounts in top 10', cogsInTop10));
+    allowed.push(cnt('opex accounts in top 10', opexInTop10));
+
+    const preCalc =
+      `Population: GL accounts with expense postings between ${dr!.start} and ${dr!.end}.\n\n` +
+      `Pre-calculated roll-ups (use these values directly — do not recompute):\n` +
+      `- Total costs: RM ${Math.round(total).toLocaleString('en-MY')}\n` +
+      `- Top 1 account share: ${top1Share.toFixed(1)}%\n` +
+      `- Top 10 accounts share: ${top10Share.toFixed(1)}% (sum RM ${Math.round(top10Sum).toLocaleString('en-MY')})\n` +
+      `- Concentration: ${concentrationLabel}\n` +
+      `- Mix in top 10: ${cogsInTop10} COGS · ${opexInTop10} OpEx\n\n` +
+      `Thresholds: Top 1 > 30% Severe · 15-30% Concentrated · < 15% Diversified · Top 10 > 75% Concentrated · < 50% Diversified\n\n`;
+
+    return {
+      prompt: preCalc + 'Top 10 expense accounts (all cost types, descending):\n' + table,
+      allowed,
+    };
+  },
 };
 
 // ─── Scope classification ────────────────────────────────────────────────────
@@ -2495,6 +2821,7 @@ const SECTION_SCOPE: Record<SectionKey, ScopeType> = {
   supplier_margin_breakdown: 'period',
   return_trend: 'period',
   return_unsettled: 'snapshot',
+  expense_overview: 'period',
 };
 
 // Per-section snapshot source: each snapshot section anchors its "as of" date on a different table.

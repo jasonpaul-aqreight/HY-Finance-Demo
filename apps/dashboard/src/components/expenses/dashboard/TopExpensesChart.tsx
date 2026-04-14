@@ -17,6 +17,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { formatRM } from '@/lib/format';
+import { AnalyzeIcon } from '@/components/ai-insight/AnalyzeIcon';
 
 const COGS_COLOR = '#3B82F6';
 const OPEX_COLOR = '#F97316';
@@ -87,7 +88,10 @@ export function TopExpensesChart({ filters }: { filters: DashboardFilters }) {
     return (
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-2 px-4">
-          <CardTitle>{title}</CardTitle>
+          <div className="flex items-center gap-2">
+            <CardTitle>{title}</CardTitle>
+            <AnalyzeIcon sectionKey="expense_overview" componentKey="ex_top_expenses" />
+          </div>
           <div className="flex items-center gap-1.5">
             <ToggleGroup<CostType>
               options={[
@@ -128,7 +132,10 @@ export function TopExpensesChart({ filters }: { filters: DashboardFilters }) {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-2 px-4 pb-2">
         <div>
-          <CardTitle>{title}</CardTitle>
+          <div className="flex items-center gap-2">
+            <CardTitle>{title}</CardTitle>
+            <AnalyzeIcon sectionKey="expense_overview" componentKey="ex_top_expenses" />
+          </div>
           <p className="text-xs text-muted-foreground mt-1">
             {direction === 'top' ? 'Highest' : 'Lowest'} GL accounts by net cost &middot;
             <span className="inline-block w-3 h-3 rounded-sm ml-2 mr-1 align-middle" style={{ background: COGS_COLOR }} />Cost of Sales

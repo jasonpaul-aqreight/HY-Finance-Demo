@@ -344,4 +344,52 @@ export const COMPONENT_INFO: Record<string, ComponentInfo> = {
     indicator: 'Top-50 items with margin % < 0 = Always flag · > 20% of universe items in the < 5% bucket = Thin-margin catalog · Meaningful tail in 20%+ = Premium pocket',
     about: 'Each dot is one item: x = avg purchase price, y = avg selling price, size = revenue. Items below the y = x line are selling for less than they cost (loss-making).\n\nThe AI analysis looks at:\n• Named loss-making items in the top 50 by revenue (the items that actually move the P&L)\n• Price-spread outliers — items where purchase price is unusually high or low relative to selling price\n• The shape of the margin distribution across the full universe of items (loss / thin / healthy / premium)\n\nUse it to spot items where procurement or pricing has drifted away from the rest of the catalog.',
   },
+
+  // ═══ Expense Overview (§7) ═══
+  ex_total_costs: {
+    name: 'Total Costs',
+    whatItMeasures: 'Total expense posted to GL in the selected period — Cost of Sales (COGS) + Operating Costs (OpEx) combined.',
+    formula: 'SUM(net_amount) from pc_expense_monthly WHERE acc_type IN (\'CO\', \'EP\') within the period',
+    indicator: 'YoY < 0% = Healthy · 0–5% = Watch · 5–10% = Concern · > 10% = Severe',
+    about: 'Total Costs shows the period cost exposure in a single number, with the COGS / OpEx split visible on the card.\n\nThis is a PERIOD FLOW — activity within the selected date range, not a point-in-time balance. It is always read against revenue for the same period to judge whether cost growth is justified.\n\nA healthy fruit-distribution business has COGS in the 60–80% range of total cost. A drift toward COGS-dominated (> 85%) suggests margin pressure; OpEx-dominated (< 50%) suggests either premium positioning or scaling inefficiency.',
+  },
+  ex_cogs: {
+    name: 'Cost of Sales (COGS)',
+    whatItMeasures: 'Variable cost directly tied to products sold — GL accounts with acc_type = \'CO\'.',
+    formula: 'SUM(net_amount) WHERE acc_type = \'CO\' within the period',
+    indicator: 'COGS share 60–80% = Typical · > 85% = Margin-pressure risk · COGS YoY > 15% with flat sales = Concern',
+    about: 'COGS is the variable piece of the cost base. It should scale with sales volume — if you sold more, you spent more on inventory.\n\nThe critical question is not "did COGS grow?" but "did COGS grow FASTER than sales?". A 10% COGS YoY on a 10% sales YoY is perfectly healthy. A 10% COGS YoY on flat sales is margin compression.\n\nThe top 3 COGS accounts shown in the analysis block identify which line items dominate the variable cost base — usually purchase cost of fruit, freight-in, or direct handling.',
+  },
+  ex_opex: {
+    name: 'Operating Costs (OpEx)',
+    whatItMeasures: 'Semi-fixed day-to-day operating expenses — GL accounts with acc_type = \'EP\' (rent, salaries, utilities, tooling, etc.).',
+    formula: 'SUM(net_amount) WHERE acc_type = \'EP\' within the period',
+    indicator: 'OpEx YoY > 10% = Concern · OpEx YoY < 0% = Healthy discipline · OpEx share > 50% of total = OpEx-dominated',
+    about: 'OpEx is the semi-fixed piece of the cost base. Unlike COGS, it does NOT scale linearly with sales volume — it grows only with structural decisions (new headcount, new rent, new tooling, new vehicles).\n\nThat makes OpEx YoY growth a stronger signal than COGS YoY growth. If OpEx jumped 15% year-over-year, something structural changed — and the analyst should be able to name it.\n\nThe top 3 OpEx accounts shown in the analysis block identify which structural line items are moving.',
+  },
+  ex_yoy_costs: {
+    name: 'vs Last Year',
+    whatItMeasures: 'Year-over-year growth in total costs for the selected period, with the COGS / OpEx split visible.',
+    formula: '((Current period total − Prior-year same-period total) / Prior-year total) × 100',
+    indicator: '< 0% = Healthy · 0–5% = Watch · 5–10% = Concern · > 10% = Severe',
+    about: 'This KPI is the quickest health check on cost discipline. It compares the total cost in the selected period to the same period one year ago.\n\nThe colour band follows the YoY growth rate. Thresholds are calibrated to typical Malaysian distribution inflation — sub-5% is in line, 5–10% warrants investigation, double-digit growth is a red flag.\n\nThe component-level analysis splits the YoY movement between COGS and OpEx. A COGS-driven YoY is the "volume story" (more sales, more inventory). An OpEx-driven YoY is the "structural story" (new headcount, rent, tooling) — the more worrying of the two.',
+  },
+  ex_cost_trend: {
+    name: 'Cost Trend',
+    whatItMeasures: 'Monthly total-cost trajectory across the selected period, stacked by COGS and OpEx so you can see which piece is moving.',
+    indicator: 'MoM growth (first → last month) > 15% = Concern · > 25% = Severe · Period YoY > 10% = Severe',
+    about: 'The chart plots one bar per month in the selected period, with COGS and OpEx stacked within each bar. You can use the Cost Type toggle above the chart to re-colour the view.\n\nWatch for two things:\n\n• Direction: is the trend rising, flat, or falling across the period? A sharp rise in the last month is the earliest cost-discipline warning signal.\n• Mix movement: if OpEx is getting taller month-over-month while COGS is flat, the cost base is re-shaping toward the semi-fixed side — that is a structural change, not a volume story.\n\nThe AI is given the pre-computed peak/low months, MoM growth, and period-over-prior-year totals so it can narrate the shape without recomputing.',
+  },
+  ex_cost_composition: {
+    name: 'Cost Composition',
+    whatItMeasures: 'Split of total costs between COGS and OpEx for the period, with prior-year composition for drift analysis.',
+    indicator: 'COGS 60–80% = Typical · > 85% = COGS-dominated (margin-pressure risk) · < 50% = OpEx-dominated (scaling inefficiency risk)',
+    about: 'The donut shows the COGS / OpEx split for the period. The critical number is not the absolute split but the DRIFT from prior year.\n\n• A rising COGS share (positive drift, in percentage points) on flat sales indicates margin compression — the cost of what you sell has grown faster than what you can charge for it.\n• A falling COGS share (negative drift) can mean two very different things: margin improvement (good) or inventory under-investment (bad) — the sales page should be cross-checked before concluding.\n• An OpEx-dominated mix (COGS < 50%) on a distribution business is unusual and usually flags either premium positioning or poor scaling of the fixed cost base.\n\nThis chart is most useful when the AI can put a number on the drift and interpret it against the sales context.',
+  },
+  ex_top_expenses: {
+    name: 'Top Expenses',
+    whatItMeasures: 'Top 10 GL accounts by net cost in the period, with bars coloured by cost type (COGS / OpEx). User can toggle cost type and top/bottom direction.',
+    indicator: 'Top 1 > 30% = Severe concentration · 15–30% = Concentrated · Top 10 > 75% = Concentrated · < 50% = Diversified',
+    about: 'This chart shows where the expense dollars actually land. Each bar is one GL account, coloured by whether it is COGS (variable) or OpEx (semi-fixed).\n\nWatch for two things:\n\n• Concentration: if one account carries > 30% of total cost, that is single-account risk — a price change, a vendor change, or a category shift in that one line moves the entire cost base. If the top 10 accounts sum to > 75%, the cost base is concentrated enough that a procurement or discipline initiative can meaningfully move the number.\n• Mix: a top 10 dominated by COGS is the normal distribution picture (inventory, freight, handling). A top 10 dominated by OpEx means structural costs are the biggest movers — usually salaries, rent, or vehicle costs — and the fix is strategic, not operational.\n\nThe Cost Type toggle (All / COGS / OpEx) and Top/Bottom toggle drive the chart locally — the AI analysis is on the default All / Top view, and drill-downs remain user-driven.',
+  },
 };

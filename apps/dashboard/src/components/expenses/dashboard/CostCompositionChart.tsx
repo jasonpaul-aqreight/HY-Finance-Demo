@@ -6,6 +6,7 @@ import type { DashboardFilters } from '@/hooks/expenses/useDashboardFilters';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatRM, getCategoryColor } from '@/lib/expenses/format';
+import { AnalyzeIcon } from '@/components/ai-insight/AnalyzeIcon';
 
 function CustomTooltip({ active, payload }: {
   active?: boolean;
@@ -38,7 +39,10 @@ export function CostCompositionChart({ filters }: { filters: DashboardFilters })
 
   return (
     <div>
-      <div className="font-semibold text-sm pb-2">Cost Composition</div>
+      <div className="flex items-center gap-2 pb-2">
+        <div className="font-semibold text-sm">Cost Composition</div>
+        <AnalyzeIcon sectionKey="expense_overview" componentKey="ex_cost_composition" />
+      </div>
       <ResponsiveContainer width="100%" height={350}>
         <PieChart>
           <Pie

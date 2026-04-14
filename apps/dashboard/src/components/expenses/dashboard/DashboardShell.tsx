@@ -12,6 +12,7 @@ import { CogsBreakdownTable } from './CogsBreakdownTable';
 import { OpexBreakdownTable } from './OpexBreakdownTable';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { InsightSectionHeader } from '@/components/ai-insight/InsightSectionHeader';
 
 function BreakdownTabs({ filters }: { filters: DashboardFilters }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -65,6 +66,15 @@ export function DashboardShell() {
 
         {ready && (
           <>
+            {/* ═══ Section 1: Expense Overview (date-filtered) ═══ */}
+            <InsightSectionHeader
+              title="Expense Overview"
+              subtitle="Filtered by date range"
+              page="expenses"
+              sectionKey="expense_overview"
+              dateRange={{ start: filters.startDate, end: filters.endDate }}
+            />
+
             {/* KPI Cards */}
             <KpiCards filters={filters} />
 

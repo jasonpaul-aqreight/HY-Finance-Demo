@@ -1,6 +1,6 @@
 // ─── AI Insight Engine — Shared Types ────────────────────────────────────────
 
-export type PageKey = 'payment' | 'sales' | 'customer-margin' | 'supplier-performance' | 'return';
+export type PageKey = 'payment' | 'sales' | 'customer-margin' | 'supplier-performance' | 'return' | 'expenses';
 
 export type SectionKey =
   | 'payment_collection_trend'
@@ -12,7 +12,8 @@ export type SectionKey =
   | 'supplier_margin_overview'
   | 'supplier_margin_breakdown'
   | 'return_trend'
-  | 'return_unsettled';
+  | 'return_unsettled'
+  | 'expense_overview';
 
 export type ComponentType = 'kpi' | 'chart' | 'table' | 'breakdown';
 

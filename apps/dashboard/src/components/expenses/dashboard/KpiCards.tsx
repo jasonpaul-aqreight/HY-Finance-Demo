@@ -5,6 +5,7 @@ import { useStableData } from '@/hooks/useStableData';
 import type { DashboardFilters } from '@/hooks/expenses/useDashboardFilters';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatRM } from '@/lib/format';
+import { AnalyzeIcon } from '@/components/ai-insight/AnalyzeIcon';
 
 interface KpiCardProps {
   title: string;
@@ -12,14 +13,16 @@ interface KpiCardProps {
   value: string;
   subtext: string;
   valueColor?: string;
+  componentKey?: string;
 }
 
-function KpiCard({ title, subtitle, value, subtext, valueColor }: KpiCardProps) {
+function KpiCard({ title, subtitle, value, subtext, valueColor, componentKey }: KpiCardProps) {
   return (
     <Card>
       <CardHeader className="pb-1 pt-4 px-4">
-        <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+        <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1">
           {title}
+          {componentKey && <AnalyzeIcon sectionKey="expense_overview" componentKey={componentKey} />}
         </CardTitle>
         {subtitle && (
           <p className="text-xs text-muted-foreground font-normal">{subtitle}</p>
@@ -74,22 +77,26 @@ export function KpiCards({ filters }: { filters: DashboardFilters }) {
         title="Total Costs"
         value={formatRM(current.total_costs)}
         subtext={`Cost of Sales ${calculated.cogs_pct_of_total.toFixed(1)}% · Operating Costs ${calculated.opex_pct_of_total.toFixed(1)}%`}
+        componentKey="ex_total_costs"
       />
       <KpiCard
         title="Cost of Sales (COGS)"
         value={formatRM(current.cogs)}
         subtext="Direct costs of products sold"
+        componentKey="ex_cogs"
       />
       <KpiCard
         title="Operating Costs (OPEX)"
         value={formatRM(current.opex)}
         subtext="Day-to-day business costs"
+        componentKey="ex_opex"
       />
       <KpiCard
         title="vs Last Year"
         value={yoyLabel}
         valueColor={yoyColor}
         subtext="vs same period last year"
+        componentKey="ex_yoy_costs"
       />
     </div>
   );

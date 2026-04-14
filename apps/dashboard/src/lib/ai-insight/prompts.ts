@@ -1068,6 +1068,212 @@ Evaluate:
 Name the top 5 debtors verbatim. Cite RM values and percentages from the pre-computed block.
 
 Provide a concise analysis focused on concentration, stale debtors, and any red-flag settlement patterns on the top debtors.`,
+
+  // ─── Expense Overview (§7) ──────────────────────────────────────────────
+  ex_total_costs: `You are analyzing the "Total Costs" KPI on the Expenses page.
+
+What it measures: Total expense (COGS + OpEx) posted to GL in the selected period. This is a period flow — activity within the date range, not a point-in-time balance.
+
+The pre-fetched data gives you:
+- Total costs (RM) — COGS + OpEx combined
+- COGS (RM) and COGS % of total
+- OpEx (RM) and OpEx % of total
+- Prior-year total costs for the same period
+- YoY total-cost growth %
+
+Thresholds (YoY total-cost growth):
+- < 0% = Healthy — costs down year-over-year
+- 0% to 5% = Watch — in line with typical inflation
+- 5% to 10% = Concern — investigate drivers
+- > 10% = Severe — costs outpacing typical inflation
+
+COGS share thresholds:
+- 60% to 80% = Typical fruit-distribution mix
+- > 85% = COGS-dominated (margin-pressure risk)
+- < 50% = OpEx-dominated (scaling inefficiency risk)
+
+Evaluate:
+- Whether total costs are growing, flat, or shrinking vs prior year
+- Whether the COGS / OpEx split looks like a healthy distribution business
+- The scale of the number in context — is this a big or small period?
+
+Cite RM values and percentages verbatim from the data block.
+
+Provide a concise analysis of period cost exposure.`,
+
+  ex_cogs: `You are analyzing the "Cost of Sales (COGS)" KPI on the Expenses page.
+
+What it measures: The variable cost of products sold in the selected period — GL accounts with acc_type = 'CO'. COGS scales with sales volume, so year-over-year growth is only concerning if it outpaces sales.
+
+The pre-fetched data gives you:
+- COGS (RM) for the period
+- COGS % of total costs
+- Prior-year COGS for the same period
+- COGS YoY growth %
+- Top 3 COGS accounts by value (account name + acc_no + RM + % of COGS)
+
+Thresholds:
+- COGS share 60% to 80% of total cost = Typical
+- COGS share > 85% of total cost = Margin-pressure risk
+- COGS YoY growth > 15% when sales are flat/declining = Concern
+
+Business context — CRITICAL:
+- COGS is VARIABLE. If sales volume grew, COGS should grow too — that is normal.
+- The question is whether COGS grew FASTER than sales (margin compression) or slower (margin improvement).
+- The analyst reading this summary will cross-check against the sales page; flag YoY drift but do not jump to conclusions about margin without that context.
+
+Evaluate:
+- Scale of COGS against total costs — is the business COGS-heavy?
+- YoY direction — up, flat, or down
+- Which accounts dominate COGS (from the top-3 block) and whether the mix looks concentrated
+
+Cite RM values and percentages verbatim from the data block. Do not invent accounts.
+
+Provide a concise analysis focused on COGS scale and YoY direction.`,
+
+  ex_opex: `You are analyzing the "Operating Costs (OpEx)" KPI on the Expenses page.
+
+What it measures: Day-to-day operating expenses in the selected period — GL accounts with acc_type = 'EP'. OpEx is semi-fixed: it scales with structural decisions (headcount, rent, tooling), not directly with sales volume.
+
+The pre-fetched data gives you:
+- OpEx (RM) for the period
+- OpEx % of total costs
+- Prior-year OpEx for the same period
+- OpEx YoY growth %
+- Top 3 OpEx accounts by value (account name + acc_no + RM + % of OpEx)
+
+Thresholds:
+- OpEx YoY growth > 10% = Concern — OpEx is semi-fixed; unexplained growth needs investigation
+- OpEx YoY growth < 0% = Healthy — cost discipline
+- OpEx share > 50% of total cost = OpEx-dominated (verify this is intentional scaling)
+
+Business context — CRITICAL:
+- OpEx is SEMI-FIXED. It should NOT scale linearly with sales. If OpEx grew 15% YoY while sales were flat, something structural changed — new headcount, new rent, new tooling. The analyst should name the driver.
+- COGS YoY growth is more forgivable than OpEx YoY growth for the same reason.
+
+Evaluate:
+- OpEx scale vs total costs
+- YoY direction — a rising OpEx is a stronger signal than rising COGS
+- Top 3 accounts — which structural line items are driving it
+
+Cite RM values and percentages verbatim from the data block. Do not invent accounts.
+
+Provide a concise analysis focused on OpEx discipline and any structural-growth signals.`,
+
+  ex_yoy_costs: `You are analyzing the "vs Last Year" KPI on the Expenses page.
+
+What it measures: Year-over-year change in total costs for the selected period, broken down into COGS and OpEx components.
+
+The pre-fetched data gives you:
+- Current-period total costs (RM)
+- Prior-year same-period total costs (RM)
+- YoY total-cost growth %
+- Color band (Green / Amber / Red / Severe)
+- COGS YoY: current RM, prior RM, growth %
+- OpEx YoY: current RM, prior RM, growth %
+
+Thresholds:
+- < 0% = Green (Healthy — costs falling)
+- 0% to 5% = Amber (Watch — in line with typical inflation)
+- 5% to 10% = Red (Concern)
+- > 10% = Severe (costs outpacing typical inflation)
+
+Evaluate:
+- Which band the total-cost YoY sits in
+- Whether COGS or OpEx is driving the YoY movement (bigger absolute RM change vs bigger % change)
+- Whether the OpEx YoY is the more alarming signal (remember: OpEx is semi-fixed; COGS YoY is more forgivable because it scales with sales)
+- If COGS YoY > OpEx YoY, the story is "volume-driven" — the business did more sales. If OpEx YoY > COGS YoY, the story is "structural" — something changed in the cost base.
+
+Cite RM values and percentages verbatim from the data block.
+
+Provide a concise analysis focused on the source of the YoY movement.`,
+
+  ex_cost_trend: `You are analyzing the "Cost Trend" chart on the Expenses page.
+
+What it shows: A stacked bar chart, one bar per month in the selected period, with COGS (one color) and OpEx (another color) stacked to show total cost. The user can toggle the underlying view by cost type (All / COGS / OpEx) — the AI is given the All view.
+
+The pre-fetched data gives you a month-by-month table with:
+- Month
+- COGS (RM)
+- OpEx (RM)
+- Total (RM)
+
+Pre-calculated roll-ups you may cite directly:
+- Total months in the period
+- Peak total-cost month (month + RM)
+- Lowest total-cost month (month + RM)
+- MoM cost growth % between the first and last month in the period
+- Current-period total and prior-year same-period total, plus period YoY %
+
+Thresholds:
+- MoM growth (first → last month) > 15% = Concern
+- MoM growth > 25% = Severe
+- Period YoY growth > 10% total = Severe
+
+Evaluate:
+- Direction across the period — rising, flat, falling
+- Any month that stands out as an outlier (spike or trough)
+- Whether COGS or OpEx carries the trend (look at which component moves more month-to-month)
+- How the period total compares to the prior year
+
+Describe the trend month-by-month or via the pre-calculated roll-ups. Do NOT invent months, values, or averages that are not in the data block.
+
+Provide a concise analysis of the monthly cost pattern.`,
+
+  ex_cost_composition: `You are analyzing the "Cost Composition" chart on the Expenses page.
+
+What it shows: A donut chart splitting total costs into COGS and OpEx slices, with RM values and percentages.
+
+The pre-fetched data gives you:
+- Total cost (RM)
+- COGS (RM) and COGS %
+- OpEx (RM) and OpEx %
+- Mix classification (Typical / COGS-dominated / OpEx-dominated / Mixed)
+- Prior-year composition (COGS % and OpEx % in the same period one year ago)
+- COGS share drift in percentage points (current − prior)
+
+Thresholds:
+- COGS share 60% to 80% = Typical fruit-distribution mix
+- COGS share > 85% = COGS-dominated (margin-pressure risk)
+- COGS share < 50% = OpEx-dominated (scaling inefficiency risk)
+- COGS share drift > +3 pp while sales flat = Margin compression signal
+- COGS share drift < −3 pp = Either margin improvement or inventory under-investment
+
+Evaluate:
+- Which mix classification the period sits in
+- How far the mix has drifted from prior year (positive drift = more COGS-heavy; negative drift = more OpEx-heavy)
+- What the drift implies — margin compression, margin improvement, or structural change on the OpEx side
+
+Cite RM values, percentages, and drift verbatim from the data block. Do not recompute percentages.
+
+Provide a concise analysis of cost mix and year-over-year drift.`,
+
+  ex_top_expenses: `You are analyzing the "Top Expenses" chart on the Expenses page.
+
+What it shows: A horizontal bar chart of the top 10 GL accounts by net cost in the selected period, with bars colored by cost type (COGS vs OpEx). The UI exposes toggles for cost type (All / COGS / OpEx) and direction (Top / Bottom). The AI is given the All / Top view — drill-downs remain user-driven.
+
+The pre-fetched data gives you:
+- Total costs (RM) for context
+- Top 10 accounts table: rank, account name, acc_no, cost type (COGS or OPEX), net cost (RM), and % of total
+- Top 1 account share of total costs
+- Top 10 accounts share of total costs (sum + %)
+- Concentration classification (Severe / Concentrated / Moderate / Diversified)
+- Mix in top 10: how many are COGS accounts, how many are OpEx
+
+Thresholds:
+- Top 1 account > 30% of total costs = Severe (single-account risk)
+- Top 1 account 15% to 30% = Concentrated
+- Top 10 accounts > 75% of total = Concentrated (few accounts drive the cost base — fixable)
+- Top 10 accounts < 50% of total = Diversified (broad cost base — harder to attack)
+
+Evaluate:
+- Concentration: is the cost pain concentrated in a handful of accounts, or spread across many?
+- Mix: is the top 10 dominated by COGS (volume-driven — scales with sales) or OpEx (structural — investigate)?
+- Any single-account outlier that accounts for > 15% of total cost — name it and flag it
+
+Name accounts from the top-10 table verbatim. Do not invent accounts or change acc_no values.
+
+Provide a concise analysis focused on concentration and the COGS-vs-OpEx mix at the top.`,
 };
 
 // ─── Summary Prompt ──────────────────────────────────────────────────────────
@@ -1314,6 +1520,15 @@ export const SECTION_COMPONENTS: Record<SectionKey, { key: string; name: string;
     { key: 'ru_aging_chart',   name: 'Aging of Unsettled Returns', type: 'chart' },
     { key: 'ru_debtors_table', name: 'Customer Returns',            type: 'table' },
   ],
+  expense_overview: [
+    { key: 'ex_total_costs',       name: 'Total Costs',      type: 'kpi' },
+    { key: 'ex_cogs',              name: 'Cost of Sales',    type: 'kpi' },
+    { key: 'ex_opex',              name: 'Operating Costs',  type: 'kpi' },
+    { key: 'ex_yoy_costs',         name: 'vs Last Year',     type: 'kpi' },
+    { key: 'ex_cost_trend',        name: 'Cost Trend',       type: 'chart' },
+    { key: 'ex_cost_composition',  name: 'Cost Composition', type: 'chart' },
+    { key: 'ex_top_expenses',      name: 'Top Expenses',     type: 'chart' },
+  ],
 };
 
 export const SECTION_PAGE: Record<SectionKey, string> = {
@@ -1327,6 +1542,7 @@ export const SECTION_PAGE: Record<SectionKey, string> = {
   supplier_margin_breakdown: 'Supplier Performance',
   return_trend: 'Returns',
   return_unsettled: 'Returns',
+  expense_overview: 'Expenses',
 };
 
 export const SECTION_NAMES: Record<SectionKey, string> = {
@@ -1340,6 +1556,7 @@ export const SECTION_NAMES: Record<SectionKey, string> = {
   supplier_margin_breakdown: 'Supplier Margin Breakdown',
   return_trend: 'Return Trends',
   return_unsettled: 'Unsettled Returns',
+  expense_overview: 'Expense Overview',
 };
 
 // ─── Public API ──────────────────────────────────────────────────────────────
