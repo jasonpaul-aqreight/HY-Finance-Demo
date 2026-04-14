@@ -762,6 +762,25 @@ Follow the same pattern documented in §1.9. Three icons to add:
 **Data source:** `pc_supplier_margin`
 **AI calls:** 7 parallel component analyses + 1 summary = **8 total**
 
+> **Naming split — important for sections 3 and 4.** The supplier domain uses **two different names** in the codebase:
+> - **App routes** live under `/supplier-performance` — the page file is [apps/dashboard/src/app/supplier-performance/page.tsx](../../apps/dashboard/src/app/supplier-performance/page.tsx), API routes are under `/api/supplier-performance/...`, and the `PageKey` for this section is `'supplier-performance'`.
+> - **Components and library code** live under `supplier-margin` — [apps/dashboard/src/components/supplier-margin/](../../apps/dashboard/src/components/supplier-margin/), [apps/dashboard/src/lib/supplier-margin/queries.ts](../../apps/dashboard/src/lib/supplier-margin/queries.ts), and the local table is `pc_supplier_margin`.
+>
+> Both names are load-bearing — do not try to unify them. Section keys use `supplier_margin_*` (matching the component path, not the URL).
+>
+> **Import name collisions when importing supplier-margin/queries.ts:** `customer-margin/queries.ts` and `supplier-margin/queries.ts` both export `getMarginTrend`, and their `getMarginKpi` / `getMarginSummary` play similar roles. Always alias on import, e.g.:
+> ```ts
+> import {
+>   getMarginSummary as getSupplierMarginSummary,
+>   getMarginTrend as getSupplierMarginTrend,
+>   getSupplierMarginDistributionV2,
+>   getItemMarginDistributionV2,
+> } from '../supplier-margin/queries';
+> ```
+> This is how [data-fetcher.ts](../../apps/dashboard/src/lib/ai-insight/data-fetcher.ts) handles it today. Section 4 should follow the same pattern.
+>
+> **`getMarginSummary` prior-period gaps:** the `previous` object from `getMarginSummary(start, end)` only carries `revenue`, `cogs`, `profit`, `margin_pct`. It does NOT carry `active_suppliers` or `items_count`. Fetchers relying on prior-period counts must either emit "prior not available" in the prompt (as `sp_active_suppliers` does) or run a separate query.
+
 ### 3.1 Component Inventory
 
 | # | Component | Type | Data Source | Key Metric |
