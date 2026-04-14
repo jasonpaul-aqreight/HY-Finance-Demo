@@ -754,12 +754,539 @@ Follow the same pattern documented in §1.9. Three icons to add:
 
 ---
 
+## Section 3 — `supplier_margin_overview`
+
+**Page:** Supplier Performance (`/supplier-performance`)
+**Scope:** `period` (date-filtered)
+**Tool policy:** `aggregate_only`
+**Data source:** `pc_supplier_margin`
+**AI calls:** 7 parallel component analyses + 1 summary = **8 total**
+
+### 3.1 Component Inventory
+
+| # | Component | Type | Data Source | Key Metric |
+|---|-----------|------|-------------|------------|
+| 31 | Est. Net Sales | KPI | `pc_supplier_margin` | RM N (period total `sales_revenue` on active rows) |
+| 32 | Est. Cost of Sales | KPI | `pc_supplier_margin` | RM N (period total `attributed_cogs` on active rows) |
+| 33 | Est. Gross Profit | KPI | `pc_supplier_margin` | RM N (Est. Net Sales − Est. Cost of Sales) |
+| 34 | Gross Margin % | KPI | `pc_supplier_margin` | % (Est. Gross Profit ÷ Est. Net Sales × 100) |
+| 35 | Active Suppliers | KPI | `pc_supplier_margin` | Count (distinct suppliers with `purchase_qty > 0` in period) |
+| 36 | Profitability Trend | Chart (ComposedChart — bars + line) | `pc_supplier_margin` | Monthly Est. Gross Profit + Margin % |
+| 37 | Margin Distribution | Chart (Bar) | `pc_supplier_margin` | Supplier count OR item count per fixed margin % bucket |
+
+**Component key registry (to be added to [prompts.ts](../../apps/dashboard/src/lib/ai-insight/prompts.ts) `SECTION_COMPONENTS`):**
+
+```ts
+supplier_margin_overview: [
+  { key: 'sp_net_sales',           name: 'Est. Net Sales',       type: 'kpi' },
+  { key: 'sp_cogs',                name: 'Est. Cost of Sales',   type: 'kpi' },
+  { key: 'sp_gross_profit',        name: 'Est. Gross Profit',    type: 'kpi' },
+  { key: 'sp_margin_pct',          name: 'Gross Margin %',       type: 'kpi' },
+  { key: 'sp_active_suppliers',    name: 'Active Suppliers',     type: 'kpi' },
+  { key: 'sp_margin_trend',        name: 'Profitability Trend',  type: 'chart' },
+  { key: 'sp_margin_distribution', name: 'Margin Distribution',  type: 'chart' },
+],
+```
+
+`SECTION_PAGE.supplier_margin_overview = 'Supplier Performance'`
+`SECTION_NAMES.supplier_margin_overview = 'Supplier Margin Overview'`
+
+**Two KPIs intentionally dropped as invisible-on-page:**
+- Top / Lowest Supplier cards — computed by [queries.ts `fetchTopLowestSupplier`](../../apps/dashboard/src/lib/supplier-margin/queries.ts) and returned as `top_supplier`/`lowest_supplier` in the summary payload, but [KpiCards.tsx](../../apps/dashboard/src/components/supplier-margin/dashboard/KpiCards.tsx) does not render them. v1 contract: narrate only visible state.
+- Items Count — also returned in the summary payload as `current.items_count` but not displayed. Same treatment.
+
+### 3.2 Filter Dimensions Available to Prompts
+
+The overview endpoints accept the following filter params (from [useDashboardFilters.ts:9-15](../../apps/dashboard/src/hooks/supplier-margin/useDashboardFilters.ts#L9-L15)):
+
+| Param | Source | Notes |
+|-------|--------|-------|
+| `date_from`, `date_to` | `DashboardFilters.startDate` / `endDate` | Always required — defines the period |
+| `supplier` | `suppliers[]` | Multi-select creditor codes |
+| `itemGroup` | `itemGroups[]` | Multi-select product groups |
+
+**Not accepted by overview endpoints:** supplier type. (`supplierTypes` is supported by the V2 breakdown queries but no V2 supplier-type selector exists in the overview filter bar.)
+
+**Prompt dimension rule:** Component prompts may reference date range, supplier concentration, and item group mix as analytical context (the data carries `creditor_code`/`creditor_name` and `item_code`/`item_group` columns surfaced by the fetcher). Prompts must **not** reference supplier-type slicing in this section — the overview filter bar cannot drive it.
+
+**Local component state exposed to the user:** [SupplierMarginDistributionChart.tsx:11-62](../../apps/dashboard/src/components/supplier-margin/dashboard/SupplierMarginDistributionChart.tsx#L11-L62) has an `entity` toggle (Suppliers ↔ Items). The trend chart has **no** granularity selector (fixed monthly). Prompts must not reference granularity toggles; the distribution prompt must analyze **both** supplier and item distributions from the fetched block and contrast them rather than guess which view the user has active. See §3.4 Margin Distribution prompt.
+
+None of the KPI cards expose per-component selectors (verified: [KpiCards.tsx:58-87](../../apps/dashboard/src/components/supplier-margin/dashboard/KpiCards.tsx#L58-L87)). No thresholds, bucket sizing, or metric toggles exist on the overview cluster outside the distribution entity switch.
+
+### 3.3 Formulas (derived at query time)
+
+All formulas operate on `pc_supplier_margin` rows filtered by `month BETWEEN startMonth AND endMonth AND is_active = 'T'`:
+
+| Metric | Formula |
+|--------|---------|
+| Est. Net Sales | `SUM(sales_revenue)` |
+| Est. Cost of Sales | `SUM(attributed_cogs)` |
+| Est. Gross Profit | `Est. Net Sales − Est. Cost of Sales` |
+| Gross Margin % | `(Est. Gross Profit ÷ Est. Net Sales) × 100` |
+| Active Suppliers | `COUNT(DISTINCT creditor_code)` where `purchase_qty > 0` in the period |
+
+**Active Suppliers nuance:** uses `purchase_qty > 0` (not "revenue OR cost nonzero" as §1 does). This is faithful to the on-page [KpiCards.tsx:84](../../apps/dashboard/src/components/supplier-margin/dashboard/KpiCards.tsx#L84) / [queries.ts:216-224](../../apps/dashboard/src/lib/supplier-margin/queries.ts#L216-L224) definition — the "active" test for suppliers is "we purchased from them," not "they produced margin rows."
+
+### 3.4 Component System Prompts
+
+All prompts inherit the v1 global system prompt (§6.1) and the standard user prompt template (§6.7). Component prompts narrate pre-fetched values only — **no tool access**.
+
+Thresholds below share the §1 bands where applicable, but the supplier framing flips two narratives: **rising COGS is not automatically bad** (could be shifting toward a preferred supplier) and **shrinking supplier count is not automatically bad** (consolidation = negotiating leverage). These tunings may be revisited after Phase B.
+
+#### Est. Net Sales (KPI)
+
+```
+You are analyzing the "Est. Net Sales" KPI on the Supplier Performance overview.
+
+What it measures: Total sales revenue attributed to items sourced from active
+suppliers during the selected period.
+Formula: SUM(sales_revenue) from pc_supplier_margin where is_active = 'T'.
+
+Context:
+- This is the Supplier Performance view of revenue — it mirrors the Customer
+  Margin Net Sales figure when no filters are applied, but may diverge when
+  supplier/item-group filters are in play.
+- The "Est." prefix is intentional: the number is constructed from the
+  supplier-margin pre-compute pipeline and is not the raw invoice figure.
+
+Performance thresholds:
+- Month-over-month growth ≥ 5% = Good
+- Month-over-month growth 0% to 5% = Neutral
+- Month-over-month decline < 0% = Bad
+- A drop > 10% in a single period warrants flagging
+
+Evaluate the level and, if prior-period data is included in the pre-fetched
+block, the direction. Comment on whether the period is tracking above or
+below the trailing baseline.
+
+Provide a concise analysis of this metric.
+```
+
+#### Est. Cost of Sales (KPI)
+
+```
+You are analyzing the "Est. Cost of Sales" KPI on the Supplier Performance overview.
+
+What it measures: Attributed cost of goods sold, summed across items from
+active suppliers for the period.
+Formula: SUM(attributed_cogs) from pc_supplier_margin where is_active = 'T'.
+
+Context — supplier page framing:
+- On a supplier page, rising COGS is NOT automatically bad. It can mean the
+  business is shifting volume toward a preferred supplier whose goods cost
+  more but carry better margin, reliability, or commercial terms.
+- Always frame COGS against Est. Net Sales and against supplier concentration
+  signals in the pre-fetched block, never in isolation.
+- Bad signals: COGS rising faster than Est. Net Sales AND margin % falling
+  (true cost pressure). Flat revenue + rising COGS = real margin erosion.
+- Neutral/Good signal: COGS rising with Est. Net Sales keeping pace, margin %
+  stable or up = healthy growth, potentially a beneficial sourcing shift.
+
+Evaluate:
+- Period COGS level
+- COGS-to-Net-Sales ratio
+- Whether the ratio is widening or holding
+
+Do NOT call rising COGS "bad" without checking the Net Sales direction and
+the margin % direction in the same pre-fetched block.
+
+Provide a concise analysis of this metric.
+```
+
+#### Est. Gross Profit (KPI)
+
+```
+You are analyzing the "Est. Gross Profit" KPI on the Supplier Performance overview.
+
+What it measures: Est. Net Sales minus Est. Cost of Sales for the period,
+derived from the supplier-margin pre-compute.
+Formula: Est. Net Sales − Est. Cost of Sales.
+
+Performance thresholds:
+- Gross Profit growing ≥ 5% while Est. Net Sales also grows = Good
+- Gross Profit flat while Est. Net Sales grows = Neutral (watch for erosion)
+- Gross Profit declining while Est. Net Sales grows = Bad (cost pressure or
+  sourcing mix shifting to lower-margin suppliers)
+- Gross Profit declining while Est. Net Sales declines = Bad (volume loss)
+
+Evaluate:
+- Absolute Gross Profit level
+- Direction vs prior period
+- Whether Gross Profit is growing faster/slower than Est. Net Sales — the
+  most important signal on the supplier page, because it reveals whether
+  the current supplier mix is actually delivering margin or just volume
+
+Provide a concise analysis of this metric.
+```
+
+#### Gross Margin % (KPI)
+
+```
+You are analyzing the "Gross Margin %" KPI on the Supplier Performance overview.
+
+What it measures: Est. Gross Profit as a percentage of Est. Net Sales.
+Formula: (Est. Gross Profit ÷ Est. Net Sales) × 100.
+
+Performance thresholds (fruit distribution, supplier-side):
+- Margin % ≥ 15% = Good
+- Margin % 10% to 15% = Neutral
+- Margin % < 10% = Bad
+- A drop ≥ 2 percentage points vs the prior period warrants flagging,
+  regardless of absolute level
+
+Evaluate:
+- Current margin level vs the benchmark bands
+- Direction vs prior period (a healthy margin trending down is still worth
+  flagging — on a supplier page this usually means upstream price pressure)
+- Whether movement is driven by Net Sales change, COGS change, or a
+  sourcing mix shift (the pre-fetched block will contain both numerators
+  and denominators)
+
+Provide a concise analysis of this metric.
+```
+
+#### Active Suppliers (KPI)
+
+```
+You are analyzing the "Active Suppliers" KPI on the Supplier Performance overview.
+
+What it measures: Count of distinct suppliers with any purchase quantity
+during the selected period (is_active = 'T' AND purchase_qty > 0).
+Formula: COUNT(DISTINCT creditor_code) where the supplier had a non-zero
+purchase_qty in the period.
+
+Context — supplier page framing:
+- Unlike Customer Active count, a shrinking supplier count is NOT
+  automatically bad. Consolidation often means the business is concentrating
+  volume with better-performing suppliers to gain negotiating leverage or
+  simplify logistics.
+- Growing supplier count can be good (sourcing diversification, new product
+  lines) OR bad (reactive scrambling after a preferred supplier issue).
+- Sudden large drops are the one clear flag — they may indicate a supplier
+  dropping out, a purchasing freeze, or a data/pipeline problem.
+
+Performance thresholds:
+- Month-over-month change within ±5% = Normal (noise)
+- Gentle decline (−5% to −10%) = Neutral (possible deliberate consolidation)
+- Drop > 10% = Flag (verify whether consolidation or disruption)
+- Sudden growth > 15% = Flag (worth asking why — new sourcing initiative or
+  emergency substitution?)
+
+Evaluate:
+- Direction of change
+- Whether the change correlates with Gross Margin % movement (consolidation
+  that ALSO improves margin = a good story; consolidation with flat or
+  falling margin = concentration risk without the payoff)
+
+Provide a concise analysis of this metric.
+```
+
+#### Profitability Trend (ComposedChart — bars + line)
+
+```
+You are analyzing the "Profitability Trend" chart on the Supplier Performance overview.
+
+What it shows:
+- Bars = Est. Gross Profit (RM, left y-axis) per month
+- Line = Gross Margin % (right y-axis) per month
+- Granularity is fixed to monthly — this chart has no granularity selector
+  on the overview cluster.
+
+The chart answers two questions simultaneously:
+- Is the sourcing mix delivering more or less profit in absolute terms?
+- Is the business getting more or less efficient at converting purchases
+  into profit?
+
+Performance thresholds:
+- 3+ consecutive months of Gross Profit growth = Good
+- Flat or mixed = Neutral
+- 3+ consecutive months of Gross Profit decline = Bad
+- Margin % trending down for 2+ consecutive months warrants flagging even
+  if Gross Profit is flat (a slow-moving sourcing problem)
+
+Look for:
+- Divergence between bars and line (e.g., profit rising while margin % stays
+  flat = growth via volume, not pricing leverage)
+- Seasonal patterns (fruit distribution has clear festive peaks and lean
+  months — don't mistake seasonality for structural movement)
+- Any month where Gross Profit and Margin % move in opposite directions —
+  always worth calling out on a supplier page, because it usually points
+  at a sourcing mix shift
+
+Use the pre-fetched monthly breakdown to cite specific months when making
+claims. Do not invent values not present in the data block.
+
+Provide a concise analysis of the profitability trend with evidence.
+```
+
+#### Margin Distribution (Bar chart, Supplier ↔ Item toggle)
+
+```
+You are analyzing the "Margin Distribution" histogram on the Supplier Performance overview.
+
+What it shows: Count of entities (suppliers OR items) falling into each
+Gross Margin % bucket for the selected period. Buckets are fixed:
+  < 0%, 0–5%, 5–10%, 10–15%, 15–20%, 20–30%, 30%+
+
+IMPORTANT — this chart has an entity toggle (Suppliers ↔ Items). The user
+may be viewing either view when they open the analysis. The pre-fetched
+block contains BOTH distributions (counts per bucket for suppliers AND for
+items). Analyze both and contrast them; do not assume one specific view.
+
+Performance thresholds:
+- Entities in < 0% bucket = sourcing at a loss (always flag if > 0)
+- Majority clustered in 10–20% band = Healthy (matches overall target)
+- Heavy concentration (> 40%) in sub-10% bands = Bad (thin-margin sourcing)
+- A meaningful tail (> 15%) in the 20%+ bands = Good (premium sourcing)
+
+Contrast the supplier view vs the item view:
+- Supplier view skewed healthy but item view skewed thin = a few premium
+  suppliers are carrying a long tail of weak items — procurement ought to
+  question the tail
+- Item view skewed healthy but supplier view skewed thin = good products
+  sourced through mostly weak suppliers — the issue is commercial terms,
+  not the product mix
+- Both views skewed the same direction = the story is consistent; the
+  weak/strong pattern is structural
+
+Evaluate:
+- Shape of both distributions (left-skewed, centered, right-skewed, bimodal)
+- Proportion below 10% margin in each view
+- Presence and size of the loss-making (< 0%) bucket in each view
+- Whether the supplier view and item view tell the same story or diverge —
+  divergence is the most actionable signal on this chart
+
+Provide a concise analysis focused on distribution shape, concentration,
+and the contrast between the supplier and item views.
+```
+
+### 3.5 Data Source — `pc_supplier_margin`
+
+Add to v1 §9.2 Tier 1 table list under a new "Supplier Margin Domain" heading:
+
+| Table | Allowed Columns |
+|-------|----------------|
+| `pc_supplier_margin` | `month, creditor_code, creditor_name, item_code, item_group, is_active, sales_revenue, attributed_cogs, purchase_qty, purchase_value` |
+
+**Population label** (to be emitted by every fetcher in this section):
+`"Population: active suppliers with purchase activity in {period}"`
+
+**Tool policy:** `aggregate_only` — summary analysis may drill down into `pc_supplier_margin` itself for root-cause investigation (e.g., "which item groups are compressing the overall margin"), but must not hit RDS tables. Per v1 §12.9.
+
+### 3.6 Fetcher Contracts (per component)
+
+Each fetcher in [data-fetcher.ts](../../apps/dashboard/src/lib/ai-insight/data-fetcher.ts) must return a `FetcherResult` with `prompt` (human-readable markdown with labeled values) and `allowed` (whitelist of every numeric rendered).
+
+Values that MUST appear in the `allowed` whitelist for each component:
+
+| Component key | Values to whitelist |
+|--------------|---------------------|
+| `sp_net_sales` | period Est. Net Sales RM, prior-period Est. Net Sales RM, MoM delta %, MoM delta RM |
+| `sp_cogs` | period Est. COGS RM, COGS-to-Net-Sales ratio %, prior-period COGS RM, COGS delta RM |
+| `sp_gross_profit` | period Est. GP RM, prior-period GP RM, GP delta RM, GP delta % |
+| `sp_margin_pct` | period margin %, prior-period margin %, margin delta (pp), Est. Net Sales RM, Est. COGS RM |
+| `sp_active_suppliers` | period active count, prior-period active count, delta count, delta % |
+| `sp_margin_trend` | for each month in range: month label, Est. GP RM, margin %; plus period totals |
+| `sp_margin_distribution` | for suppliers: count per bucket (7) + total; for items: count per bucket (7) + total |
+
+**Whitelist discipline (v1 §12.10):** every RM amount, percentage, and count printed in the prompt must be in `allowed`, except dates/years and safe small integers (0, 1, 100).
+
+### 3.7 Truth Queries (per key metric)
+
+Truth queries live in `_bmad-output/planning-artifacts/truth-queries/supplier-margin-overview.sql`. Each must match the fetcher value (within RM 1 tolerance) and the dashboard displayed value.
+
+```sql
+-- Parameters (bind before running):
+-- :date_from — ISO date (e.g. '2025-01-01')
+-- :date_to   — ISO date (e.g. '2025-12-31')
+-- No supplier / item-group filters applied (match a clean un-filtered run).
+-- startMonth = to_char(:date_from::date, 'YYYY-MM')
+-- endMonth   = to_char(:date_to::date,   'YYYY-MM')
+
+-- T1. Est. Net Sales — should match sp_net_sales fetcher + KpiCards "Est. Net Sales" card
+SELECT COALESCE(SUM(sales_revenue), 0)::numeric(18,2) AS net_sales
+FROM pc_supplier_margin
+WHERE month BETWEEN to_char(:date_from::date, 'YYYY-MM')
+                AND to_char(:date_to::date,   'YYYY-MM')
+  AND is_active = 'T';
+
+-- T2. Est. Cost of Sales — should match sp_cogs fetcher + KpiCards "Est. Cost of Sales" card
+SELECT COALESCE(SUM(attributed_cogs), 0)::numeric(18,2) AS cogs
+FROM pc_supplier_margin
+WHERE month BETWEEN to_char(:date_from::date, 'YYYY-MM')
+                AND to_char(:date_to::date,   'YYYY-MM')
+  AND is_active = 'T';
+
+-- T3. Est. Gross Profit — should match sp_gross_profit fetcher + KpiCards "Est. Gross Profit" card
+SELECT COALESCE(SUM(sales_revenue) - SUM(attributed_cogs), 0)::numeric(18,2) AS gross_profit
+FROM pc_supplier_margin
+WHERE month BETWEEN to_char(:date_from::date, 'YYYY-MM')
+                AND to_char(:date_to::date,   'YYYY-MM')
+  AND is_active = 'T';
+
+-- T4. Gross Margin % — should match sp_margin_pct fetcher + KpiCards "Gross Margin %" card
+WITH totals AS (
+  SELECT
+    SUM(sales_revenue)    AS net_sales,
+    SUM(attributed_cogs)  AS cogs
+  FROM pc_supplier_margin
+  WHERE month BETWEEN to_char(:date_from::date, 'YYYY-MM')
+                  AND to_char(:date_to::date,   'YYYY-MM')
+    AND is_active = 'T'
+)
+SELECT
+  CASE WHEN net_sales > 0
+    THEN ROUND(((net_sales - cogs) / net_sales * 100)::numeric, 2)
+    ELSE 0
+  END AS margin_pct
+FROM totals;
+
+-- T5. Active Suppliers — should match sp_active_suppliers fetcher + KpiCards "Active Suppliers" card
+SELECT COUNT(DISTINCT creditor_code) AS active_suppliers
+FROM pc_supplier_margin
+WHERE month BETWEEN to_char(:date_from::date, 'YYYY-MM')
+                AND to_char(:date_to::date,   'YYYY-MM')
+  AND is_active = 'T'
+  AND purchase_qty > 0;
+
+-- T6. Profitability Trend — monthly breakdown for sp_margin_trend fetcher + MarginTrendChart
+SELECT
+  month,
+  SUM(sales_revenue)::numeric(18,2)                          AS net_sales,
+  SUM(attributed_cogs)::numeric(18,2)                        AS cogs,
+  (SUM(sales_revenue) - SUM(attributed_cogs))::numeric(18,2) AS gross_profit,
+  CASE WHEN SUM(sales_revenue) > 0
+    THEN ROUND(
+      ((SUM(sales_revenue) - SUM(attributed_cogs))
+       / SUM(sales_revenue) * 100)::numeric, 2)
+    ELSE 0
+  END AS margin_pct
+FROM pc_supplier_margin
+WHERE month BETWEEN to_char(:date_from::date, 'YYYY-MM')
+                AND to_char(:date_to::date,   'YYYY-MM')
+  AND is_active = 'T'
+GROUP BY month
+ORDER BY month;
+
+-- T7a. Supplier Margin Distribution — should match sp_margin_distribution (suppliers view)
+-- Mirrors getSupplierMarginDistributionV2 bucketing in queries.ts.
+-- NOTE: supplier view places rev IS NULL OR rev = 0 into the '< 0%' bucket.
+WITH supplier_margin AS (
+  SELECT
+    creditor_code,
+    SUM(sales_revenue)   AS rev,
+    SUM(attributed_cogs) AS cost
+  FROM pc_supplier_margin
+  WHERE month BETWEEN to_char(:date_from::date, 'YYYY-MM')
+                  AND to_char(:date_to::date,   'YYYY-MM')
+    AND is_active = 'T'
+  GROUP BY creditor_code
+),
+bucketed AS (
+  SELECT
+    CASE
+      WHEN rev IS NULL OR rev = 0             THEN '< 0%'
+      WHEN (rev - cost) / rev * 100 < 0       THEN '< 0%'
+      WHEN (rev - cost) / rev * 100 < 5       THEN '0-5%'
+      WHEN (rev - cost) / rev * 100 < 10      THEN '5-10%'
+      WHEN (rev - cost) / rev * 100 < 15      THEN '10-15%'
+      WHEN (rev - cost) / rev * 100 < 20      THEN '15-20%'
+      WHEN (rev - cost) / rev * 100 < 30      THEN '20-30%'
+      ELSE '30%+'
+    END AS bucket
+  FROM supplier_margin
+)
+SELECT bucket, COUNT(*) AS entity_count
+FROM bucketed
+GROUP BY bucket
+ORDER BY CASE bucket
+  WHEN '< 0%'   THEN 1
+  WHEN '0-5%'   THEN 2
+  WHEN '5-10%'  THEN 3
+  WHEN '10-15%' THEN 4
+  WHEN '15-20%' THEN 5
+  WHEN '20-30%' THEN 6
+  WHEN '30%+'   THEN 7
+END;
+
+-- T7b. Item Margin Distribution — should match sp_margin_distribution (items view)
+-- Mirrors getItemMarginDistributionV2: items with rev <= 0 are EXCLUDED via HAVING.
+WITH item_margin AS (
+  SELECT
+    item_code,
+    SUM(sales_revenue)   AS rev,
+    SUM(attributed_cogs) AS cost
+  FROM pc_supplier_margin
+  WHERE month BETWEEN to_char(:date_from::date, 'YYYY-MM')
+                  AND to_char(:date_to::date,   'YYYY-MM')
+    AND is_active = 'T'
+  GROUP BY item_code
+  HAVING SUM(sales_revenue) > 0
+),
+bucketed AS (
+  SELECT
+    CASE
+      WHEN (rev - cost) / NULLIF(rev, 0) * 100 < 0   THEN '< 0%'
+      WHEN (rev - cost) / NULLIF(rev, 0) * 100 < 5   THEN '0-5%'
+      WHEN (rev - cost) / NULLIF(rev, 0) * 100 < 10  THEN '5-10%'
+      WHEN (rev - cost) / NULLIF(rev, 0) * 100 < 15  THEN '10-15%'
+      WHEN (rev - cost) / NULLIF(rev, 0) * 100 < 20  THEN '15-20%'
+      WHEN (rev - cost) / NULLIF(rev, 0) * 100 < 30  THEN '20-30%'
+      ELSE '30%+'
+    END AS bucket
+  FROM item_margin
+)
+SELECT bucket, COUNT(*) AS entity_count
+FROM bucketed
+GROUP BY bucket
+ORDER BY CASE bucket
+  WHEN '< 0%'   THEN 1
+  WHEN '0-5%'   THEN 2
+  WHEN '5-10%'  THEN 3
+  WHEN '10-15%' THEN 4
+  WHEN '15-20%' THEN 5
+  WHEN '20-30%' THEN 6
+  WHEN '30%+'   THEN 7
+END;
+```
+
+**Three-way match required** (per v1 §9.5): fetcher output, truth query output, and dashboard displayed value must all agree.
+
+### 3.8 Implementation Checklist (v1 §14 playbook, instantiated)
+
+- [ ] **Step 1** — Add `'supplier_margin_overview'` to `SectionKey` union in [types.ts](../../apps/dashboard/src/lib/ai-insight/types.ts)
+- [ ] **Step 2** — Extend `SECTION_COMPONENTS`, `SECTION_PAGE`, `SECTION_NAMES` in [prompts.ts](../../apps/dashboard/src/lib/ai-insight/prompts.ts)
+- [ ] **Step 3** — Add 7 component prompts to `COMPONENT_PROMPTS` in [prompts.ts](../../apps/dashboard/src/lib/ai-insight/prompts.ts)
+- [ ] **Step 4** — Add 7 fetchers to the `fetchers` record in [data-fetcher.ts](../../apps/dashboard/src/lib/ai-insight/data-fetcher.ts); each returns `{ prompt, allowed }` per §3.6. The `sp_margin_distribution` fetcher must return BOTH supplier and item distributions in one block.
+- [ ] **Step 5** — Add `supplier_margin_overview: 'period'` to `SECTION_SCOPE` in [data-fetcher.ts](../../apps/dashboard/src/lib/ai-insight/data-fetcher.ts)
+- [ ] **Step 6** — Add `supplier_margin_overview: 'aggregate_only'` to `SECTION_POLICY` in [tool-policy.ts](../../apps/dashboard/src/lib/ai-insight/tool-policy.ts); add `pc_supplier_margin` to `AGGREGATE_LOCAL_TABLES` AND to `LOCAL_WHITELIST` in [tools.ts](../../apps/dashboard/src/lib/ai-insight/tools.ts); add the table + column list to the summary prompt's `LOCAL` reference in `prompts.ts`
+- [ ] **Step 7** — Mount `<InsightSectionHeader sectionKey="supplier_margin_overview" />` in [DashboardShell.tsx](../../apps/dashboard/src/components/supplier-margin/dashboard/DashboardShell.tsx) above the KpiCards + charts cluster (between `FilterBar` and `KpiCards`)
+- [ ] **Step 7b** — Per §3.9, wire per-component `AnalyzeIcon` + add `COMPONENT_INFO` entries. See §3.9.
+- [ ] **Step 8** — Write truth queries to `_bmad-output/planning-artifacts/truth-queries/supplier-margin-overview.sql`
+- [ ] **Step 9** — `npm run build` and `tsc --noEmit` clean; commit with message `feat: add AI insight for supplier margin overview (supplier_margin_overview)`
+- [ ] **Step 10 (Phase B)** — Run Appendix C verification with live LLM. Per project feedback (2026-04-14), do NOT call live Anthropic in this session. Defer to Phase B.
+
+### 3.9 Per-Component Analyze Icons (MANDATORY — per §1.9)
+
+Follow the same pattern documented in §1.9. Seven icons to add:
+
+- [ ] **§3.9.1** — Add 7 entries to `COMPONENT_INFO` in [component-info.ts](../../apps/dashboard/src/lib/ai-insight/component-info.ts): `sp_net_sales`, `sp_cogs`, `sp_gross_profit`, `sp_margin_pct`, `sp_active_suppliers`, `sp_margin_trend`, `sp_margin_distribution` — each with `name`, `whatItMeasures`, optional `formula`, optional `indicator`, `about`
+- [ ] **§3.9.2** — [KpiCards.tsx](../../apps/dashboard/src/components/supplier-margin/dashboard/KpiCards.tsx): the current `KpiCard` prop shape takes `title`/`value`/`valueColor`/`formula`. Add an optional `componentKey?: string` prop, render `<AnalyzeIcon sectionKey="supplier_margin_overview" componentKey={componentKey} />` inside `<CardHeader>` in a `flex items-center gap-1` wrapper alongside the existing `<CardTitle>`. Pass a componentKey to each of the 5 `KpiCard` usages in the main grid.
+- [ ] **§3.9.3** — [MarginTrendChart.tsx](../../apps/dashboard/src/components/supplier-margin/dashboard/MarginTrendChart.tsx): wrap `<CardTitle>` in `flex items-center gap-2`; add icon with `componentKey="sp_margin_trend"`. The existing `CardHeader` also renders a subtitle `<p>` — keep the icon on the title row only.
+- [ ] **§3.9.4** — [SupplierMarginDistributionChart.tsx](../../apps/dashboard/src/components/supplier-margin/dashboard/SupplierMarginDistributionChart.tsx): the existing `CardHeader` is `flex flex-row items-center justify-between` (title on the left, entity toggle on the right). Keep that outer structure; wrap the left-side `<CardTitle>` in an inner `flex items-center gap-2` and add the icon there with `componentKey="sp_margin_distribution"`. The entity toggle stays on the right.
+- [ ] **§3.9.5** — Playwright spot-check: count 7 icons on the overview cluster (5 KPI + trend + distribution), dialog opens with About populated, AI Analysis section shows placeholder pre-run. Verify the distribution chart icon works in BOTH Suppliers and Items toggle states.
+
+**Page total after §3 ships:** 7 icons (overview only; §4 breakdown not yet in this session).
+
+---
+
 ## Appendix A addendum (section key reference) — updated
 
 | Section Key | Page | Section Name | Date Filtered |
 |-------------|------|-------------|---------------|
 | `customer_margin_overview` | Customer Margin | Customer Margin Overview | Yes (period) |
 | `customer_margin_breakdown` | Customer Margin | Customer Margin Breakdown | Yes (period) |
+| `supplier_margin_overview` | Supplier Performance | Supplier Margin Overview | Yes (period) |
 
 ---
 
@@ -769,17 +1296,17 @@ Follow the same pattern documented in §1.9. Three icons to add:
 |---------|-----------|-------------|--------------------------|----------|
 | Customer Margin Overview | 7 + summary | ~22,000 | ~$0.10 | Deferred to Phase B |
 | Customer Margin Breakdown | 3 + summary | ~18,000 | ~$0.09 | Deferred to Phase B |
+| Supplier Margin Overview | 7 + summary | ~23,000 | ~$0.11 | Deferred to Phase B |
 
-**Estimation basis for breakdown:** 3 component calls at ~3,000 tokens each (richer prompts with 20-row top/bottom tables per component) + 1 summary call at ~9,000 tokens (Sonnet, with up to 2 tool calls for RDS drill-down). Pattern scales from v1 Sales Breakdown (4 × ~16,000 tokens, $0.07 estimated).
+**Estimation basis for supplier overview:** mirrors Customer Margin Overview (7 component calls at ~2,000 tokens each on Haiku + 1 summary call at ~8,000 tokens on Sonnet). Slightly higher token budget than §1 because the `sp_margin_distribution` fetcher carries two distribution tables (supplier + item) in one prompt block.
 
 ---
 
-## Sections 3–11
+## Sections 4–11
 
-To be authored after Section 2 is signed off, implemented, and committed. Each subsequent section follows the same template as Sections 1 and 2 above — with the mandatory §X.9 per-component icons subsection.
+To be authored after Section 3 is signed off, implemented, and committed. Each subsequent section follows the same template as Sections 1, 2, and 3 above — with the mandatory §X.9 per-component icons subsection.
 
 **Pending spec authoring:**
-- Section 3 — `supplier_margin_overview`
 - Section 4 — `supplier_margin_breakdown`
 - Section 5 — `return_trend`
 - Section 6 — `return_unsettled`
