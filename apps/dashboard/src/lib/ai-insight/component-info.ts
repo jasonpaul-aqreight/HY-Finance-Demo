@@ -324,6 +324,20 @@ export const COMPONENT_INFO: Record<string, ComponentInfo> = {
     about: 'This chart shows where the return pain actually lands. You can rank items two ways:\n\n• Frequency — which items get returned most often (process noise, breakage, quality)\n• Value (RM) — which items hurt the P&L most when they are returned (high-cost items)\n\nAn item on BOTH lists is a star problem product — it breaks often AND costs a lot when it does. Fixing one of those moves the number.\n\nYou can also drill into Product, Variant, or Country dimensions via the toggle — useful once the item-level view has flagged a suspicious pattern.',
   },
 
+  // ═══ Return Unsettled (§6) ═══
+  ru_aging_chart: {
+    name: 'Aging of Unsettled Returns',
+    whatItMeasures: 'The current unsettled return book split by how long each return credit note has been sitting unresolved — five buckets from 0–30 days through 180+ days.',
+    indicator: '91+ combined > 25% of unsettled value = Watch · 180+ alone > 10% = Write-off risk',
+    about: 'This chart answers a single question: how old is the money that is still stuck on the return book?\n\nEvery return credit note that is not yet knocked off or refunded ages through five buckets:\n\n• 0–30 Days (emerald) — fresh, still in the normal reconciliation window\n• 31–60 Days (amber) — starting to age\n• 61–90 Days (orange) — ageing, process slowing down\n• 91–180 Days (red) — concerning, needs active follow-up\n• 180+ Days (dark red) — real write-off risk\n\nThis is a SNAPSHOT — cumulative across all months, not filtered by the date range. It shows every return CN still open as of the latest aging snapshot.\n\nA healthy book has most of its unsettled value in the 0–30 bucket. Weight drifting into the 91+ buckets means the follow-up process is falling behind. Material 180+ exposure triggers write-off review.',
+  },
+  ru_debtors_table: {
+    name: 'Customer Returns',
+    whatItMeasures: 'Per-debtor cumulative return exposure across all months — return count, total return value, amount knocked off against invoices, amount refunded in cash, and the unresolved balance still open.',
+    indicator: 'Top 1 debtor > 15% of total unsettled = Single-point risk · Top 10 > 60% = Concentrated book · Stale debtors (unresolved > 0, no knock-off, no refund) = Process failure',
+    about: 'This table lists every customer who has ever issued a return credit note, with cumulative totals across all months. By default it is sorted by unresolved amount and the filter is set to "Unsettled" — showing only customers with open return exposure.\n\nThe settlement columns tell the story:\n\n• Knocked Off — the return was offset against an invoice. No cash left the door. This is the preferred resolution.\n• Refunded — real cash was paid back. Only appropriate for ending relationships or customers with no upcoming invoices.\n• Unsettled — neither offset nor refunded. Still open.\n\nThree patterns to watch for:\n\n1. **Concentration** — if one customer dominates the unsettled book, a single collections conversation can move the whole number. If it is spread across many, the fix is a process push, not a customer conversation.\n2. **Stale debtors** — customers with an unresolved balance AND zero settlement activity. These are the ones the collections team never opened a conversation on. Pure process failure.\n3. **Refund-but-still-unresolved** — the cash already went out AND the book is still dirty. A red flag on the specific customer.',
+  },
+
   sm_price_scatter: {
     name: 'Purchase vs Selling Price',
     whatItMeasures: 'Item-level scatter plot of avg purchase price (x) vs avg selling price (y), bubble-sized by revenue.',

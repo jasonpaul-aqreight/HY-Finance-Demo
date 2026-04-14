@@ -14,6 +14,7 @@ const SECTION_POLICY: Record<SectionKey, ToolPolicy> = {
   supplier_margin_overview: 'aggregate_only',
   supplier_margin_breakdown: 'full',
   return_trend: 'aggregate_only',
+  return_unsettled: 'full',
 };
 
 const AGGREGATE_LOCAL_TABLES = new Set([

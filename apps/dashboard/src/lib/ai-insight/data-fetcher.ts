@@ -24,6 +24,8 @@ import {
   getReturnTrend,
   getRefundSummary,
   getReturnProducts,
+  getReturnAging,
+  getAllCustomerReturnsAll,
 } from '../return/queries';
 import type { SectionKey, DateRange, AllowedValue, FetcherResult } from './types';
 
@@ -2344,6 +2346,138 @@ const fetchers: Record<string, DataFetcher> = {
       allowed,
     };
   },
+
+  // ─── Return Unsettled (§6) ──────────────────────────────────────────────
+  async ru_aging_chart() {
+    const buckets = await getReturnAging();
+
+    // Canonical order, matching UI AgingChart
+    const order = ['0-30 days', '31-60 days', '61-90 days', '91-180 days', '180+ days'];
+    const byBucket = new Map(buckets.map(b => [b.bucket, b]));
+    const rows = order.map(b => ({
+      bucket: b,
+      amount: Number(byBucket.get(b)?.amount ?? 0),
+      count: Number(byBucket.get(b)?.count ?? 0),
+    }));
+
+    const totalAmt = rows.reduce((s, r) => s + r.amount, 0);
+    const totalCnt = rows.reduce((s, r) => s + r.count, 0);
+    const share = (amt: number) => (totalAmt > 0 ? (amt / totalAmt) * 100 : 0);
+
+    const b030 = rows[0], b3160 = rows[1], b6190 = rows[2], b91180 = rows[3], b180 = rows[4];
+    const share030 = share(b030.amount);
+    const share3160 = share(b3160.amount);
+    const share6190 = share(b6190.amount);
+    const share91180 = share(b91180.amount);
+    const share180 = share(b180.amount);
+    const share91Plus = share91180 + share180;
+
+    const allowed: AllowedValue[] = [
+      rm('total unsettled amount', totalAmt),
+      cnt('total unsettled count', totalCnt),
+      rm('0-30 bucket amount', b030.amount),
+      rm('31-60 bucket amount', b3160.amount),
+      rm('61-90 bucket amount', b6190.amount),
+      rm('91-180 bucket amount', b91180.amount),
+      rm('180+ bucket amount', b180.amount),
+      cnt('0-30 bucket count', b030.count),
+      cnt('31-60 bucket count', b3160.count),
+      cnt('61-90 bucket count', b6190.count),
+      cnt('91-180 bucket count', b91180.count),
+      cnt('180+ bucket count', b180.count),
+      pct('0-30 share of unsettled', share030),
+      pct('31-60 share of unsettled', share3160),
+      pct('61-90 share of unsettled', share6190),
+      pct('91-180 share of unsettled', share91180),
+      pct('180+ share of unsettled', share180),
+      pct('91+ combined share of unsettled', share91Plus),
+    ];
+
+    const preCalc =
+      `Population: cumulative unsettled return exposure across all months, by aging bucket.\n\n` +
+      `Pre-calculated roll-ups (use these values directly — do not recompute):\n` +
+      `- Total unsettled amount: RM ${totalAmt.toLocaleString('en-MY')}\n` +
+      `- Total unsettled count: ${totalCnt}\n` +
+      `- 91+ buckets combined share of unsettled value: ${share91Plus.toFixed(1)}%\n` +
+      `- 180+ bucket share of unsettled value: ${share180.toFixed(1)}%\n\n` +
+      `Thresholds: 91+ combined > 25% = Watch · 180+ alone > 10% = Write-off risk\n\n`;
+
+    const table =
+      `Aging distribution:\n` +
+      '| Bucket | Amount (RM) | Count | Share of Unsettled |\n' +
+      '|---|---|---|---|\n' +
+      rows.map(r =>
+        `| ${r.bucket} | RM ${r.amount.toLocaleString('en-MY')} | ${r.count} | ${share(r.amount).toFixed(1)}% |`
+      ).join('\n');
+
+    return {
+      prompt: preCalc + table,
+      allowed,
+    };
+  },
+
+  async ru_debtors_table() {
+    const all = await getAllCustomerReturnsAll();
+    const unresolvedRows = all.filter(r => r.unresolved > 0.01);
+
+    const totalUnsettled = unresolvedRows.reduce((s, r) => s + r.unresolved, 0);
+    const debtorCount = unresolvedRows.length;
+
+    const staleCount = unresolvedRows.filter(r =>
+      r.total_knocked_off === 0 && r.total_refunded === 0
+    ).length;
+
+    // Sort by unresolved desc for top-N
+    const sorted = [...unresolvedRows].sort((a, b) => b.unresolved - a.unresolved);
+    const top1Share = sorted.length > 0 && totalUnsettled > 0
+      ? (sorted[0].unresolved / totalUnsettled) * 100
+      : 0;
+    const top10 = sorted.slice(0, 10);
+    const top10Sum = top10.reduce((s, r) => s + r.unresolved, 0);
+    const top10Share = totalUnsettled > 0 ? (top10Sum / totalUnsettled) * 100 : 0;
+
+    const allowed: AllowedValue[] = [
+      rm('total unsettled across all debtors', totalUnsettled),
+      cnt('debtors with unresolved balance', debtorCount),
+      cnt('stale debtor count (never actioned)', staleCount),
+      pct('top 1 debtor share of unsettled', top1Share),
+      pct('top 10 debtor share of unsettled', top10Share),
+      rm('top 10 debtor unresolved sum', top10Sum),
+    ];
+
+    // Top 5 detail rows (names + numbers)
+    const top5 = sorted.slice(0, 5);
+    top5.forEach(r => {
+      allowed.push(rm(`${r.company_name} unresolved`, r.unresolved));
+      allowed.push(rm(`${r.company_name} knocked off`, r.total_knocked_off));
+      allowed.push(rm(`${r.company_name} refunded`, r.total_refunded));
+      allowed.push(rm(`${r.company_name} total return value`, r.total_return_value));
+      allowed.push(cnt(`${r.company_name} return count`, r.return_count));
+    });
+
+    const preCalc =
+      `Population: every debtor with a non-zero unresolved return balance, cumulative across all months.\n\n` +
+      `Pre-calculated roll-ups (use these values directly — do not recompute):\n` +
+      `- Total unsettled: RM ${totalUnsettled.toLocaleString('en-MY')}\n` +
+      `- Debtors with unresolved balance: ${debtorCount}\n` +
+      `- Stale debtors (unresolved > 0 AND no knock-off AND no refund): ${staleCount}\n` +
+      `- Top 1 debtor share: ${top1Share.toFixed(1)}%\n` +
+      `- Top 10 debtor share: ${top10Share.toFixed(1)}% (sum RM ${top10Sum.toLocaleString('en-MY')})\n\n` +
+      `Thresholds: Top-1 > 15% = Single-point risk · Top-10 > 60% = Concentrated\n\n`;
+
+    const table =
+      `Top 5 debtors by unresolved:\n` +
+      '| # | Debtor | Returns | Return Value | Knocked Off | Refunded | Unresolved |\n' +
+      '|---|---|---|---|---|---|---|\n' +
+      top5.map((r, i) =>
+        `| ${i + 1} | ${r.company_name} | ${r.return_count} | RM ${r.total_return_value.toLocaleString('en-MY')} | RM ${r.total_knocked_off.toLocaleString('en-MY')} | RM ${r.total_refunded.toLocaleString('en-MY')} | RM ${r.unresolved.toLocaleString('en-MY')} |`
+      ).join('\n');
+
+    return {
+      prompt: preCalc + table,
+      allowed,
+    };
+  },
 };
 
 // ─── Scope classification ────────────────────────────────────────────────────
@@ -2360,16 +2494,31 @@ const SECTION_SCOPE: Record<SectionKey, ScopeType> = {
   supplier_margin_overview: 'period',
   supplier_margin_breakdown: 'period',
   return_trend: 'period',
+  return_unsettled: 'snapshot',
 };
 
-async function buildScopeLabel(scope: ScopeType, dateRange: DateRange | null): Promise<string> {
+// Per-section snapshot source: each snapshot section anchors its "as of" date on a different table.
+const SNAPSHOT_SOURCE_TABLE: Partial<Record<SectionKey, string>> = {
+  payment_outstanding: 'pc_ar_customer_snapshot',
+  return_unsettled: 'pc_return_aging',
+};
+
+async function buildScopeLabel(
+  scope: ScopeType,
+  dateRange: DateRange | null,
+  sectionKey: SectionKey,
+): Promise<string> {
   if (scope === 'period') {
     if (!dateRange) return 'Scope: Period-based metric (no date range provided).';
     return `Scope: PERIOD-BASED metric — filtered to ${dateRange.start} through ${dateRange.end}. All figures reflect activity WITHIN this date range only. Do NOT describe these numbers as "outstanding balance" or "total receivables" — they are period flows, not point-in-time balances.`;
   }
+  const table = SNAPSHOT_SOURCE_TABLE[sectionKey];
+  if (!table) {
+    return 'Scope: SNAPSHOT metric — current state. Point-in-time balances, not filtered by date range.';
+  }
   try {
     const pool = getPool();
-    const { rows } = await pool.query(`SELECT MAX(snapshot_date) AS d FROM pc_ar_customer_snapshot`);
+    const { rows } = await pool.query(`SELECT MAX(snapshot_date) AS d FROM ${table}`);
     const d = rows[0]?.d ? new Date(rows[0].d).toISOString().slice(0, 10) : 'unknown';
     return `Scope: SNAPSHOT metric — current state as of ${d}. These are point-in-time balances NOT filtered by any date range. Do NOT describe these numbers as "period collection" or "invoiced in the period" — they are cumulative balances. Do NOT apply any date-range context to these numbers.`;
   } catch {
@@ -2391,7 +2540,7 @@ export async function fetchComponentData(
 
   try {
     const { prompt, allowed } = await fetcher(dateRange);
-    const scopeLabel = await buildScopeLabel(SECTION_SCOPE[sectionKey], dateRange);
+    const scopeLabel = await buildScopeLabel(SECTION_SCOPE[sectionKey], dateRange, sectionKey);
     return { prompt: `${scopeLabel}\n\n${prompt}`, allowed };
   } catch (err) {
     console.error(`Data fetch error for ${componentKey}:`, err);

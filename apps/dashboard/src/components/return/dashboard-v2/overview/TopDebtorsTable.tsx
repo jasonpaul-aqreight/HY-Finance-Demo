@@ -14,6 +14,7 @@ import { TablePagination, type PageSize } from '@/components/ui/table-pagination
 import { formatRM, formatCount } from '@/lib/format';
 import { exportToExcel } from '@/lib/export-excel';
 import { CustomerProfileRevamp } from '@/components/profiles/CustomerProfileRevampPreview';
+import { AnalyzeIcon } from '@/components/ai-insight/AnalyzeIcon';
 
 // ─── Sort helpers ────────────────────────────────────────────────────────────
 
@@ -143,7 +144,12 @@ export function TopDebtorsTable({ initialStartDate, initialEndDate }: { initialS
   if (!data) {
     return (
       <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-sm">Customer Returns</CardTitle></CardHeader>
+        <CardHeader className="pb-2">
+          <div className="flex items-center gap-2">
+            <CardTitle className="text-sm">Customer Returns</CardTitle>
+            <AnalyzeIcon sectionKey="return_unsettled" componentKey="ru_debtors_table" />
+          </div>
+        </CardHeader>
         <CardContent><div className="h-[400px] bg-muted rounded animate-pulse" /></CardContent>
       </Card>
     );
@@ -163,7 +169,10 @@ export function TopDebtorsTable({ initialStartDate, initialEndDate }: { initialS
     <Card>
       <CardHeader>
         <div>
-          <CardTitle className="text-sm">Customer Returns</CardTitle>
+          <div className="flex items-center gap-2">
+            <CardTitle className="text-sm">Customer Returns</CardTitle>
+            <AnalyzeIcon sectionKey="return_unsettled" componentKey="ru_debtors_table" />
+          </div>
           <p className="text-xs text-muted-foreground">
             {formatCount(sorted.length)} customers
             {statusFilter !== 'all' && data.length > 0 && (

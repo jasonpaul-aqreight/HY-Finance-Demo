@@ -1564,6 +1564,7 @@ Four icons to add:
 | `supplier_margin_overview` | Supplier Performance | Supplier Margin Overview | Yes (period) |
 | `supplier_margin_breakdown` | Supplier Performance | Supplier Margin Breakdown | Yes (period) |
 | `return_trend` | Returns | Return Trends | Yes (period) |
+| `expense_overview` | Expenses | Expense Overview | Yes (period) |
 
 ---
 
@@ -1576,6 +1577,7 @@ Four icons to add:
 | Supplier Margin Overview | 7 + summary | ~23,000 | ~$0.11 | Deferred to Phase B |
 | Supplier Margin Breakdown | 4 + summary | ~20,000 | ~$0.10 | Deferred to Phase B |
 | Return Trends | 7 + summary | ~16,000 | ~$0.08 | Deferred to Phase B |
+| Expense Overview | 7 + summary | ~17,000 | ~$0.08 | Deferred to Phase B |
 
 **Estimation basis for return trends:** 7 component calls at ~1,500 tokens each on Haiku (KPI fetchers carry small roll-up blocks, charts carry month/item tables) + 1 summary call at ~5,500 tokens on Sonnet. Cheapest section so far because return volume is small relative to sales and the pre-computed tables aggregate monthly.
 
@@ -1719,13 +1721,260 @@ Seven icons to add:
 
 ---
 
-## Sections 6–11
+## Section 6 — `return_unsettled`
+
+**Page:** Returns (`/return`)
+**Scope:** `snapshot` (no date filter)
+**Tool policy:** `full` (mirrors v1 `payment_outstanding` — snapshot + customer table = drill-down is the whole point)
+**Data sources:** `pc_return_aging` (daily snapshot, 5 buckets — filter to latest `snapshot_date`) + `pc_return_by_customer` (monthly per debtor, cumulative across all months)
+**AI calls:** 2 parallel component analyses + 1 summary = **3 total**
+
+> **Scope label** — `"Current state as of latest pc_return_aging snapshot (cumulative position across all months)"`. Both fetchers share this single label. The `buildScopeLabel` helper in [data-fetcher.ts](../../apps/dashboard/src/lib/ai-insight/data-fetcher.ts) is extended to branch per-section — `payment_outstanding` keeps its `pc_ar_customer_snapshot` lookup; `return_unsettled` queries `pc_return_aging`.
+
+> **Data-source reality check** — the Returns v2 kickoff referenced `pc_return_monthly`, but the two UI components actually pull from `pc_return_aging` (aging chart) and `pc_return_by_customer` (debtors table). Both fetchers reuse existing [return/queries.ts](../../apps/dashboard/src/lib/return/queries.ts) functions (`getReturnAging`, `getAllCustomerReturnsAll`) — **zero new SQL**. Both tables are newly whitelisted in [tools.ts](../../apps/dashboard/src/lib/ai-insight/tools.ts).
+
+### 6.1 Component Inventory
+
+| # | Component | Type | Data Source | Key Metric |
+|---|-----------|------|-------------|------------|
+| 58 | Aging of Unsettled Returns | Chart (horizontal bar) | `pc_return_aging` (latest snapshot) | 5 bucket amounts + counts, % share of unsettled value |
+| 59 | Customer Returns | Table | `pc_return_by_customer` (cumulative) | Per-debtor returns, offset, refund, unresolved |
+
+**Component key registry (added to `SECTION_COMPONENTS` in [prompts.ts](../../apps/dashboard/src/lib/ai-insight/prompts.ts)):**
+
+```ts
+return_unsettled: [
+  { key: 'ru_aging_chart',   name: 'Aging of Unsettled Returns', type: 'chart' },
+  { key: 'ru_debtors_table', name: 'Customer Returns',            type: 'table' },
+],
+```
+
+`SECTION_PAGE.return_unsettled = 'Returns'`
+`SECTION_NAMES.return_unsettled = 'Unsettled Returns'`
+
+### 6.2 Filter Dimensions Available to Prompts
+
+None — snapshot section. The table's in-UI filter (Unsettled / Resolved / All) is local UI state and does not flow to the AI. Fetchers emit the full cumulative view.
+
+### 6.3 Thresholds
+
+- **Aging concern:** > 25% of unsettled value in 91+ buckets → watch · > 10% in 180+ → write-off risk
+- **Concentration:** top-1 debtor > 15% of total unsettled → single-point risk · top-10 > 60% → concentrated book
+- **Stale debtors:** `unresolved > 0 AND knock_off_total = 0 AND refund_total = 0` → never actioned (collections team forgot)
+
+### 6.4 Component System Prompts
+
+Two prompts added to `COMPONENT_PROMPTS` in [prompts.ts](../../apps/dashboard/src/lib/ai-insight/prompts.ts) under the `// ─── Return Unsettled (§6) ───` block. Both prompts run under `full` policy — component-level tool drilldown is permitted alongside the summary layer.
+
+- **`ru_aging_chart`** — narrates bucket distribution, calls out skew toward 91+ and 180+ buckets, instructs drilldown into `pc_return_aging` history if trend over time is needed.
+- **`ru_debtors_table`** — narrates concentration, names top 5 debtors, flags stale debtors and settlement-activity patterns. May drill `pc_return_by_customer` by debtor or `dbo.CN` for credit note detail under `full` policy.
+
+### 6.5 Data Source + Tool Access
+
+**Local tables newly whitelisted in [tools.ts](../../apps/dashboard/src/lib/ai-insight/tools.ts):**
+
+- `pc_return_aging`: `snapshot_date, bucket, count, amount`
+- `pc_return_by_customer`: `month, debtor_code, company_name, cn_count, cn_total, knock_off_total, refund_total, unresolved, outstanding_count`
+
+Neither is added to `AGGREGATE_LOCAL_TABLES` — tool policy is `full`, so no aggregate-only restriction applies. Previously whitelisted return tables (`pc_return_monthly`, `pc_return_products`) remain accessible under `full`.
+
+**Population label** (both fetchers): `"Population: cumulative unsettled return exposure across all months"`
+
+**Tool policy:** `'full'` in `SECTION_POLICY`.
+
+### 6.6 Fetcher Contracts (per component)
+
+Each fetcher reuses [return/queries.ts](../../apps/dashboard/src/lib/return/queries.ts) — zero new SQL.
+
+| Component key | Query functions | Values whitelisted in `allowed` |
+|---|---|---|
+| `ru_aging_chart` | `getReturnAging()` | 5 bucket amounts, 5 bucket counts, total unsettled amount, total unsettled count, 0–30 / 31–60 / 61–90 / 91–180 / 180+ share % |
+| `ru_debtors_table` | `getAllCustomerReturnsAll()` | total unsettled (sum of `unresolved`), debtors-with-unresolved count, stale-debtor count, top-1 / top-10 share % of unsettled, top 5 debtor names + unresolved + knock-off + refund |
+
+**Whitelist discipline (v1 §12.10):** every RM amount, percentage, and count printed in a prompt appears in `allowed`, except dates/years and safe small integers (0, 1, 2, 5, 10, 15, 20, 25, 30, 50, 60, 70, 100).
+
+**Pre-computed roll-up block (required per v1 §12.8):** both fetchers emit a `Pre-calculated roll-ups (use these values directly — do not recompute)` header.
+
+### 6.7 Truth Queries (per key metric)
+
+To live in `_bmad-output/planning-artifacts/truth-queries/return-unsettled.sql` (deferred to Phase B).
+
+| Truth query | Matches | Component |
+|---|---|---|
+| T1. 5-bucket amounts + counts from latest `pc_return_aging` snapshot | Aging chart | `ru_aging_chart` |
+| T2. Total unsettled across all months (`SUM(unresolved)` on `pc_return_by_customer`) | Debtors table header | `ru_debtors_table` |
+| T3. Top 10 debtors by `SUM(unresolved)` | Debtors table body | `ru_debtors_table` |
+| T4. Top-1 debtor concentration % of total unsettled | Concentration flag | `ru_debtors_table` |
+| T5. Stale-debtor count (`unresolved > 0 AND knock_off_total = 0 AND refund_total = 0`) | Stale debtor flag | `ru_debtors_table` |
+
+### 6.8 Implementation Checklist (v1 §14 playbook)
+
+- [ ] **Step 1** — Add `'return_unsettled'` to `SectionKey` in [types.ts](../../apps/dashboard/src/lib/ai-insight/types.ts)
+- [ ] **Step 2** — Extend `SECTION_COMPONENTS`, `SECTION_PAGE`, `SECTION_NAMES` in [prompts.ts](../../apps/dashboard/src/lib/ai-insight/prompts.ts)
+- [ ] **Step 3** — Add 2 component prompts to `COMPONENT_PROMPTS` in [prompts.ts](../../apps/dashboard/src/lib/ai-insight/prompts.ts)
+- [ ] **Step 4** — Add 2 fetchers to the `fetchers` record in [data-fetcher.ts](../../apps/dashboard/src/lib/ai-insight/data-fetcher.ts); each returns `{ prompt, allowed }` per §6.6. Imports `getReturnAging`, `getAllCustomerReturnsAll` from `../return/queries` — no new SQL.
+- [ ] **Step 5** — Add `return_unsettled: 'snapshot'` to `SECTION_SCOPE` in [data-fetcher.ts](../../apps/dashboard/src/lib/ai-insight/data-fetcher.ts). Extend `buildScopeLabel` to branch per-section for snapshot label resolution.
+- [ ] **Step 6** — Add `return_unsettled: 'full'` to `SECTION_POLICY` in [tool-policy.ts](../../apps/dashboard/src/lib/ai-insight/tool-policy.ts). Add `pc_return_aging` and `pc_return_by_customer` to `LOCAL_WHITELIST` in [tools.ts](../../apps/dashboard/src/lib/ai-insight/tools.ts). No `AGGREGATE_LOCAL_TABLES` change.
+- [ ] **Step 7** — Replace the bespoke `<SectionHeader title="Unsettled Returns" …>` in [DashboardShellV2.tsx](../../apps/dashboard/src/components/return/dashboard-v2/DashboardShellV2.tsx) with `<InsightSectionHeader page="return" sectionKey="return_unsettled" dateRange={null} subtitle="Accumulated from beginning to now" />`.
+- [ ] **Step 7b** — Per §6.9, wire per-component `AnalyzeIcon` + add 2 `COMPONENT_INFO` entries.
+- [ ] **Step 8** — Write truth queries to `_bmad-output/planning-artifacts/truth-queries/return-unsettled.sql` (deferred to Phase B)
+- [ ] **Step 9** — `tsc --noEmit` clean; Playwright spot-check in debug mode (no live Anthropic call). Commit with message `feat: AI insight v2 — return unsettled section`.
+- [ ] **Step 10 (deferred)** — Live LLM verification pending Phase B / Anthropic credits.
+
+### 6.9 Per-Component Analyze Icons (MANDATORY — per §1.9)
+
+Two icons to add:
+
+- [ ] **§6.9.1** — Add 2 entries to `COMPONENT_INFO` in [component-info.ts](../../apps/dashboard/src/lib/ai-insight/component-info.ts): `ru_aging_chart`, `ru_debtors_table`.
+- [ ] **§6.9.2** — [AgingChart.tsx](../../apps/dashboard/src/components/return/dashboard-v2/overview/AgingChart.tsx): wrap `<CardTitle>` in `flex items-center gap-2`; add icon with `componentKey="ru_aging_chart"`.
+- [ ] **§6.9.3** — [TopDebtorsTable.tsx](../../apps/dashboard/src/components/return/dashboard-v2/overview/TopDebtorsTable.tsx): wrap `<CardTitle>Customer Returns</CardTitle>` in `flex items-center gap-2`; add icon with `componentKey="ru_debtors_table"`. Subtitle paragraph stays below.
+- [ ] **§6.9.4** — Playwright spot-check: 2 icons render on the Unsettled Returns cluster, dialog opens on click, About section populated.
+
+**Page total after §6 ships:** 7 (from §5) + 2 = **9 icons** on the Returns page.
+
+---
+
+## Section 7 — `expense_overview`
+
+**Page:** Expenses (`/expenses`)
+**Scope:** `period` (date-filtered)
+**Tool policy:** `aggregate_only` (matches §1 / §3 / §5 — first section of a page with only local pre-computes behind it)
+**Data source:** `pc_expense_monthly` (local pre-compute — GL account × month × `acc_type` where `acc_type IN ('CO','EP')`)
+**AI calls:** 7 parallel component analyses + 1 summary = **8 total**
+
+> **Naming reminder** — section key is `expense_overview`; component prefix is `ex_*`; page route is `/expenses`; `SECTION_PAGE` label is `'Expenses'`; dashboard shell at [DashboardShell.tsx](../../apps/dashboard/src/components/expenses/dashboard/DashboardShell.tsx). There is no `dashboard-v2` split for Expenses — AI icons are mounted on the existing `components/expenses/dashboard/*` components directly.
+
+> **UI alignment note (2026-04-14)** — the Expenses page renders **4 KPI cards** (Total Costs, Cost of Sales, Operating Costs, vs Last Year). Per the §1.9 / §5.9 contract, every visible KPI gets an icon — the vs-Last-Year card is a first-class KPI (YoY cost-growth signal) and is wired with `ex_yoy_costs`. The component inventory below is 1:1 with the actual UI cards.
+
+### 7.1 Component Inventory
+
+| # | Component | Type | Data Source | Key Metric |
+|---|-----------|------|-------------|------------|
+| 71 | Total Costs | KPI | `pc_expense_monthly` | COGS + OpEx for the period + split |
+| 72 | Cost of Sales | KPI | `pc_expense_monthly` | COGS RM, % of total cost, YoY |
+| 73 | Operating Costs | KPI | `pc_expense_monthly` | OpEx RM, % of total cost, YoY |
+| 74 | vs Last Year | KPI | `pc_expense_monthly` | YoY % on total cost + COGS YoY + OpEx YoY |
+| 75 | Cost Trend | Chart (stacked bars, monthly) | `pc_expense_monthly` | MoM trajectory, peak/low month, MoM growth, YoY overlay |
+| 76 | Cost Composition | Chart (donut) | `pc_expense_monthly` | COGS vs OpEx split and YoY composition drift |
+| 77 | Top Expenses | Chart (horizontal bar, cost-type toggle) | `pc_expense_monthly` | Top 10 accounts by net cost + concentration |
+
+**Component key registry (added to `SECTION_COMPONENTS` in [prompts.ts](../../apps/dashboard/src/lib/ai-insight/prompts.ts)):**
+
+```ts
+expense_overview: [
+  { key: 'ex_total_costs',      name: 'Total Costs',      type: 'kpi' },
+  { key: 'ex_cogs',              name: 'Cost of Sales',    type: 'kpi' },
+  { key: 'ex_opex',              name: 'Operating Costs',  type: 'kpi' },
+  { key: 'ex_yoy_costs',         name: 'vs Last Year',     type: 'kpi' },
+  { key: 'ex_cost_trend',        name: 'Cost Trend',       type: 'chart' },
+  { key: 'ex_cost_composition',  name: 'Cost Composition', type: 'chart' },
+  { key: 'ex_top_expenses',      name: 'Top Expenses',     type: 'chart' },
+],
+```
+
+`SECTION_PAGE.expense_overview = 'Expenses'`
+`SECTION_NAMES.expense_overview = 'Expense Overview'`
+`PageKey` union extended with `'expenses'` in [types.ts](../../apps/dashboard/src/lib/ai-insight/types.ts).
+
+### 7.2 Filter Dimensions Available to Prompts
+
+Period endpoints accept `startDate` / `endDate` from `useDashboardFilters`. The UI also exposes a `costType` toggle (All / COGS / OpEx) that scopes the CostTrendChart and CostCompositionChart views locally, but the AI is always given the **unfiltered All view** — drill-downs into cost-type remain user-driven via the toggles.
+
+### 7.3 Thresholds (used across prompts)
+
+- **YoY total-cost growth:** < 0% Healthy · 0–5% Watch · 5–10% Concern · > 10% Severe — costs growing faster than typical revenue inflation
+- **COGS share of total cost:** 60–80% Typical fruit-distribution mix · > 85% COGS-dominated (margin-pressure risk) · < 50% OpEx-dominated (scaling inefficiency risk)
+- **OpEx YoY growth:** > 10% Concern — OpEx is semi-fixed and should grow slower than revenue
+- **COGS YoY growth:** tolerable if sales volume also grew; flag if > 15% and sales flat/declining
+- **MoM cost growth (first → last month in period):** > 15% Concern · > 25% Severe
+- **Expense concentration (Top 1 account share of total cost):** > 30% Severe · 15–30% Concentrated · < 15% Diversified
+- **Top 10 share of total cost:** > 75% Concentrated · < 50% Diversified
+- **Cost discipline rule:** COGS scales with sales volume (variable — YoY growth acceptable if sales also grew); OpEx grows only with structural decisions (headcount, rent, tooling) — unexplained OpEx jumps warrant investigation.
+
+### 7.4 Component System Prompts
+
+All 7 prompts live in `COMPONENT_PROMPTS` in [prompts.ts](../../apps/dashboard/src/lib/ai-insight/prompts.ts) under the `// ─── Expense Overview (§7) ───` block. Prompts narrate pre-fetched values only — no component-level tool access. Summary layer inherits the `aggregate_only` policy and may drill `pc_expense_monthly` up to 2 tool calls for root-cause investigation.
+
+### 7.5 Data Source + Tool Access
+
+**Local table newly whitelisted in [tools.ts](../../apps/dashboard/src/lib/ai-insight/tools.ts):**
+
+- `pc_expense_monthly`: `month, acc_no, account_name, acc_type, net_amount`
+
+Added to `AGGREGATE_LOCAL_TABLES` in [tool-policy.ts](../../apps/dashboard/src/lib/ai-insight/tool-policy.ts) so the `aggregate_only` policy permits it.
+
+**Population label** (every fetcher in this section):
+`"Population: expense GL postings in {period}"`
+
+**Tool policy:** `'aggregate_only'` in `SECTION_POLICY`.
+
+### 7.6 Fetcher Contracts (per component)
+
+Each fetcher reuses [expenses/queries.ts](../../apps/dashboard/src/lib/expenses/queries.ts) functions so the dashboard and the AI see identical numbers — no new SQL was added.
+
+| Component key | Query functions | Values whitelisted in `allowed` |
+|---|---|---|
+| `ex_total_costs` | `getCostKpisV2` | total cost, COGS, OpEx, COGS %, OpEx %, YoY total, previous total |
+| `ex_cogs` | `getCostKpisV2` + `getCogsBreakdown` | COGS RM, COGS % of total, COGS YoY, top 3 COGS accounts + % shares |
+| `ex_opex` | `getCostKpisV2` + `getOpexBreakdown` | OpEx RM, OpEx % of total, OpEx YoY, top 3 OpEx accounts + % shares |
+| `ex_yoy_costs` | `getCostKpisV2` | YoY % total, YoY % COGS, YoY % OpEx, current vs previous RM amounts |
+| `ex_cost_trend` | `getCostTrendV2` | per-month COGS + OpEx, months in period, peak/low month, MoM growth %, prior-year totals |
+| `ex_cost_composition` | `getCostCompositionV2` | COGS RM, OpEx RM, total RM, COGS %, OpEx %, prior-year composition |
+| `ex_top_expenses` | `getTopExpensesByType(..., 'all', 'desc')` | total cost, top 10 rows (acc_no, account_name, cost_type, net_cost), top 1 share %, top 10 share % |
+
+**Whitelist discipline (v1 §12.10):** every RM amount, percentage, and count printed in a prompt must appear in `allowed`, except dates/years and safe small integers (0, 1, 2, 5, 10, 15, 20, 30, 50, 60, 70, 80, 85, 100).
+
+**Pre-computed roll-up block (required per v1 §12.8):** the trend, composition, and top-expenses fetchers emit a `Pre-calculated roll-ups (use these values directly — do not recompute)` header with aggregate lines the AI cites verbatim. KPI fetchers carry their roll-ups inline.
+
+### 7.7 Truth Queries (per key metric)
+
+To live in `_bmad-output/planning-artifacts/truth-queries/expense-overview.sql` (deferred until Phase B verification). Each query must match the fetcher value, the dashboard displayed value, and `queries.ts` function output (±RM 1 tolerance).
+
+**Metrics to verify:**
+
+| Truth query | Matches | Component |
+|---|---|---|
+| T1. Total cost, COGS, OpEx (`SUM(net_amount)` grouped by `acc_type`) from `pc_expense_monthly` | Total Costs / COGS / OpEx KPIs | `ex_total_costs`, `ex_cogs`, `ex_opex` |
+| T2. YoY total, COGS, OpEx (same query shifted 1 year back) | vs Last Year KPI | `ex_yoy_costs` |
+| T3. Monthly trend (month × COGS × OpEx) | CostTrendChart | `ex_cost_trend` |
+| T4. Composition (acc_type × `SUM(net_amount)`) | CostCompositionChart | `ex_cost_composition` |
+| T5. Top 10 accounts by `SUM(net_amount) DESC` (all cost types) | TopExpensesChart (All view) | `ex_top_expenses` |
+
+### 7.8 Implementation Checklist (v1 §14 playbook, instantiated)
+
+- [ ] **Step 1** — Add `'expense_overview'` to `SectionKey` and `'expenses'` to `PageKey` in [types.ts](../../apps/dashboard/src/lib/ai-insight/types.ts)
+- [ ] **Step 2** — Extend `SECTION_COMPONENTS`, `SECTION_PAGE`, `SECTION_NAMES` in [prompts.ts](../../apps/dashboard/src/lib/ai-insight/prompts.ts)
+- [ ] **Step 3** — Add 7 component prompts to `COMPONENT_PROMPTS` in [prompts.ts](../../apps/dashboard/src/lib/ai-insight/prompts.ts)
+- [ ] **Step 4** — Add 7 fetchers to the `fetchers` record in [data-fetcher.ts](../../apps/dashboard/src/lib/ai-insight/data-fetcher.ts); each returns `{ prompt, allowed }` per §7.6. Imports `getCostKpisV2`, `getCostTrendV2`, `getCostCompositionV2`, `getCogsBreakdown`, `getOpexBreakdown`, `getTopExpensesByType` from `../expenses/queries` — no new SQL.
+- [ ] **Step 5** — Add `expense_overview: 'period'` to `SECTION_SCOPE` in [data-fetcher.ts](../../apps/dashboard/src/lib/ai-insight/data-fetcher.ts)
+- [ ] **Step 6** — Add `expense_overview: 'aggregate_only'` to `SECTION_POLICY` in [tool-policy.ts](../../apps/dashboard/src/lib/ai-insight/tool-policy.ts). Add `pc_expense_monthly` to `AGGREGATE_LOCAL_TABLES` and to `LOCAL_WHITELIST` in [tools.ts](../../apps/dashboard/src/lib/ai-insight/tools.ts).
+- [ ] **Step 7** — Insert `<InsightSectionHeader page="expenses" sectionKey="expense_overview" ... />` above the KPI cluster in [DashboardShell.tsx](../../apps/dashboard/src/components/expenses/dashboard/DashboardShell.tsx).
+- [ ] **Step 7b** — Per §7.9, wire per-component `AnalyzeIcon` + add 7 `COMPONENT_INFO` entries.
+- [ ] **Step 8** — Write truth queries to `_bmad-output/planning-artifacts/truth-queries/expense-overview.sql` (deferred to Phase B)
+- [ ] **Step 9** — `tsc --noEmit` clean; Playwright spot-check in debug mode (no live Anthropic call). Commit with message `feat: AI insight v2 — expense overview section`.
+- [ ] **Step 10 (deferred)** — Live LLM verification pending Phase B / Anthropic credits.
+
+### 7.9 Per-Component Analyze Icons (MANDATORY — per §1.9)
+
+Seven icons to add:
+
+- [ ] **§7.9.1** — Add 7 entries to `COMPONENT_INFO` in [component-info.ts](../../apps/dashboard/src/lib/ai-insight/component-info.ts): `ex_total_costs`, `ex_cogs`, `ex_opex`, `ex_yoy_costs`, `ex_cost_trend`, `ex_cost_composition`, `ex_top_expenses` — each with `name`, `whatItMeasures`, `formula` where relevant, `indicator`, `about`.
+- [ ] **§7.9.2** — [KpiCards.tsx](../../apps/dashboard/src/components/expenses/dashboard/KpiCards.tsx): add `componentKey` prop to `KpiCard` and render `<AnalyzeIcon sectionKey="expense_overview" componentKey={componentKey} />` inline with `<CardTitle>` via a `flex items-center gap-1` container. Each of the 4 cards passes its component key.
+- [ ] **§7.9.3** — [CostTrendChart.tsx](../../apps/dashboard/src/components/expenses/dashboard/CostTrendChart.tsx): the chart uses a bare `<div class="font-semibold text-sm">` title, not a Card. Wrap that div in `flex items-center gap-2` and add icon with `componentKey="ex_cost_trend"`.
+- [ ] **§7.9.4** — [CostCompositionChart.tsx](../../apps/dashboard/src/components/expenses/dashboard/CostCompositionChart.tsx): same bare-title pattern — wrap in `flex items-center gap-2` and add icon with `componentKey="ex_cost_composition"`.
+- [ ] **§7.9.5** — [TopExpensesChart.tsx](../../apps/dashboard/src/components/expenses/dashboard/TopExpensesChart.tsx): header already uses `justify-between` with Card/CardHeader/CardTitle. Wrap `<CardTitle>` in a `flex items-center gap-2` container on the left; add icon with `componentKey="ex_top_expenses"`. The subtitle paragraph and right-side toggle clusters stay untouched.
+- [ ] **§7.9.6** — Playwright spot-check: 7 icons render on the Expense Overview cluster, dialog opens on click, About section populated, AI Analysis area shows the pre-run placeholder.
+
+**Page total after §7 ships:** 7 icons on the Expenses page (Section 2 `expense_breakdown` will add more in §8).
+
+---
+
+## Sections 6, 8–11
 
 To be authored after Section 5 is signed off, implemented, and committed. Each subsequent section follows the same template as Sections 1–5 above — with the mandatory §X.9 per-component icons subsection.
 
 **Pending spec authoring:**
 - Section 6 — `return_unsettled`
-- Section 7 — `expense_overview`
 - Section 8 — `expense_breakdown`
 - Section 9 — `financial_overview` (introduces `fiscal_period` scope)
 - Section 10 — `financial_pnl`

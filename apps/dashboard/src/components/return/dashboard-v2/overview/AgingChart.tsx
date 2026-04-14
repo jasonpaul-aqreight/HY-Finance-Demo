@@ -5,6 +5,7 @@ import { useStableData } from '@/hooks/useStableData';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid, Cell } from 'recharts';
 import { formatRM, formatCount } from '@/lib/format';
+import { AnalyzeIcon } from '@/components/ai-insight/AnalyzeIcon';
 
 // API returns lowercase hyphenated bucket names; map to display labels
 const BUCKET_LABEL: Record<string, string> = {
@@ -30,7 +31,12 @@ export function AgingChart() {
   if (!data) {
     return (
       <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-sm">Aging of Unsettled Returns</CardTitle></CardHeader>
+        <CardHeader className="pb-2">
+          <div className="flex items-center gap-2">
+            <CardTitle className="text-sm">Aging of Unsettled Returns</CardTitle>
+            <AnalyzeIcon sectionKey="return_unsettled" componentKey="ru_aging_chart" />
+          </div>
+        </CardHeader>
         <CardContent><div className="h-[280px] bg-muted rounded animate-pulse" /></CardContent>
       </Card>
     );
@@ -46,8 +52,10 @@ export function AgingChart() {
   return (
     <Card className="w-full">
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm">Aging of Unsettled Returns</CardTitle>
-
+        <div className="flex items-center gap-2">
+          <CardTitle className="text-sm">Aging of Unsettled Returns</CardTitle>
+          <AnalyzeIcon sectionKey="return_unsettled" componentKey="ru_aging_chart" />
+        </div>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={5 * 26 + 60}>

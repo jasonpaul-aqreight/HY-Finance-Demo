@@ -11,7 +11,8 @@ export type SectionKey =
   | 'customer_margin_breakdown'
   | 'supplier_margin_overview'
   | 'supplier_margin_breakdown'
-  | 'return_trend';
+  | 'return_trend'
+  | 'return_unsettled';
 
 export type ComponentType = 'kpi' | 'chart' | 'table' | 'breakdown';
 

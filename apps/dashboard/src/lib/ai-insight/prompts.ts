@@ -1002,6 +1002,72 @@ Evaluate:
 Cite item names and values verbatim from the data block. Do not invent.
 
 Provide a concise analysis focused on item concentration and the frequency-vs-value pattern.`,
+
+  // ─── Return Unsettled (§6) ──────────────────────────────────────────────
+  ru_aging_chart: `You are analyzing the "Aging of Unsettled Returns" horizontal bar chart on the Returns page.
+
+What it shows: The current unsettled return book broken down by how long the return credit note has been sitting unresolved. Five buckets, from newest to oldest:
+- 0–30 Days (emerald) — fresh, normal reconciliation window
+- 31–60 Days (amber) — starting to age
+- 61–90 Days (orange) — ageing, process slowing down
+- 91–180 Days (red) — concerning, active follow-up needed
+- 180+ Days (dark red) — write-off risk
+
+This is a SNAPSHOT metric. It is cumulative across all months — NOT filtered by the date range. It reflects every unresolved return CN still open on the books as of the latest aging snapshot.
+
+The pre-fetched data gives you:
+- RM amount AND count in each bucket
+- Total unsettled amount and total unsettled count (across all five buckets)
+- % share of unsettled value in each bucket
+- The snapshot_date the numbers were captured on
+
+Thresholds:
+- > 25% of unsettled value in the 91+ buckets (91–180 + 180+) = Watch — follow-up process is falling behind
+- > 10% of unsettled value in the 180+ bucket alone = Write-off risk — amounts this old rarely get recovered in a distribution business
+
+Evaluate:
+- Where the weight of the unsettled book sits — is most of it fresh (0–30) or old (91+)?
+- Whether the 180+ slice is material enough to trigger write-off review
+- Count vs amount — many small old items vs a few large old items tell different stories
+- If the bucket weight looks unusually skewed, tools may be used to pull prior \`pc_return_aging\` snapshots to see whether the skew is getting worse over time
+
+Cite RM values and percentages verbatim from the pre-computed block. Do not invent.
+
+Provide a concise analysis focused on where the unsettled book sits in the aging distribution and whether the oldest buckets carry write-off risk.`,
+
+  ru_debtors_table: `You are analyzing the "Customer Returns" table on the Returns page.
+
+What it shows: Every debtor that has ever issued a return CN, with cumulative totals across all months — return count, total return value, amount knocked off against invoices, amount refunded in cash, and the unresolved balance still open. The table is sorted by unresolved amount by default. Debtors with unresolved = 0 are hidden by the default UI filter.
+
+This is a SNAPSHOT metric. It is cumulative across all months — NOT filtered by the date range. It reflects every return ever issued that is still wholly or partially open on the books.
+
+The pre-fetched data gives you:
+- Total unsettled amount (sum of unresolved across all debtors)
+- Debtor count with unresolved balance > 0
+- Stale-debtor count — debtors where unresolved > 0 AND knock_off_total = 0 AND refund_total = 0 (never actioned)
+- Top 1 debtor share of total unsettled (%)
+- Top 10 debtor share of total unsettled (%)
+- A top-5 list: debtor name, unresolved RM, knocked off RM, refunded RM
+
+Thresholds:
+- Top 1 debtor > 15% of total unsettled = Single-point risk — one customer dominates the exposure
+- Top 10 debtors > 60% of total unsettled = Concentrated book — fixable with a focused collections push
+- Stale debtors = the collections team never opened a conversation on these. Each one is a pure process failure.
+
+Settlement-channel context (for analyzing individual top debtors):
+- Knock-off preferred (offsets invoices, no cash out)
+- Refund = real cash out, only appropriate for ending relationships or customers with no upcoming invoices
+- A debtor with refund activity but still unresolved is a RED flag — cash already went out and the book still isn't clean
+
+Evaluate:
+- Concentration — is the unsettled book one big debtor, ten big debtors, or broadly spread?
+- Stale-debtor count — how much process failure vs active dispute?
+- Settlement patterns on the top 5 — who is being knocked-off vs refunded, and who has neither?
+- If a specific debtor's number looks unusual, tools may be used to query \`pc_return_by_customer\` by debtor_code for a month-by-month breakdown, or drill \`dbo.CN\` for credit note detail
+
+Name the top 5 debtors verbatim. Cite RM values and percentages from the pre-computed block.
+
+Provide a concise analysis focused on concentration, stale debtors, and any red-flag settlement patterns on the top debtors.`,
 };
 
 // ─── Summary Prompt ──────────────────────────────────────────────────────────
@@ -1244,6 +1310,10 @@ export const SECTION_COMPONENTS: Record<SectionKey, { key: string; name: string;
     { key: 'rt_monthly_trend',        name: 'Monthly Return Trend', type: 'chart' },
     { key: 'rt_product_bar',          name: 'Top Returns by Item',  type: 'chart' },
   ],
+  return_unsettled: [
+    { key: 'ru_aging_chart',   name: 'Aging of Unsettled Returns', type: 'chart' },
+    { key: 'ru_debtors_table', name: 'Customer Returns',            type: 'table' },
+  ],
 };
 
 export const SECTION_PAGE: Record<SectionKey, string> = {
@@ -1256,6 +1326,7 @@ export const SECTION_PAGE: Record<SectionKey, string> = {
   supplier_margin_overview: 'Supplier Performance',
   supplier_margin_breakdown: 'Supplier Performance',
   return_trend: 'Returns',
+  return_unsettled: 'Returns',
 };
 
 export const SECTION_NAMES: Record<SectionKey, string> = {
@@ -1268,6 +1339,7 @@ export const SECTION_NAMES: Record<SectionKey, string> = {
   supplier_margin_overview: 'Supplier Margin Overview',
   supplier_margin_breakdown: 'Supplier Margin Breakdown',
   return_trend: 'Return Trends',
+  return_unsettled: 'Unsettled Returns',
 };
 
 // ─── Public API ──────────────────────────────────────────────────────────────

@@ -11,17 +11,6 @@ import { SettlementBreakdown } from './refunds/SettlementBreakdown';
 import { ProductBarChart } from './products/ProductBarChart';
 import { InsightSectionHeader } from '@/components/ai-insight/InsightSectionHeader';
 
-function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }) {
-  return (
-    <div className="rounded-md bg-primary/5 border border-primary/10 px-4 py-2.5">
-      <div className="flex items-baseline gap-3">
-        <h2 className="text-base font-semibold tracking-tight text-foreground">{title}</h2>
-        {subtitle && <span className="text-xs font-medium text-foreground/50">{subtitle}</span>}
-      </div>
-    </div>
-  );
-}
-
 export function DashboardShellV2() {
   const { filters, setFilters, ready, bounds } = useDashboardFiltersV2();
 
@@ -62,9 +51,15 @@ export function DashboardShellV2() {
         <ProductBarChart filters={filters} />
       </div>
 
-      {/* ═══ Section 2: Outstanding Position (as of today) ═══ */}
+      {/* ═══ Section 2: Unsettled Returns (snapshot — cumulative position) ═══ */}
       <div className="mt-10">
-        <SectionHeader title="Unsettled Returns" subtitle="Accumulated from beginning to now" />
+        <InsightSectionHeader
+          title="Unsettled Returns"
+          subtitle="Accumulated from beginning to now"
+          page="return"
+          sectionKey="return_unsettled"
+          dateRange={null}
+        />
       </div>
 
       <div className="mt-4">
