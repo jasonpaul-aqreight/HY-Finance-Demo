@@ -28,7 +28,7 @@ Legend: ⬜ Not started · 🟡 Spec in progress · 🔵 Spec signed off · 🟢
 | # | Section Key | Page | Scope | Tool Policy | Status |
 |---|-------------|------|-------|-------------|--------|
 | 1 | `customer_margin_overview` | Customer Margin | period | aggregate_only | ✅ Shipped (offline verified — live LLM run deferred) |
-| 2 | `customer_margin_breakdown` | Customer Margin | period | full | ⬜ |
+| 2 | `customer_margin_breakdown` | Customer Margin | period | full | 🟡 Spec drafted — awaiting sign-off |
 | 3 | `supplier_margin_overview` | Supplier Performance | period | aggregate_only | ⬜ |
 | 4 | `supplier_margin_breakdown` | Supplier Performance | period | full | ⬜ |
 | 5 | `return_trend` | Returns | period | aggregate_only | ⬜ |
@@ -103,3 +103,4 @@ Legend: ⬜ Not started · 🟡 Spec in progress · 🔵 Spec signed off · 🟢
 | 2026-04-14 | 1 | Added 7 `COMPONENT_INFO` entries; wired `AnalyzeIcon` into `KpiCards.tsx`, `MarginTrendChart.tsx`, `MarginDistributionChart.tsx`. tsc clean. |
 | 2026-04-14 | 1 | Playwright re-verified: 7 icons at expected positions, ComponentInsightDialog opens with About section populated, Analyze click reaches Anthropic API through full orchestration pipeline. Live LLM run blocked on `400 — credit balance too low` (request_id `req_011Ca2xts2A1d56NVyGfVRBF`). |
 | 2026-04-14 | 1 | Section 1 shipped. Status → ✅. Live LLM verification deferred until API credits are available. |
+| 2026-04-14 | 2 | Section 2 (`customer_margin_breakdown`) spec drafted at v1 rigor with §2.9 per-component icons checklist. 3 components. Tool policy `full`. Awaiting user sign-off. |
