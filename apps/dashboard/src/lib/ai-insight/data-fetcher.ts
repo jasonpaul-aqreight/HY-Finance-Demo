@@ -7,6 +7,12 @@ import {
   getCreditNoteImpact,
   type MarginFilters,
 } from '../customer-margin/queries';
+import {
+  getMarginSummary as getSupplierMarginSummary,
+  getMarginTrend as getSupplierMarginTrend,
+  getSupplierMarginDistributionV2,
+  getItemMarginDistributionV2,
+} from '../supplier-margin/queries';
 import type { SectionKey, DateRange, AllowedValue, FetcherResult } from './types';
 
 // Convert YYYY-MM-DD to YYYY-MM to match pc_ar_monthly.month column format
@@ -1414,6 +1420,290 @@ const fetchers: Record<string, DataFetcher> = {
       allowed,
     };
   },
+
+  // ─── Supplier Margin Section 3: Supplier Margin Overview ──────────────────
+  // All fetchers in this section reuse supplier-margin/queries.ts so the
+  // dashboard and the AI see identical numbers (three-way match guaranteed).
+
+  async sp_net_sales(dr) {
+    const summary = await getSupplierMarginSummary(dr!.start, dr!.end);
+    const net = Number(summary.current.revenue);
+    const prevNet = Number(summary.previous.revenue);
+    const growthPct = summary.growth.revenue_pct;
+    const deltaRm = net - prevNet;
+
+    return {
+      prompt:
+        `Population: active suppliers with purchase activity in ${dr!.start} to ${dr!.end}.\n\n` +
+        `Value: RM ${net.toLocaleString('en-MY')}\n` +
+        `Prior period Est. Net Sales: RM ${prevNet.toLocaleString('en-MY')}\n` +
+        `MoM delta: RM ${deltaRm.toLocaleString('en-MY')}\n` +
+        `MoM delta %: ${growthPct != null ? `${growthPct.toFixed(2)}%` : 'n/a'}`,
+      allowed: [
+        rm('est net sales', net),
+        rm('prior est net sales', prevNet),
+        rm('est net sales delta rm', deltaRm),
+        ...(growthPct != null ? [pct('est net sales delta pct', growthPct)] : []),
+      ],
+    };
+  },
+
+  async sp_cogs(dr) {
+    const summary = await getSupplierMarginSummary(dr!.start, dr!.end);
+    const net = Number(summary.current.revenue);
+    const cogs = Number(summary.current.cogs);
+    const prevCogs = Number(summary.previous.cogs);
+    const cogsRatio = net > 0 ? (cogs / net) * 100 : 0;
+    const deltaRm = cogs - prevCogs;
+
+    return {
+      prompt:
+        `Population: active suppliers with purchase activity in ${dr!.start} to ${dr!.end}.\n\n` +
+        `Value: RM ${cogs.toLocaleString('en-MY')}\n` +
+        `Period Est. Net Sales: RM ${net.toLocaleString('en-MY')}\n` +
+        `COGS as % of Est. Net Sales: ${cogsRatio.toFixed(1)}%\n` +
+        `Prior period Est. COGS: RM ${prevCogs.toLocaleString('en-MY')}\n` +
+        `COGS delta: RM ${deltaRm.toLocaleString('en-MY')}`,
+      allowed: [
+        rm('est cogs', cogs),
+        rm('est net sales', net),
+        pct('cogs share of net sales', cogsRatio),
+        rm('prior est cogs', prevCogs),
+        rm('est cogs delta rm', deltaRm),
+      ],
+    };
+  },
+
+  async sp_gross_profit(dr) {
+    const summary = await getSupplierMarginSummary(dr!.start, dr!.end);
+    const net = Number(summary.current.revenue);
+    const cogs = Number(summary.current.cogs);
+    const gp = Number(summary.current.profit);
+    const prevGp = Number(summary.previous.profit);
+    const deltaRm = gp - prevGp;
+    const growthPct = summary.growth.profit_pct;
+
+    return {
+      prompt:
+        `Population: active suppliers with purchase activity in ${dr!.start} to ${dr!.end}.\n\n` +
+        `Value: RM ${gp.toLocaleString('en-MY')}\n` +
+        `Period Est. Net Sales: RM ${net.toLocaleString('en-MY')}\n` +
+        `Period Est. COGS: RM ${cogs.toLocaleString('en-MY')}\n` +
+        `Prior period Est. Gross Profit: RM ${prevGp.toLocaleString('en-MY')}\n` +
+        `GP delta: RM ${deltaRm.toLocaleString('en-MY')}\n` +
+        `GP delta %: ${growthPct != null ? `${growthPct.toFixed(2)}%` : 'n/a'}`,
+      allowed: [
+        rm('est gross profit', gp),
+        rm('est net sales', net),
+        rm('est cogs', cogs),
+        rm('prior est gross profit', prevGp),
+        rm('est gross profit delta rm', deltaRm),
+        ...(growthPct != null ? [pct('est gross profit delta pct', growthPct)] : []),
+      ],
+    };
+  },
+
+  async sp_margin_pct(dr) {
+    const summary = await getSupplierMarginSummary(dr!.start, dr!.end);
+    const net = Number(summary.current.revenue);
+    const cogs = Number(summary.current.cogs);
+    const marginPct = summary.current.margin_pct != null ? Number(summary.current.margin_pct) : 0;
+    const prevMarginPct = summary.previous.margin_pct != null ? Number(summary.previous.margin_pct) : 0;
+    const marginDelta = summary.growth.margin_delta != null ? Number(summary.growth.margin_delta) : (marginPct - prevMarginPct);
+    const color =
+      marginPct >= 15 ? 'Green (Good)' :
+      marginPct >= 10 ? 'Yellow (Neutral)' :
+      'Red (Bad)';
+
+    return {
+      prompt:
+        `Population: active suppliers with purchase activity in ${dr!.start} to ${dr!.end}.\n\n` +
+        `Value: ${marginPct.toFixed(2)}%\n` +
+        `Color: ${color}\n` +
+        `Good threshold: >= 15%\n` +
+        `Neutral threshold: 10% to 15%\n` +
+        `Bad threshold: < 10%\n` +
+        `Prior period margin %: ${prevMarginPct.toFixed(2)}%\n` +
+        `Margin delta (percentage points): ${marginDelta.toFixed(2)} pp\n` +
+        `Period Est. Net Sales: RM ${net.toLocaleString('en-MY')}\n` +
+        `Period Est. COGS: RM ${cogs.toLocaleString('en-MY')}`,
+      allowed: [
+        pct('margin pct', marginPct),
+        pct('prior margin pct', prevMarginPct),
+        pct('margin delta pp', marginDelta),
+        pct('good threshold', 15),
+        pct('neutral threshold', 10),
+        rm('est net sales', net),
+        rm('est cogs', cogs),
+      ],
+    };
+  },
+
+  async sp_active_suppliers(dr) {
+    const summary = await getSupplierMarginSummary(dr!.start, dr!.end);
+    const activeSuppliers = Number(summary.current.active_suppliers);
+    const net = Number(summary.current.revenue);
+    const avgPerSupplier = activeSuppliers > 0 ? net / activeSuppliers : 0;
+
+    return {
+      prompt:
+        `Population: active suppliers with purchase activity in ${dr!.start} to ${dr!.end}.\n\n` +
+        `Value: ${activeSuppliers.toLocaleString('en-MY')}\n` +
+        `Period Est. Net Sales: RM ${net.toLocaleString('en-MY')}\n` +
+        `Avg Est. Net Sales per active supplier: RM ${Math.round(avgPerSupplier).toLocaleString('en-MY')}\n` +
+        `Prior-period active supplier count: not available in the current pre-compute — evaluate based on overall mix signals, not a direct delta.`,
+      allowed: [
+        cnt('active suppliers', activeSuppliers),
+        rm('est net sales', net),
+        rm('avg net sales per supplier', Math.round(avgPerSupplier)),
+      ],
+    };
+  },
+
+  async sp_margin_trend(dr) {
+    const trend = await getSupplierMarginTrend(dr!.start, dr!.end, 'monthly');
+    if (trend.length === 0) {
+      return { prompt: 'No profitability trend data available for selected period.', allowed: [] };
+    }
+
+    const allowed: AllowedValue[] = [];
+    let table =
+      '| Month | Est. Net Sales | Est. COGS | Est. Gross Profit | Margin % |\n' +
+      '|-------|----------------|-----------|-------------------|----------|\n';
+    let gpSum = 0;
+    let revSum = 0;
+    let cogsSum = 0;
+    const marginPcts: number[] = [];
+    for (const r of trend) {
+      const rev = Number(r.revenue);
+      const cogs = Number(r.cogs);
+      const gp = Number(r.profit);
+      const mp = r.margin_pct != null ? Number(r.margin_pct) : 0;
+      revSum += rev;
+      cogsSum += cogs;
+      gpSum += gp;
+      marginPcts.push(mp);
+      table +=
+        `| ${r.period} ` +
+        `| RM ${rev.toLocaleString('en-MY')} ` +
+        `| RM ${cogs.toLocaleString('en-MY')} ` +
+        `| RM ${gp.toLocaleString('en-MY')} ` +
+        `| ${mp.toFixed(2)}% |\n`;
+      allowed.push(rm(`${r.period} est net sales`, rev));
+      allowed.push(rm(`${r.period} est cogs`, cogs));
+      allowed.push(rm(`${r.period} est gross profit`, gp));
+      allowed.push(pct(`${r.period} margin pct`, mp));
+    }
+
+    const avgMargin = marginPcts.length > 0
+      ? marginPcts.reduce((s, v) => s + v, 0) / marginPcts.length
+      : 0;
+    const periodMarginPct = revSum > 0 ? ((revSum - cogsSum) / revSum) * 100 : 0;
+    const minMargin = marginPcts.length ? Math.min(...marginPcts) : 0;
+    const maxMargin = marginPcts.length ? Math.max(...marginPcts) : 0;
+    const minRow = trend.find(r => Number(r.margin_pct) === minMargin);
+    const maxRow = trend.find(r => Number(r.margin_pct) === maxMargin);
+
+    const preCalc =
+      `Pre-calculated totals (use these values directly — do not recompute):\n` +
+      `- Period Est. Net Sales: RM ${revSum.toLocaleString('en-MY')}\n` +
+      `- Period Est. COGS: RM ${cogsSum.toLocaleString('en-MY')}\n` +
+      `- Period Est. Gross Profit: RM ${gpSum.toLocaleString('en-MY')}\n` +
+      `- Period Margin %: ${periodMarginPct.toFixed(2)}%\n` +
+      `- Average Monthly Margin %: ${avgMargin.toFixed(2)}%\n` +
+      (minRow ? `- Lowest margin month: ${minRow.period} at ${minMargin.toFixed(2)}%\n` : '') +
+      (maxRow ? `- Highest margin month: ${maxRow.period} at ${maxMargin.toFixed(2)}%\n` : '') +
+      `- Months in period: ${trend.length}\n`;
+
+    allowed.push(rm('period est net sales', revSum));
+    allowed.push(rm('period est cogs', cogsSum));
+    allowed.push(rm('period est gross profit', gpSum));
+    allowed.push(pct('period margin pct', periodMarginPct));
+    allowed.push(pct('avg monthly margin pct', avgMargin));
+    allowed.push(pct('lowest monthly margin pct', minMargin));
+    allowed.push(pct('highest monthly margin pct', maxMargin));
+    allowed.push(cnt('months in period', trend.length));
+
+    return {
+      prompt: `${preCalc}\nMonthly breakdown:\n${table}`,
+      allowed,
+    };
+  },
+
+  async sp_margin_distribution(dr) {
+    const [supplierBuckets, itemBuckets] = await Promise.all([
+      getSupplierMarginDistributionV2(dr!.start, dr!.end),
+      getItemMarginDistributionV2(dr!.start, dr!.end),
+    ]);
+
+    const allowed: AllowedValue[] = [];
+
+    const renderBuckets = (buckets: { bucket: string; count: number }[], label: string) => {
+      const total = buckets.reduce((s, b) => s + Number(b.count), 0);
+      let table =
+        `| Margin % Bucket | ${label} Count | % of Total |\n` +
+        `|-----------------|----------------|------------|\n`;
+      for (const b of buckets) {
+        const count = Number(b.count);
+        const shareOfTotal = total > 0 ? (count / total) * 100 : 0;
+        table += `| ${b.bucket} | ${count} | ${shareOfTotal.toFixed(1)}% |\n`;
+        allowed.push(cnt(`${label.toLowerCase()} bucket ${b.bucket} count`, count));
+        allowed.push(pct(`${label.toLowerCase()} bucket ${b.bucket} share`, shareOfTotal));
+      }
+
+      const lossBucket = buckets.find(b => b.bucket === '< 0%');
+      const lossCount = lossBucket ? Number(lossBucket.count) : 0;
+      const subTenCount = buckets
+        .filter(b => ['< 0%', '0-5%', '5-10%'].includes(b.bucket))
+        .reduce((s, b) => s + Number(b.count), 0);
+      const healthyCount = buckets
+        .filter(b => ['10-15%', '15-20%'].includes(b.bucket))
+        .reduce((s, b) => s + Number(b.count), 0);
+      const premiumCount = buckets
+        .filter(b => ['20-30%', '30%+'].includes(b.bucket))
+        .reduce((s, b) => s + Number(b.count), 0);
+
+      const lossShare = total > 0 ? (lossCount / total) * 100 : 0;
+      const subTenShare = total > 0 ? (subTenCount / total) * 100 : 0;
+      const healthyShare = total > 0 ? (healthyCount / total) * 100 : 0;
+      const premiumShare = total > 0 ? (premiumCount / total) * 100 : 0;
+
+      allowed.push(cnt(`total ${label.toLowerCase()} in distribution`, total));
+      allowed.push(cnt(`loss making ${label.toLowerCase()}`, lossCount));
+      allowed.push(cnt(`sub ten ${label.toLowerCase()}`, subTenCount));
+      allowed.push(cnt(`healthy band ${label.toLowerCase()}`, healthyCount));
+      allowed.push(cnt(`premium band ${label.toLowerCase()}`, premiumCount));
+      allowed.push(pct(`${label.toLowerCase()} loss making share`, lossShare));
+      allowed.push(pct(`${label.toLowerCase()} sub ten share`, subTenShare));
+      allowed.push(pct(`${label.toLowerCase()} healthy band share`, healthyShare));
+      allowed.push(pct(`${label.toLowerCase()} premium band share`, premiumShare));
+
+      return (
+        `${label} view — ${total} ${label.toLowerCase()} total\n` +
+        `- Loss-making (< 0%): ${lossCount} (${lossShare.toFixed(1)}%)\n` +
+        `- Sub-10% margin: ${subTenCount} (${subTenShare.toFixed(1)}%)\n` +
+        `- Healthy band (10–20%): ${healthyCount} (${healthyShare.toFixed(1)}%)\n` +
+        `- Premium band (20%+): ${premiumCount} (${premiumShare.toFixed(1)}%)\n\n` +
+        table
+      );
+    };
+
+    if (supplierBuckets.length === 0 && itemBuckets.length === 0) {
+      return { prompt: 'No margin distribution data available for selected period.', allowed: [] };
+    }
+
+    const supplierBlock = renderBuckets(supplierBuckets, 'Suppliers');
+    const itemBlock = renderBuckets(itemBuckets, 'Items');
+
+    const preamble =
+      `This chart has a Suppliers ↔ Items toggle on the dashboard. Both views are pre-fetched here. Analyze both and contrast them.\n\n` +
+      `Note: the Suppliers view places suppliers with zero revenue into the "< 0%" bucket (query behavior). The Items view excludes items with zero revenue.\n`;
+
+    return {
+      prompt: `${preamble}\n${supplierBlock}\n${itemBlock}`,
+      allowed,
+    };
+  },
 };
 
 // ─── Scope classification ────────────────────────────────────────────────────
@@ -1427,6 +1717,7 @@ const SECTION_SCOPE: Record<SectionKey, ScopeType> = {
   sales_breakdown: 'period',
   customer_margin_overview: 'period',
   customer_margin_breakdown: 'period',
+  supplier_margin_overview: 'period',
 };
 
 async function buildScopeLabel(scope: ScopeType, dateRange: DateRange | null): Promise<string> {

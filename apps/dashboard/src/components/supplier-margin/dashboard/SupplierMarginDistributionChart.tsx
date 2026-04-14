@@ -7,6 +7,7 @@ import { useMarginDistribution } from '@/hooks/supplier-margin/useMarginData';
 import { useStableData } from '@/hooks/useStableData';
 import type { DashboardFilters } from '@/hooks/supplier-margin/useDashboardFilters';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { AnalyzeIcon } from '@/components/ai-insight/AnalyzeIcon';
 
 type Entity = 'suppliers' | 'items';
 
@@ -40,7 +41,10 @@ export function SupplierMarginDistributionChart({ filters }: { filters: Dashboar
   return (
     <Card className="h-full flex flex-col">
       <CardHeader className="flex flex-row items-center justify-between gap-2 px-4">
-        <CardTitle className="whitespace-nowrap shrink-0">{entityLabel} Margin Distribution</CardTitle>
+        <div className="flex items-center gap-2">
+          <CardTitle className="whitespace-nowrap shrink-0">{entityLabel} Margin Distribution</CardTitle>
+          <AnalyzeIcon sectionKey="supplier_margin_overview" componentKey="sp_margin_distribution" />
+        </div>
         <div className="flex rounded-md border overflow-hidden">
           <Button
             size="sm"

@@ -16,6 +16,7 @@ import {
 } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatRM } from '@/lib/supplier-margin/format';
+import { AnalyzeIcon } from '@/components/ai-insight/AnalyzeIcon';
 
 const COLORS = {
   grossProfit: '#10b981',
@@ -74,7 +75,10 @@ export function MarginTrendChart({ filters }: { filters: DashboardFilters }) {
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle>Profitability Trend</CardTitle>
+        <div className="flex items-center gap-2">
+          <CardTitle>Profitability Trend</CardTitle>
+          <AnalyzeIcon sectionKey="supplier_margin_overview" componentKey="sp_margin_trend" />
+        </div>
         <p className="text-xs text-muted-foreground">
           Est. Gross Profit with Gross Margin % overlay
         </p>

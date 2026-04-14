@@ -547,6 +547,156 @@ Evaluate:
 Cite named customers from the pre-fetched top 25. Do not invent names.
 
 Provide a concise analysis focused on which accounts to investigate first.`,
+
+  // ═══ Supplier Margin Overview (Section 3) ═══
+  sp_net_sales: `You are analyzing the "Est. Net Sales" KPI on the Supplier Performance overview.
+
+What it measures: Total sales revenue attributed to items sourced from active suppliers during the selected period.
+Formula: SUM(sales_revenue) from pc_supplier_margin where is_active = 'T'.
+
+Context:
+- This is the Supplier Performance view of revenue — it mirrors the Customer Margin Net Sales figure when no filters are applied, but may diverge when supplier/item-group filters are in play.
+- The "Est." prefix is intentional: the number is constructed from the supplier-margin pre-compute pipeline and is not the raw invoice figure.
+
+Performance thresholds:
+- Month-over-month growth ≥ 5% = Good
+- Month-over-month growth 0% to 5% = Neutral
+- Month-over-month decline < 0% = Bad
+- A drop > 10% in a single period warrants flagging
+
+Evaluate the level and, if prior-period data is included in the pre-fetched block, the direction. Comment on whether the period is tracking above or below the trailing baseline.
+
+Provide a concise analysis of this metric.`,
+
+  sp_cogs: `You are analyzing the "Est. Cost of Sales" KPI on the Supplier Performance overview.
+
+What it measures: Attributed cost of goods sold, summed across items from active suppliers for the period.
+Formula: SUM(attributed_cogs) from pc_supplier_margin where is_active = 'T'.
+
+Context — supplier page framing:
+- On a supplier page, rising COGS is NOT automatically bad. It can mean the business is shifting volume toward a preferred supplier whose goods cost more but carry better margin, reliability, or commercial terms.
+- Always frame COGS against Est. Net Sales and against supplier concentration signals in the pre-fetched block, never in isolation.
+- Bad signals: COGS rising faster than Est. Net Sales AND margin % falling (true cost pressure). Flat revenue + rising COGS = real margin erosion.
+- Neutral/Good signal: COGS rising with Est. Net Sales keeping pace, margin % stable or up = healthy growth, potentially a beneficial sourcing shift.
+
+Evaluate:
+- Period COGS level
+- COGS-to-Net-Sales ratio
+- Whether the ratio is widening or holding
+
+Do NOT call rising COGS "bad" without checking the Net Sales direction and the margin % direction in the same pre-fetched block.
+
+Provide a concise analysis of this metric.`,
+
+  sp_gross_profit: `You are analyzing the "Est. Gross Profit" KPI on the Supplier Performance overview.
+
+What it measures: Est. Net Sales minus Est. Cost of Sales for the period, derived from the supplier-margin pre-compute.
+Formula: Est. Net Sales − Est. Cost of Sales.
+
+Performance thresholds:
+- Gross Profit growing ≥ 5% while Est. Net Sales also grows = Good
+- Gross Profit flat while Est. Net Sales grows = Neutral (watch for erosion)
+- Gross Profit declining while Est. Net Sales grows = Bad (cost pressure or sourcing mix shifting to lower-margin suppliers)
+- Gross Profit declining while Est. Net Sales declines = Bad (volume loss)
+
+Evaluate:
+- Absolute Gross Profit level
+- Direction vs prior period
+- Whether Gross Profit is growing faster/slower than Est. Net Sales — the most important signal on the supplier page, because it reveals whether the current supplier mix is actually delivering margin or just volume
+
+Provide a concise analysis of this metric.`,
+
+  sp_margin_pct: `You are analyzing the "Gross Margin %" KPI on the Supplier Performance overview.
+
+What it measures: Est. Gross Profit as a percentage of Est. Net Sales.
+Formula: (Est. Gross Profit ÷ Est. Net Sales) × 100.
+
+Performance thresholds (fruit distribution, supplier-side):
+- Margin % ≥ 15% = Good
+- Margin % 10% to 15% = Neutral
+- Margin % < 10% = Bad
+- A drop ≥ 2 percentage points vs the prior period warrants flagging, regardless of absolute level
+
+Evaluate:
+- Current margin level vs the benchmark bands
+- Direction vs prior period (a healthy margin trending down is still worth flagging — on a supplier page this usually means upstream price pressure)
+- Whether movement is driven by Net Sales change, COGS change, or a sourcing mix shift (the pre-fetched block will contain both numerators and denominators)
+
+Provide a concise analysis of this metric.`,
+
+  sp_active_suppliers: `You are analyzing the "Active Suppliers" KPI on the Supplier Performance overview.
+
+What it measures: Count of distinct suppliers with any purchase quantity during the selected period (is_active = 'T' AND purchase_qty > 0).
+Formula: COUNT(DISTINCT creditor_code) where the supplier had a non-zero purchase_qty in the period.
+
+Context — supplier page framing:
+- Unlike Customer Active count, a shrinking supplier count is NOT automatically bad. Consolidation often means the business is concentrating volume with better-performing suppliers to gain negotiating leverage or simplify logistics.
+- Growing supplier count can be good (sourcing diversification, new product lines) OR bad (reactive scrambling after a preferred supplier issue).
+- Sudden large drops are the one clear flag — they may indicate a supplier dropping out, a purchasing freeze, or a data/pipeline problem.
+
+Performance thresholds:
+- Month-over-month change within ±5% = Normal (noise)
+- Gentle decline (−5% to −10%) = Neutral (possible deliberate consolidation)
+- Drop > 10% = Flag (verify whether consolidation or disruption)
+- Sudden growth > 15% = Flag (worth asking why — new sourcing initiative or emergency substitution?)
+
+Evaluate:
+- Direction of change
+- Whether the change correlates with Gross Margin % movement (consolidation that ALSO improves margin = a good story; consolidation with flat or falling margin = concentration risk without the payoff)
+
+Provide a concise analysis of this metric.`,
+
+  sp_margin_trend: `You are analyzing the "Profitability Trend" chart on the Supplier Performance overview.
+
+What it shows:
+- Bars = Est. Gross Profit (RM, left y-axis) per month
+- Line = Gross Margin % (right y-axis) per month
+- Granularity is fixed to monthly — this chart has no granularity selector on the overview cluster.
+
+The chart answers two questions simultaneously:
+- Is the sourcing mix delivering more or less profit in absolute terms?
+- Is the business getting more or less efficient at converting purchases into profit?
+
+Performance thresholds:
+- 3+ consecutive months of Gross Profit growth = Good
+- Flat or mixed = Neutral
+- 3+ consecutive months of Gross Profit decline = Bad
+- Margin % trending down for 2+ consecutive months warrants flagging even if Gross Profit is flat (a slow-moving sourcing problem)
+
+Look for:
+- Divergence between bars and line (e.g., profit rising while margin % stays flat = growth via volume, not pricing leverage)
+- Seasonal patterns (fruit distribution has clear festive peaks and lean months — don't mistake seasonality for structural movement)
+- Any month where Gross Profit and Margin % move in opposite directions — always worth calling out on a supplier page, because it usually points at a sourcing mix shift
+
+Use the pre-fetched monthly breakdown to cite specific months when making claims. Do not invent values not present in the data block.
+
+Provide a concise analysis of the profitability trend with evidence.`,
+
+  sp_margin_distribution: `You are analyzing the "Margin Distribution" histogram on the Supplier Performance overview.
+
+What it shows: Count of entities (suppliers OR items) falling into each Gross Margin % bucket for the selected period. Buckets are fixed:
+  < 0%, 0-5%, 5-10%, 10-15%, 15-20%, 20-30%, 30%+
+
+IMPORTANT — this chart has an entity toggle (Suppliers ↔ Items). The user may be viewing either view when they open the analysis. The pre-fetched block contains BOTH distributions (counts per bucket for suppliers AND for items). Analyze both and contrast them; do not assume one specific view.
+
+Performance thresholds:
+- Entities in < 0% bucket = sourcing at a loss (always flag if > 0)
+- Majority clustered in 10–20% band = Healthy (matches overall target)
+- Heavy concentration (> 40%) in sub-10% bands = Bad (thin-margin sourcing)
+- A meaningful tail (> 15%) in the 20%+ bands = Good (premium sourcing)
+
+Contrast the supplier view vs the item view:
+- Supplier view skewed healthy but item view skewed thin = a few premium suppliers are carrying a long tail of weak items — procurement ought to question the tail
+- Item view skewed healthy but supplier view skewed thin = good products sourced through mostly weak suppliers — the issue is commercial terms, not the product mix
+- Both views skewed the same direction = the story is consistent; the weak/strong pattern is structural
+
+Evaluate:
+- Shape of both distributions (left-skewed, centered, right-skewed, bimodal)
+- Proportion below 10% margin in each view
+- Presence and size of the loss-making (< 0%) bucket in each view
+- Whether the supplier view and item view tell the same story or diverge — divergence is the most actionable signal on this chart
+
+Provide a concise analysis focused on distribution shape, concentration, and the contrast between the supplier and item views.`,
 };
 
 // ─── Summary Prompt ──────────────────────────────────────────────────────────
@@ -618,6 +768,7 @@ LOCAL (PostgreSQL — pre-aggregated, query first):
 - pc_ar_customer_snapshot: debtor_code, company_name, debtor_type, sales_agent, display_term, credit_limit, total_outstanding, overdue_amount, utilization_pct, credit_score, risk_tier, is_active, invoice_count, avg_payment_days, max_overdue_days
 - pc_ar_aging_history: snapshot_date, bucket, dimension, dimension_key, invoice_count, total_outstanding
 - pc_customer_margin: month, debtor_code, company_name, debtor_type, sales_agent, is_active, iv_revenue, dn_revenue, cn_revenue, iv_cost, dn_cost, cn_cost, iv_count, cn_count
+- pc_supplier_margin: month, creditor_code, creditor_name, item_code, item_group, is_active, sales_revenue, attributed_cogs, purchase_qty, purchase_value
 
 REMOTE (SQL Server — raw transactions, use for detail drill-down):
 - dbo.IV (Invoices): DocNo, DocDate, DebtorCode, LocalNetTotal, Description, SalesAgent, SalesLocation, Cancelled
@@ -764,6 +915,15 @@ export const SECTION_COMPONENTS: Record<SectionKey, { key: string; name: string;
     { key: 'cm_customer_table',     name: 'Customer Margin Table', type: 'table' },
     { key: 'cm_credit_note_impact', name: 'Credit Note Impact',    type: 'table' },
   ],
+  supplier_margin_overview: [
+    { key: 'sp_net_sales',           name: 'Est. Net Sales',       type: 'kpi' },
+    { key: 'sp_cogs',                name: 'Est. Cost of Sales',   type: 'kpi' },
+    { key: 'sp_gross_profit',        name: 'Est. Gross Profit',    type: 'kpi' },
+    { key: 'sp_margin_pct',          name: 'Gross Margin %',       type: 'kpi' },
+    { key: 'sp_active_suppliers',    name: 'Active Suppliers',     type: 'kpi' },
+    { key: 'sp_margin_trend',        name: 'Profitability Trend',  type: 'chart' },
+    { key: 'sp_margin_distribution', name: 'Margin Distribution',  type: 'chart' },
+  ],
 };
 
 export const SECTION_PAGE: Record<SectionKey, string> = {
@@ -773,6 +933,7 @@ export const SECTION_PAGE: Record<SectionKey, string> = {
   sales_breakdown: 'Sales',
   customer_margin_overview: 'Customer Margin',
   customer_margin_breakdown: 'Customer Margin',
+  supplier_margin_overview: 'Supplier Performance',
 };
 
 export const SECTION_NAMES: Record<SectionKey, string> = {
@@ -782,6 +943,7 @@ export const SECTION_NAMES: Record<SectionKey, string> = {
   sales_breakdown: 'Sales Breakdown',
   customer_margin_overview: 'Customer Margin Overview',
   customer_margin_breakdown: 'Customer Margin Breakdown',
+  supplier_margin_overview: 'Supplier Margin Overview',
 };
 
 // ─── Public API ──────────────────────────────────────────────────────────────

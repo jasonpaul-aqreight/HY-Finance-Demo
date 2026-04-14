@@ -207,4 +207,53 @@ export const COMPONENT_INFO: Record<string, ComponentInfo> = {
     indicator: 'Top 5 > 50% of total margin lost = Concentrated CN problem · Return rate > 10% = Excessive · Margin lost > 10 pp = Severe impact',
     about: 'Credit notes (returns, adjustments, rejections) directly reduce your margin. This table ranks customers by how much margin they cost you through credit notes.\n\nColumns:\n• Margin Before CN — what the margin would have been without any credit notes\n• Margin After CN — the actual margin after credit notes were applied\n• Margin Lost — the gap between the two, in percentage points\n\nIf the top 5 customers account for more than half of all margin lost, you have a concentrated problem — fix those few accounts first. A return rate above 10% usually points to quality or operational issues.',
   },
+
+  // ═══ Supplier Margin Overview ═══
+  sp_net_sales: {
+    name: 'Est. Net Sales',
+    whatItMeasures: 'Total sales revenue attributed to goods sourced from active suppliers during the selected period.',
+    formula: 'SUM(sales_revenue) from pc_supplier_margin where is_active = \'T\'',
+    indicator: 'Growth = Good · Flat = Neutral · Decline = Bad · Drop > 10% = Flag',
+    about: 'Est. Net Sales on the Supplier Performance page is the sales revenue attributed to items you sourced from active suppliers during the period. The "Est." prefix flags that this number comes from the supplier-margin pre-compute pipeline — it mirrors the Customer Margin Net Sales figure when no filters are applied, but may diverge when supplier/item-group filters are in play.\n\nGrowth = Good · Flat = Neutral · Decline = Bad',
+  },
+  sp_cogs: {
+    name: 'Est. Cost of Sales',
+    whatItMeasures: 'Attributed cost of goods sold, summed across items from active suppliers for the period.',
+    formula: 'SUM(attributed_cogs) from pc_supplier_margin where is_active = \'T\'',
+    indicator: 'Read against Net Sales and sourcing mix — rising COGS alone is NOT automatically bad on a supplier page.',
+    about: 'Est. Cost of Sales is the total cost of goods sold during the period, summed across items from active suppliers.\n\nIMPORTANT: On the supplier page, rising COGS is NOT automatically bad. It can mean the business is shifting volume toward a preferred supplier whose goods cost more but carry better margin, reliability, or commercial terms. Always read COGS together with Est. Net Sales and Gross Margin %.\n\nBad signal: COGS rising faster than Net Sales AND margin % falling.\nGood signal: COGS rising with Net Sales keeping pace, margin % stable or up.',
+  },
+  sp_gross_profit: {
+    name: 'Est. Gross Profit',
+    whatItMeasures: 'Est. Net Sales minus Est. Cost of Sales for the period — the absolute profit contribution from the active supplier mix.',
+    formula: 'Est. Net Sales − Est. Cost of Sales',
+    indicator: 'Growing with Net Sales = Good · Flat while sales grow = Neutral · Declining = Bad',
+    about: 'Est. Gross Profit is what remains from Est. Net Sales after subtracting the cost of the goods sold. On the supplier page, the most important signal is whether Gross Profit is growing faster or slower than Est. Net Sales — that reveals whether the current supplier mix is actually delivering margin or just volume.\n\nGrowing with Net Sales = Good · Flat while sales grow = Neutral · Declining while sales grow = Bad (cost pressure or sourcing mix shifting to lower-margin suppliers)',
+  },
+  sp_margin_pct: {
+    name: 'Gross Margin %',
+    whatItMeasures: 'Est. Gross Profit as a percentage of Est. Net Sales — the efficiency ratio of the current supplier mix.',
+    formula: '(Est. Gross Profit ÷ Est. Net Sales) × 100',
+    indicator: '≥15% = Good (green) · 10–15% = Neutral (yellow) · <10% = Bad (red)',
+    about: 'Gross Margin % tells you how efficiently the current supplier mix is converting sales into profit. A healthy margin trending down is still worth flagging — on a supplier page this usually means upstream price pressure.\n\nFruit distribution benchmarks:\n≥15% = Good · 10% to 15% = Neutral · <10% = Bad\n\nA drop of 2 percentage points vs the prior period warrants investigation regardless of absolute level.',
+  },
+  sp_active_suppliers: {
+    name: 'Active Suppliers',
+    whatItMeasures: 'Count of distinct suppliers with purchase activity during the selected period.',
+    formula: 'COUNT(DISTINCT creditor_code) where is_active = \'T\' AND purchase_qty > 0',
+    indicator: 'Steady or gently consolidating = Neutral · Sudden drop > 10% = Flag · Sudden growth > 15% = Flag',
+    about: 'The number of distinct active suppliers you purchased from during the period.\n\nUnlike the Customer Active count, a shrinking supplier count is NOT automatically bad. Consolidation often means the business is concentrating volume with better-performing suppliers to gain negotiating leverage.\n\nSudden large drops are the one clear flag — they may indicate a supplier dropping out, a purchasing freeze, or a data issue.\n\n±5% monthly change = Normal · −5% to −10% = Neutral (possible consolidation) · >10% drop or >15% growth = Flag',
+  },
+  sp_margin_trend: {
+    name: 'Profitability Trend',
+    whatItMeasures: 'Monthly Est. Gross Profit (bars) and Gross Margin % (line) over time.',
+    indicator: '3+ months of profit growth = Good · Margin % declining for 2+ months = Flag even if profit is flat',
+    about: 'This chart answers two questions at once for the supplier mix:\n\n• Bars (Est. Gross Profit, RM) — is the sourcing mix delivering more or less profit in absolute terms?\n• Line (Margin %) — is the business getting more or less efficient at converting purchases into profit?\n\nWatch for divergence: if profit is rising while Margin % stays flat, growth is coming from volume, not pricing leverage. Any month where Gross Profit and Margin % move in opposite directions usually points at a sourcing mix shift worth investigating. The chart is fixed to monthly granularity.',
+  },
+  sp_margin_distribution: {
+    name: 'Margin Distribution',
+    whatItMeasures: 'How many suppliers (or items) fall into each Gross Margin % bucket for the period. The chart has a Suppliers ↔ Items toggle.',
+    indicator: 'Most entities in the 10–20% band = Healthy · Over 40% below 10% = Bad · Any entity < 0% = sourcing at a loss',
+    about: 'A histogram of the supplier (or item) base spread across margin bands. Buckets are fixed:\n\n< 0% · 0–5% · 5–10% · 10–15% · 15–20% · 20–30% · 30%+\n\nThe chart has a Suppliers ↔ Items toggle. The AI analysis looks at BOTH views:\n\n• Supplier view healthy but item view thin = a few premium suppliers are carrying a long tail of weak items.\n• Item view healthy but supplier view thin = good products sourced through mostly weak suppliers — a commercial terms issue.\n• Both views skewed the same way = the pattern is structural.\n\nAny entity in the < 0% bucket is sourcing at a loss and deserves attention.',
+  },
 };

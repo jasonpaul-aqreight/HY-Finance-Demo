@@ -11,6 +11,7 @@ const SECTION_POLICY: Record<SectionKey, ToolPolicy> = {
   sales_breakdown: 'full',
   customer_margin_overview: 'aggregate_only',
   customer_margin_breakdown: 'full',
+  supplier_margin_overview: 'aggregate_only',
 };
 
 const AGGREGATE_LOCAL_TABLES = new Set([
@@ -18,6 +19,7 @@ const AGGREGATE_LOCAL_TABLES = new Set([
   'pc_ar_monthly',
   'pc_ar_aging_history',
   'pc_customer_margin',
+  'pc_supplier_margin',
 ]);
 
 export function policyForSection(sectionKey: SectionKey): ToolPolicy {

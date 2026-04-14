@@ -5,20 +5,27 @@ import { useStableData } from '@/hooks/useStableData';
 import type { DashboardFilters } from '@/hooks/supplier-margin/useDashboardFilters';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatRM, marginColor } from '@/lib/supplier-margin/format';
+import { AnalyzeIcon } from '@/components/ai-insight/AnalyzeIcon';
 
 interface KpiCardProps {
   title: string;
   value: string;
   valueColor?: string;
+  componentKey?: string;
 }
 
-function KpiCard({ title, value, valueColor, formula }: KpiCardProps & { formula?: string }) {
+function KpiCard({ title, value, valueColor, formula, componentKey }: KpiCardProps & { formula?: string }) {
   return (
     <Card>
       <CardHeader className="pb-1 pt-4 px-4">
-        <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-          {title}
-        </CardTitle>
+        <div className="flex items-center gap-1">
+          <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            {title}
+          </CardTitle>
+          {componentKey && (
+            <AnalyzeIcon sectionKey="supplier_margin_overview" componentKey={componentKey} />
+          )}
+        </div>
       </CardHeader>
       <CardContent className="px-4 pb-4">
         <div className={`text-2xl font-bold ${valueColor ?? ''}`}>{value}</div>
@@ -61,27 +68,32 @@ export function KpiCards({ filters }: { filters: DashboardFilters }) {
         title="Est. Net Sales"
         value={formatRM(current.revenue)}
         formula="Invoice + Cash Sales (excl. credit notes)"
+        componentKey="sp_net_sales"
       />
       <KpiCard
         title="Est. Cost of Sales"
         value={formatRM(current.cogs)}
         formula="Avg purchase price × sold qty"
+        componentKey="sp_cogs"
       />
       <KpiCard
         title="Est. Gross Profit"
         value={formatRM(current.profit)}
         valueColor={current.profit >= 0 ? 'text-emerald-600' : 'text-red-600'}
         formula="Est. Gross Sales − Est. Cost of Sales"
+        componentKey="sp_gross_profit"
       />
       <KpiCard
         title="Gross Margin %"
         value={current.margin_pct != null ? `${current.margin_pct.toFixed(1)}%` : '—'}
         valueColor={marginColor(current.margin_pct)}
         formula="Gross Profit ÷ Net Sales"
+        componentKey="sp_margin_pct"
       />
       <KpiCard
         title="Active Suppliers"
         value={current.active_suppliers != null ? current.active_suppliers.toLocaleString() : '—'}
+        componentKey="sp_active_suppliers"
       />
     </div>
   );

@@ -11,6 +11,7 @@ import { SupplierTable } from './SupplierTable';
 import { ItemPricingPanel } from './ItemPricingPanel';
 import { PriceScatterChart } from './PriceScatterChart';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { InsightSectionHeader } from '@/components/ai-insight/InsightSectionHeader';
 
 export function DashboardShell() {
   const { filters, setFilters, ready, bounds } = useDashboardFilters();
@@ -27,6 +28,13 @@ export function DashboardShell() {
 
         {ready && (
           <>
+            {/* Overview section — KPIs + profitability trend + margin distribution */}
+            <InsightSectionHeader
+              title="Supplier Margin Overview"
+              page="supplier-performance"
+              sectionKey="supplier_margin_overview"
+              dateRange={{ start: filters.startDate, end: filters.endDate }}
+            />
             <KpiCards filters={filters} />
             {/* Margin Trends + Distribution */}
             <div className="grid gap-4 lg:grid-cols-5">
