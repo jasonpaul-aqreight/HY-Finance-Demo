@@ -7,7 +7,8 @@ export type SectionKey =
   | 'payment_outstanding'
   | 'sales_trend'
   | 'sales_breakdown'
-  | 'customer_margin_overview';
+  | 'customer_margin_overview'
+  | 'customer_margin_breakdown';
 
 export type ComponentType = 'kpi' | 'chart' | 'table' | 'breakdown';
 

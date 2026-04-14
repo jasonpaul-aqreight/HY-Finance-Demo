@@ -185,4 +185,26 @@ export const COMPONENT_INFO: Record<string, ComponentInfo> = {
     indicator: 'Most customers in the 10–20% band = Healthy · Over 40% below 10% = Bad · Any customer < 0% = selling at a loss',
     about: 'A histogram showing how your customer base is spread across margin bands. Buckets are fixed:\n\n< 0% · 0–5% · 5–10% · 10–15% · 15–20% · 20–30% · 30%+\n\nOnly customers with more than RM 1,000 of revenue in the period are included (small-volume customers are excluded to avoid noise).\n\nA healthy portfolio concentrates in the 10–20% bands with a small tail at 20%+. Heavy weight in the sub-10% bands signals a thin-margin portfolio. Any customers below 0% are selling at a loss and need investigation.',
   },
+
+  // ═══ Customer Margin Breakdown ═══
+  cm_top_customers: {
+    name: 'Top Customers',
+    whatItMeasures: 'The top 10 customers for the selected period — viewed by Gross Profit (RM contribution) or Gross Margin % (efficiency).',
+    formula: 'Top 10 by Gross Profit · Top 10 by Margin % (revenue ≥ RM 10,000)',
+    indicator: 'Top customer > 15% of period GP = Concentration risk · Top 10 > 60% of period GP = Concentrated · Top 10 < 40% = Diversified',
+    about: 'This chart shows the top 10 customers for the selected period. You can switch between two lenses:\n\n• Gross Profit — absolute RM contribution. Who is bringing in the most profit?\n• Gross Margin % — efficiency. Who has the best margin? (customers with less than RM 10,000 revenue are excluded to avoid noise)\n\nYou can also switch direction to see the bottom 10. Watch for customers that appear on BOTH top lists — those are star accounts (high profit AND high margin). Watch for over-reliance: if your top 1 customer is more than 15% of total Gross Profit, losing them would hurt badly.',
+  },
+  cm_customer_table: {
+    name: 'Customer Analysis Table',
+    whatItMeasures: 'Every active customer in the period with revenue, COGS, Gross Profit, Margin %, and Return Rate. Sortable and searchable.',
+    indicator: 'Top 10 share > 60% of GP = Over-concentrated · Loss-makers > 10% of active = Unhealthy tail',
+    about: 'A full sortable, paginated table of every active customer in the selected period. Columns: Code, Name, Type, Net Sales, COGS, Gross Profit, Margin %, Return Rate.\n\nUse it to find:\n• Top performers (sort by Gross Profit desc)\n• Loss-makers (sort by Gross Profit asc)\n• High-return customers (sort by Return Rate desc)\n\nThe AI analysis looks at concentration (how much of the profit sits in the top 10) and the at-risk tail (how many customers are losing money).',
+  },
+  cm_credit_note_impact: {
+    name: 'Credit Note Impact',
+    whatItMeasures: 'Customers ranked by how much credit notes eroded their margin. Shows margin before CN, margin after CN, and the points lost.',
+    formula: 'Margin Lost = (Margin before CN) − (Margin after CN), in percentage points',
+    indicator: 'Top 5 > 50% of total margin lost = Concentrated CN problem · Return rate > 10% = Excessive · Margin lost > 10 pp = Severe impact',
+    about: 'Credit notes (returns, adjustments, rejections) directly reduce your margin. This table ranks customers by how much margin they cost you through credit notes.\n\nColumns:\n• Margin Before CN — what the margin would have been without any credit notes\n• Margin After CN — the actual margin after credit notes were applied\n• Margin Lost — the gap between the two, in percentage points\n\nIf the top 5 customers account for more than half of all margin lost, you have a concentrated problem — fix those few accounts first. A return rate above 10% usually points to quality or operational issues.',
+  },
 };

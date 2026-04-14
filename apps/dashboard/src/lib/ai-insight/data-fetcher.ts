@@ -3,6 +3,8 @@ import {
   getMarginKpi,
   getMarginTrend,
   getMarginDistribution,
+  getCustomerMargins,
+  getCreditNoteImpact,
   type MarginFilters,
 } from '../customer-margin/queries';
 import type { SectionKey, DateRange, AllowedValue, FetcherResult } from './types';
@@ -1160,6 +1162,258 @@ const fetchers: Record<string, DataFetcher> = {
       allowed,
     };
   },
+
+  // ─── Customer Margin Section 2: Customer Margin Breakdown ──────────────────
+
+  async cm_top_customers(dr) {
+    const filters: MarginFilters = { start: dr!.start, end: dr!.end };
+    const [kpi, topByProfit, topByMarginPool] = await Promise.all([
+      getMarginKpi(filters),
+      getCustomerMargins(filters, 'gross_profit', 'desc', 1, 10),
+      getCustomerMargins(filters, 'margin_pct', 'desc', 1, 50),
+    ]);
+
+    const periodGp = Number(kpi.gross_profit);
+    const periodRev = Number(kpi.total_revenue);
+
+    const profitRows = topByProfit.rows;
+    const marginRows = topByMarginPool.rows
+      .filter(r => Number(r.revenue) >= 10000)
+      .slice(0, 10);
+
+    const allowed: AllowedValue[] = [
+      rm('period gross profit', periodGp),
+      rm('period net sales', periodRev),
+      rm('revenue floor', 10000),
+    ];
+
+    let profitTable =
+      '| # | Code | Customer | Type | Agent | Revenue | GP | Margin % | Share of GP % |\n' +
+      '|---|------|----------|------|-------|---------|----|---------:|--------------:|\n';
+    let top1GpShare = 0;
+    let top3GpShare = 0;
+    let top10GpShare = 0;
+    profitRows.forEach((r, i) => {
+      const rev = Number(r.revenue);
+      const gp = Number(r.gross_profit);
+      const mp = Number(r.margin_pct);
+      const share = periodGp > 0 ? (gp / periodGp) * 100 : 0;
+      if (i === 0) top1GpShare = share;
+      if (i < 3) top3GpShare += share;
+      top10GpShare += share;
+      profitTable +=
+        `| ${i + 1} | ${r.debtor_code} | ${r.company_name ?? r.debtor_code} | ${r.debtor_type ?? 'Unassigned'} | ${r.sales_agent ?? '-'} ` +
+        `| RM ${rev.toLocaleString('en-MY')} | RM ${gp.toLocaleString('en-MY')} | ${mp.toFixed(2)}% | ${share.toFixed(2)}% |\n`;
+      allowed.push(rm(`${r.debtor_code} revenue`, rev));
+      allowed.push(rm(`${r.debtor_code} gross profit`, gp));
+      allowed.push(pct(`${r.debtor_code} margin pct`, mp));
+      allowed.push(pct(`${r.debtor_code} share of gp`, share));
+    });
+
+    let marginTable =
+      '| # | Code | Customer | Type | Agent | Revenue | GP | Margin % |\n' +
+      '|---|------|----------|------|-------|---------|----|---------:|\n';
+    marginRows.forEach((r, i) => {
+      const rev = Number(r.revenue);
+      const gp = Number(r.gross_profit);
+      const mp = Number(r.margin_pct);
+      marginTable +=
+        `| ${i + 1} | ${r.debtor_code} | ${r.company_name ?? r.debtor_code} | ${r.debtor_type ?? 'Unassigned'} | ${r.sales_agent ?? '-'} ` +
+        `| RM ${rev.toLocaleString('en-MY')} | RM ${gp.toLocaleString('en-MY')} | ${mp.toFixed(2)}% |\n`;
+      allowed.push(rm(`${r.debtor_code} revenue`, rev));
+      allowed.push(rm(`${r.debtor_code} gross profit`, gp));
+      allowed.push(pct(`${r.debtor_code} margin pct`, mp));
+    });
+
+    const profitCodes = new Set(profitRows.map(r => r.debtor_code));
+    const stars = marginRows.filter(r => profitCodes.has(r.debtor_code));
+
+    allowed.push(pct('top 1 share of gp', top1GpShare));
+    allowed.push(pct('top 3 share of gp', top3GpShare));
+    allowed.push(pct('top 10 share of gp', top10GpShare));
+    allowed.push(cnt('star customers on both lists', stars.length));
+
+    const preCalc =
+      `Population: active customers with revenue during ${dr!.start} to ${dr!.end}.\n\n` +
+      `Pre-calculated totals (use these values directly — do not recompute):\n` +
+      `- Period Net Sales: RM ${periodRev.toLocaleString('en-MY')}\n` +
+      `- Period Gross Profit: RM ${periodGp.toLocaleString('en-MY')}\n` +
+      `- Top 1 customer share of GP: ${top1GpShare.toFixed(2)}%\n` +
+      `- Top 3 customers share of GP: ${top3GpShare.toFixed(2)}%\n` +
+      `- Top 10 customers share of GP: ${top10GpShare.toFixed(2)}%\n` +
+      `- Margin-% list revenue floor: RM 10,000\n` +
+      `- Customers on BOTH top-10 lists (star accounts): ${stars.length}` +
+      (stars.length > 0 ? ` (${stars.map(s => s.company_name ?? s.debtor_code).join(', ')})` : '') +
+      `\n`;
+
+    return {
+      prompt:
+        `${preCalc}\n(A) Top 10 customers by Gross Profit:\n${profitTable}\n` +
+        `(B) Top 10 customers by Gross Margin % (revenue >= RM 10,000):\n${marginTable}`,
+      allowed,
+    };
+  },
+
+  async cm_customer_table(dr) {
+    const filters: MarginFilters = { start: dr!.start, end: dr!.end };
+    const [kpi, top10, bottom10, distribution] = await Promise.all([
+      getMarginKpi(filters),
+      getCustomerMargins(filters, 'gross_profit', 'desc', 1, 10),
+      getCustomerMargins(filters, 'gross_profit', 'asc', 1, 10),
+      getMarginDistribution(filters),
+    ]);
+
+    const periodGp = Number(kpi.gross_profit);
+    const activeCustomers = Number(kpi.active_customers);
+    const totalInTable = Number(top10.total);
+
+    const lossBucket = distribution.find(b => b.bucket === '< 0%');
+    const lossCount = lossBucket ? Number(lossBucket.count) : 0;
+    const lossShare = activeCustomers > 0 ? (lossCount / activeCustomers) * 100 : 0;
+
+    const top10GpSum = top10.rows.reduce((s, r) => s + Number(r.gross_profit), 0);
+    const top10Share = periodGp > 0 ? (top10GpSum / periodGp) * 100 : 0;
+
+    const marginPcts = [...top10.rows, ...bottom10.rows].map(r => Number(r.margin_pct));
+    const avgMarginSample = marginPcts.length > 0
+      ? marginPcts.reduce((s, v) => s + v, 0) / marginPcts.length
+      : 0;
+    const marginSpread = marginPcts.length > 0
+      ? Math.max(...marginPcts) - Math.min(...marginPcts)
+      : 0;
+
+    const allowed: AllowedValue[] = [
+      rm('period gross profit', periodGp),
+      rm('top 10 gp sum', top10GpSum),
+      pct('top 10 share of gp', top10Share),
+      cnt('active customers', activeCustomers),
+      cnt('loss making customers', lossCount),
+      pct('loss maker share of active', lossShare),
+      cnt('customers in table (unpaginated)', totalInTable),
+      pct('avg margin (top+bottom sample)', avgMarginSample),
+      pct('margin spread (top-bottom sample)', marginSpread),
+    ];
+
+    const renderRow = (r: typeof top10.rows[0], i: number) => {
+      const rev = Number(r.revenue);
+      const cogs = Number(r.cogs);
+      const gp = Number(r.gross_profit);
+      const mp = Number(r.margin_pct);
+      const rr = Number(r.return_rate_pct);
+      allowed.push(rm(`${r.debtor_code} revenue`, rev));
+      allowed.push(rm(`${r.debtor_code} cogs`, cogs));
+      allowed.push(rm(`${r.debtor_code} gross profit`, gp));
+      allowed.push(pct(`${r.debtor_code} margin pct`, mp));
+      allowed.push(pct(`${r.debtor_code} return rate`, rr));
+      return (
+        `| ${i + 1} | ${r.debtor_code} | ${r.company_name ?? r.debtor_code} | ${r.debtor_type ?? 'Unassigned'} | ${r.sales_agent ?? '-'} ` +
+        `| RM ${rev.toLocaleString('en-MY')} | RM ${cogs.toLocaleString('en-MY')} | RM ${gp.toLocaleString('en-MY')} | ${mp.toFixed(2)}% | ${rr.toFixed(2)}% |\n`
+      );
+    };
+
+    const header =
+      '| # | Code | Customer | Type | Agent | Revenue | COGS | GP | Margin % | Return % |\n' +
+      '|---|------|----------|------|-------|---------|------|----|---------:|---------:|\n';
+
+    let topTable = header;
+    top10.rows.forEach((r, i) => { topTable += renderRow(r, i); });
+
+    let bottomTable = header;
+    bottom10.rows.forEach((r, i) => { bottomTable += renderRow(r, i); });
+
+    const preCalc =
+      `Population: active customers with revenue during ${dr!.start} to ${dr!.end}.\n\n` +
+      `Pre-calculated roll-ups (use these values directly — do not recompute):\n` +
+      `- Total active customers in table: ${activeCustomers}\n` +
+      `- Period Gross Profit: RM ${periodGp.toLocaleString('en-MY')}\n` +
+      `- Top 10 Gross Profit sum: RM ${top10GpSum.toLocaleString('en-MY')}\n` +
+      `- Top 10 share of total Gross Profit: ${top10Share.toFixed(2)}%\n` +
+      `- Loss-making customers (GP < 0): ${lossCount} (${lossShare.toFixed(2)}% of active)\n` +
+      `- Avg margin % across the top-10 + bottom-10 sample: ${avgMarginSample.toFixed(2)}%\n` +
+      `- Margin spread (best minus worst in the 20-row sample): ${marginSpread.toFixed(2)} percentage points\n`;
+
+    return {
+      prompt:
+        `${preCalc}\n(A) Top 10 customers by Gross Profit (best performers):\n${topTable}\n` +
+        `(B) Bottom 10 customers by Gross Profit (worst performers):\n${bottomTable}`,
+      allowed,
+    };
+  },
+
+  async cm_credit_note_impact(dr) {
+    const filters: MarginFilters = { start: dr!.start, end: dr!.end };
+    const rows = await getCreditNoteImpact(filters);
+
+    if (rows.length === 0) {
+      return { prompt: 'No credit note impact data available for selected period.', allowed: [] };
+    }
+
+    // getCreditNoteImpact returns up to 100 rows ordered by return_rate_pct DESC.
+    // For this fetcher we want ranking by margin_lost.
+    const sortedByLost = [...rows].sort(
+      (a, b) => Number(b.margin_lost) - Number(a.margin_lost),
+    );
+    const top25 = sortedByLost.slice(0, 25);
+
+    const totalMarginLost = sortedByLost.reduce((s, r) => s + Number(r.margin_lost), 0);
+    const top5Lost = sortedByLost.slice(0, 5).reduce((s, r) => s + Number(r.margin_lost), 0);
+    const top5Share = totalMarginLost > 0 ? (top5Lost / totalMarginLost) * 100 : 0;
+    const highReturnCount = sortedByLost.filter(r => Number(r.return_rate_pct) > 5).length;
+    const avgMarginLost = sortedByLost.length > 0 ? totalMarginLost / sortedByLost.length : 0;
+    const universeSize = sortedByLost.length;
+
+    const totalCnRevenue = sortedByLost.reduce((s, r) => s + Number(r.cn_revenue), 0);
+    const totalIvRevenue = sortedByLost.reduce((s, r) => s + Number(r.iv_revenue), 0);
+
+    const allowed: AllowedValue[] = [
+      pct('total margin lost (sum pp)', totalMarginLost),
+      pct('top 5 margin lost (sum pp)', top5Lost),
+      pct('top 5 share of margin lost', top5Share),
+      cnt('customers with return rate above 5', highReturnCount),
+      pct('avg margin lost', avgMarginLost),
+      cnt('customers in impact universe', universeSize),
+      rm('total cn revenue', totalCnRevenue),
+      rm('total iv revenue', totalIvRevenue),
+    ];
+
+    let table =
+      '| # | Code | Customer | IV Revenue | CN Revenue | Return % | Margin Before | Margin After | Margin Lost (pp) |\n' +
+      '|---|------|----------|------------|------------|---------:|--------------:|-------------:|-----------------:|\n';
+    top25.forEach((r, i) => {
+      const iv = Number(r.iv_revenue);
+      const cn = Number(r.cn_revenue);
+      const rr = Number(r.return_rate_pct);
+      const mb = Number(r.margin_before);
+      const ma = Number(r.margin_after);
+      const ml = Number(r.margin_lost);
+      table +=
+        `| ${i + 1} | ${r.debtor_code} | ${r.company_name ?? r.debtor_code} ` +
+        `| RM ${iv.toLocaleString('en-MY')} | RM ${cn.toLocaleString('en-MY')} | ${rr.toFixed(2)}% ` +
+        `| ${mb.toFixed(2)}% | ${ma.toFixed(2)}% | ${ml.toFixed(2)} |\n`;
+      allowed.push(rm(`${r.debtor_code} iv revenue`, iv));
+      allowed.push(rm(`${r.debtor_code} cn revenue`, cn));
+      allowed.push(pct(`${r.debtor_code} return rate`, rr));
+      allowed.push(pct(`${r.debtor_code} margin before`, mb));
+      allowed.push(pct(`${r.debtor_code} margin after`, ma));
+      allowed.push(pct(`${r.debtor_code} margin lost`, ml));
+    });
+
+    const preCalc =
+      `Population: customers with credit notes during ${dr!.start} to ${dr!.end} (up to 100 rows ranked by impact).\n\n` +
+      `Pre-calculated roll-ups (use these values directly — do not recompute):\n` +
+      `- Customers in impact universe: ${universeSize}\n` +
+      `- Total margin lost (sum of percentage-point drops): ${totalMarginLost.toFixed(2)} pp\n` +
+      `- Top 5 customers share of total margin lost: ${top5Share.toFixed(2)}%\n` +
+      `- Customers with return rate > 5%: ${highReturnCount}\n` +
+      `- Avg margin lost per customer in universe: ${avgMarginLost.toFixed(2)} pp\n` +
+      `- Total invoice revenue across universe: RM ${totalIvRevenue.toLocaleString('en-MY')}\n` +
+      `- Total credit note revenue across universe: RM ${totalCnRevenue.toLocaleString('en-MY')}\n`;
+
+    return {
+      prompt: `${preCalc}\nTop 25 customers by Margin Lost:\n${table}`,
+      allowed,
+    };
+  },
 };
 
 // ─── Scope classification ────────────────────────────────────────────────────
@@ -1172,6 +1426,7 @@ const SECTION_SCOPE: Record<SectionKey, ScopeType> = {
   sales_trend: 'period',
   sales_breakdown: 'period',
   customer_margin_overview: 'period',
+  customer_margin_breakdown: 'period',
 };
 
 async function buildScopeLabel(scope: ScopeType, dateRange: DateRange | null): Promise<string> {

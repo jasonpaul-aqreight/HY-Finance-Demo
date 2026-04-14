@@ -10,6 +10,7 @@ const SECTION_POLICY: Record<SectionKey, ToolPolicy> = {
   sales_trend: 'aggregate_only',
   sales_breakdown: 'full',
   customer_margin_overview: 'aggregate_only',
+  customer_margin_breakdown: 'full',
 };
 
 const AGGREGATE_LOCAL_TABLES = new Set([

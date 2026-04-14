@@ -472,6 +472,81 @@ Evaluate:
 - Whether the distribution is consistent with the overall Margin % KPI (a 16% overall margin with most customers sub-10% means a few large accounts are carrying the portfolio — concentration risk)
 
 Provide a concise analysis focused on distribution shape and concentration.`,
+
+  // Customer Margin Section 2: Customer Margin Breakdown
+  cm_top_customers: `You are analyzing the "Top Customers" chart on the Customer Margin breakdown.
+
+What it shows:
+- The pre-fetched data contains TWO ranked lists of the period's top 10 customers:
+  (A) Top 10 by Gross Profit (absolute RM contribution)
+  (B) Top 10 by Gross Margin % (efficiency, filtered to customers with at least RM 10,000 revenue)
+- The UI lets users toggle between these two lenses plus a "highest/lowest" direction. Your analysis should cover both lenses.
+
+Performance thresholds:
+- Top customer > 15% of total period Gross Profit = Bad (concentration risk — losing them would hurt badly)
+- Top 10 > 60% of total period Gross Profit = Bad (concentrated portfolio)
+- Top 10 < 40% of total period Gross Profit = Good (diversified)
+- Any top-by-profit customer with margin % < 10% = Flag (thin-margin anchor)
+- Any top-by-margin customer with revenue < RM 50,000 = Niche premium segment (worth protecting but not load-bearing)
+
+Evaluate:
+- Revenue-vs-margin polarity: which customers are the RM anchors, which are the efficiency leaders, and is there overlap?
+- Concentration risk: how much of the period's total Gross Profit is held by the top 1, top 3, top 10?
+- Customer type / sales agent patterns across the top lists (if the data block surfaces them)
+- Any customer appearing on BOTH lists (high profit AND high margin) = star account — call them out by name.
+
+Cite named customers from the pre-fetched data. Do not invent names or numbers.
+
+Provide a concise analysis focused on concentration, quality of top accounts, and any over-reliance risk.`,
+
+  cm_customer_table: `You are analyzing the "Customer Margin Table" on the Customer Margin breakdown.
+
+What it shows:
+- A sortable, paginated table of all active customers with columns for Code, Name, Type, Net Sales, COGS, Gross Profit, Margin %, Return Rate %.
+- The pre-fetched data gives you:
+  (A) Top 10 customers by Gross Profit (the best performers)
+  (B) Bottom 10 customers by Gross Profit (the worst performers, including loss-makers)
+  (C) Aggregate roll-ups: total customers, loss-making customer count, average margin %, top-10 share of total GP.
+
+Performance thresholds:
+- Top 10 share of GP > 60% = Bad (over-concentrated)
+- Top 10 share of GP 40-60% = Neutral (typical for distribution)
+- Top 10 share of GP < 40% = Good (well spread)
+- Loss-making customers > 10% of active count = Bad (unhealthy tail)
+- Margin spread (best minus worst) > 50 percentage points = Polarized portfolio
+- Any bottom-10 customer with meaningful revenue (> RM 100,000) AND negative margin = Critical flag — they are actively destroying margin.
+
+Evaluate:
+- Concentration: how much of the profit is in the top few names?
+- The bottom tail: who is losing money, and is the problem big (high-revenue loss-makers) or small (many tiny negative-margin accounts)?
+- Customer type / sales agent clustering in the bottom 10
+- Whether the bottom 10 have unusually high return rates (signal of quality or service problem)
+
+Cite named customers from the pre-fetched top/bottom blocks. Do not invent names.
+
+Provide a concise analysis focused on concentration risk and the at-risk tail.`,
+
+  cm_credit_note_impact: `You are analyzing the "Credit Note Impact on Margins" table.
+
+What it shows: Customers ranked by how much credit notes eroded their margin, with columns for Code, Name, Invoice Revenue, CN Revenue, Return Rate %, Margin Before CN, Margin After CN, and Margin Lost (percentage points).
+
+Pre-fetched data contains the top 25 customers by Margin Lost (the most-affected accounts) plus aggregate roll-ups: total margin lost across the full top-100 list, top-5 share of total margin lost, count of customers with return rate > 5%, and average margin lost.
+
+Performance thresholds:
+- Top 5 customers > 50% of total margin lost = Bad (concentrated CN problem — fix the top offenders first)
+- Any customer with return rate > 10% = Bad (excessive returns, likely quality or operational issue)
+- Any customer with margin_lost > 10 percentage points = Severe impact
+- Customers with high CN revenue but margin_lost < 2 points = Acceptable (they return a lot but costs are recovered)
+
+Evaluate:
+- Concentration of the CN problem: is it one or two serial returners, or spread across many customers?
+- Relationship between return rate and margin lost (high return rate but low margin lost suggests the credit notes are on low-margin items — a different problem than high-margin returns)
+- Any customer type or sales agent clustering in the top 25 worst-impacted
+- Whether return rates look normal (<3% for most) or systemic (>5% across many customers = upstream quality problem)
+
+Cite named customers from the pre-fetched top 25. Do not invent names.
+
+Provide a concise analysis focused on which accounts to investigate first.`,
 };
 
 // ─── Summary Prompt ──────────────────────────────────────────────────────────
@@ -684,6 +759,11 @@ export const SECTION_COMPONENTS: Record<SectionKey, { key: string; name: string;
     { key: 'cm_margin_trend',        name: 'Margin Trend',        type: 'chart' },
     { key: 'cm_margin_distribution', name: 'Margin Distribution', type: 'chart' },
   ],
+  customer_margin_breakdown: [
+    { key: 'cm_top_customers',      name: 'Top Customers',         type: 'chart' },
+    { key: 'cm_customer_table',     name: 'Customer Margin Table', type: 'table' },
+    { key: 'cm_credit_note_impact', name: 'Credit Note Impact',    type: 'table' },
+  ],
 };
 
 export const SECTION_PAGE: Record<SectionKey, string> = {
@@ -692,6 +772,7 @@ export const SECTION_PAGE: Record<SectionKey, string> = {
   sales_trend: 'Sales',
   sales_breakdown: 'Sales',
   customer_margin_overview: 'Customer Margin',
+  customer_margin_breakdown: 'Customer Margin',
 };
 
 export const SECTION_NAMES: Record<SectionKey, string> = {
@@ -700,6 +781,7 @@ export const SECTION_NAMES: Record<SectionKey, string> = {
   sales_trend: 'Sales Trend',
   sales_breakdown: 'Sales Breakdown',
   customer_margin_overview: 'Customer Margin Overview',
+  customer_margin_breakdown: 'Customer Margin Breakdown',
 };
 
 // ─── Public API ──────────────────────────────────────────────────────────────

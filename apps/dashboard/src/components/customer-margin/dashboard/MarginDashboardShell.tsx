@@ -47,6 +47,14 @@ export function MarginDashboardShell() {
         </div>
       </div>
 
+      {/* Breakdown section — top customers + customer analysis + credit note impact */}
+      <InsightSectionHeader
+        title="Customer Margin Breakdown"
+        page="customer-margin"
+        sectionKey="customer_margin_breakdown"
+        dateRange={overviewDateRange}
+      />
+
       {/* Top Customers — full width */}
       <TopCustomersChart filters={filters} />
 

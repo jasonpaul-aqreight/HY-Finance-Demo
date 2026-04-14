@@ -8,6 +8,7 @@ import { useStableData } from '@/hooks/useStableData';
 import type { MarginDashboardFilters } from '@/hooks/customer-margin/useDashboardFilters';
 import { formatRM } from '@/lib/customer-margin/format';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { AnalyzeIcon } from '@/components/ai-insight/AnalyzeIcon';
 
 interface Props {
   filters: MarginDashboardFilters;
@@ -55,7 +56,10 @@ export function TopCustomersChart({ filters }: Props) {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-2 px-4">
         <div className="shrink-0">
-          <CardTitle className="whitespace-nowrap">{dirLabel} 10 Customers</CardTitle>
+          <div className="flex items-center gap-2">
+            <CardTitle className="whitespace-nowrap">{dirLabel} 10 Customers</CardTitle>
+            <AnalyzeIcon sectionKey="customer_margin_breakdown" componentKey="cm_top_customers" />
+          </div>
           {metric === 'margin' && (
             <p className="text-xs text-muted-foreground mt-0.5">min RM 10K revenue</p>
           )}

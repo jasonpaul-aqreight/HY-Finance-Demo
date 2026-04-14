@@ -16,6 +16,7 @@ import { exportToExcel } from '@/lib/export-excel';
 import { Download, ArrowUpDown, ChevronDown, Search, X } from 'lucide-react';
 import type { CustomerMonthlyRow } from '@/lib/customer-margin/queries';
 import { CustomerProfileRevamp } from '@/components/profiles/CustomerProfileRevampPreview';
+import { AnalyzeIcon } from '@/components/ai-insight/AnalyzeIcon';
 
 interface Props {
   filters: MarginDashboardFilters;
@@ -212,7 +213,10 @@ export function CustomerMarginTable({ filters }: Props) {
     <Card>
       <CardHeader className="flex-row items-center justify-between">
         <div>
-          <CardTitle>Customer Analysis</CardTitle>
+          <div className="flex items-center gap-2">
+            <CardTitle>Customer Analysis</CardTitle>
+            <AnalyzeIcon sectionKey="customer_margin_breakdown" componentKey="cm_customer_table" />
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-64">

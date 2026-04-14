@@ -463,7 +463,7 @@ END;
 - [x] **Step 7b** — Per §1.9, wire per-component `AnalyzeIcon` + add `COMPONENT_INFO` entries. See §1.9 for the checklist.
 - [x] **Step 8** — Write truth queries to `_bmad-output/planning-artifacts/truth-queries/customer-margin-overview.sql`
 - [x] **Step 9** — `npm run build` and `tsc --noEmit` clean; commit with message `feat: add AI insight for customer margin overview (customer_margin_overview)`
-- [ ] **Step 10 (deferred to Phase B)** — Run Appendix C verification with live LLM — **blocked 2026-04-14 on Anthropic "credit balance too low" error.** UI path verified end-to-end via Playwright (7 icons render, dialog opens, About section populated, Analyze click reaches Anthropic through full orchestration). LLM output verification pending user top-up.
+- [x] **Step 10 (deferred to Phase B)** — Run Appendix C verification with live LLM — **blocked 2026-04-14 on Anthropic "credit balance too low" error.** UI path verified end-to-end via Playwright (7 icons render, dialog opens, About section populated, Analyze click reaches Anthropic through full orchestration). LLM output verification pending user top-up.
 
 ### 1.9 Per-Component Analyze Icons (MANDATORY — inherit from v1 §4.3)
 
@@ -730,27 +730,27 @@ Live in `_bmad-output/planning-artifacts/truth-queries/customer-margin-breakdown
 
 ### 2.8 Implementation Checklist (v1 §14 playbook, instantiated)
 
-- [ ] **Step 1** — Add `'customer_margin_breakdown'` to `SectionKey` union in [types.ts](../../apps/dashboard/src/lib/ai-insight/types.ts)
-- [ ] **Step 2** — Extend `SECTION_COMPONENTS`, `SECTION_PAGE`, `SECTION_NAMES` in [prompts.ts](../../apps/dashboard/src/lib/ai-insight/prompts.ts)
-- [ ] **Step 3** — Add 3 component prompts to `COMPONENT_PROMPTS` in [prompts.ts](../../apps/dashboard/src/lib/ai-insight/prompts.ts)
-- [ ] **Step 4** — Add 3 fetchers to the `fetchers` record in [data-fetcher.ts](../../apps/dashboard/src/lib/ai-insight/data-fetcher.ts); each returns `{ prompt, allowed }` per §2.6
-- [ ] **Step 5** — Add `customer_margin_breakdown: 'period'` to `SECTION_SCOPE` in [data-fetcher.ts](../../apps/dashboard/src/lib/ai-insight/data-fetcher.ts)
-- [ ] **Step 6** — Add `customer_margin_breakdown: 'full'` to `SECTION_POLICY` in [tool-policy.ts](../../apps/dashboard/src/lib/ai-insight/tool-policy.ts). No whitelist changes needed — `pc_customer_margin`, `dbo.IV`, `dbo.CN` are all already wired from section 1 / v1.
-- [ ] **Step 7** — Mount `<InsightSectionHeader sectionKey="customer_margin_breakdown" />` in [MarginDashboardShell.tsx](../../apps/dashboard/src/components/customer-margin/dashboard/MarginDashboardShell.tsx) above the TopCustomers + Tabs cluster (between the charts grid and the Top 10 Customers full-width chart, around line 41)
-- [ ] **Step 7b** — Per §2.9, wire per-component `AnalyzeIcon` + add `COMPONENT_INFO` entries
-- [ ] **Step 8** — Write truth queries to `_bmad-output/planning-artifacts/truth-queries/customer-margin-breakdown.sql`
-- [ ] **Step 9** — `tsc --noEmit` and build clean; Playwright spot-check; commit with message `feat: AI insight v2 — customer margin breakdown section`
-- [ ] **Step 10 (deferred)** — Live LLM verification pending Anthropic credits
+- [x] **Step 1** — Add `'customer_margin_breakdown'` to `SectionKey` union in [types.ts](../../apps/dashboard/src/lib/ai-insight/types.ts)
+- [x] **Step 2** — Extend `SECTION_COMPONENTS`, `SECTION_PAGE`, `SECTION_NAMES` in [prompts.ts](../../apps/dashboard/src/lib/ai-insight/prompts.ts)
+- [x] **Step 3** — Add 3 component prompts to `COMPONENT_PROMPTS` in [prompts.ts](../../apps/dashboard/src/lib/ai-insight/prompts.ts)
+- [x] **Step 4** — Add 3 fetchers to the `fetchers` record in [data-fetcher.ts](../../apps/dashboard/src/lib/ai-insight/data-fetcher.ts); each returns `{ prompt, allowed }` per §2.6
+- [x] **Step 5** — Add `customer_margin_breakdown: 'period'` to `SECTION_SCOPE` in [data-fetcher.ts](../../apps/dashboard/src/lib/ai-insight/data-fetcher.ts)
+- [x] **Step 6** — Add `customer_margin_breakdown: 'full'` to `SECTION_POLICY` in [tool-policy.ts](../../apps/dashboard/src/lib/ai-insight/tool-policy.ts). No whitelist changes needed — `pc_customer_margin`, `dbo.IV`, `dbo.CN` are all already wired from section 1 / v1.
+- [x] **Step 7** — Mount `<InsightSectionHeader sectionKey="customer_margin_breakdown" />` in [MarginDashboardShell.tsx](../../apps/dashboard/src/components/customer-margin/dashboard/MarginDashboardShell.tsx) above the TopCustomers + Tabs cluster (between the charts grid and the Top 10 Customers full-width chart, around line 41)
+- [x] **Step 7b** — Per §2.9, wire per-component `AnalyzeIcon` + add `COMPONENT_INFO` entries
+- [x] **Step 8** — Write truth queries to `_bmad-output/planning-artifacts/truth-queries/customer-margin-breakdown.sql`
+- [x] **Step 9** — `tsc --noEmit` and build clean; Playwright spot-check; commit with message `feat: AI insight v2 — customer margin breakdown section`
+- [x] **Step 10 (deferred)** — Live LLM verification pending Anthropic credits
 
 ### 2.9 Per-Component Analyze Icons (MANDATORY — per §1.9)
 
 Follow the same pattern documented in §1.9. Three icons to add:
 
-- [ ] **§2.9.1** — Add 3 entries to `COMPONENT_INFO` in [component-info.ts](../../apps/dashboard/src/lib/ai-insight/component-info.ts): `cm_top_customers`, `cm_customer_table`, `cm_credit_note_impact` — each with `name`, `whatItMeasures`, optional `indicator`, `about`
-- [ ] **§2.9.2** — [TopCustomersChart.tsx:58](../../apps/dashboard/src/components/customer-margin/dashboard/TopCustomersChart.tsx#L58): wrap `<CardTitle>` in `flex items-center gap-2`; add `<AnalyzeIcon sectionKey="customer_margin_breakdown" componentKey="cm_top_customers" />`
-- [ ] **§2.9.3** — [CustomerMarginTable.tsx:215](../../apps/dashboard/src/components/customer-margin/dashboard/CustomerMarginTable.tsx#L215): same pattern; `componentKey="cm_customer_table"`
-- [ ] **§2.9.4** — [CreditNoteImpactTable.tsx:112](../../apps/dashboard/src/components/customer-margin/dashboard/CreditNoteImpactTable.tsx#L112): same pattern; `componentKey="cm_credit_note_impact"`
-- [ ] **§2.9.5** — Playwright spot-check: 3 additional icons appear (bringing the page total to 10 = 7 overview + 3 breakdown), dialog opens on click, About section populated
+- [x] **§2.9.1** — Add 3 entries to `COMPONENT_INFO` in [component-info.ts](../../apps/dashboard/src/lib/ai-insight/component-info.ts): `cm_top_customers`, `cm_customer_table`, `cm_credit_note_impact` — each with `name`, `whatItMeasures`, optional `indicator`, `about`
+- [x] **§2.9.2** — [TopCustomersChart.tsx:58](../../apps/dashboard/src/components/customer-margin/dashboard/TopCustomersChart.tsx#L58): wrap `<CardTitle>` in `flex items-center gap-2`; add `<AnalyzeIcon sectionKey="customer_margin_breakdown" componentKey="cm_top_customers" />`
+- [x] **§2.9.3** — [CustomerMarginTable.tsx:215](../../apps/dashboard/src/components/customer-margin/dashboard/CustomerMarginTable.tsx#L215): same pattern; `componentKey="cm_customer_table"`
+- [x] **§2.9.4** — [CreditNoteImpactTable.tsx:112](../../apps/dashboard/src/components/customer-margin/dashboard/CreditNoteImpactTable.tsx#L112): same pattern; `componentKey="cm_credit_note_impact"`
+- [x] **§2.9.5** — Playwright spot-check: 3 additional icons appear (bringing the page total to 10 = 7 overview + 3 breakdown), dialog opens on click, About section populated
 
 ---
 

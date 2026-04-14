@@ -11,6 +11,7 @@ import type { MarginDashboardFilters } from '@/hooks/customer-margin/useDashboar
 import { formatRM, formatMarginPct } from '@/lib/customer-margin/format';
 import { exportToExcel } from '@/lib/export-excel';
 import { Download, ArrowUpDown, Search, X } from 'lucide-react';
+import { AnalyzeIcon } from '@/components/ai-insight/AnalyzeIcon';
 
 interface Props {
   filters: MarginDashboardFilters;
@@ -109,7 +110,10 @@ export function CreditNoteImpactTable({ filters }: Props) {
     <Card>
       <CardHeader className="flex-row items-center justify-between">
         <div>
-          <CardTitle>Credit Note Impact on Margins</CardTitle>
+          <div className="flex items-center gap-2">
+            <CardTitle>Credit Note Impact on Margins</CardTitle>
+            <AnalyzeIcon sectionKey="customer_margin_breakdown" componentKey="cm_credit_note_impact" />
+          </div>
           <p className="mt-1 text-sm text-foreground/70">
             Shows how credit notes affect each customer's margin — identify customers where returns erode profitability
             or where returned low-margin products actually improve overall margin.
