@@ -15,6 +15,7 @@ import { useTopBottomSuppliers, useTopBottomItems } from '@/hooks/supplier-margi
 import { useStableData } from '@/hooks/useStableData';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { AnalyzeIcon } from '@/components/ai-insight/AnalyzeIcon';
 import { formatRM } from '@/lib/supplier-margin/format';
 import type { DashboardFilters } from '@/hooks/supplier-margin/useDashboardFilters';
 
@@ -110,7 +111,10 @@ export function TopBottomChart({ filters }: { filters: DashboardFilters }) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-2 px-4">
-        <CardTitle className="whitespace-nowrap shrink-0">{title}</CardTitle>
+        <div className="flex items-center gap-2 shrink-0">
+          <CardTitle className="whitespace-nowrap">{title}</CardTitle>
+          <AnalyzeIcon sectionKey="supplier_margin_breakdown" componentKey="sm_top_bottom" />
+        </div>
         <div className="flex items-center gap-1.5 overflow-x-auto">
           <ToggleGroup<Entity>
             options={[

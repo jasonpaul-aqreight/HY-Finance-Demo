@@ -46,6 +46,14 @@ export function DashboardShell() {
               </div>
             </div>
 
+            {/* Breakdown section — top/bottom, table, item pricing, scatter */}
+            <InsightSectionHeader
+              title="Supplier Margin Breakdown"
+              page="supplier-performance"
+              sectionKey="supplier_margin_breakdown"
+              dateRange={{ start: filters.startDate, end: filters.endDate }}
+            />
+
             {/* Top/Bottom Suppliers — full width */}
             <TopBottomChart filters={filters} />
 

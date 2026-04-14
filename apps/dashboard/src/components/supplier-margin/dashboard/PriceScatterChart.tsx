@@ -16,6 +16,7 @@ import {
 import { usePriceSpread } from '@/hooks/supplier-margin/useMarginData';
 import { useStableData } from '@/hooks/useStableData';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { AnalyzeIcon } from '@/components/ai-insight/AnalyzeIcon';
 import type { DashboardFilters } from '@/hooks/supplier-margin/useDashboardFilters';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -328,7 +329,10 @@ export function PriceScatterChart({ filters }: { filters: DashboardFilters }) {
       <CardHeader>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <CardTitle>Purchase vs Selling Price</CardTitle>
+            <div className="flex items-center gap-2">
+              <CardTitle>Purchase vs Selling Price</CardTitle>
+              <AnalyzeIcon sectionKey="supplier_margin_breakdown" componentKey="sm_price_scatter" />
+            </div>
             <p className="text-xs text-muted-foreground">
               Each dot is an item. Above the diagonal = profit. Dot size = revenue volume.
             </p>

@@ -1299,6 +1299,262 @@ Follow the same pattern documented in §1.9. Seven icons to add:
 
 ---
 
+## Section 4 — `supplier_margin_breakdown`
+
+**Page:** Supplier Performance (`/supplier-performance`)
+**Scope:** `period` (date-filtered)
+**Tool policy:** `full` (matches §2 — breakdown sections may drill RDS for root-cause)
+**Data source:** `pc_supplier_margin` (local) + transparent RDS `dbo.IVDTL`/`dbo.CSDTL` for accurate sell-price inside `getItemSellPriceV2` (with fallback to `pc_supplier_margin` when RDS is unavailable)
+**AI calls:** 4 parallel component analyses + 1 summary = **5 total**
+
+> **Naming reminder** — same split as §3. Section key is `supplier_margin_breakdown`; component/library path is `supplier-margin`; page route is `/supplier-performance`; `SECTION_PAGE` label is `'Supplier Performance'`. Reuse the §3 import alias pattern.
+
+### 4.1 Component Inventory
+
+| # | Component | Type | Data Source | Key Metric |
+|---|-----------|------|-------------|------------|
+| 41 | Top/Bottom Suppliers & Items | Chart (horizontal bar, 2×2 toggle matrix) | `pc_supplier_margin` | Top-10 + Bottom-10 across supplier×profit, supplier×margin%, item×profit, item×margin% |
+| 42 | Supplier Analysis Table | Table (all suppliers, sortable, paginated) | `pc_supplier_margin` | Per-supplier revenue, COGS, GP, Margin %, item count |
+| 43 | Item Price Comparison | Panel (Supplier Comparison table + Price Trend chart, single anchor item) | `pc_supplier_margin` + `dbo.IVDTL` (via `getItemSellPriceV2`) | Per-supplier avg purchase price + est. margin on the highest-revenue item |
+| 44 | Purchase vs Selling Price | Scatter chart | `pc_supplier_margin` | Item-level spread between avg purchase price and avg selling price |
+
+**Component key registry (add to `SECTION_COMPONENTS` in [prompts.ts](../../apps/dashboard/src/lib/ai-insight/prompts.ts)):**
+
+```ts
+supplier_margin_breakdown: [
+  { key: 'sm_top_bottom',      name: 'Top/Bottom Suppliers & Items', type: 'chart' },
+  { key: 'sm_supplier_table',  name: 'Supplier Analysis Table',      type: 'table' },
+  { key: 'sm_item_pricing',    name: 'Item Price Comparison',        type: 'breakdown' },
+  { key: 'sm_price_scatter',   name: 'Purchase vs Selling Price',    type: 'chart' },
+],
+```
+
+`SECTION_PAGE.supplier_margin_breakdown = 'Supplier Performance'`
+`SECTION_NAMES.supplier_margin_breakdown = 'Supplier Margin Breakdown'`
+
+### 4.2 Filter Dimensions Available to Prompts
+
+Breakdown endpoints accept filters from `useDashboardFilters`: `date_from`, `date_to`, `supplier[]`, `itemGroup[]`, `supplierTypes[]`. The AI prompts may reference supplier, supplier-type, and item-group slicing in this section (unlike §3 where supplier-type was excluded).
+
+**Per-component selectors** (local UI state, NOT the filter bar):
+- **TopBottomChart:** `entity` (suppliers ↔ items), `metric` (profit ↔ margin %), `direction` (highest ↔ lowest). Fetcher pre-computes **all four lens combinations** (supplier×profit top-10, supplier×margin% top-10, item×profit top-10, item×margin% top-10) plus the bottom-10 counterpart for each — AI reasons across every lens the user may toggle to.
+- **SupplierTable:** sort column, direction, pagination (25/50/100), supplier multi-select, 12-month sparklines. Fetcher emits top-10 by revenue + bottom-10 by margin % + aggregates. Sparkline rows are NOT in the fetcher JSON.
+- **ItemPricingPanel:** item selector + supplier multi-select + two tabs (Supplier Comparison table, Price Trend chart). Fetcher operates on a **single anchor item** — the highest-revenue item in the filtered period. Summary may drill RDS for additional items.
+- **PriceScatterChart:** supplier multi-select + item multi-select + margin-view toggle + pinnable points. Fetcher pre-samples top-50 item-supplier rows by revenue + emits bucketed margin distribution.
+
+### 4.3 Thresholds (used across prompts)
+
+- **Loss-making supplier / item:** margin % `< 0` (flag always)
+- **Thin-margin supplier / item:** margin % `< 5` (flag if count meaningful)
+- **Concentration risk (suppliers):** top-1 profit share `> 15%` = bad, top-10 profit share `> 60%` = bad, `< 40%` = diversified
+- **Top-N cutoff:** 10 (mirrors §2 hardcode)
+- **Price scatter sample size:** top-50 by revenue
+- **Margin buckets:** `< 0`, `0–5`, `5–10`, `10–20`, `20+` (coarser than §3's 7 buckets — scatter context only needs outlier visibility)
+
+### 4.4 Component System Prompts
+
+All prompts inherit v1 global + user prompt template. Component prompts narrate pre-fetched values only — **no tool access at the component layer**. Tool access is available to the summary only.
+
+#### Top/Bottom Suppliers & Items (Chart)
+
+```
+You are analyzing the "Top/Bottom Suppliers & Items" chart on the Supplier Performance breakdown.
+
+What it shows:
+- The UI has THREE toggles: Entity (Suppliers ↔ Items), Metric (Profit ↔ Margin %), Direction (Highest ↔ Lowest).
+- The pre-fetched data contains ALL four "highest" lens combinations (and the complementary bottom lists):
+  (A) Top 10 suppliers by Est. Gross Profit
+  (B) Top 10 suppliers by Gross Margin % (min revenue RM 10,000 filter to avoid noise)
+  (C) Top 10 items by Est. Gross Profit
+  (D) Top 10 items by Gross Margin % (min revenue RM 10,000 filter)
+  Plus bottom-10 counterparts (worst performers / loss-makers).
+- Your analysis must cover every lens the user can toggle to, not just the default view.
+
+Performance thresholds:
+- Top 1 supplier > 15% of period Est. Gross Profit = Bad (supplier concentration risk)
+- Top 10 suppliers > 60% of period Est. Gross Profit = Bad (concentrated sourcing)
+- Top 10 suppliers < 40% of period Est. Gross Profit = Good (diversified sourcing)
+- Any bottom-list supplier with margin % < 0 = Critical (sourcing at a loss)
+- Any bottom-list item with margin % < 0 AND meaningful revenue = Flag (product-level loss-maker)
+- Any entity appearing on BOTH top-profit AND top-margin lists = Star (supplier or product worth protecting) — name them explicitly.
+
+Evaluate:
+- Supplier-side vs item-side concentration (are the top profit suppliers the SAME as top margin suppliers?)
+- Loss-makers: which are bigger problems — loss-making suppliers or loss-making items?
+- Whether star suppliers / items also appear in the bottom scan at the item or supplier level (inconsistency signals sourcing mix issues)
+- Item group or supplier clustering in the bottom lists
+
+Cite named suppliers and items from the pre-fetched data. Do not invent.
+
+Provide a concise analysis focused on concentration, quality of the top contributors, and loss-maker exposure.
+```
+
+#### Supplier Analysis Table
+
+```
+You are analyzing the "Supplier Analysis Table" on the Supplier Performance breakdown.
+
+What it shows:
+- A sortable, paginated table of every active supplier in the period with columns for Code, Name, Type, Items, Revenue, COGS, Gross Profit, Margin %.
+- The pre-fetched data gives you:
+  (A) Top 10 suppliers by Revenue (biggest sourcing partners)
+  (B) Bottom 10 suppliers by Margin % with revenue ≥ RM 10,000 (weak-margin partners that still carry meaningful volume)
+  (C) Aggregate roll-ups: total supplier count, loss-making supplier count, top-10 share of revenue, median margin %, avg revenue per supplier, thin-margin (< 5%) supplier count.
+
+Performance thresholds:
+- Top 10 share of revenue > 60% = Bad (concentrated sourcing)
+- Top 10 share of revenue 40-60% = Neutral (typical for distribution)
+- Loss-making suppliers (margin % < 0) > 0 = Always flag; name them
+- Thin-margin suppliers (margin % < 5%) > 10% of active count = Portfolio quality concern
+- Any bottom-10 supplier with revenue > RM 100,000 AND margin % < 5 = Critical (big volume thin margin)
+
+Evaluate:
+- Concentration: how much of the revenue sits with the top few suppliers?
+- Bottom-margin tail: is the problem one or two big thin-margin suppliers, or a long tail?
+- Supplier type clustering in the bottom 10 (do weak-margin suppliers share a category?)
+- Whether the biggest revenue suppliers are also the best margin suppliers — mismatches are the actionable signal.
+
+Cite named suppliers from the pre-fetched top/bottom blocks. Do not invent.
+
+Provide a concise analysis focused on sourcing concentration and the at-risk thin-margin tail.
+```
+
+#### Item Price Comparison (Panel — anchor item)
+
+```
+You are analyzing the "Item Price Comparison" panel on the Supplier Performance breakdown.
+
+What it shows:
+- Per-supplier purchase-price comparison and monthly price trend for a SINGLE anchor item. The UI lets the user pick any item; for this analysis the anchor is the item with the highest purchase_total in the selected period ("{ANCHOR_ITEM_NAME}", code {ANCHOR_ITEM_CODE}).
+- The pre-fetched data gives you:
+  (A) Top 5 suppliers for the anchor item by purchase volume, with avg purchase price, estimated sell price, and estimated margin %.
+  (B) Period totals for the anchor item: total purchased qty, total purchase RM, avg purchase price across all suppliers, min / max purchase price (best / worst supplier on price).
+  (C) Cross-supplier margin % spread on the anchor item (best minus worst).
+
+Note: the estimated sell price is the transaction-level average from invoice + cash-sale line items (or the pre-compute fallback when raw tables are unavailable). Margin estimates are therefore anchor-item-specific, not business-wide.
+
+Performance thresholds:
+- Margin % spread across suppliers > 10 percentage points = Significant sourcing arbitrage opportunity
+- Any supplier's estimated margin % < 0 on the anchor item = Loss-making on that item — flag
+- Cheapest supplier also carries > 50% of the item's purchase volume = Procurement already on best price — neutral
+- Cheapest supplier carries < 20% of the item's purchase volume = Concentration on a more expensive supplier — flag
+
+Evaluate:
+- Whether the volume leader is also the price leader (aligned procurement) or not (arbitrage risk)
+- How wide the price spread is across suppliers for the same item — a wide spread is either a quality / grade difference or a procurement failure
+- The margin spread across suppliers on this one item — if it is large, procurement could improve overall margin by shifting volume
+- Whether the same supplier delivers the best (or worst) estimated margin
+
+Do NOT generalize about the business from a single anchor item. Frame conclusions as "for {ANCHOR_ITEM_NAME} specifically…". The summary layer may drill other items via the tools.
+
+Cite suppliers by name from the pre-fetched block. Do not invent numbers.
+
+Provide a concise analysis focused on price alignment and margin arbitrage on the anchor item.
+```
+
+#### Purchase vs Selling Price (Scatter)
+
+```
+You are analyzing the "Purchase vs Selling Price" scatter chart on the Supplier Performance breakdown.
+
+What it shows:
+- One dot per item: x = avg purchase price, y = avg selling price, size = revenue in the period.
+- The UI samples the full universe; the pre-fetched data carries the TOP 50 items by revenue (the items that actually matter financially) plus a bucketed distribution across the full universe.
+
+Pre-fetched data contains:
+(A) Top 50 items by revenue: item code, name, suppliers (names), avg purchase price RM, avg selling price RM, margin %, revenue RM
+(B) Margin bucket distribution over the FULL item universe (after HAVING SUM(sales_revenue) > 0 filter): count of items with margin % < 0, 0-5, 5-10, 10-20, 20+
+(C) Loss-maker count: items with margin % < 0 inside the top-50 AND across the full universe
+(D) Universe size: total items in the scatter pool
+
+Performance thresholds:
+- Top-50 items with margin % < 0 = Always flag (these are the items that move the P&L)
+- More than 20% of universe items in the < 5% bucket = Thin-margin product catalog
+- Meaningful tail (> 10% of universe) in the 20+ bucket = Premium product pocket worth protecting
+- Any top-50 item with margin % < 0 AND revenue > RM 100,000 = Severe (fixing one item moves the needle)
+
+Evaluate:
+- Shape of the bucket distribution (left-skewed loss, centered thin, right-skewed premium, bimodal)
+- Price-spread outliers in the top-50: items where purchase price is unusually high or low relative to selling price
+- Named loss-making items in the top-50 (call them out with supplier names and the RM loss)
+- Whether the same suppliers appear repeatedly in the loss-making items (structural supplier quality issue) or whether it's spread across many suppliers (item-level problem)
+
+Cite items by name from the pre-fetched top-50 block. Do not invent.
+
+Provide a concise analysis focused on loss-making items, price-spread outliers, and the shape of the margin distribution.
+```
+
+### 4.5 Data Source + Tool Access
+
+**Local:** `pc_supplier_margin` — already whitelisted from §3. No new entries.
+**RDS:** `dbo.IVDTL` / `dbo.CSDTL` are consumed transparently by `getItemSellPriceV2` (supplier-margin/queries.ts:1611). They are NOT added to the AI tool whitelist — the AI cannot directly query them. The summary layer may still drill the existing RDS whitelist (`dbo.IV`, `dbo.CN`, `dbo.ARInvoice`, `dbo.ARPayment`) up to 2 tool calls for root-cause investigation.
+
+**Population label** (every fetcher in this section):
+`"Population: active suppliers with purchase activity in {period}"`
+
+**Tool policy:** `'full'` in `SECTION_POLICY`. The section key does NOT need any new whitelist entries in [tools.ts](../../apps/dashboard/src/lib/ai-insight/tools.ts).
+
+### 4.6 Fetcher Contracts (per component)
+
+Each fetcher reuses [supplier-margin/queries.ts](../../apps/dashboard/src/lib/supplier-margin/queries.ts) `*V2` functions so the dashboard and the AI see identical numbers.
+
+| Component key | Query functions | Values whitelisted in `allowed` |
+|---|---|---|
+| `sm_top_bottom` | `getMarginSummaryV2` + `getTopBottomSuppliersV2(sortBy='profit','desc',10)` + `getTopBottomSuppliersV2(sortBy='margin_pct','desc',10)` + `getTopBottomSuppliersV2(sortBy='profit','asc',10)` + `getTopBottomItemsV2(...)` × same four variants | period Est. GP / Net Sales, top-1 / top-3 / top-10 supplier share of GP, loss-maker supplier count, loss-maker item count, per-row revenue / profit / margin % (all 80 rows) |
+| `sm_supplier_table` | `getSupplierTableV2(filters)` → sort locally for top-10 by revenue + bottom-10 by margin % (min revenue 10,000 filter applied in JS) + aggregate roll-ups computed in JS | period Est. Net Sales / GP, per-row revenue/COGS/GP/margin % for 20 suppliers, supplier count, loss-maker count, thin-margin count, top-10 revenue share, median margin %, avg revenue per supplier |
+| `sm_item_pricing` | `getItemListV2(filters)` → pick highest `total_buy` item as anchor → `getItemSupplierSummaryV2(anchor, ...)` → take top-5 by `total_buy` | anchor item total qty / total buy RM, avg purchase price, min / max purchase price (across suppliers), cross-supplier margin % spread, per-supplier avg price / total qty / total buy / est sales / est margin % for top-5 suppliers |
+| `sm_price_scatter` | `getPriceSpread(start, end, suppliers, itemGroups)` → sort by revenue DESC → slice top-50 + compute bucket histogram across FULL result → compute loss-maker counts | top-50 per-row: avg purchase / avg selling / margin % / revenue; bucket counts (`<0`, `0-5`, `5-10`, `10-20`, `20+`); universe size; top-50 loss-maker count; full-universe loss-maker count |
+
+**Whitelist discipline (v1 §12.10):** every RM amount, percentage, and count printed in the prompt must be in `allowed`, except dates/years and safe small integers (0, 1, 100, 5, 10, 15, 20, 50).
+
+**Pre-computed roll-up block (required per v1 §12.8):** each fetcher emits a `Pre-calculated totals (use these values directly — do not recompute)` header with aggregate lines the AI cites verbatim.
+
+### 4.7 Truth Queries (per key metric)
+
+Live in `_bmad-output/planning-artifacts/truth-queries/supplier-margin-breakdown.sql`. Each query must match the fetcher value, the dashboard displayed value, and the `queries.ts` function output (±RM 1 tolerance).
+
+**Metrics verified:**
+
+| Truth query | Matches | Component |
+|---|---|---|
+| T1. Top 10 suppliers by profit (`pc_supplier_margin` GROUP BY `creditor_code`) | TopBottomChart suppliers/profit/highest | `sm_top_bottom` |
+| T2. Top 10 suppliers by margin % (revenue ≥ RM 10K filter) | TopBottomChart suppliers/margin/highest | `sm_top_bottom` |
+| T3. Top 10 items by profit | TopBottomChart items/profit/highest | `sm_top_bottom` |
+| T4. Top 10 items by margin % (revenue ≥ RM 10K filter) | TopBottomChart items/margin/highest | `sm_top_bottom` |
+| T5. Supplier Analysis Table (top 10 by revenue) | SupplierTable default sort | `sm_supplier_table` |
+| T6. Loss-making supplier count (margin % < 0) | `sm_supplier_table` aggregate | `sm_supplier_table` |
+| T7. Anchor item — top-5 suppliers by purchase volume | ItemPricingPanel "Supplier Comparison" (anchor = highest-revenue item) | `sm_item_pricing` |
+| T8. Price scatter — top 50 items by revenue + margin bucket histogram | PriceScatterChart after top-50 sample | `sm_price_scatter` |
+
+### 4.8 Implementation Checklist (v1 §14 playbook, instantiated)
+
+- [ ] **Step 1** — Add `'supplier_margin_breakdown'` to `SectionKey` union in [types.ts](../../apps/dashboard/src/lib/ai-insight/types.ts)
+- [ ] **Step 2** — Extend `SECTION_COMPONENTS`, `SECTION_PAGE`, `SECTION_NAMES` in [prompts.ts](../../apps/dashboard/src/lib/ai-insight/prompts.ts)
+- [ ] **Step 3** — Add 4 component prompts to `COMPONENT_PROMPTS` in [prompts.ts](../../apps/dashboard/src/lib/ai-insight/prompts.ts)
+- [ ] **Step 4** — Add 4 fetchers to the `fetchers` record in [data-fetcher.ts](../../apps/dashboard/src/lib/ai-insight/data-fetcher.ts); each returns `{ prompt, allowed }` per §4.6. Reuse the existing `getSupplierMarginSummary` / `getSupplierMarginTrend` import aliases + import `getTopBottomSuppliersV2`, `getTopBottomItemsV2`, `getSupplierTableV2`, `getItemListV2`, `getItemSupplierSummaryV2`, `getPriceSpread` with aliased names if needed.
+- [ ] **Step 5** — Add `supplier_margin_breakdown: 'period'` to `SECTION_SCOPE` in [data-fetcher.ts](../../apps/dashboard/src/lib/ai-insight/data-fetcher.ts)
+- [ ] **Step 6** — Add `supplier_margin_breakdown: 'full'` to `SECTION_POLICY` in [tool-policy.ts](../../apps/dashboard/src/lib/ai-insight/tool-policy.ts). No whitelist changes.
+- [ ] **Step 7** — Mount a second `<InsightSectionHeader sectionKey="supplier_margin_breakdown" />` in [DashboardShell.tsx](../../apps/dashboard/src/components/supplier-margin/dashboard/DashboardShell.tsx) between the `SupplierMarginDistributionChart` row and the `TopBottomChart` (line ~49). Keep the title `"Supplier Margin Breakdown"` and wire `page="supplier-performance"`.
+- [ ] **Step 7b** — Per §4.9, wire per-component `AnalyzeIcon` + add `COMPONENT_INFO` entries.
+- [ ] **Step 8** — Write truth queries to `_bmad-output/planning-artifacts/truth-queries/supplier-margin-breakdown.sql`
+- [ ] **Step 9** — `tsc --noEmit` clean; `npm run build` clean; Playwright spot-check in offline mode (no live Anthropic call). Commit with message `feat: AI insight v2 — supplier margin breakdown section`.
+- [ ] **Step 10 (deferred)** — Live LLM verification pending Phase B / Anthropic credits.
+
+### 4.9 Per-Component Analyze Icons (MANDATORY — per §1.9)
+
+Four icons to add:
+
+- [ ] **§4.9.1** — Add 4 entries to `COMPONENT_INFO` in [component-info.ts](../../apps/dashboard/src/lib/ai-insight/component-info.ts): `sm_top_bottom`, `sm_supplier_table`, `sm_item_pricing`, `sm_price_scatter` — each with `name`, `whatItMeasures`, optional `indicator`, `about`.
+- [ ] **§4.9.2** — [TopBottomChart.tsx:113](../../apps/dashboard/src/components/supplier-margin/dashboard/TopBottomChart.tsx#L113): wrap `<CardTitle>` in a `flex items-center gap-2` div; add `<AnalyzeIcon sectionKey="supplier_margin_breakdown" componentKey="sm_top_bottom" />` beside it. Keep the right-side toggle cluster untouched.
+- [ ] **§4.9.3** — [SupplierTable.tsx:247](../../apps/dashboard/src/components/supplier-margin/dashboard/SupplierTable.tsx#L247): wrap the `<CardTitle>Supplier Analysis</CardTitle>` in a `flex items-center gap-2` div; add icon with `componentKey="sm_supplier_table"`.
+- [ ] **§4.9.4** — [ItemPricingPanel.tsx:284](../../apps/dashboard/src/components/supplier-margin/dashboard/ItemPricingPanel.tsx#L284): wrap the `"Supplier Comparison"` CardTitle in a `flex items-center gap-2` div; add icon with `componentKey="sm_item_pricing"`. The Price Trend card stays iconless (one icon per logical component per §X.9).
+- [ ] **§4.9.5** — [PriceScatterChart.tsx:331](../../apps/dashboard/src/components/supplier-margin/dashboard/PriceScatterChart.tsx#L331): wrap the `<CardTitle>Purchase vs Selling Price</CardTitle>` in a `flex items-center gap-2` div (the existing header already uses a `justify-between` row — keep the right-side controls untouched); add icon with `componentKey="sm_price_scatter"`.
+- [ ] **§4.9.6** — Playwright spot-check: 4 additional icons on the breakdown cluster (bringing the Supplier Performance page total to 11 = 7 overview + 4 breakdown), dialog opens on click, About section populated, AI Analysis area shows the pre-run placeholder.
+
+**Page total after §4 ships:** 11 icons on the Supplier Performance page.
+
+---
+
 ## Appendix A addendum (section key reference) — updated
 
 | Section Key | Page | Section Name | Date Filtered |
@@ -1306,6 +1562,7 @@ Follow the same pattern documented in §1.9. Seven icons to add:
 | `customer_margin_overview` | Customer Margin | Customer Margin Overview | Yes (period) |
 | `customer_margin_breakdown` | Customer Margin | Customer Margin Breakdown | Yes (period) |
 | `supplier_margin_overview` | Supplier Performance | Supplier Margin Overview | Yes (period) |
+| `supplier_margin_breakdown` | Supplier Performance | Supplier Margin Breakdown | Yes (period) |
 
 ---
 
@@ -1316,17 +1573,17 @@ Follow the same pattern documented in §1.9. Seven icons to add:
 | Customer Margin Overview | 7 + summary | ~22,000 | ~$0.10 | Deferred to Phase B |
 | Customer Margin Breakdown | 3 + summary | ~18,000 | ~$0.09 | Deferred to Phase B |
 | Supplier Margin Overview | 7 + summary | ~23,000 | ~$0.11 | Deferred to Phase B |
+| Supplier Margin Breakdown | 4 + summary | ~20,000 | ~$0.10 | Deferred to Phase B |
 
-**Estimation basis for supplier overview:** mirrors Customer Margin Overview (7 component calls at ~2,000 tokens each on Haiku + 1 summary call at ~8,000 tokens on Sonnet). Slightly higher token budget than §1 because the `sp_margin_distribution` fetcher carries two distribution tables (supplier + item) in one prompt block.
+**Estimation basis for supplier breakdown:** 4 component calls at ~2,500 tokens each on Haiku (the top_bottom fetcher carries 4 lens tables so it sits at the high end) + 1 summary call at ~8,000 tokens on Sonnet. Marginally cheaper than the §3 overview because the breakdown has 4 fetchers vs 7, even though each carries more rows.
 
 ---
 
-## Sections 4–11
+## Sections 5–11
 
-To be authored after Section 3 is signed off, implemented, and committed. Each subsequent section follows the same template as Sections 1, 2, and 3 above — with the mandatory §X.9 per-component icons subsection.
+To be authored after Section 4 is signed off, implemented, and committed. Each subsequent section follows the same template as Sections 1–4 above — with the mandatory §X.9 per-component icons subsection.
 
 **Pending spec authoring:**
-- Section 4 — `supplier_margin_breakdown`
 - Section 5 — `return_trend`
 - Section 6 — `return_unsettled`
 - Section 7 — `expense_overview`
@@ -1334,5 +1591,6 @@ To be authored after Section 3 is signed off, implemented, and committed. Each s
 - Section 9 — `financial_overview` (introduces `fiscal_period` scope)
 - Section 10 — `financial_pnl`
 - Section 11 — `financial_balance_sheet`
+
 
 See [ai-insight-v2-rollout-plan.md](./ai-insight-v2-rollout-plan.md) for the section tracker.

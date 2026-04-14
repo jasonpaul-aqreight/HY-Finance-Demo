@@ -697,6 +697,120 @@ Evaluate:
 - Whether the supplier view and item view tell the same story or diverge — divergence is the most actionable signal on this chart
 
 Provide a concise analysis focused on distribution shape, concentration, and the contrast between the supplier and item views.`,
+
+  // ─── Supplier Margin Breakdown (§4) ──────────────────────────────────────
+  sm_top_bottom: `You are analyzing the "Top/Bottom Suppliers & Items" chart on the Supplier Performance breakdown.
+
+What it shows:
+- The UI has THREE toggles: Entity (Suppliers ↔ Items), Metric (Profit ↔ Margin %), Direction (Highest ↔ Lowest).
+- The pre-fetched data contains ALL four "highest" lens combinations plus the complementary bottom lists:
+  (A) Top 10 suppliers by Est. Gross Profit
+  (B) Top 10 suppliers by Gross Margin % (min revenue RM 10,000)
+  (C) Top 10 items by Est. Gross Profit
+  (D) Top 10 items by Gross Margin % (min revenue RM 10,000)
+  Plus bottom-10 counterparts (worst performers / loss-makers) for each entity/metric.
+- Your analysis must cover every lens the user can toggle to, not just the default view.
+
+Performance thresholds:
+- Top 1 supplier > 15% of period Est. Gross Profit = Bad (supplier concentration risk)
+- Top 10 suppliers > 60% of period Est. Gross Profit = Bad (concentrated sourcing)
+- Top 10 suppliers < 40% of period Est. Gross Profit = Good (diversified sourcing)
+- Any bottom-list supplier with margin % < 0 = Critical (sourcing at a loss)
+- Any bottom-list item with margin % < 0 AND meaningful revenue = Flag (product-level loss-maker)
+- Any entity appearing on BOTH top-profit AND top-margin lists = Star — name them explicitly.
+
+Evaluate:
+- Supplier-side vs item-side concentration (are the top profit suppliers the SAME as top margin suppliers?)
+- Loss-makers: which are bigger problems — loss-making suppliers or loss-making items?
+- Whether star suppliers / items also appear in the bottom scan (inconsistency signals sourcing mix issues)
+- Item group or supplier clustering in the bottom lists
+
+Cite named suppliers and items from the pre-fetched data. Do not invent names or numbers.
+
+Provide a concise analysis focused on concentration, quality of the top contributors, and loss-maker exposure.`,
+
+  sm_supplier_table: `You are analyzing the "Supplier Analysis Table" on the Supplier Performance breakdown.
+
+What it shows:
+- A sortable, paginated table of every active supplier in the period with columns for Code, Name, Type, Items, Revenue, COGS, Gross Profit, Margin %.
+- The pre-fetched data gives you:
+  (A) Top 10 suppliers by Revenue (biggest sourcing partners)
+  (B) Bottom 10 suppliers by Margin % with revenue ≥ RM 10,000 (weak-margin partners that still carry meaningful volume)
+  (C) Aggregate roll-ups: total supplier count, loss-making supplier count, top-10 share of revenue, median margin %, avg revenue per supplier, thin-margin (< 5%) supplier count.
+
+Performance thresholds:
+- Top 10 share of revenue > 60% = Bad (concentrated sourcing)
+- Top 10 share of revenue 40-60% = Neutral (typical for distribution)
+- Loss-making suppliers (margin % < 0) > 0 = Always flag; name them
+- Thin-margin suppliers (margin % < 5%) > 10% of active count = Portfolio quality concern
+- Any bottom-10 supplier with revenue > RM 100,000 AND margin % < 5 = Critical (big volume, thin margin)
+
+Evaluate:
+- Concentration: how much of the revenue sits with the top few suppliers?
+- Bottom-margin tail: is the problem one or two big thin-margin suppliers, or a long tail?
+- Supplier type clustering in the bottom 10 (do weak-margin suppliers share a category?)
+- Whether the biggest revenue suppliers are also the best margin suppliers — mismatches are the actionable signal.
+
+Cite named suppliers from the pre-fetched top/bottom blocks. Do not invent.
+
+Provide a concise analysis focused on sourcing concentration and the at-risk thin-margin tail.`,
+
+  sm_item_pricing: `You are analyzing the "Item Price Comparison" panel on the Supplier Performance breakdown.
+
+What it shows:
+- Per-supplier purchase-price comparison for a SINGLE anchor item. The UI lets the user pick any item; for this analysis the anchor is the item with the highest purchase_total in the selected period (named in the pre-fetched block).
+- The pre-fetched data gives you:
+  (A) Top 5 suppliers for the anchor item by purchase volume, with avg purchase price, estimated sell price, and estimated margin %.
+  (B) Period totals for the anchor item: total purchased qty, total purchase RM, avg purchase price across all suppliers, min / max purchase price (best / worst supplier on price).
+  (C) Cross-supplier margin % spread on the anchor item (best minus worst).
+
+Note: the estimated sell price is derived from raw invoice + cash-sale line items (or a pre-compute fallback when raw tables are unavailable). Margin estimates are therefore anchor-item-specific, not business-wide.
+
+Performance thresholds:
+- Margin % spread across suppliers > 10 percentage points = Significant sourcing arbitrage opportunity
+- Any supplier's estimated margin % < 0 on the anchor item = Loss-making on that item — flag
+- Cheapest supplier carries > 50% of the item's purchase volume = Procurement already on best price — neutral
+- Cheapest supplier carries < 20% of the item's purchase volume = Concentration on a more expensive supplier — flag
+
+Evaluate:
+- Whether the volume leader is also the price leader (aligned procurement) or not (arbitrage risk)
+- How wide the price spread is across suppliers for the same item — wide spreads are either a quality / grade difference or a procurement failure
+- The margin spread across suppliers on this one item — if it is large, shifting volume could improve overall margin
+- Whether the same supplier delivers the best (or worst) estimated margin
+
+Do NOT generalize about the business from a single anchor item. Frame conclusions as "for this anchor item specifically...". The summary layer may drill other items via tools.
+
+Cite suppliers by name from the pre-fetched block. Do not invent numbers.
+
+Provide a concise analysis focused on price alignment and margin arbitrage on the anchor item.`,
+
+  sm_price_scatter: `You are analyzing the "Purchase vs Selling Price" scatter chart on the Supplier Performance breakdown.
+
+What it shows:
+- One dot per item: x = avg purchase price, y = avg selling price, size = revenue in the period.
+- The UI samples the full universe; the pre-fetched data carries the TOP 50 items by revenue (the items that actually move the P&L) plus a bucketed margin % distribution across the full universe.
+
+Pre-fetched data contains:
+(A) Top 50 items by revenue: item code, name, suppliers (names), avg purchase price RM, avg selling price RM, margin %, revenue RM
+(B) Margin bucket distribution over the full item universe: counts of items with margin % < 0, 0-5, 5-10, 10-20, 20+
+(C) Loss-maker counts: items with margin % < 0 inside the top-50 AND across the full universe
+(D) Universe size: total items in the scatter pool
+
+Performance thresholds:
+- Top-50 items with margin % < 0 = Always flag (these items move the P&L)
+- More than 20% of universe items in the < 5% bucket = Thin-margin product catalog
+- Meaningful tail (> 10% of universe) in the 20+ bucket = Premium product pocket worth protecting
+- Any top-50 item with margin % < 0 AND revenue > RM 100,000 = Severe (fixing one item moves the needle)
+
+Evaluate:
+- Shape of the bucket distribution (left-skewed loss, centered thin, right-skewed premium, bimodal)
+- Price-spread outliers in the top-50: items where purchase price is unusually high or low relative to selling price
+- Named loss-making items in the top-50 (call them out with supplier names and the RM revenue)
+- Whether the same suppliers appear repeatedly in the loss-making items (structural supplier quality issue) or whether it is spread across many suppliers (item-level problem)
+
+Cite items by name from the pre-fetched top-50 block. Do not invent.
+
+Provide a concise analysis focused on loss-making items, price-spread outliers, and the shape of the margin distribution.`,
 };
 
 // ─── Summary Prompt ──────────────────────────────────────────────────────────
@@ -924,6 +1038,12 @@ export const SECTION_COMPONENTS: Record<SectionKey, { key: string; name: string;
     { key: 'sp_margin_trend',        name: 'Profitability Trend',  type: 'chart' },
     { key: 'sp_margin_distribution', name: 'Margin Distribution',  type: 'chart' },
   ],
+  supplier_margin_breakdown: [
+    { key: 'sm_top_bottom',     name: 'Top/Bottom Suppliers & Items', type: 'chart' },
+    { key: 'sm_supplier_table', name: 'Supplier Analysis Table',      type: 'table' },
+    { key: 'sm_item_pricing',   name: 'Item Price Comparison',        type: 'breakdown' },
+    { key: 'sm_price_scatter',  name: 'Purchase vs Selling Price',    type: 'chart' },
+  ],
 };
 
 export const SECTION_PAGE: Record<SectionKey, string> = {
@@ -934,6 +1054,7 @@ export const SECTION_PAGE: Record<SectionKey, string> = {
   customer_margin_overview: 'Customer Margin',
   customer_margin_breakdown: 'Customer Margin',
   supplier_margin_overview: 'Supplier Performance',
+  supplier_margin_breakdown: 'Supplier Performance',
 };
 
 export const SECTION_NAMES: Record<SectionKey, string> = {
@@ -944,6 +1065,7 @@ export const SECTION_NAMES: Record<SectionKey, string> = {
   customer_margin_overview: 'Customer Margin Overview',
   customer_margin_breakdown: 'Customer Margin Breakdown',
   supplier_margin_overview: 'Supplier Margin Overview',
+  supplier_margin_breakdown: 'Supplier Margin Breakdown',
 };
 
 // ─── Public API ──────────────────────────────────────────────────────────────

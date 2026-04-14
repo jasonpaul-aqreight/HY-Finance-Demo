@@ -256,4 +256,30 @@ export const COMPONENT_INFO: Record<string, ComponentInfo> = {
     indicator: 'Most entities in the 10–20% band = Healthy · Over 40% below 10% = Bad · Any entity < 0% = sourcing at a loss',
     about: 'A histogram of the supplier (or item) base spread across margin bands. Buckets are fixed:\n\n< 0% · 0–5% · 5–10% · 10–15% · 15–20% · 20–30% · 30%+\n\nThe chart has a Suppliers ↔ Items toggle. The AI analysis looks at BOTH views:\n\n• Supplier view healthy but item view thin = a few premium suppliers are carrying a long tail of weak items.\n• Item view healthy but supplier view thin = good products sourced through mostly weak suppliers — a commercial terms issue.\n• Both views skewed the same way = the pattern is structural.\n\nAny entity in the < 0% bucket is sourcing at a loss and deserves attention.',
   },
+
+  // ═══ Supplier Margin Breakdown ═══
+  sm_top_bottom: {
+    name: 'Top/Bottom Suppliers & Items',
+    whatItMeasures: 'The top and bottom 10 suppliers AND items for the period, viewed by Est. Gross Profit (RM contribution) or Gross Margin % (efficiency).',
+    indicator: 'Top 1 supplier > 15% of period GP = Concentration risk · Top 10 > 60% = Concentrated · Any bottom-list entity < 0% = Sourcing at a loss',
+    about: 'This chart lets you see the best and worst performers on the supplier page through four lenses:\n\n• Suppliers by Gross Profit (RM contribution)\n• Suppliers by Margin % (efficiency, min revenue RM 10,000)\n• Items by Gross Profit\n• Items by Margin % (min revenue RM 10,000)\n\nYou can also flip to the bottom 10 on any lens. Watch for entities that appear on BOTH top-profit AND top-margin lists — those are star suppliers or products worth protecting. Any bottom-list entity with negative margin is sourcing at a loss and needs attention.',
+  },
+  sm_supplier_table: {
+    name: 'Supplier Analysis Table',
+    whatItMeasures: 'Every active supplier in the period with revenue, COGS, Gross Profit, Margin %, and item count. Sortable and searchable.',
+    indicator: 'Top 10 share of revenue > 60% = Concentrated · Loss-makers (margin < 0) > 0 = Always flag · Thin-margin (< 5%) > 10% of active = Portfolio quality concern',
+    about: 'A full sortable, paginated table of every active supplier in the selected period. Columns: Code, Name, Type, Items, Revenue, COGS, Gross Profit, Margin %.\n\nUse it to find:\n• Biggest sourcing partners (sort by Revenue desc)\n• Thin-margin suppliers (sort by Margin % asc, with a revenue floor to cut noise)\n• Loss-making suppliers (sort by Gross Profit asc)\n\nThe AI analysis focuses on sourcing concentration in the top 10 and the at-risk thin-margin tail.',
+  },
+  sm_item_pricing: {
+    name: 'Item Price Comparison',
+    whatItMeasures: 'Per-supplier avg purchase price and estimated margin for a selected item, plus the monthly price trend across suppliers.',
+    indicator: 'Margin spread > 10 pp across suppliers = Arbitrage opportunity · Cheapest supplier carries < 20% of qty = Misaligned procurement · Any supplier margin < 0 = Loss-making on that item',
+    about: 'This panel lets you pick any item and see how each supplier compares on price and estimated margin. The AI analysis is anchored to a single item — the highest-revenue item in the selected period — and looks at:\n\n• Whether the volume leader is also the price leader (aligned procurement) or not (arbitrage risk)\n• How wide the price spread is across suppliers for the same item\n• The cross-supplier margin % spread — a wide spread means shifting volume could improve margin\n\nThe estimated sell price comes from raw invoice + cash-sale line items (or the pre-compute fallback when raw tables are unavailable). Conclusions are framed to the anchor item specifically — the summary layer may drill other items.',
+  },
+  sm_price_scatter: {
+    name: 'Purchase vs Selling Price',
+    whatItMeasures: 'Item-level scatter plot of avg purchase price (x) vs avg selling price (y), bubble-sized by revenue.',
+    indicator: 'Top-50 items with margin % < 0 = Always flag · > 20% of universe items in the < 5% bucket = Thin-margin catalog · Meaningful tail in 20%+ = Premium pocket',
+    about: 'Each dot is one item: x = avg purchase price, y = avg selling price, size = revenue. Items below the y = x line are selling for less than they cost (loss-making).\n\nThe AI analysis looks at:\n• Named loss-making items in the top 50 by revenue (the items that actually move the P&L)\n• Price-spread outliers — items where purchase price is unusually high or low relative to selling price\n• The shape of the margin distribution across the full universe of items (loss / thin / healthy / premium)\n\nUse it to spot items where procurement or pricing has drifted away from the rest of the catalog.',
+  },
 };

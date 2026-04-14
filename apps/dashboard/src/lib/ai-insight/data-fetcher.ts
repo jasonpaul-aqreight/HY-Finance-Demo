@@ -12,6 +12,12 @@ import {
   getMarginTrend as getSupplierMarginTrend,
   getSupplierMarginDistributionV2,
   getItemMarginDistributionV2,
+  getTopBottomSuppliersV2,
+  getTopBottomItemsV2,
+  getSupplierTableV2,
+  getItemListV2,
+  getItemSupplierSummaryV2,
+  getPriceSpread,
 } from '../supplier-margin/queries';
 import type { SectionKey, DateRange, AllowedValue, FetcherResult } from './types';
 
@@ -1704,6 +1710,382 @@ const fetchers: Record<string, DataFetcher> = {
       allowed,
     };
   },
+
+  // ─── Supplier Margin Section 4: Supplier Margin Breakdown ─────────────────
+  // All fetchers reuse supplier-margin/queries.ts V2 helpers so the dashboard
+  // and the AI see identical numbers (three-way match guaranteed).
+
+  async sm_top_bottom(dr) {
+    const start = dr!.start;
+    const end = dr!.end;
+    const summary = await getSupplierMarginSummary(start, end);
+    const periodRev = Number(summary.current.revenue);
+    const periodGp = Number(summary.current.profit);
+
+    const [
+      supProfitTop, supProfitBot, supMarginTop, supMarginBot,
+      itemProfitTop, itemProfitBot, itemMarginTop, itemMarginBot,
+    ] = await Promise.all([
+      getTopBottomSuppliersV2(start, end, undefined, undefined, 10, 'desc', 'profit'),
+      getTopBottomSuppliersV2(start, end, undefined, undefined, 10, 'asc',  'profit'),
+      getTopBottomSuppliersV2(start, end, undefined, undefined, 50, 'desc', 'margin_pct'),
+      getTopBottomSuppliersV2(start, end, undefined, undefined, 50, 'asc',  'margin_pct'),
+      getTopBottomItemsV2(start, end, undefined, undefined, 10, 'desc', 'profit'),
+      getTopBottomItemsV2(start, end, undefined, undefined, 10, 'asc',  'profit'),
+      getTopBottomItemsV2(start, end, undefined, undefined, 50, 'desc', 'margin_pct'),
+      getTopBottomItemsV2(start, end, undefined, undefined, 50, 'asc',  'margin_pct'),
+    ]);
+
+    // Margin-% lists: apply revenue floor RM 10,000 to cut noise (mirrors §2)
+    const supMarginTopFiltered = supMarginTop.filter(r => Number(r.revenue) >= 10000).slice(0, 10);
+    const supMarginBotFiltered = supMarginBot.filter(r => Number(r.revenue) >= 10000).slice(0, 10);
+    const itemMarginTopFiltered = itemMarginTop.filter(r => Number(r.revenue) >= 10000).slice(0, 10);
+    const itemMarginBotFiltered = itemMarginBot.filter(r => Number(r.revenue) >= 10000).slice(0, 10);
+
+    const allowed: AllowedValue[] = [
+      rm('period net sales', periodRev),
+      rm('period gross profit', periodGp),
+      rm('revenue floor', 10000),
+    ];
+
+    // Concentration (supplier profit)
+    let top1GpShare = 0, top3GpShare = 0, top10GpShare = 0;
+    supProfitTop.forEach((r, i) => {
+      const share = periodGp > 0 ? (Number(r.profit) / periodGp) * 100 : 0;
+      if (i === 0) top1GpShare = share;
+      if (i < 3) top3GpShare += share;
+      top10GpShare += share;
+    });
+    allowed.push(pct('top 1 supplier share of gp', top1GpShare));
+    allowed.push(pct('top 3 supplier share of gp', top3GpShare));
+    allowed.push(pct('top 10 supplier share of gp', top10GpShare));
+
+    const lossSuppliers = supProfitBot.filter(r => Number(r.profit) < 0);
+    const lossItems = itemProfitBot.filter(r => Number(r.profit) < 0);
+    allowed.push(cnt('loss-making suppliers in bottom-10', lossSuppliers.length));
+    allowed.push(cnt('loss-making items in bottom-10', lossItems.length));
+
+    // Star accounts: suppliers on both top-profit and top-margin
+    const supProfitCodes = new Set(supProfitTop.map(r => r.creditor_code));
+    const supStars = supMarginTopFiltered.filter(r => supProfitCodes.has(r.creditor_code));
+    const itemProfitCodes = new Set(itemProfitTop.map(r => r.item_code));
+    const itemStars = itemMarginTopFiltered.filter(r => itemProfitCodes.has(r.item_code));
+    allowed.push(cnt('star suppliers on both lists', supStars.length));
+    allowed.push(cnt('star items on both lists', itemStars.length));
+
+    const renderSupRow = (r: typeof supProfitTop[0], i: number) => {
+      const rev = Number(r.revenue);
+      const gp = Number(r.profit);
+      const mp = Number(r.margin_pct);
+      allowed.push(rm(`${r.creditor_code} revenue`, rev));
+      allowed.push(rm(`${r.creditor_code} profit`, gp));
+      allowed.push(pct(`${r.creditor_code} margin pct`, mp));
+      return `| ${i + 1} | ${r.creditor_code} | ${r.company_name ?? r.creditor_code} | RM ${rev.toLocaleString('en-MY')} | RM ${gp.toLocaleString('en-MY')} | ${mp.toFixed(2)}% |\n`;
+    };
+
+    const renderItemRow = (r: typeof itemProfitTop[0], i: number) => {
+      const rev = Number(r.revenue);
+      const gp = Number(r.profit);
+      const mp = Number(r.margin_pct);
+      allowed.push(rm(`${r.item_code} revenue`, rev));
+      allowed.push(rm(`${r.item_code} profit`, gp));
+      allowed.push(pct(`${r.item_code} margin pct`, mp));
+      return `| ${i + 1} | ${r.item_code} | ${r.item_name ?? r.item_code} | ${r.item_group ?? '-'} | RM ${rev.toLocaleString('en-MY')} | RM ${gp.toLocaleString('en-MY')} | ${mp.toFixed(2)}% |\n`;
+    };
+
+    const supHeader = '| # | Code | Supplier | Revenue | Profit | Margin % |\n|---|------|----------|---------|--------|---------:|\n';
+    const itemHeader = '| # | Code | Item | Group | Revenue | Profit | Margin % |\n|---|------|------|-------|---------|--------|---------:|\n';
+
+    let supTopProfitTable = supHeader;  supProfitTop.forEach((r, i) => { supTopProfitTable += renderSupRow(r, i); });
+    let supBotProfitTable = supHeader;  supProfitBot.forEach((r, i) => { supBotProfitTable += renderSupRow(r, i); });
+    let supTopMarginTable = supHeader;  supMarginTopFiltered.forEach((r, i) => { supTopMarginTable += renderSupRow(r, i); });
+    let supBotMarginTable = supHeader;  supMarginBotFiltered.forEach((r, i) => { supBotMarginTable += renderSupRow(r, i); });
+    let itemTopProfitTable = itemHeader; itemProfitTop.forEach((r, i) => { itemTopProfitTable += renderItemRow(r, i); });
+    let itemBotProfitTable = itemHeader; itemProfitBot.forEach((r, i) => { itemBotProfitTable += renderItemRow(r, i); });
+    let itemTopMarginTable = itemHeader; itemMarginTopFiltered.forEach((r, i) => { itemTopMarginTable += renderItemRow(r, i); });
+    let itemBotMarginTable = itemHeader; itemMarginBotFiltered.forEach((r, i) => { itemBotMarginTable += renderItemRow(r, i); });
+
+    const starList = (
+      (supStars.length > 0 ? `Suppliers: ${supStars.map(s => s.company_name ?? s.creditor_code).join(', ')}` : '') +
+      (itemStars.length > 0 ? `${supStars.length > 0 ? '; ' : ''}Items: ${itemStars.map(s => s.item_name ?? s.item_code).join(', ')}` : '')
+    ) || 'none';
+
+    const preCalc =
+      `Population: active suppliers with purchase activity during ${start} to ${end}.\n\n` +
+      `Pre-calculated totals (use these values directly — do not recompute):\n` +
+      `- Period Est. Net Sales: RM ${periodRev.toLocaleString('en-MY')}\n` +
+      `- Period Est. Gross Profit: RM ${periodGp.toLocaleString('en-MY')}\n` +
+      `- Top 1 supplier share of period GP: ${top1GpShare.toFixed(2)}%\n` +
+      `- Top 3 supplier share of period GP: ${top3GpShare.toFixed(2)}%\n` +
+      `- Top 10 supplier share of period GP: ${top10GpShare.toFixed(2)}%\n` +
+      `- Margin-% list revenue floor: RM 10,000\n` +
+      `- Loss-making suppliers in bottom-10: ${lossSuppliers.length}\n` +
+      `- Loss-making items in bottom-10: ${lossItems.length}\n` +
+      `- Star accounts on BOTH top-profit AND top-margin lists — ${starList}\n`;
+
+    return {
+      prompt:
+        `${preCalc}\n(A) Top 10 suppliers by Est. Gross Profit:\n${supTopProfitTable}\n` +
+        `(B) Bottom 10 suppliers by Est. Gross Profit:\n${supBotProfitTable}\n` +
+        `(C) Top 10 suppliers by Margin % (revenue ≥ RM 10,000):\n${supTopMarginTable}\n` +
+        `(D) Bottom 10 suppliers by Margin % (revenue ≥ RM 10,000):\n${supBotMarginTable}\n` +
+        `(E) Top 10 items by Est. Gross Profit:\n${itemTopProfitTable}\n` +
+        `(F) Bottom 10 items by Est. Gross Profit:\n${itemBotProfitTable}\n` +
+        `(G) Top 10 items by Margin % (revenue ≥ RM 10,000):\n${itemTopMarginTable}\n` +
+        `(H) Bottom 10 items by Margin % (revenue ≥ RM 10,000):\n${itemBotMarginTable}`,
+      allowed,
+    };
+  },
+
+  async sm_supplier_table(dr) {
+    const start = dr!.start;
+    const end = dr!.end;
+    const rows = await getSupplierTableV2(start, end);
+
+    if (rows.length === 0) {
+      return { prompt: 'No supplier table data available for selected period.', allowed: [] };
+    }
+
+    const totalRevenue = rows.reduce((s, r) => s + Number(r.revenue), 0);
+    const totalGp = rows.reduce((s, r) => s + Number(r.gross_profit), 0);
+    const supplierCount = rows.length;
+
+    // Top 10 by revenue
+    const top10 = [...rows].sort((a, b) => Number(b.revenue) - Number(a.revenue)).slice(0, 10);
+    const top10RevSum = top10.reduce((s, r) => s + Number(r.revenue), 0);
+    const top10Share = totalRevenue > 0 ? (top10RevSum / totalRevenue) * 100 : 0;
+
+    // Bottom 10 by margin % (with revenue floor RM 10,000)
+    const meaningful = rows.filter(r => Number(r.revenue) >= 10000 && r.margin_pct != null);
+    const bottom10 = [...meaningful].sort((a, b) => Number(a.margin_pct) - Number(b.margin_pct)).slice(0, 10);
+
+    const lossCount = rows.filter(r => r.margin_pct != null && Number(r.margin_pct) < 0).length;
+    const thinCount = rows.filter(r => r.margin_pct != null && Number(r.margin_pct) < 5).length;
+    const avgRevenue = supplierCount > 0 ? totalRevenue / supplierCount : 0;
+
+    const validMargins = rows.map(r => Number(r.margin_pct)).filter(m => !isNaN(m)).sort((a, b) => a - b);
+    const medianMargin = validMargins.length > 0
+      ? validMargins[Math.floor(validMargins.length / 2)]
+      : 0;
+
+    const allowed: AllowedValue[] = [
+      rm('period total revenue', totalRevenue),
+      rm('period total gross profit', totalGp),
+      rm('top 10 revenue sum', top10RevSum),
+      pct('top 10 share of revenue', top10Share),
+      cnt('total supplier count', supplierCount),
+      cnt('loss-making suppliers', lossCount),
+      cnt('thin-margin suppliers below 5 pct', thinCount),
+      pct('median margin pct', medianMargin),
+      rm('avg revenue per supplier', avgRevenue),
+      rm('revenue floor for bottom margin list', 10000),
+    ];
+
+    const renderRow = (r: typeof rows[0], i: number) => {
+      const rev = Number(r.revenue);
+      const cogs = Number(r.cogs);
+      const gp = Number(r.gross_profit);
+      const mp = Number(r.margin_pct ?? 0);
+      allowed.push(rm(`${r.creditor_code} revenue`, rev));
+      allowed.push(rm(`${r.creditor_code} cogs`, cogs));
+      allowed.push(rm(`${r.creditor_code} gross profit`, gp));
+      allowed.push(pct(`${r.creditor_code} margin pct`, mp));
+      return `| ${i + 1} | ${r.creditor_code} | ${r.company_name ?? r.creditor_code} | ${r.supplier_type ?? 'Unassigned'} | ${r.item_count} | RM ${rev.toLocaleString('en-MY')} | RM ${cogs.toLocaleString('en-MY')} | RM ${gp.toLocaleString('en-MY')} | ${mp.toFixed(2)}% |\n`;
+    };
+
+    const header =
+      '| # | Code | Supplier | Type | Items | Revenue | COGS | GP | Margin % |\n' +
+      '|---|------|----------|------|------:|---------|------|----|---------:|\n';
+
+    let topTable = header; top10.forEach((r, i) => { topTable += renderRow(r, i); });
+    let bottomTable = header; bottom10.forEach((r, i) => { bottomTable += renderRow(r, i); });
+
+    const preCalc =
+      `Population: active suppliers with purchase activity during ${start} to ${end}.\n\n` +
+      `Pre-calculated roll-ups (use these values directly — do not recompute):\n` +
+      `- Total active suppliers: ${supplierCount}\n` +
+      `- Period Est. Net Sales (across all suppliers): RM ${totalRevenue.toLocaleString('en-MY')}\n` +
+      `- Period Est. Gross Profit (across all suppliers): RM ${totalGp.toLocaleString('en-MY')}\n` +
+      `- Top 10 revenue sum: RM ${top10RevSum.toLocaleString('en-MY')}\n` +
+      `- Top 10 share of total revenue: ${top10Share.toFixed(2)}%\n` +
+      `- Loss-making suppliers (margin % < 0): ${lossCount}\n` +
+      `- Thin-margin suppliers (margin % < 5%): ${thinCount}\n` +
+      `- Median margin %: ${medianMargin.toFixed(2)}%\n` +
+      `- Avg revenue per supplier: RM ${avgRevenue.toLocaleString('en-MY')}\n`;
+
+    return {
+      prompt:
+        `${preCalc}\n(A) Top 10 suppliers by Revenue (biggest sourcing partners):\n${topTable}\n` +
+        `(B) Bottom 10 suppliers by Margin % with revenue ≥ RM 10,000 (weak-margin partners):\n${bottomTable}`,
+      allowed,
+    };
+  },
+
+  async sm_item_pricing(dr) {
+    const start = dr!.start;
+    const end = dr!.end;
+    const items = await getItemListV2(start, end);
+
+    if (items.length === 0) {
+      return { prompt: 'No item pricing data available for selected period.', allowed: [] };
+    }
+
+    // Anchor = highest purchase-total item (items are already ORDER BY total_buy DESC)
+    const anchor = items[0];
+    const supplierRows = await getItemSupplierSummaryV2(anchor.item_code, start, end);
+
+    if (supplierRows.length === 0) {
+      return {
+        prompt: `Anchor item "${anchor.item_description}" (${anchor.item_code}) has no supplier rows in the selected period.`,
+        allowed: [],
+      };
+    }
+
+    const top5 = supplierRows.slice(0, 5);
+    const totalQty = supplierRows.reduce((s, r) => s + Number(r.total_qty), 0);
+    const totalBuy = supplierRows.reduce((s, r) => s + Number(r.total_buy), 0);
+    const avgPurchasePrice = totalQty > 0 ? totalBuy / totalQty : 0;
+    const prices = supplierRows.map(r => Number(r.avg_price)).filter(p => p > 0);
+    const minPurchasePrice = prices.length ? Math.min(...prices) : 0;
+    const maxPurchasePrice = prices.length ? Math.max(...prices) : 0;
+    const marginPcts = supplierRows
+      .map(r => (r.est_margin_pct != null ? Number(r.est_margin_pct) : null))
+      .filter((m): m is number => m !== null);
+    const marginSpread = marginPcts.length ? Math.max(...marginPcts) - Math.min(...marginPcts) : 0;
+
+    const cheapest = supplierRows.find(r => Number(r.avg_price) === minPurchasePrice);
+    const cheapestShare = cheapest && totalQty > 0 ? (Number(cheapest.total_qty) / totalQty) * 100 : 0;
+
+    const allowed: AllowedValue[] = [
+      rm(`${anchor.item_code} total purchase rm`, totalBuy),
+      rm(`${anchor.item_code} total purchase qty`, totalQty),
+      rm(`${anchor.item_code} avg purchase price`, avgPurchasePrice),
+      rm(`${anchor.item_code} min purchase price`, minPurchasePrice),
+      rm(`${anchor.item_code} max purchase price`, maxPurchasePrice),
+      pct(`${anchor.item_code} margin spread`, marginSpread),
+      pct(`${anchor.item_code} cheapest supplier share of qty`, cheapestShare),
+      cnt(`${anchor.item_code} supplier count`, supplierRows.length),
+    ];
+
+    let table =
+      '| # | Code | Supplier | Qty | Total Buy | Avg Price | Est. Sales | Est. Margin % |\n' +
+      '|---|------|----------|----:|-----------|-----------|------------|--------------:|\n';
+    top5.forEach((r, i) => {
+      const qty = Number(r.total_qty);
+      const buy = Number(r.total_buy);
+      const price = Number(r.avg_price);
+      const estSales = Number(r.est_sales);
+      const estMargin = r.est_margin_pct != null ? Number(r.est_margin_pct) : null;
+      allowed.push(rm(`${r.creditor_code} total buy`, buy));
+      allowed.push(rm(`${r.creditor_code} avg price`, price));
+      allowed.push(rm(`${r.creditor_code} qty`, qty));
+      allowed.push(rm(`${r.creditor_code} est sales`, estSales));
+      if (estMargin != null) allowed.push(pct(`${r.creditor_code} est margin pct`, estMargin));
+      table +=
+        `| ${i + 1} | ${r.creditor_code} | ${r.creditor_name ?? r.creditor_code} ` +
+        `| ${qty.toLocaleString('en-MY')} | RM ${buy.toLocaleString('en-MY')} | RM ${price.toFixed(2)} ` +
+        `| RM ${estSales.toLocaleString('en-MY')} | ${estMargin != null ? estMargin.toFixed(2) + '%' : 'n/a'} |\n`;
+    });
+
+    const preCalc =
+      `Population: active suppliers of anchor item "${anchor.item_description}" (${anchor.item_code}) during ${start} to ${end}.\n\n` +
+      `Anchor item selection: highest-revenue item in the period (${items.length} items in universe).\n\n` +
+      `Pre-calculated roll-ups (use these values directly — do not recompute):\n` +
+      `- Anchor item: ${anchor.item_description} (${anchor.item_code})\n` +
+      `- Supplier count for this item: ${supplierRows.length}\n` +
+      `- Total purchased qty: ${totalQty.toLocaleString('en-MY')}\n` +
+      `- Total purchase RM: RM ${totalBuy.toLocaleString('en-MY')}\n` +
+      `- Avg purchase price across all suppliers: RM ${avgPurchasePrice.toFixed(2)}\n` +
+      `- Min / max supplier avg price: RM ${minPurchasePrice.toFixed(2)} / RM ${maxPurchasePrice.toFixed(2)}\n` +
+      `- Cross-supplier margin % spread: ${marginSpread.toFixed(2)} percentage points\n` +
+      `- Cheapest supplier (${cheapest?.creditor_name ?? 'n/a'}) qty share: ${cheapestShare.toFixed(2)}%\n`;
+
+    return {
+      prompt: `${preCalc}\nTop 5 suppliers for this anchor item by purchase volume:\n${table}`,
+      allowed,
+    };
+  },
+
+  async sm_price_scatter(dr) {
+    const start = dr!.start;
+    const end = dr!.end;
+    const rows = await getPriceSpread(start, end);
+
+    if (rows.length === 0) {
+      return { prompt: 'No price scatter data available for selected period.', allowed: [] };
+    }
+
+    // Top 50 by revenue (the items that actually matter)
+    const sortedByRevenue = [...rows].sort((a, b) => Number(b.revenue) - Number(a.revenue));
+    const top50 = sortedByRevenue.slice(0, 50);
+    const universeSize = rows.length;
+
+    // Bucket histogram across the full universe
+    const buckets = { lt0: 0, b0_5: 0, b5_10: 0, b10_20: 0, b20plus: 0 };
+    rows.forEach(r => {
+      const mp = r.margin_pct != null ? Number(r.margin_pct) : null;
+      if (mp == null) return;
+      if (mp < 0) buckets.lt0++;
+      else if (mp < 5) buckets.b0_5++;
+      else if (mp < 10) buckets.b5_10++;
+      else if (mp < 20) buckets.b10_20++;
+      else buckets.b20plus++;
+    });
+
+    const universeLossCount = buckets.lt0;
+    const top50LossCount = top50.filter(r => r.margin_pct != null && Number(r.margin_pct) < 0).length;
+    const top50RevenueSum = top50.reduce((s, r) => s + Number(r.revenue), 0);
+
+    const allowed: AllowedValue[] = [
+      cnt('universe size items', universeSize),
+      cnt('top 50 sample size', top50.length),
+      cnt('items margin below 0', buckets.lt0),
+      cnt('items margin 0 to 5', buckets.b0_5),
+      cnt('items margin 5 to 10', buckets.b5_10),
+      cnt('items margin 10 to 20', buckets.b10_20),
+      cnt('items margin 20 plus', buckets.b20plus),
+      cnt('universe loss-maker count', universeLossCount),
+      cnt('top 50 loss-maker count', top50LossCount),
+      rm('top 50 revenue sum', top50RevenueSum),
+    ];
+
+    let table =
+      '| # | Code | Item | Suppliers | Avg Purchase | Avg Sell | Margin % | Revenue |\n' +
+      '|---|------|------|-----------|-------------:|---------:|---------:|---------|\n';
+    top50.forEach((r, i) => {
+      const pp = Number(r.avg_purchase_price);
+      const sp = Number(r.avg_selling_price);
+      const mp = r.margin_pct != null ? Number(r.margin_pct) : 0;
+      const rev = Number(r.revenue);
+      allowed.push(rm(`${r.item_code} avg purchase`, pp));
+      allowed.push(rm(`${r.item_code} avg selling`, sp));
+      allowed.push(pct(`${r.item_code} margin pct`, mp));
+      allowed.push(rm(`${r.item_code} revenue`, rev));
+      const suppliers = (r.supplier_names ?? '').split(',').slice(0, 3).join(', ');
+      table +=
+        `| ${i + 1} | ${r.item_code} | ${r.item_name ?? r.item_code} | ${suppliers} ` +
+        `| RM ${pp.toFixed(2)} | RM ${sp.toFixed(2)} | ${mp.toFixed(2)}% | RM ${rev.toLocaleString('en-MY')} |\n`;
+    });
+
+    const preCalc =
+      `Population: items with positive sales revenue during ${start} to ${end}.\n\n` +
+      `Pre-calculated roll-ups (use these values directly — do not recompute):\n` +
+      `- Universe size (items with revenue > 0): ${universeSize}\n` +
+      `- Top 50 sample revenue sum: RM ${top50RevenueSum.toLocaleString('en-MY')}\n` +
+      `- Loss-making items in top-50 sample: ${top50LossCount}\n` +
+      `- Loss-making items in full universe: ${universeLossCount}\n` +
+      `- Margin bucket distribution (full universe):\n` +
+      `  · < 0%: ${buckets.lt0}\n` +
+      `  · 0-5%: ${buckets.b0_5}\n` +
+      `  · 5-10%: ${buckets.b5_10}\n` +
+      `  · 10-20%: ${buckets.b10_20}\n` +
+      `  · 20%+: ${buckets.b20plus}\n`;
+
+    return {
+      prompt: `${preCalc}\nTop 50 items by revenue:\n${table}`,
+      allowed,
+    };
+  },
 };
 
 // ─── Scope classification ────────────────────────────────────────────────────
@@ -1718,6 +2100,7 @@ const SECTION_SCOPE: Record<SectionKey, ScopeType> = {
   customer_margin_overview: 'period',
   customer_margin_breakdown: 'period',
   supplier_margin_overview: 'period',
+  supplier_margin_breakdown: 'period',
 };
 
 async function buildScopeLabel(scope: ScopeType, dateRange: DateRange | null): Promise<string> {

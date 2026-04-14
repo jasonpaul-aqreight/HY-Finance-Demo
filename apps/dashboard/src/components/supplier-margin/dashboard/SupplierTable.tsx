@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { AnalyzeIcon } from '@/components/ai-insight/AnalyzeIcon';
 import { TablePagination, type PageSize } from '@/components/ui/table-pagination';
 import { formatRM, marginColor } from '@/lib/supplier-margin/format';
 import { exportToExcel } from '@/lib/export-excel';
@@ -244,7 +245,10 @@ export function SupplierTable({ filters }: { filters: DashboardFilters }) {
       <CardHeader className="pb-2 space-y-2">
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle>Supplier Analysis</CardTitle>
+            <div className="flex items-center gap-2">
+              <CardTitle>Supplier Analysis</CardTitle>
+              <AnalyzeIcon sectionKey="supplier_margin_breakdown" componentKey="sm_supplier_table" />
+            </div>
             <p className="flex items-start gap-1.5 text-xs text-foreground/70 mt-1">
               <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
               <span className="flex flex-col gap-0.5"><span><strong>Est.</strong> = Estimated — the system does not track which supplier's stock was sold to which customer, so revenue, cost of sales, and profit are split based on each supplier's share of total purchases.</span><span>Qty Purchased, Avg Purchase / Unit, and Total Spend use actual data from purchase invoices.</span></span>

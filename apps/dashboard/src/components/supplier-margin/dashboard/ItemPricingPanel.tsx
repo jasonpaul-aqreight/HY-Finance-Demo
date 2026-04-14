@@ -14,6 +14,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { AnalyzeIcon } from '@/components/ai-insight/AnalyzeIcon';
 import {
   Table,
   TableBody,
@@ -281,7 +282,10 @@ function SupplierComparisonTable({
   return (
     <Card data-testid="supplier-comparison-table">
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">Supplier Comparison</CardTitle>
+        <div className="flex items-center gap-2">
+          <CardTitle className="text-base">Supplier Comparison</CardTitle>
+          <AnalyzeIcon sectionKey="supplier_margin_breakdown" componentKey="sm_item_pricing" />
+        </div>
         <p className="text-xs text-muted-foreground">
           Sorted by average price (cheapest first) — best deal highlighted
         </p>

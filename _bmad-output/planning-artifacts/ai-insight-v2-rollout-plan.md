@@ -23,14 +23,14 @@
 
 ## Section tracker (11 sections)
 
-Legend: ⬜ Not started · 🟡 Spec in progress · 🔵 Spec signed off · 🟢 Implemented · ✅ Committed
+Legend: ⬜ Not started · 🟡 Spec in progress · 🔵 Spec signed off · 🟢 Implemented · ✅ Done (committed; live LLM run deferred Phase B)
 
 | # | Section Key | Page | Scope | Tool Policy | Status |
 |---|-------------|------|-------|-------------|--------|
-| 1 | `customer_margin_overview` | Customer Margin | period | aggregate_only | ✅ Shipped (offline verified — live LLM run deferred) |
-| 2 | `customer_margin_breakdown` | Customer Margin | period | full | ✅ Implemented (live LLM deferred) |
-| 3 | `supplier_margin_overview` | Supplier Performance | period | aggregate_only | ⬜ |
-| 4 | `supplier_margin_breakdown` | Supplier Performance | period | full | ⬜ |
+| 1 | `customer_margin_overview` | Customer Margin | period | aggregate_only | ✅ Done |
+| 2 | `customer_margin_breakdown` | Customer Margin | period | full | ✅ Done |
+| 3 | `supplier_margin_overview` | Supplier Performance | period | aggregate_only | ✅ Done |
+| 4 | `supplier_margin_breakdown` | Supplier Performance | period | full | ✅ Done |
 | 5 | `return_trend` | Returns | period | aggregate_only | ⬜ |
 | 6 | `return_unsettled` | Returns | snapshot | full | ⬜ |
 | 7 | `expense_overview` | Expenses | period | aggregate_only | ⬜ |
@@ -106,3 +106,8 @@ Legend: ⬜ Not started · 🟡 Spec in progress · 🔵 Spec signed off · 🟢
 | 2026-04-14 | 2 | Section 2 (`customer_margin_breakdown`) spec drafted at v1 rigor with §2.9 per-component icons checklist. 3 components. Tool policy `full`. Awaiting user sign-off. |
 | 2026-04-14 | 2 | Section 2 sign-off received (dual-lens Option A for `cm_top_customers`). 9-step playbook executed: types → prompts (registries + 3 component prompts) → 3 fetchers (zero new SQL — all reuse `getCustomerMargins` / `getCreditNoteImpact` / `getMarginKpi` / `getMarginDistribution`) → scope `period` → policy `full` → `InsightSectionHeader` mounted above `TopCustomersChart` in `MarginDashboardShell.tsx` → `COMPONENT_INFO` + 3 `AnalyzeIcon` wirings (`TopCustomersChart`, `CustomerMarginTable`, `CreditNoteImpactTable`). Truth queries written (7 queries, T1–T7). `tsc --noEmit` clean. |
 | 2026-04-14 | 2 | Playwright offline verify: breakdown section header renders, `cm_top_customers` + `cm_customer_table` + `cm_credit_note_impact` icons all present, ComponentInsightDialog opens with About section populated (verified on `cm_customer_table`). Page shows 9 icons per tab (not 10) because `CustomerMarginTable` and `CreditNoteImpactTable` share a `<Tabs>` container — only one table mounts at a time. 7 overview + TopCustomers + active-tab table = 9. All 3 breakdown icons present across tabs. No new JS errors. Live LLM run still blocked on credit balance. |
+| 2026-04-14 | 2 | Section 2 shipped. Status → ✅. Committed as `ef9d259` (feat: AI insight v2 — customer margin breakdown section). Live LLM verification deferred until API credits are available. |
+| 2026-04-14 | 3 | Section 3 (`supplier_margin_overview`) spec drafted + implemented (7 components: 5 KPIs + trend + dual-entity distribution). 9-step playbook executed. Shipped as commit `72218fe` (feat: AI insight v2 — supplier margin overview section). |
+| 2026-04-14 | 4 | Section 4 (`supplier_margin_breakdown`) spec drafted with §4.9 per-component icons checklist. 4 components: TopBottomChart (2×2 lens matrix), SupplierTable, ItemPricingPanel (anchor-item anchor = highest-revenue item), PriceScatterChart (top-50 sample + 5-bucket distribution). Tool policy `full` (mirrors §2). User accepted all proposal recommendations verbatim. |
+| 2026-04-14 | 4 | Section 4 implementation: types → prompts (SECTION_COMPONENTS/PAGE/NAMES + 4 component prompts) → 4 fetchers (all reuse `getTopBottomSuppliersV2` / `getTopBottomItemsV2` / `getSupplierTableV2` / `getItemListV2` / `getItemSupplierSummaryV2` / `getPriceSpread` — zero new SQL) → scope `period` → policy `full` (no whitelist changes) → second `InsightSectionHeader` mounted above `TopBottomChart` in `DashboardShell.tsx` → `COMPONENT_INFO` + 4 `AnalyzeIcon` wirings (`TopBottomChart`, `SupplierTable`, `ItemPricingPanel` on Supplier Comparison card, `PriceScatterChart`). Truth queries written (8 queries, T1–T8). `tsc --noEmit` clean. `npm run build` clean. |
+| 2026-04-14 | 4 | Playwright offline verify: "Supplier Margin Breakdown" section header renders with Get Insight button, 3 immediately-visible breakdown icons present (top_bottom, supplier_table, price_scatter), dialog opens with correct About section on `sm_supplier_table` click (dialog heading "Supplier Analysis Table"). `sm_item_pricing` icon lives inside the Price Comparison tab's Supplier Comparison card and only renders once a user selects an item — wiring verified in source. Only pre-existing console errors; no new JS errors introduced. Live LLM run still deferred on credit balance. |

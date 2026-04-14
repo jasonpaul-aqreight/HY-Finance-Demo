@@ -9,7 +9,8 @@ export type SectionKey =
   | 'sales_breakdown'
   | 'customer_margin_overview'
   | 'customer_margin_breakdown'
-  | 'supplier_margin_overview';
+  | 'supplier_margin_overview'
+  | 'supplier_margin_breakdown';
 
 export type ComponentType = 'kpi' | 'chart' | 'table' | 'breakdown';
 
