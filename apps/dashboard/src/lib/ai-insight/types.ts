@@ -13,7 +13,8 @@ export type SectionKey =
   | 'supplier_margin_breakdown'
   | 'return_trend'
   | 'return_unsettled'
-  | 'expense_overview';
+  | 'expense_overview'
+  | 'expense_breakdown';
 
 export type ComponentType = 'kpi' | 'chart' | 'table' | 'breakdown';
 

@@ -386,6 +386,22 @@ export const COMPONENT_INFO: Record<string, ComponentInfo> = {
     indicator: 'COGS 60–80% = Typical · > 85% = COGS-dominated (margin-pressure risk) · < 50% = OpEx-dominated (scaling inefficiency risk)',
     about: 'The donut shows the COGS / OpEx split for the period. The critical number is not the absolute split but the DRIFT from prior year.\n\n• A rising COGS share (positive drift, in percentage points) on flat sales indicates margin compression — the cost of what you sell has grown faster than what you can charge for it.\n• A falling COGS share (negative drift) can mean two very different things: margin improvement (good) or inventory under-investment (bad) — the sales page should be cross-checked before concluding.\n• An OpEx-dominated mix (COGS < 50%) on a distribution business is unusual and usually flags either premium positioning or poor scaling of the fixed cost base.\n\nThis chart is most useful when the AI can put a number on the drift and interpret it against the sales context.',
   },
+  // ═══ Expense Breakdown (§8) ═══
+  ex_cogs_table: {
+    name: 'Cost of Sales Breakdown',
+    whatItMeasures: 'Every active GL account with acc_type = \'CO\' (Cost of Sales) for the selected period, with each account\'s share of total COGS.',
+    formula: 'SUM(net_amount) per acc_no WHERE acc_type = \'CO\' within the period; share = account net_cost ÷ SUM(net_cost)',
+    indicator: 'Top 1 > 50% = Severe · 30-50% = Concentrated · < 15% = Diversified · Top 3 > 80% = Concentrated · Account count < 5 = Thin surface · Any negative net_cost = Flag',
+    about: 'COGS is the variable cost base — the dollars you spend to buy what you sell. This breakdown answers one question: where do those dollars actually land?\n\nA handful of accounts usually dominate in a fruit-distribution business (raw purchase, freight-in, direct handling), and concentrated COGS is normal. The flag is not "concentration" itself — it is Top 1 above 50%, which means a single unit-price renegotiation on one account moves the whole COGS line.\n\nThe analysis ignores prior-year comparisons by design — those live in §7 Expense Overview. Here the focus is structure: who is big, who has a negative balance (credit-note reversal), and whether the GL surface is rich enough to be trusted.',
+  },
+  ex_opex_table: {
+    name: 'Operating Costs Breakdown',
+    whatItMeasures: 'Every active GL account with acc_type = \'EP\' (Operating Costs) for the selected period, grouped under a fixed category taxonomy (People & Payroll, Vehicle & Transport, Property & Utilities, etc.), with each category\'s and account\'s share of total OpEx.',
+    formula: 'SUM(net_amount) per acc_no WHERE acc_type = \'EP\' within the period, grouped by category (ParentAccNo → category map)',
+    indicator: 'Top category > 50% = Dominant · 30-50% = Typical · < 20% = Diversified · Top 1 account > 20% = Single-account risk · Singleton categories / negative accounts = Flag',
+    about: 'OpEx is the semi-fixed cost base — rent, salaries, utilities, tooling, vehicles. Unlike COGS, it does not scale with sales volume, so the structure of the OpEx breakdown tells you where the business is actually spending its structural dollars.\n\nThe table groups accounts into a fixed category taxonomy. For a Malaysian fruit distributor, People & Payroll, Vehicle & Transport, or Property & Utilities dominating is expected. Marketing & Entertainment or Professional Fees dominating is not.\n\nThe analysis ignores prior-year comparisons by design — those live in §7 Expense Overview. Here the focus is structure: which category carries the base, whether one account drives the dominant category (single-account risk), and whether any category has only a single account (data-quality flag).',
+  },
+
   ex_top_expenses: {
     name: 'Top Expenses',
     whatItMeasures: 'Top 10 GL accounts by net cost in the period, with bars coloured by cost type (COGS / OpEx). User can toggle cost type and top/bottom direction.',

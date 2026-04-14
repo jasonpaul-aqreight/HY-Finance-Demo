@@ -2804,6 +2804,206 @@ const fetchers: Record<string, DataFetcher> = {
       allowed,
     };
   },
+
+  async ex_cogs_table(dr) {
+    const rows = await getCogsBreakdown(dr!.start, dr!.end);
+    if (rows.length === 0) {
+      return { prompt: `No COGS (acc_type = 'CO') postings in ${dr!.start} to ${dr!.end}.`, allowed: [] };
+    }
+
+    const total = rows.reduce((s, r) => s + r.net_cost, 0);
+    const positive = rows.filter(r => r.net_cost > 0);
+    const negatives = rows.filter(r => r.net_cost < 0);
+    const sorted = [...positive].sort((a, b) => b.net_cost - a.net_cost);
+
+    const top1 = sorted[0];
+    const top1Share = total > 0 ? (top1.net_cost / total) * 100 : 0;
+    const top3Sum = sorted.slice(0, 3).reduce((s, r) => s + r.net_cost, 0);
+    const top3Share = total > 0 ? (top3Sum / total) * 100 : 0;
+    const top10Sum = sorted.slice(0, 10).reduce((s, r) => s + r.net_cost, 0);
+    const top10Share = total > 0 ? (top10Sum / total) * 100 : 0;
+
+    const top1Label =
+      top1Share > 50 ? 'Severe (single-account exposure)' :
+      top1Share >= 30 ? 'Concentrated (dominant-fruit sourcing)' :
+      top1Share < 15 ? 'Diversified' :
+      'Moderate';
+    const top3Label =
+      top3Share > 80 ? 'Concentrated top 3' :
+      top3Share < 55 ? 'Diversified top 3' :
+      'Moderate top 3';
+    const surfaceLabel = positive.length < 5 ? 'Thin COGS surface (< 5 accounts)' : `${positive.length} active COGS accounts`;
+
+    const allowed: AllowedValue[] = [
+      rm('total cogs', Math.round(total)),
+      cnt('cogs account count', positive.length),
+      pct('top 1 cogs share', top1Share),
+      pct('top 3 cogs share', top3Share),
+      pct('top 10 cogs share', top10Share),
+      rm('top 3 cogs sum', Math.round(top3Sum)),
+      rm('top 10 cogs sum', Math.round(top10Sum)),
+    ];
+
+    let table =
+      '| # | Account | Acc No | Net Cost | % of COGS |\n' +
+      '|---|---------|--------|----------|-----------|\n';
+    sorted.slice(0, 10).forEach((r, i) => {
+      const share = total > 0 ? (r.net_cost / total) * 100 : 0;
+      table +=
+        `| ${i + 1} | ${r.account_name} | ${r.acc_no} ` +
+        `| RM ${Math.round(r.net_cost).toLocaleString('en-MY')} | ${share.toFixed(1)}% |\n`;
+      allowed.push(rm(`${r.account_name} net cost`, Math.round(r.net_cost)));
+      allowed.push(pct(`${r.account_name} share of cogs`, share));
+    });
+
+    let negBlock = '';
+    if (negatives.length > 0) {
+      negBlock = `\nNegative-value COGS accounts (likely credit notes / reversals — flag these):\n`;
+      negatives.forEach(r => {
+        negBlock += `- ${r.account_name} (${r.acc_no}): RM ${Math.round(r.net_cost).toLocaleString('en-MY')}\n`;
+        allowed.push(rm(`${r.account_name} negative cogs`, Math.round(r.net_cost)));
+      });
+    }
+
+    const preCalc =
+      `Population: GL accounts with acc_type = 'CO' (Cost of Sales) postings between ${dr!.start} and ${dr!.end}.\n\n` +
+      `Pre-calculated roll-ups (use these values directly — do not recompute):\n` +
+      `- Total COGS: RM ${Math.round(total).toLocaleString('en-MY')}\n` +
+      `- Active COGS accounts: ${positive.length} — ${surfaceLabel}\n` +
+      `- Top 1 account share: ${top1Share.toFixed(1)}% — ${top1Label}\n` +
+      `- Top 3 accounts share: ${top3Share.toFixed(1)}% (sum RM ${Math.round(top3Sum).toLocaleString('en-MY')}) — ${top3Label}\n` +
+      `- Top 10 accounts share: ${top10Share.toFixed(1)}% (sum RM ${Math.round(top10Sum).toLocaleString('en-MY')})\n` +
+      `- Negative-value accounts: ${negatives.length}\n\n` +
+      `Thresholds:\n` +
+      `- Top 1 > 50% = Severe · 30-50% = Concentrated · < 15% = Diversified\n` +
+      `- Top 3 > 80% = Concentrated · < 55% = Diversified\n` +
+      `- Account count < 5 = Thin COGS surface\n` +
+      `- Any negative net_cost account = Flag (credit note / reversal)\n\n`;
+
+    return {
+      prompt: preCalc + 'Top 10 COGS accounts (descending):\n' + table + negBlock,
+      allowed,
+    };
+  },
+
+  async ex_opex_table(dr) {
+    const rows = await getOpexBreakdown(dr!.start, dr!.end);
+    if (rows.length === 0) {
+      return { prompt: `No OpEx (acc_type = 'EP') postings in ${dr!.start} to ${dr!.end}.`, allowed: [] };
+    }
+
+    const total = rows.reduce((s, r) => s + r.net_cost, 0);
+    const positive = rows.filter(r => r.net_cost > 0);
+    const negatives = rows.filter(r => r.net_cost < 0);
+
+    // Category subtotals
+    const catMap = new Map<string, { subtotal: number; accountCount: number }>();
+    for (const r of rows) {
+      const entry = catMap.get(r.category) ?? { subtotal: 0, accountCount: 0 };
+      entry.subtotal += r.net_cost;
+      entry.accountCount += 1;
+      catMap.set(r.category, entry);
+    }
+    const categories = [...catMap.entries()]
+      .map(([name, v]) => ({ name, subtotal: v.subtotal, accountCount: v.accountCount }))
+      .sort((a, b) => b.subtotal - a.subtotal);
+
+    const topCat = categories[0];
+    const topCatShare = total > 0 ? (topCat.subtotal / total) * 100 : 0;
+    const topCatLabel =
+      topCatShare > 50 ? 'Dominant category (one cost center carries the base)' :
+      topCatShare >= 30 ? 'Typical dominance (usually staff or rent)' :
+      topCatShare < 20 ? 'Diversified across categories' :
+      'Moderate';
+
+    // Top 10 accounts across all categories
+    const sortedAccounts = [...positive].sort((a, b) => b.net_cost - a.net_cost);
+    const top1Acct = sortedAccounts[0];
+    const top1AcctShare = total > 0 ? (top1Acct.net_cost / total) * 100 : 0;
+    const top3AcctSum = sortedAccounts.slice(0, 3).reduce((s, r) => s + r.net_cost, 0);
+    const top3AcctShare = total > 0 ? (top3AcctSum / total) * 100 : 0;
+    const acctLabel =
+      top1AcctShare > 20 ? 'Single-account risk (name it)' :
+      top3AcctShare > 50 ? 'Concentrated top 3 accounts' :
+      'Spread across accounts';
+
+    const singletonCats = categories.filter(c => c.accountCount === 1);
+
+    const allowed: AllowedValue[] = [
+      rm('total opex', Math.round(total)),
+      cnt('opex account count', positive.length),
+      cnt('opex category count', categories.length),
+      pct('top category share', topCatShare),
+      pct('top 1 opex account share', top1AcctShare),
+      pct('top 3 opex account share', top3AcctShare),
+    ];
+
+    let catTable =
+      '| Category | Accounts | Subtotal | % of OpEx |\n' +
+      '|----------|----------|----------|-----------|\n';
+    categories.forEach(c => {
+      const share = total > 0 ? (c.subtotal / total) * 100 : 0;
+      catTable +=
+        `| ${c.name} | ${c.accountCount} ` +
+        `| RM ${Math.round(c.subtotal).toLocaleString('en-MY')} | ${share.toFixed(1)}% |\n`;
+      allowed.push(rm(`${c.name} subtotal`, Math.round(c.subtotal)));
+      allowed.push(pct(`${c.name} share of opex`, share));
+    });
+
+    let acctTable =
+      '| # | Category | Account | Acc No | Net Cost | % of OpEx |\n' +
+      '|---|----------|---------|--------|----------|-----------|\n';
+    sortedAccounts.slice(0, 10).forEach((r, i) => {
+      const share = total > 0 ? (r.net_cost / total) * 100 : 0;
+      acctTable +=
+        `| ${i + 1} | ${r.category} | ${r.account_name} | ${r.acc_no} ` +
+        `| RM ${Math.round(r.net_cost).toLocaleString('en-MY')} | ${share.toFixed(1)}% |\n`;
+      allowed.push(rm(`${r.account_name} opex net cost`, Math.round(r.net_cost)));
+      allowed.push(pct(`${r.account_name} share of opex`, share));
+    });
+
+    let flagsBlock = '';
+    if (singletonCats.length > 0) {
+      flagsBlock += `\nCategories with only 1 account (possible misclassification or sparse data):\n`;
+      singletonCats.forEach(c => {
+        flagsBlock += `- ${c.name}\n`;
+      });
+    }
+    if (negatives.length > 0) {
+      flagsBlock += `\nNegative-value OpEx accounts (likely reversals — flag these):\n`;
+      negatives.forEach(r => {
+        flagsBlock += `- ${r.account_name} (${r.acc_no}) [${r.category}]: RM ${Math.round(r.net_cost).toLocaleString('en-MY')}\n`;
+        allowed.push(rm(`${r.account_name} negative opex`, Math.round(r.net_cost)));
+      });
+    }
+
+    const preCalc =
+      `Population: GL accounts with acc_type = 'EP' (Operating Costs) postings between ${dr!.start} and ${dr!.end}.\n\n` +
+      `Pre-calculated roll-ups (use these values directly — do not recompute):\n` +
+      `- Total OpEx: RM ${Math.round(total).toLocaleString('en-MY')}\n` +
+      `- Active OpEx accounts: ${positive.length}\n` +
+      `- Active categories: ${categories.length}\n` +
+      `- Top category: ${topCat.name} at ${topCatShare.toFixed(1)}% — ${topCatLabel}\n` +
+      `- Top 1 account share: ${top1AcctShare.toFixed(1)}% (${top1Acct.account_name}) — ${acctLabel}\n` +
+      `- Top 3 accounts share: ${top3AcctShare.toFixed(1)}%\n` +
+      `- Singleton categories: ${singletonCats.length}\n` +
+      `- Negative-value accounts: ${negatives.length}\n\n` +
+      `Thresholds:\n` +
+      `- Top 1 category > 50% = Dominant · 30-50% = Typical · < 20% = Diversified\n` +
+      `- Top 1 account > 20% of OpEx = Single-account risk\n` +
+      `- Top 3 accounts > 50% = Concentrated\n` +
+      `- Category with only 1 account = Flag\n` +
+      `- Any negative net_cost account = Flag\n\n`;
+
+    return {
+      prompt:
+        preCalc +
+        'OpEx by category:\n' + catTable +
+        '\nTop 10 OpEx accounts across all categories (descending):\n' + acctTable +
+        flagsBlock,
+      allowed,
+    };
+  },
 };
 
 // ─── Scope classification ────────────────────────────────────────────────────
@@ -2822,6 +3022,7 @@ const SECTION_SCOPE: Record<SectionKey, ScopeType> = {
   return_trend: 'period',
   return_unsettled: 'snapshot',
   expense_overview: 'period',
+  expense_breakdown: 'period',
 };
 
 // Per-section snapshot source: each snapshot section anchors its "as of" date on a different table.

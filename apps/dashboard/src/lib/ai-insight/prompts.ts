@@ -1274,6 +1274,75 @@ Evaluate:
 Name accounts from the top-10 table verbatim. Do not invent accounts or change acc_no values.
 
 Provide a concise analysis focused on concentration and the COGS-vs-OpEx mix at the top.`,
+
+  // ─── Expense Breakdown (§8) ──────────────────────────────────────────────
+  ex_cogs_table: `You are analyzing the "Cost of Sales Breakdown" table on the Expenses page.
+
+What it shows:
+- A sortable table of every active GL account with acc_type = 'CO' (Cost of Sales) for the selected period.
+- Columns: Account No, Account Name, Net Cost (RM), % of Total COGS.
+- The user can also see this side-by-side with the OpEx Breakdown via a tab.
+
+The pre-fetched data gives you:
+- Total COGS for the period
+- Active COGS account count (and a "thin surface" flag if < 5)
+- Top 10 COGS accounts table: rank, name, acc_no, net cost, % of total COGS
+- Pre-computed Top 1 / Top 3 / Top 10 share of total COGS, with classification labels
+- Any negative-value COGS accounts (usually credit notes or reversals)
+
+Thresholds:
+- Top 1 account > 50% of COGS = Severe (single-account exposure in variable cost base)
+- Top 1 account 30-50% = Concentrated (typical for dominant-fruit sourcing — not automatically bad)
+- Top 1 account < 15% = Diversified
+- Top 3 accounts > 80% of COGS = Concentrated (normal for a focused distributor)
+- Top 3 accounts < 55% = Diversified (broad sourcing)
+- Active COGS accounts < 5 = Thin COGS surface (limited line-item visibility — flag for GL discipline)
+- Any account with negative net_cost = Flag (name it — likely a credit note posted to expense)
+
+Evaluate:
+- Concentration: where does the variable-cost dollar actually land? If Top 1 dominates, name it — a unit-price change on that one account moves the whole COGS line.
+- Top 3 mix: is the tail meaningfully contributing, or is this a 3-account story?
+- Negative-value accounts: are any reversals large enough to distort the apparent total?
+- Do NOT compare to prior year here — that is the §7 Expense Overview job. Focus on the structure of the period's COGS.
+
+Name accounts verbatim from the top-10 table. Do not invent accounts or change acc_no values.
+
+Provide a concise analysis focused on COGS concentration and any negative-value anomalies.`,
+
+  ex_opex_table: `You are analyzing the "Operating Costs Breakdown" table on the Expenses page.
+
+What it shows:
+- A category-grouped table of every active GL account with acc_type = 'EP' (Operating Costs) for the selected period.
+- Accounts are grouped under a fixed category taxonomy (People & Payroll, Vehicle & Transport, Property & Utilities, Depreciation, Office & Supplies, Equipment & IT, Insurance, Finance & Banking, Professional Fees, Marketing & Entertainment, Repair & Maintenance, Tax & Compliance, Other).
+- Columns: Category / Account, Account Name, Net Cost (RM), % of Total OpEx. Categories are collapsible.
+
+The pre-fetched data gives you:
+- Total OpEx for the period
+- Active OpEx account count and active category count
+- Category subtotals table: category, account count, subtotal, % of OpEx (sorted by subtotal desc)
+- Top 10 OpEx accounts across all categories: rank, category, name, acc_no, net cost, % of OpEx
+- Pre-computed Top 1 category share, Top 1 / Top 3 account shares, with classification labels
+- Singleton categories (only 1 account) and any negative-value accounts
+
+Thresholds:
+- Top 1 category > 50% of OpEx = Dominant (one cost center carries the base)
+- Top 1 category 30-50% = Typical dominance (usually People & Payroll, Vehicle & Transport, or Property & Utilities)
+- Top 1 category < 20% = Diversified across categories
+- Top 1 account > 20% of total OpEx = Single-account risk (name it)
+- Top 3 accounts > 50% = Concentrated
+- Any category with only 1 account = Flag (possible misclassification or sparse data)
+- Any account with negative net_cost = Flag (name it — likely a reversal)
+
+Evaluate:
+- Category concentration: which category dominates? For a Malaysian fruit distributor, People & Payroll or Vehicle & Transport dominating is normal; Marketing & Entertainment dominating is not.
+- Single-account risk: is the dominant category driven by many accounts, or one line item? Name the account if Top 1 > 20%.
+- Structural signals: any category that looks out of proportion for a distribution business is an investigation lead.
+- Singleton categories and negative accounts are data-quality flags, not business signals — call them out if present but keep them brief.
+- Do NOT compare to prior year — that is the §7 Expense Overview job.
+
+Name categories and accounts verbatim from the pre-fetched blocks. Do not invent.
+
+Provide a concise analysis focused on category concentration, single-account risk, and any data-quality flags.`,
 };
 
 // ─── Summary Prompt ──────────────────────────────────────────────────────────
@@ -1529,6 +1598,10 @@ export const SECTION_COMPONENTS: Record<SectionKey, { key: string; name: string;
     { key: 'ex_cost_composition',  name: 'Cost Composition', type: 'chart' },
     { key: 'ex_top_expenses',      name: 'Top Expenses',     type: 'chart' },
   ],
+  expense_breakdown: [
+    { key: 'ex_cogs_table', name: 'Cost of Sales Breakdown', type: 'table' },
+    { key: 'ex_opex_table', name: 'Operating Costs Breakdown', type: 'table' },
+  ],
 };
 
 export const SECTION_PAGE: Record<SectionKey, string> = {
@@ -1543,6 +1616,7 @@ export const SECTION_PAGE: Record<SectionKey, string> = {
   return_trend: 'Returns',
   return_unsettled: 'Returns',
   expense_overview: 'Expenses',
+  expense_breakdown: 'Expenses',
 };
 
 export const SECTION_NAMES: Record<SectionKey, string> = {
@@ -1557,6 +1631,7 @@ export const SECTION_NAMES: Record<SectionKey, string> = {
   return_trend: 'Return Trends',
   return_unsettled: 'Unsettled Returns',
   expense_overview: 'Expense Overview',
+  expense_breakdown: 'Expense Breakdown',
 };
 
 // ─── Public API ──────────────────────────────────────────────────────────────

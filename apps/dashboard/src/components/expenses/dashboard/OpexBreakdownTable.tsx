@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatRM } from '@/lib/format';
 import { exportToExcel } from '@/lib/export-excel';
+import { AnalyzeIcon } from '@/components/ai-insight/AnalyzeIcon';
 
 interface Row {
   category: string;
@@ -82,7 +83,12 @@ export function OpexBreakdownTable({ filters }: { filters: DashboardFilters }) {
   if (isLoading) {
     return (
       <Card>
-        <CardHeader><CardTitle>Operating Costs Breakdown</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            Operating Costs Breakdown
+            <AnalyzeIcon sectionKey="expense_breakdown" componentKey="ex_opex_table" />
+          </CardTitle>
+        </CardHeader>
         <CardContent><div className="h-48 bg-muted animate-pulse rounded" /></CardContent>
       </Card>
     );
@@ -91,7 +97,10 @@ export function OpexBreakdownTable({ filters }: { filters: DashboardFilters }) {
   return (
     <Card>
       <CardHeader className="pb-2 flex-row items-center justify-between">
-        <CardTitle>Operating Costs Breakdown</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          Operating Costs Breakdown
+          <AnalyzeIcon sectionKey="expense_breakdown" componentKey="ex_opex_table" />
+        </CardTitle>
         <Button size="sm" variant="outline" onClick={() => handleExportExcel(groups, total)}>
           Export Excel
         </Button>

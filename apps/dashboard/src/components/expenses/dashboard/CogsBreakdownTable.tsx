@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatRM } from '@/lib/format';
 import { exportToExcel } from '@/lib/export-excel';
+import { AnalyzeIcon } from '@/components/ai-insight/AnalyzeIcon';
 
 type SortKey = 'acc_no' | 'account_name' | 'net_cost';
 
@@ -73,7 +74,12 @@ export function CogsBreakdownTable({ filters }: { filters: DashboardFilters }) {
   if (isLoading) {
     return (
       <Card>
-        <CardHeader><CardTitle>Cost of Sales Breakdown</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            Cost of Sales Breakdown
+            <AnalyzeIcon sectionKey="expense_breakdown" componentKey="ex_cogs_table" />
+          </CardTitle>
+        </CardHeader>
         <CardContent><div className="h-48 bg-muted animate-pulse rounded" /></CardContent>
       </Card>
     );
@@ -82,7 +88,10 @@ export function CogsBreakdownTable({ filters }: { filters: DashboardFilters }) {
   return (
     <Card>
       <CardHeader className="pb-2 flex-row items-center justify-between">
-        <CardTitle>Cost of Sales Breakdown</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          Cost of Sales Breakdown
+          <AnalyzeIcon sectionKey="expense_breakdown" componentKey="ex_cogs_table" />
+        </CardTitle>
         <Button size="sm" variant="outline" onClick={() => handleExportExcel(sorted, total)}>
           Export Excel
         </Button>

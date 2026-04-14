@@ -124,6 +124,15 @@ export function DashboardShell() {
             {/* Top 10 Expenses (full width, own toggles) */}
             <TopExpensesChart filters={filters} />
 
+            {/* ═══ Section 2: Expense Breakdown (date-filtered) ═══ */}
+            <InsightSectionHeader
+              title="Expense Breakdown"
+              subtitle="Filtered by date range"
+              page="expenses"
+              sectionKey="expense_breakdown"
+              dateRange={{ start: filters.startDate, end: filters.endDate }}
+            />
+
             {/* Breakdown Tables in Tabs */}
             <BreakdownTabs filters={filters} />
           </>

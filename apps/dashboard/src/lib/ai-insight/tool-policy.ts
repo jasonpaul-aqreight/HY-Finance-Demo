@@ -16,6 +16,7 @@ const SECTION_POLICY: Record<SectionKey, ToolPolicy> = {
   return_trend: 'aggregate_only',
   return_unsettled: 'full',
   expense_overview: 'aggregate_only',
+  expense_breakdown: 'full',
 };
 
 const AGGREGATE_LOCAL_TABLES = new Set([
