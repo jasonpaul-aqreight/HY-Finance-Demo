@@ -11,6 +11,7 @@ const LOCAL_WHITELIST: Record<string, string[]> = {
   pc_ar_monthly: ['month', 'invoiced', 'collected', 'cn_applied', 'refunded', 'total_outstanding', 'total_billed', 'customer_count'],
   pc_ar_customer_snapshot: ['debtor_code', 'company_name', 'debtor_type', 'sales_agent', 'display_term', 'credit_limit', 'total_outstanding', 'overdue_amount', 'utilization_pct', 'credit_score', 'risk_tier', 'is_active', 'invoice_count', 'avg_payment_days', 'max_overdue_days'],
   pc_ar_aging_history: ['snapshot_date', 'bucket', 'dimension', 'dimension_key', 'invoice_count', 'total_outstanding'],
+  pc_customer_margin: ['month', 'debtor_code', 'company_name', 'debtor_type', 'sales_agent', 'is_active', 'iv_revenue', 'dn_revenue', 'cn_revenue', 'iv_cost', 'dn_cost', 'cn_cost', 'iv_count', 'cn_count'],
 };
 
 const RDS_WHITELIST: Record<string, string[]> = {

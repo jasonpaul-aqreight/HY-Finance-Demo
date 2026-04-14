@@ -1,4 +1,10 @@
 import { getPool } from '../postgres';
+import {
+  getMarginKpi,
+  getMarginTrend,
+  getMarginDistribution,
+  type MarginFilters,
+} from '../customer-margin/queries';
 import type { SectionKey, DateRange, AllowedValue, FetcherResult } from './types';
 
 // Convert YYYY-MM-DD to YYYY-MM to match pc_ar_monthly.month column format
@@ -900,6 +906,260 @@ const fetchers: Record<string, DataFetcher> = {
       allowed,
     };
   },
+
+  // ─── Customer Margin Section: Overview ────────────────────────────────────
+  // All fetchers in this section reuse customer-margin/queries.ts so the
+  // dashboard and the AI see identical numbers (three-way match guaranteed).
+
+  async cm_net_sales(dr) {
+    const filters: MarginFilters = { start: dr!.start, end: dr!.end };
+    const kpi = await getMarginKpi(filters);
+    const net = Number(kpi.total_revenue);
+    const cogs = Number(kpi.total_cogs);
+    const gp = Number(kpi.gross_profit);
+
+    return {
+      prompt:
+        `Value: RM ${net.toLocaleString('en-MY')}\n` +
+        `Period COGS: RM ${cogs.toLocaleString('en-MY')}\n` +
+        `Period Gross Profit: RM ${gp.toLocaleString('en-MY')}`,
+      allowed: [
+        rm('net sales', net),
+        rm('cogs', cogs),
+        rm('gross profit', gp),
+      ],
+    };
+  },
+
+  async cm_cogs(dr) {
+    const filters: MarginFilters = { start: dr!.start, end: dr!.end };
+    const kpi = await getMarginKpi(filters);
+    const net = Number(kpi.total_revenue);
+    const cogs = Number(kpi.total_cogs);
+    const cogsRatio = net > 0 ? (cogs / net) * 100 : 0;
+
+    return {
+      prompt:
+        `Value: RM ${cogs.toLocaleString('en-MY')}\n` +
+        `Period Net Sales: RM ${net.toLocaleString('en-MY')}\n` +
+        `COGS as % of Net Sales: ${cogsRatio.toFixed(1)}%`,
+      allowed: [
+        rm('cogs', cogs),
+        rm('net sales', net),
+        pct('cogs share of net sales', cogsRatio),
+      ],
+    };
+  },
+
+  async cm_gross_profit(dr) {
+    const filters: MarginFilters = { start: dr!.start, end: dr!.end };
+    const kpi = await getMarginKpi(filters);
+    const net = Number(kpi.total_revenue);
+    const cogs = Number(kpi.total_cogs);
+    const gp = Number(kpi.gross_profit);
+    const marginPct = Number(kpi.margin_pct);
+
+    return {
+      prompt:
+        `Value: RM ${gp.toLocaleString('en-MY')}\n` +
+        `Period Net Sales: RM ${net.toLocaleString('en-MY')}\n` +
+        `Period COGS: RM ${cogs.toLocaleString('en-MY')}\n` +
+        `Implied Margin %: ${marginPct.toFixed(2)}%`,
+      allowed: [
+        rm('gross profit', gp),
+        rm('net sales', net),
+        rm('cogs', cogs),
+        pct('margin pct', marginPct),
+      ],
+    };
+  },
+
+  async cm_margin_pct(dr) {
+    const filters: MarginFilters = { start: dr!.start, end: dr!.end };
+    const kpi = await getMarginKpi(filters);
+    const marginPct = Number(kpi.margin_pct);
+    const net = Number(kpi.total_revenue);
+    const cogs = Number(kpi.total_cogs);
+    const gp = Number(kpi.gross_profit);
+    const color =
+      marginPct >= 15 ? 'Green (Good)' :
+      marginPct >= 10 ? 'Yellow (Neutral)' :
+      'Red (Bad)';
+
+    return {
+      prompt:
+        `Value: ${marginPct.toFixed(2)}%\n` +
+        `Color: ${color}\n` +
+        `Good threshold: >= 15%\n` +
+        `Neutral threshold: 10% to 15%\n` +
+        `Bad threshold: < 10%\n` +
+        `Period Net Sales: RM ${net.toLocaleString('en-MY')}\n` +
+        `Period COGS: RM ${cogs.toLocaleString('en-MY')}\n` +
+        `Period Gross Profit: RM ${gp.toLocaleString('en-MY')}`,
+      allowed: [
+        pct('margin pct', marginPct),
+        pct('good threshold', 15),
+        pct('neutral threshold', 10),
+        rm('net sales', net),
+        rm('cogs', cogs),
+        rm('gross profit', gp),
+      ],
+    };
+  },
+
+  async cm_active_customers(dr) {
+    const filters: MarginFilters = { start: dr!.start, end: dr!.end };
+    const kpi = await getMarginKpi(filters);
+    const activeCustomers = Number(kpi.active_customers);
+    const net = Number(kpi.total_revenue);
+    const avgPerCustomer = activeCustomers > 0 ? net / activeCustomers : 0;
+
+    return {
+      prompt:
+        `Value: ${activeCustomers.toLocaleString('en-MY')}\n` +
+        `Period Net Sales: RM ${net.toLocaleString('en-MY')}\n` +
+        `Avg Net Sales per active customer: RM ${Math.round(avgPerCustomer).toLocaleString('en-MY')}`,
+      allowed: [
+        cnt('active customers', activeCustomers),
+        rm('net sales', net),
+        rm('avg net sales per customer', Math.round(avgPerCustomer)),
+      ],
+    };
+  },
+
+  async cm_margin_trend(dr) {
+    const filters: MarginFilters = { start: dr!.start, end: dr!.end };
+    const trend = await getMarginTrend(filters);
+    if (trend.length === 0) {
+      return { prompt: 'No margin trend data available for selected period.', allowed: [] };
+    }
+
+    const allowed: AllowedValue[] = [];
+    let table =
+      '| Month | Net Sales | COGS | Gross Profit | Margin % |\n' +
+      '|-------|-----------|------|--------------|----------|\n';
+    let gpSum = 0;
+    let revSum = 0;
+    let cogsSum = 0;
+    const marginPcts: number[] = [];
+    for (const r of trend) {
+      const rev = Number(r.revenue);
+      const cogs = Number(r.cogs);
+      const gp = Number(r.gross_profit);
+      const mp = Number(r.margin_pct);
+      revSum += rev;
+      cogsSum += cogs;
+      gpSum += gp;
+      marginPcts.push(mp);
+      table +=
+        `| ${r.period} ` +
+        `| RM ${rev.toLocaleString('en-MY')} ` +
+        `| RM ${cogs.toLocaleString('en-MY')} ` +
+        `| RM ${gp.toLocaleString('en-MY')} ` +
+        `| ${mp.toFixed(2)}% |\n`;
+      allowed.push(rm(`${r.period} net sales`, rev));
+      allowed.push(rm(`${r.period} cogs`, cogs));
+      allowed.push(rm(`${r.period} gross profit`, gp));
+      allowed.push(pct(`${r.period} margin pct`, mp));
+    }
+
+    const avgMargin = marginPcts.length > 0
+      ? marginPcts.reduce((s, v) => s + v, 0) / marginPcts.length
+      : 0;
+    const periodMarginPct = revSum > 0 ? ((revSum - cogsSum) / revSum) * 100 : 0;
+    const minMargin = marginPcts.length ? Math.min(...marginPcts) : 0;
+    const maxMargin = marginPcts.length ? Math.max(...marginPcts) : 0;
+    const minRow = trend.find(r => Number(r.margin_pct) === minMargin);
+    const maxRow = trend.find(r => Number(r.margin_pct) === maxMargin);
+
+    const preCalc =
+      `Pre-calculated totals (use these values directly — do not recompute):\n` +
+      `- Period Net Sales: RM ${revSum.toLocaleString('en-MY')}\n` +
+      `- Period COGS: RM ${cogsSum.toLocaleString('en-MY')}\n` +
+      `- Period Gross Profit: RM ${gpSum.toLocaleString('en-MY')}\n` +
+      `- Period Margin %: ${periodMarginPct.toFixed(2)}%\n` +
+      `- Average Monthly Margin %: ${avgMargin.toFixed(2)}%\n` +
+      (minRow ? `- Lowest margin month: ${minRow.period} at ${minMargin.toFixed(2)}%\n` : '') +
+      (maxRow ? `- Highest margin month: ${maxRow.period} at ${maxMargin.toFixed(2)}%\n` : '') +
+      `- Months in period: ${trend.length}\n`;
+
+    allowed.push(rm('period net sales', revSum));
+    allowed.push(rm('period cogs', cogsSum));
+    allowed.push(rm('period gross profit', gpSum));
+    allowed.push(pct('period margin pct', periodMarginPct));
+    allowed.push(pct('avg monthly margin pct', avgMargin));
+    allowed.push(pct('lowest monthly margin pct', minMargin));
+    allowed.push(pct('highest monthly margin pct', maxMargin));
+    allowed.push(cnt('months in period', trend.length));
+
+    return {
+      prompt: `${preCalc}\nMonthly breakdown:\n${table}`,
+      allowed,
+    };
+  },
+
+  async cm_margin_distribution(dr) {
+    const filters: MarginFilters = { start: dr!.start, end: dr!.end };
+    const buckets = await getMarginDistribution(filters);
+    if (buckets.length === 0) {
+      return { prompt: 'No margin distribution data available for selected period.', allowed: [] };
+    }
+
+    const allowed: AllowedValue[] = [];
+    const total = buckets.reduce((s, b) => s + Number(b.count), 0);
+
+    let table =
+      '| Margin % Bucket | Customer Count | % of Total |\n' +
+      '|-----------------|----------------|------------|\n';
+    for (const b of buckets) {
+      const count = Number(b.count);
+      const pctOfTotal = total > 0 ? (count / total) * 100 : 0;
+      table += `| ${b.bucket} | ${count} | ${pctOfTotal.toFixed(1)}% |\n`;
+      allowed.push(cnt(`bucket ${b.bucket} count`, count));
+      allowed.push(pct(`bucket ${b.bucket} share`, pctOfTotal));
+    }
+
+    const lossBucket = buckets.find(b => b.bucket === '< 0%');
+    const lossCount = lossBucket ? Number(lossBucket.count) : 0;
+    const subTenCount = buckets
+      .filter(b => b.bucket === '< 0%' || b.bucket === '0-5%' || b.bucket === '5-10%')
+      .reduce((s, b) => s + Number(b.count), 0);
+    const healthyCount = buckets
+      .filter(b => b.bucket === '10-15%' || b.bucket === '15-20%')
+      .reduce((s, b) => s + Number(b.count), 0);
+    const premiumCount = buckets
+      .filter(b => b.bucket === '20-30%' || b.bucket === '30%+')
+      .reduce((s, b) => s + Number(b.count), 0);
+
+    const lossShare = total > 0 ? (lossCount / total) * 100 : 0;
+    const subTenShare = total > 0 ? (subTenCount / total) * 100 : 0;
+    const healthyShare = total > 0 ? (healthyCount / total) * 100 : 0;
+    const premiumShare = total > 0 ? (premiumCount / total) * 100 : 0;
+
+    const preCalc =
+      `Population: customers with > RM 1,000 of total revenue in the period (small-volume customers excluded upstream).\n\n` +
+      `Pre-calculated roll-ups (use these values directly — do not recompute):\n` +
+      `- Total customers in distribution: ${total}\n` +
+      `- Loss-making (< 0%): ${lossCount} customers (${lossShare.toFixed(1)}% of total)\n` +
+      `- Sub-10% margin (< 0% + 0-5% + 5-10%): ${subTenCount} customers (${subTenShare.toFixed(1)}%)\n` +
+      `- Healthy band (10-15% + 15-20%): ${healthyCount} customers (${healthyShare.toFixed(1)}%)\n` +
+      `- Premium band (20-30% + 30%+): ${premiumCount} customers (${premiumShare.toFixed(1)}%)\n`;
+
+    allowed.push(cnt('total customers in distribution', total));
+    allowed.push(cnt('loss making customers', lossCount));
+    allowed.push(cnt('sub ten customers', subTenCount));
+    allowed.push(cnt('healthy band customers', healthyCount));
+    allowed.push(cnt('premium band customers', premiumCount));
+    allowed.push(pct('loss making share', lossShare));
+    allowed.push(pct('sub ten share', subTenShare));
+    allowed.push(pct('healthy band share', healthyShare));
+    allowed.push(pct('premium band share', premiumShare));
+
+    return {
+      prompt: `${preCalc}\nBucket breakdown:\n${table}`,
+      allowed,
+    };
+  },
 };
 
 // ─── Scope classification ────────────────────────────────────────────────────
@@ -911,6 +1171,7 @@ const SECTION_SCOPE: Record<SectionKey, ScopeType> = {
   payment_outstanding: 'snapshot',
   sales_trend: 'period',
   sales_breakdown: 'period',
+  customer_margin_overview: 'period',
 };
 
 async function buildScopeLabel(scope: ScopeType, dateRange: DateRange | null): Promise<string> {

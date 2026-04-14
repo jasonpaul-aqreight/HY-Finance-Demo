@@ -10,6 +10,7 @@ import { MarginDistributionChart } from './MarginDistributionChart';
 import { CustomerMarginTable } from './CustomerMarginTable';
 import { CreditNoteImpactTable } from './CreditNoteImpactTable';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { InsightSectionHeader } from '@/components/ai-insight/InsightSectionHeader';
 
 
 export function MarginDashboardShell() {
@@ -20,12 +21,20 @@ export function MarginDashboardShell() {
     return <div className="mx-auto max-w-[1600px] px-6 py-6 text-foreground/60">Loading data range...</div>;
   }
 
+  const overviewDateRange = { start: filters.startDate, end: filters.endDate };
+
   return (
     <div className="mx-auto max-w-[1600px] space-y-4 px-6 py-6">
       {/* Filters */}
       <FilterBar filters={filters} setFilters={setFilters} bounds={bounds} />
 
-      {/* Overview */}
+      {/* Overview section — KPIs + margin trend + margin distribution */}
+      <InsightSectionHeader
+        title="Customer Margin Overview"
+        page="customer-margin"
+        sectionKey="customer_margin_overview"
+        dateRange={overviewDateRange}
+      />
       <KpiCards filters={filters} />
 
       {/* Margin Trends + Distribution */}

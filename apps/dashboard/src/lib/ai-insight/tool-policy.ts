@@ -9,12 +9,14 @@ const SECTION_POLICY: Record<SectionKey, ToolPolicy> = {
   payment_outstanding: 'full',
   sales_trend: 'aggregate_only',
   sales_breakdown: 'full',
+  customer_margin_overview: 'aggregate_only',
 };
 
 const AGGREGATE_LOCAL_TABLES = new Set([
   'pc_sales_daily',
   'pc_ar_monthly',
   'pc_ar_aging_history',
+  'pc_customer_margin',
 ]);
 
 export function policyForSection(sectionKey: SectionKey): ToolPolicy {

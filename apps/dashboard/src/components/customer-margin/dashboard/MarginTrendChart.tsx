@@ -5,6 +5,7 @@ import { useMarginTrend } from '@/hooks/customer-margin/useMarginData';
 import { useStableData } from '@/hooks/useStableData';
 import type { MarginDashboardFilters } from '@/hooks/customer-margin/useDashboardFilters';
 import { formatRM } from '@/lib/customer-margin/format';
+import { AnalyzeIcon } from '@/components/ai-insight/AnalyzeIcon';
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Legend,
@@ -46,7 +47,10 @@ export function MarginTrendChart({ filters }: Props) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Profitability Trend</CardTitle>
+        <div className="flex items-center gap-2">
+          <CardTitle>Profitability Trend</CardTitle>
+          <AnalyzeIcon sectionKey="customer_margin_overview" componentKey="cm_margin_trend" />
+        </div>
       </CardHeader>
       <CardContent>
         {!data ? (

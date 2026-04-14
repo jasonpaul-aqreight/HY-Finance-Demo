@@ -342,6 +342,136 @@ Evaluate:
 - "(Unassigned)" outlet percentage: data quality indicator
 
 Provide a concise analysis.`,
+
+  // Customer Margin Section: Overview
+  cm_net_sales: `You are analyzing the "Net Sales" KPI on the Customer Margin overview.
+
+What it measures: Total net sales for the selected period, summed across all active customers after subtracting credit notes.
+Formula: SUM(iv_revenue + dn_revenue - cn_revenue) from pc_customer_margin.
+
+Context:
+- This is the same Net Sales figure as the Sales page but scoped to the customer-margin view (active customers only).
+- Small variance vs the Sales page Net Sales is expected and is NOT an error.
+
+Performance thresholds:
+- Growth over the period = Good
+- Flat = Neutral
+- Decline = Bad
+- A drop > 10% in the full period vs a comparable prior period warrants flagging.
+
+Evaluate the level and, if trend data is included in the pre-fetched block, the direction.
+
+Provide a concise analysis of this metric.`,
+
+  cm_cogs: `You are analyzing the "Cost of Goods Sold (COGS)" KPI on the Customer Margin overview.
+
+What it measures: Total landed cost of goods sold for the selected period.
+Formula: SUM(iv_cost + dn_cost - cn_cost) from pc_customer_margin.
+
+Context:
+- For a fruit distribution business, COGS is expected to be the dominant expense line — typically 80-90% of Net Sales.
+- COGS rising faster than Net Sales is the leading indicator of margin compression (upstream price pressure or sourcing mix shift).
+
+Evaluate:
+- COGS-to-Net-Sales ratio for the period
+- Whether COGS is moving in the same direction as Net Sales
+- Do NOT evaluate COGS in isolation — always frame it relative to Net Sales.
+
+Provide a concise analysis of this metric.`,
+
+  cm_gross_profit: `You are analyzing the "Gross Profit" KPI on the Customer Margin overview.
+
+What it measures: Net Sales minus COGS for the selected period.
+Formula: Net Sales - COGS (both from pc_customer_margin).
+
+Performance thresholds:
+- Gross Profit growing while Net Sales also grows = Good
+- Gross Profit flat while Net Sales grows = Neutral (watch for margin erosion)
+- Gross Profit declining while Net Sales grows = Bad (cost pressure)
+- Gross Profit declining while Net Sales declines = Bad (volume loss)
+
+The most important signal is whether Gross Profit is growing faster or slower than Net Sales — that reveals whether the business is gaining or losing pricing power.
+
+Provide a concise analysis of this metric.`,
+
+  cm_margin_pct: `You are analyzing the "Gross Margin %" KPI on the Customer Margin overview.
+
+What it measures: Gross Profit as a percentage of Net Sales.
+Formula: (Gross Profit / Net Sales) x 100.
+
+Performance thresholds (fruit distribution benchmarks):
+- Margin % >= 15% = Good
+- Margin % 10% to 15% = Neutral
+- Margin % < 10% = Bad
+
+Evaluate:
+- Current margin level vs the benchmark bands
+- Whether movement is driven by Net Sales change, COGS change, or both — the pre-fetched block contains both numerator and denominator
+
+Provide a concise analysis of this metric.`,
+
+  cm_active_customers: `You are analyzing the "Active Customers" KPI on the Customer Margin overview.
+
+What it measures: Count of distinct active customers that had activity in the selected period.
+Formula: COUNT(DISTINCT debtor_code) from pc_customer_margin with is_active = 'T'.
+
+Context:
+- This is a period-scoped count of active customers, not a total customer base count.
+- Stability is the baseline — steady numbers are healthy for a mature distribution business.
+- Changes matter more than the absolute number.
+
+Evaluate:
+- Direction of the number vs any prior context in the data block
+- Whether the count correlates with Net Sales movement (a drop in active customers but steady Net Sales = revenue concentrating on fewer accounts)
+
+Provide a concise analysis of this metric.`,
+
+  cm_margin_trend: `You are analyzing the "Margin Trend" chart on the Customer Margin overview.
+
+What it shows:
+- Bars = Gross Profit (RM, left axis) per month
+- Line = Gross Margin % (right axis) per month
+- Granularity is fixed to monthly — the chart has no granularity selector.
+
+The chart answers two questions at once:
+- Is the business making more or less profit in absolute terms?
+- Is it getting more or less efficient at converting sales into profit?
+
+Performance thresholds:
+- 3+ consecutive months of Gross Profit growth = Good
+- Flat or mixed = Neutral
+- 3+ consecutive months of Gross Profit decline = Bad
+- Margin % trending down for 2+ consecutive months warrants flagging even if Gross Profit is flat.
+
+Look for:
+- Divergence between bars and line (e.g., profit rising while margin % stays flat = growth via volume, not pricing)
+- Seasonal patterns (festive months typically show different mix)
+- Any month where Gross Profit and Margin % move in opposite directions — always worth calling out
+
+Cite specific months from the pre-fetched monthly breakdown when making claims. Do not invent values.
+
+Provide a concise analysis of the margin trend pattern with evidence.`,
+
+  cm_margin_distribution: `You are analyzing the "Margin Distribution" histogram on the Customer Margin overview.
+
+What it shows: Count of customers falling into each Gross Margin % bucket for the selected period. Buckets are fixed:
+  < 0%, 0-5%, 5-10%, 10-15%, 15-20%, 20-30%, 30%+
+
+Population: only customers with > RM 1,000 of total revenue in the period are included (small-volume customers are excluded to avoid noise). There is no bucket-size selector.
+
+Performance thresholds:
+- Customers in < 0% bucket = selling at a loss (worth flagging if > 0)
+- Majority of customers in 10-20% band = Healthy (matches overall target)
+- Heavy concentration (> 40% of customers) in sub-10% bands = Bad (portfolio is thin-margin)
+- A meaningful tail (> 15%) in the 20%+ bands = Good (premium segment exists)
+
+Evaluate:
+- Shape of the distribution (left-skewed, centered, right-skewed)
+- Proportion of customers below 10% margin
+- Presence and size of the loss-making bucket
+- Whether the distribution is consistent with the overall Margin % KPI (a 16% overall margin with most customers sub-10% means a few large accounts are carrying the portfolio — concentration risk)
+
+Provide a concise analysis focused on distribution shape and concentration.`,
 };
 
 // ─── Summary Prompt ──────────────────────────────────────────────────────────
@@ -412,6 +542,7 @@ LOCAL (PostgreSQL — pre-aggregated, query first):
 - pc_ar_monthly: month, invoiced, collected, cn_applied, refunded, total_outstanding, total_billed, customer_count
 - pc_ar_customer_snapshot: debtor_code, company_name, debtor_type, sales_agent, display_term, credit_limit, total_outstanding, overdue_amount, utilization_pct, credit_score, risk_tier, is_active, invoice_count, avg_payment_days, max_overdue_days
 - pc_ar_aging_history: snapshot_date, bucket, dimension, dimension_key, invoice_count, total_outstanding
+- pc_customer_margin: month, debtor_code, company_name, debtor_type, sales_agent, is_active, iv_revenue, dn_revenue, cn_revenue, iv_cost, dn_cost, cn_cost, iv_count, cn_count
 
 REMOTE (SQL Server — raw transactions, use for detail drill-down):
 - dbo.IV (Invoices): DocNo, DocDate, DebtorCode, LocalNetTotal, Description, SalesAgent, SalesLocation, Cancelled
@@ -544,6 +675,15 @@ export const SECTION_COMPONENTS: Record<SectionKey, { key: string; name: string;
     { key: 'by_agent', name: 'By Sales Agent', type: 'breakdown' },
     { key: 'by_outlet', name: 'By Outlet', type: 'breakdown' },
   ],
+  customer_margin_overview: [
+    { key: 'cm_net_sales',           name: 'Net Sales',           type: 'kpi' },
+    { key: 'cm_cogs',                name: 'COGS',                type: 'kpi' },
+    { key: 'cm_gross_profit',        name: 'Gross Profit',        type: 'kpi' },
+    { key: 'cm_margin_pct',          name: 'Margin %',            type: 'kpi' },
+    { key: 'cm_active_customers',    name: 'Active Customers',    type: 'kpi' },
+    { key: 'cm_margin_trend',        name: 'Margin Trend',        type: 'chart' },
+    { key: 'cm_margin_distribution', name: 'Margin Distribution', type: 'chart' },
+  ],
 };
 
 export const SECTION_PAGE: Record<SectionKey, string> = {
@@ -551,6 +691,7 @@ export const SECTION_PAGE: Record<SectionKey, string> = {
   payment_outstanding: 'Payment',
   sales_trend: 'Sales',
   sales_breakdown: 'Sales',
+  customer_margin_overview: 'Customer Margin',
 };
 
 export const SECTION_NAMES: Record<SectionKey, string> = {
@@ -558,6 +699,7 @@ export const SECTION_NAMES: Record<SectionKey, string> = {
   payment_outstanding: 'Outstanding Payment',
   sales_trend: 'Sales Trend',
   sales_breakdown: 'Sales Breakdown',
+  customer_margin_overview: 'Customer Margin Overview',
 };
 
 // ─── Public API ──────────────────────────────────────────────────────────────

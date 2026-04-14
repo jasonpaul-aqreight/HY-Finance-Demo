@@ -5,6 +5,7 @@ import { useMarginDistribution } from '@/hooks/customer-margin/useMarginData';
 import { useStableData } from '@/hooks/useStableData';
 import type { MarginDashboardFilters } from '@/hooks/customer-margin/useDashboardFilters';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { AnalyzeIcon } from '@/components/ai-insight/AnalyzeIcon';
 
 interface Props {
   filters: MarginDashboardFilters;
@@ -36,7 +37,10 @@ export function MarginDistributionChart({ filters }: Props) {
   return (
     <Card className="h-full flex flex-col">
       <CardHeader>
-        <CardTitle>Customer Margin Distribution</CardTitle>
+        <div className="flex items-center gap-2">
+          <CardTitle>Customer Margin Distribution</CardTitle>
+          <AnalyzeIcon sectionKey="customer_margin_overview" componentKey="cm_margin_distribution" />
+        </div>
       </CardHeader>
       <CardContent className="flex-1">
         {!data ? (
