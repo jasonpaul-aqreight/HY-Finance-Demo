@@ -408,4 +408,61 @@ export const COMPONENT_INFO: Record<string, ComponentInfo> = {
     indicator: 'Top 1 > 30% = Severe concentration · 15–30% = Concentrated · Top 10 > 75% = Concentrated · < 50% = Diversified',
     about: 'This chart shows where the expense dollars actually land. Each bar is one GL account, coloured by whether it is COGS (variable) or OpEx (semi-fixed).\n\nWatch for two things:\n\n• Concentration: if one account carries > 30% of total cost, that is single-account risk — a price change, a vendor change, or a category shift in that one line moves the entire cost base. If the top 10 accounts sum to > 75%, the cost base is concentrated enough that a procurement or discipline initiative can meaningfully move the number.\n• Mix: a top 10 dominated by COGS is the normal distribution picture (inventory, freight, handling). A top 10 dominated by OpEx means structural costs are the biggest movers — usually salaries, rent, or vehicle costs — and the fix is strategic, not operational.\n\nThe Cost Type toggle (All / COGS / OpEx) and Top/Bottom toggle drive the chart locally — the AI analysis is on the default All / Top view, and drill-downs remain user-driven.',
   },
+
+  // ─── Financial page §9 — financial_overview ──────────────────────────────
+
+  fin_net_sales: {
+    name: 'Net Sales',
+    whatItMeasures: 'Total net sales (Sales + Sales Adjustments) posted to pc_pnl_period for the selected fiscal window (full FY, YTD, or trailing 12 months).',
+    formula: 'SUM(net_amount) WHERE acc_type IN (\'SL\', \'SA\') within the fiscal window',
+    indicator: 'YoY > 10% = Strong favourable · 5–10% = Favourable · 0–5% = Flat · -5–0% = Unfavourable · < -5% = Severe',
+    about: 'Net Sales is the top-line number — the size of the business\'s revenue in the selected fiscal window.\n\nThis is a FISCAL-PERIOD FLOW, not a calendar-date flow. The window is defined by fiscal year + range selector (full FY, YTD, or trailing 12 months) and every figure reflects activity within that window only.\n\nThe card reads the current-window total and compares it against the prior-year same window for a YoY growth %. On its own it answers one question — is the top line expanding or contracting? — and is always read in pair with Cost of Sales to judge whether growth is coming at the expense of margin.',
+  },
+
+  fin_cost_of_sales: {
+    name: 'Cost of Sales',
+    whatItMeasures: 'Total direct cost of products sold (COGS) for the selected fiscal window, with the COGS share of Net Sales.',
+    formula: 'SUM(net_amount) WHERE acc_type = \'CO\' within the fiscal window',
+    indicator: 'COGS share 60–80% = Typical · > 85% = COGS-dominated · YoY cost growth > 10% = Severe',
+    about: 'Cost of Sales is the variable cost base — the money spent to acquire the inventory that was sold in this window.\n\nTwo numbers matter here: the absolute RM direction, and the RATIO of COGS to Net Sales. A rising absolute COGS is expected when sales grow; a rising RATIO is the early warning for margin pressure.\n\nFor a Malaysian fruit distributor, a COGS share of 60–80% of Net Sales is typical. Drift toward 85%+ means margin is compressing; drift below 50% is unusual and worth a data-quality check. The card reads both current-window values and the prior-year same-window equivalents for comparison.',
+  },
+
+  fin_gross_profit: {
+    name: 'Gross Profit',
+    whatItMeasures: 'Net Sales minus Cost of Sales for the selected fiscal window, with gross margin % and prior-year comparison.',
+    formula: 'Net Sales − Cost of Sales. Gross Margin % = Gross Profit ÷ Net Sales × 100',
+    indicator: 'Gross margin < 15% = Severe · 15–20% = Watch · 20–25% = Typical · > 25% = Strong (fruit distribution)',
+    about: 'Gross Profit is the spread between revenue and the cost of the goods that produced it. It is the first line where the business\'s economics become visible.\n\nAlways read BOTH dimensions — the absolute RM and the gross margin %. They can move in opposite directions:\n\n• RM up + margin up = unambiguously healthier, growing AND pricing better.\n• RM up + margin down = volume growth masking price / cost erosion. The top line looks fine, but each unit sold is less profitable than before.\n• RM down + margin up = shrinking but cleaner business.\n• RM down + margin down = compression on both axes — the most serious signal.\n\nFor a fruit distributor, a gross margin in the 20–25% range is typical. Below 15% is severe territory.',
+  },
+
+  fin_operating_costs: {
+    name: 'Operating Costs',
+    whatItMeasures: 'Total operating costs / OpEx (day-to-day running costs, distinct from COGS) for the selected fiscal window, with OpEx ratio against Net Sales.',
+    formula: 'SUM(net_amount) WHERE acc_type = \'EP\' within the fiscal window. OpEx ratio = OpEx ÷ Net Sales × 100',
+    indicator: 'OpEx ratio < 10% = Lean · 10–18% = Typical · 18–25% = Elevated · > 25% = Severe · YoY OpEx growth > 15% = Severe',
+    about: 'Operating Costs capture the semi-fixed running costs of the business — salaries, rent, utilities, depreciation, vehicles, tooling. They are distinct from Cost of Sales (which scales with volume) and are the main lever for operating leverage.\n\nThe card tracks both the absolute RM and the OpEx ratio (OpEx ÷ Net Sales). The ratio is the more informative number for direction — a drifting-up ratio means OpEx is growing faster than Net Sales, which is scaling inefficiency.\n\nCompare OpEx YoY growth against Net Sales YoY growth: if OpEx is growing faster than sales, operating leverage is deteriorating regardless of the absolute margin position.',
+  },
+
+  fin_operating_profit: {
+    name: 'Operating Profit',
+    whatItMeasures: 'Gross Profit minus Operating Costs for the selected fiscal window — the cleanest read on core-business efficiency before non-operating items.',
+    formula: 'Gross Profit − Operating Costs. Operating Margin % = Operating Profit ÷ Net Sales × 100',
+    indicator: 'Operating margin < 0% = Severe (loss) · 0–5% = Thin · 5–10% = Healthy · > 10% = Strong',
+    about: 'Operating Profit is the clearest read on whether the core business is making money. It is after COGS AND after OpEx, but BEFORE non-operating items (other income, tax).\n\nThe sign matters most: positive means the operating engine is producing profit on its own; negative means the fundamental business is losing money before any rental income, interest, or disposal gains are added back.\n\nThe common mismatch to watch for: Gross Profit positive while Operating Profit negative. That pattern says the GP exists but OpEx is erasing it — the fix is cost discipline, not revenue or pricing. Operating margin direction over time is the single best leading indicator for whether the business model is actually working at this scale.',
+  },
+
+  fin_net_profit: {
+    name: 'Profit / Loss',
+    whatItMeasures: 'Pre-tax net profit = Operating Profit + Other Income, for the selected fiscal window, with net margin and prior-year comparison.',
+    formula: 'Gross Profit + Other Income − Operating Costs. Net Margin % = Net Profit ÷ Net Sales × 100',
+    indicator: 'Net margin < 0% = Severe · 0–3% = Thin · 3–7% = Healthy · > 7% = Strong',
+    about: 'Profit / Loss is the pre-tax bottom line. It adds non-operating income (rental, interest, disposal gains) on top of Operating Profit, which matters because it is the number most people quote when they talk about "profit" — but it can mask whether the core business is actually healthy.\n\nALWAYS read this alongside Operating Profit. If Net Profit is materially larger than Operating Profit, the delta is Other Income, and Other Income carrying the headline means the core business is weaker than the number suggests. A business that reports "RM 2M profit" with Operating Profit at RM -500K is really losing RM 500K in its core, offset by RM 2.5M of non-operating income — very different story from a clean RM 2M.\n\nEarnings quality is the narrative this card exists to tell.',
+  },
+
+  fin_monthly_trend: {
+    name: 'Monthly P&L Trend',
+    whatItMeasures: 'Month-by-month Net Sales, COGS, Gross Profit, OpEx, and Operating Profit across the selected fiscal window (full FY, YTD, or trailing 12 months).',
+    indicator: 'Any loss month = Watch · Loss months > 30% of window = Concern · First-to-last operating-profit decline > 25% = Severe',
+    about: 'The trend chart takes the single-number KPIs and stretches them across the window month by month, so you can see HOW the numbers got to where they are — steady build, cliff, oscillation, or seasonal peak.\n\nWatch for three things:\n\n• Loss months: any single month where Operating Profit is negative is a watch signal. Cluster vs. scatter matters — clustered losses usually mean seasonality or a one-off event; scattered losses mean chronic weakness.\n• Sales-vs-profit divergence: if Net Sales is rising but Operating Profit is falling, margin is compressing in real time. That is the pattern the monthly view exposes that the aggregate KPIs hide.\n• First-to-last direction: use the pre-computed first-to-last growth lines for headline direction. Arbitrary sub-window averages are not allowed — the AI analysis is constrained to the pre-computed roll-ups to prevent fabricated narratives.\n\nThe chart reads in fiscal order (March → February), not calendar order. The range selector at the top of the page controls which months appear.',
+  },
 };

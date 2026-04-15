@@ -4,6 +4,7 @@ import { useV3Monthly } from '@/hooks/pnl/usePLDataV3';
 import { useStableData } from '@/hooks/useStableData';
 import { Card, CardContent } from '@/components/ui/card';
 import { formatRMCompact } from '@/lib/pnl/format';
+import { AnalyzeIcon } from '@/components/ai-insight/AnalyzeIcon';
 import {
   ComposedChart,
   Bar,
@@ -45,8 +46,9 @@ export function MonthlyPLTrendV3({ fy, range }: Props) {
   return (
     <Card className="rounded-xl ring-1 ring-foreground/10">
       <CardContent className="p-6">
-        <h3 className="text-sm font-semibold mb-4">
+        <h3 className="text-sm font-semibold mb-4 flex items-center gap-1">
           Monthly P&L Trend
+          <AnalyzeIcon sectionKey="financial_overview" componentKey="fin_monthly_trend" />
         </h3>
 
         <div className="h-[360px]">

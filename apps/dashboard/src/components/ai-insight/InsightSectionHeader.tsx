@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { AiInsightPanel } from './AiInsightPanel';
 import { useInsightAnalysis } from '@/hooks/ai-insight/useInsightAnalysis';
 import { useRole } from '@/components/layout/RoleProvider';
-import type { SectionKey, PageKey, DateRange } from '@/lib/ai-insight/types';
+import type { SectionKey, PageKey, DateRange, FiscalPeriod } from '@/lib/ai-insight/types';
 
 interface InsightSectionHeaderProps {
   title: string;
@@ -14,6 +14,7 @@ interface InsightSectionHeaderProps {
   page: PageKey;
   sectionKey: SectionKey;
   dateRange: DateRange | null;
+  fiscalPeriod?: FiscalPeriod | null;
   userName?: string;
 }
 
@@ -23,6 +24,7 @@ export function InsightSectionHeader({
   page,
   sectionKey,
   dateRange,
+  fiscalPeriod = null,
   userName = 'User',
 }: InsightSectionHeaderProps) {
   const [expanded, setExpanded] = useState(false);
@@ -30,7 +32,7 @@ export function InsightSectionHeader({
   const insight = useInsightAnalysis(page, sectionKey);
 
   const handleAnalyze = () => {
-    insight.analyze(dateRange, userName);
+    insight.analyze(dateRange, userName, fiscalPeriod);
   };
 
   return (

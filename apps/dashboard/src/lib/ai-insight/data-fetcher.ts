@@ -35,7 +35,15 @@ import {
   getOpexBreakdown,
   getTopExpensesByType,
 } from '../expenses/queries';
-import type { SectionKey, DateRange, AllowedValue, FetcherResult } from './types';
+import { fyNameToNumber, fyToPeriodRange, periodLabel } from '../pnl/period-utils';
+import type {
+  SectionKey,
+  DateRange,
+  FiscalPeriod,
+  FiscalRange,
+  AllowedValue,
+  FetcherResult,
+} from './types';
 
 // Convert YYYY-MM-DD to YYYY-MM to match pc_ar_monthly.month column format
 function toMonth(date: string): string {
@@ -3006,9 +3014,431 @@ const fetchers: Record<string, DataFetcher> = {
   },
 };
 
+// ─── Financial page — fiscal_period scope helpers ───────────────────────────
+// The Financial page filters by fiscalYear + named window (fy/last12/ytd)
+// against pc_pnl_period (period_no indexed). Fetchers below reuse a compact
+// aggregate helper with module-level memoization so the 6 KPI fetchers + 1
+// trend fetcher don't each re-hit the DB for the same roll-ups.
+
+interface FinPLAggregates {
+  net_sales: number;
+  cogs: number;
+  gross_profit: number;
+  other_income: number;
+  expenses: number;      // OpEx
+  operating_profit: number;
+  taxation: number;
+  net_profit: number;    // gross_profit + other_income - expenses (pre-tax operating view)
+}
+
+interface FinMonthlyRow {
+  period: number;
+  label: string;
+  net_sales: number;
+  cogs: number;
+  gross_profit: number;
+  other_income: number;
+  expenses: number;
+  operating_profit: number;
+  net_profit: number;
+}
+
+interface FinFiscalSlice {
+  fyLabel: string;              // e.g. "FY2025"
+  rangeLabel: string;           // e.g. "full FY", "YTD", "last 12 months"
+  periodFrom: number;
+  periodTo: number;
+  current: FinPLAggregates;
+  prior: FinPLAggregates;       // same window of prior FY
+  monthly: FinMonthlyRow[];
+}
+
+function zeroAgg(): FinPLAggregates {
+  return { net_sales: 0, cogs: 0, gross_profit: 0, other_income: 0, expenses: 0, operating_profit: 0, taxation: 0, net_profit: 0 };
+}
+
+function rangeLabel(range: FiscalRange, fy: string): string {
+  if (range === 'fy') return `full ${fy}`;
+  if (range === 'ytd') return `${fy} year-to-date`;
+  return `last 12 months ending within ${fy}`;
+}
+
+async function queryPLPeriodRaw(periodFrom: number, periodTo: number): Promise<{ period_no: number; acc_type: string; net_amount: number }[]> {
+  const pool = getPool();
+  const { rows } = await pool.query(
+    `SELECT pp.period_no AS period_no,
+            pp.acc_type  AS acc_type,
+            (CASE WHEN plf.creditaspositive = 'T'
+                    THEN SUM(pp.home_cr) - SUM(pp.home_dr)
+                  ELSE SUM(pp.home_dr) - SUM(pp.home_cr)
+             END)::float AS net_amount
+       FROM pc_pnl_period pp
+       JOIN pl_format plf ON pp.acc_type = plf.acctype
+      WHERE pp.acc_type IN (SELECT acctype FROM account_type WHERE isbstype = 'F')
+        AND pp.period_no BETWEEN $1 AND $2
+      GROUP BY pp.period_no, pp.acc_type, plf.creditaspositive`,
+    [periodFrom, periodTo],
+  );
+  return rows as { period_no: number; acc_type: string; net_amount: number }[];
+}
+
+async function getLatestPnlPeriod(): Promise<number> {
+  const pool = getPool();
+  const { rows } = await pool.query(
+    `SELECT MAX(pp.period_no)::int AS maxp
+       FROM pc_pnl_period pp
+      WHERE pp.acc_type IN (SELECT acctype FROM account_type WHERE isbstype = 'F')
+        AND (pp.home_dr <> 0 OR pp.home_cr <> 0)`,
+  );
+  return rows[0]?.maxp ?? 0;
+}
+
+function aggregateFinRows(rows: { acc_type: string; net_amount: number }[]): FinPLAggregates {
+  const by: Record<string, number> = {};
+  for (const r of rows) by[r.acc_type] = (by[r.acc_type] ?? 0) + r.net_amount;
+  const net_sales = (by['SL'] ?? 0) + (by['SA'] ?? 0);
+  const cogs = by['CO'] ?? 0;
+  const gross_profit = net_sales - cogs;
+  const other_income = by['OI'] ?? 0;
+  const expenses = by['EP'] ?? 0;
+  const operating_profit = gross_profit - expenses;
+  const taxation = by['TX'] ?? 0;
+  const net_profit = gross_profit + other_income - expenses;
+  return { net_sales, cogs, gross_profit, other_income, expenses, operating_profit, taxation, net_profit };
+}
+
+function resolveFiscalWindow(fyNum: number, range: FiscalRange, latest: number): { periodFrom: number; periodTo: number } {
+  const { from: fyFrom, to: fyTo } = fyToPeriodRange(fyNum);
+  if (range === 'last12') {
+    const periodTo = Math.min(latest, fyTo);
+    return { periodFrom: periodTo - 11, periodTo };
+  }
+  const periodTo = range === 'fy' ? fyTo : Math.min(latest, fyTo);
+  return { periodFrom: fyFrom, periodTo };
+}
+
+const fiscalSliceCache = new Map<string, Promise<FinFiscalSlice>>();
+
+function getFiscalSlice(period: FiscalPeriod): Promise<FinFiscalSlice> {
+  const key = `${period.fiscalYear}:${period.range}`;
+  const cached = fiscalSliceCache.get(key);
+  if (cached) return cached;
+  const promise = computeFiscalSlice(period);
+  fiscalSliceCache.set(key, promise);
+  setTimeout(() => fiscalSliceCache.delete(key), 60_000);
+  return promise;
+}
+
+async function computeFiscalSlice(period: FiscalPeriod): Promise<FinFiscalSlice> {
+  const fyNum = fyNameToNumber(period.fiscalYear);
+  const latest = await getLatestPnlPeriod();
+
+  const { periodFrom, periodTo } = resolveFiscalWindow(fyNum, period.range, latest);
+  const priorWindow = resolveFiscalWindow(fyNum - 1, period.range, latest);
+
+  const [currentRows, priorRows] = await Promise.all([
+    queryPLPeriodRaw(periodFrom, periodTo),
+    queryPLPeriodRaw(priorWindow.periodFrom, priorWindow.periodTo),
+  ]);
+
+  const byPeriod: Record<number, typeof currentRows> = {};
+  for (const r of currentRows) {
+    (byPeriod[r.period_no] ??= []).push(r);
+  }
+  const monthly: FinMonthlyRow[] = [];
+  for (let p = periodFrom; p <= periodTo; p++) {
+    const agg = aggregateFinRows(byPeriod[p] ?? []);
+    monthly.push({
+      period: p,
+      label: periodLabel(p),
+      net_sales: agg.net_sales,
+      cogs: agg.cogs,
+      gross_profit: agg.gross_profit,
+      other_income: agg.other_income,
+      expenses: agg.expenses,
+      operating_profit: agg.operating_profit,
+      net_profit: agg.net_profit,
+    });
+  }
+
+  return {
+    fyLabel: period.fiscalYear,
+    rangeLabel: rangeLabel(period.range, period.fiscalYear),
+    periodFrom,
+    periodTo,
+    current: currentRows.length > 0 ? aggregateFinRows(currentRows) : zeroAgg(),
+    prior:   priorRows.length   > 0 ? aggregateFinRows(priorRows)   : zeroAgg(),
+    monthly,
+  };
+}
+
+function yoyPct(curr: number, prior: number): number | null {
+  if (prior === 0) return null;
+  return ((curr - prior) / Math.abs(prior)) * 100;
+}
+
+function yoyLabel(pctVal: number | null, higherIsBetter: boolean): string {
+  if (pctVal == null) return 'No prior-year data';
+  const good = higherIsBetter ? pctVal >= 0 : pctVal <= 0;
+  const mag = Math.abs(pctVal);
+  if (mag < 2) return good ? 'Flat (healthy)' : 'Flat (watch)';
+  if (good) return mag > 10 ? 'Strong favourable' : 'Favourable';
+  return mag > 10 ? 'Severe unfavourable' : 'Unfavourable';
+}
+
+// ─── Fiscal-period fetchers (Financial page §9 — financial_overview) ────────
+
+type FiscalPeriodFetcher = (period: FiscalPeriod) => Promise<FetcherResult>;
+
+const fiscalPeriodFetchers: Record<string, FiscalPeriodFetcher> = {
+  async fin_net_sales(period) {
+    const s = await getFiscalSlice(period);
+    const curr = s.current.net_sales;
+    const prev = s.prior.net_sales;
+    const yoy = yoyPct(curr, prev);
+    const label = yoyLabel(yoy, true);
+
+    return {
+      prompt:
+        `Population: P&L postings (SL + SA account types) for ${s.rangeLabel}, from pc_pnl_period.\n\n` +
+        `Net Sales (${s.rangeLabel}): RM ${Math.round(curr).toLocaleString('en-MY')}\n` +
+        `Prior-year same window: RM ${Math.round(prev).toLocaleString('en-MY')}\n` +
+        `YoY growth: ${yoy == null ? 'n/a' : yoy.toFixed(1) + '%'} — ${label}\n\n` +
+        `Thresholds (YoY net-sales growth): < -5% Severe · -5 to 0% Unfavourable · 0-5% Flat · 5-10% Favourable · > 10% Strong favourable`,
+      allowed: [
+        rm('net sales', Math.round(curr)),
+        rm('prior year net sales', Math.round(prev)),
+        ...(yoy != null ? [pct('yoy net sales growth', yoy)] : []),
+      ],
+    };
+  },
+
+  async fin_cost_of_sales(period) {
+    const s = await getFiscalSlice(period);
+    const curr = s.current.cogs;
+    const prev = s.prior.cogs;
+    const yoy = yoyPct(curr, prev);
+    const cogsPct = s.current.net_sales > 0 ? (curr / s.current.net_sales) * 100 : 0;
+    const priorCogsPct = s.prior.net_sales > 0 ? (prev / s.prior.net_sales) * 100 : 0;
+    const label = yoyLabel(yoy, false);
+
+    return {
+      prompt:
+        `Population: P&L postings (CO account type) for ${s.rangeLabel}, from pc_pnl_period.\n\n` +
+        `Cost of Sales (${s.rangeLabel}): RM ${Math.round(curr).toLocaleString('en-MY')}\n` +
+        `- COGS share of net sales: ${cogsPct.toFixed(1)}%\n` +
+        `Prior-year same window: RM ${Math.round(prev).toLocaleString('en-MY')} (${priorCogsPct.toFixed(1)}% of prior net sales)\n` +
+        `YoY cost growth: ${yoy == null ? 'n/a' : yoy.toFixed(1) + '%'} — ${label}\n\n` +
+        `Thresholds (COGS share of net sales): 60-80% = Typical fruit-distribution mix · > 85% = COGS-dominated (margin pressure) · < 50% = OpEx-dominated\n` +
+        `Thresholds (YoY cost growth): < 0% Healthy · 0-5% Watch · 5-10% Concern · > 10% Severe`,
+      allowed: [
+        rm('cost of sales', Math.round(curr)),
+        rm('prior year cost of sales', Math.round(prev)),
+        pct('cogs share of net sales', cogsPct),
+        pct('prior cogs share of net sales', priorCogsPct),
+        ...(yoy != null ? [pct('yoy cogs growth', yoy)] : []),
+      ],
+    };
+  },
+
+  async fin_gross_profit(period) {
+    const s = await getFiscalSlice(period);
+    const curr = s.current.gross_profit;
+    const prev = s.prior.gross_profit;
+    const yoy = yoyPct(curr, prev);
+    const gpMargin = s.current.net_sales > 0 ? (curr / s.current.net_sales) * 100 : 0;
+    const priorGpMargin = s.prior.net_sales > 0 ? (prev / s.prior.net_sales) * 100 : 0;
+    const marginChangePct = gpMargin - priorGpMargin;
+    const label = yoyLabel(yoy, true);
+
+    return {
+      prompt:
+        `Gross Profit (${s.rangeLabel}): RM ${Math.round(curr).toLocaleString('en-MY')}\n` +
+        `Gross margin: ${gpMargin.toFixed(1)}%\n` +
+        `Prior-year same window: RM ${Math.round(prev).toLocaleString('en-MY')} (margin ${priorGpMargin.toFixed(1)}%)\n` +
+        `YoY GP growth: ${yoy == null ? 'n/a' : yoy.toFixed(1) + '%'} — ${label}\n` +
+        `Margin change: ${marginChangePct >= 0 ? '+' : ''}${marginChangePct.toFixed(1)} ppts\n\n` +
+        `Gross Profit = Net Sales − Cost of Sales. Track BOTH the absolute RM and the margin %.\n` +
+        `A rising RM with a falling margin means volume growth is masking price/cost erosion.\n` +
+        `Thresholds (gross margin): < 15% Severe · 15-20% Watch · 20-25% Typical · > 25% Strong (fruit distribution)`,
+      allowed: [
+        rm('gross profit', Math.round(curr)),
+        rm('prior year gross profit', Math.round(prev)),
+        pct('gross margin', gpMargin),
+        pct('prior gross margin', priorGpMargin),
+        pct('gross margin change ppts', marginChangePct),
+        ...(yoy != null ? [pct('yoy gross profit growth', yoy)] : []),
+      ],
+    };
+  },
+
+  async fin_operating_costs(period) {
+    const s = await getFiscalSlice(period);
+    const curr = s.current.expenses;
+    const prev = s.prior.expenses;
+    const yoy = yoyPct(curr, prev);
+    const opexRatio = s.current.net_sales > 0 ? (curr / s.current.net_sales) * 100 : 0;
+    const priorOpexRatio = s.prior.net_sales > 0 ? (prev / s.prior.net_sales) * 100 : 0;
+    const label = yoyLabel(yoy, false);
+
+    return {
+      prompt:
+        `Operating Costs / OpEx (${s.rangeLabel}): RM ${Math.round(curr).toLocaleString('en-MY')}\n` +
+        `- OpEx ratio (OpEx ÷ Net Sales): ${opexRatio.toFixed(1)}%\n` +
+        `Prior-year same window: RM ${Math.round(prev).toLocaleString('en-MY')} (ratio ${priorOpexRatio.toFixed(1)}%)\n` +
+        `YoY OpEx growth: ${yoy == null ? 'n/a' : yoy.toFixed(1) + '%'} — ${label}\n\n` +
+        `Day-to-day running costs — distinct from COGS. Watch whether OpEx is growing faster than Net Sales\n` +
+        `(ratio drifting up = scaling inefficiency).\n` +
+        `Thresholds (OpEx ratio): < 10% Lean · 10-18% Typical · 18-25% Elevated · > 25% Severe\n` +
+        `Thresholds (YoY OpEx growth): < 0% Healthy · 0-5% In line with inflation · 5-15% Concern · > 15% Severe`,
+      allowed: [
+        rm('operating costs', Math.round(curr)),
+        rm('prior year operating costs', Math.round(prev)),
+        pct('opex ratio', opexRatio),
+        pct('prior opex ratio', priorOpexRatio),
+        ...(yoy != null ? [pct('yoy opex growth', yoy)] : []),
+      ],
+    };
+  },
+
+  async fin_operating_profit(period) {
+    const s = await getFiscalSlice(period);
+    const curr = s.current.operating_profit;
+    const prev = s.prior.operating_profit;
+    const yoy = yoyPct(curr, prev);
+    const opMargin = s.current.net_sales > 0 ? (curr / s.current.net_sales) * 100 : 0;
+    const priorOpMargin = s.prior.net_sales > 0 ? (prev / s.prior.net_sales) * 100 : 0;
+    const marginChangePct = opMargin - priorOpMargin;
+    const label = yoyLabel(yoy, true);
+
+    return {
+      prompt:
+        `Operating Profit (${s.rangeLabel}): RM ${Math.round(curr).toLocaleString('en-MY')}\n` +
+        `Operating margin: ${opMargin.toFixed(1)}%\n` +
+        `Prior-year same window: RM ${Math.round(prev).toLocaleString('en-MY')} (margin ${priorOpMargin.toFixed(1)}%)\n` +
+        `YoY operating-profit growth: ${yoy == null ? 'n/a' : yoy.toFixed(1) + '%'} — ${label}\n` +
+        `Margin change: ${marginChangePct >= 0 ? '+' : ''}${marginChangePct.toFixed(1)} ppts\n\n` +
+        `Operating Profit = Gross Profit − Operating Costs. This is the cleanest read on core-business efficiency\n` +
+        `before non-operating items (other income, tax). Negative = the operating engine is losing money.\n` +
+        `Thresholds (operating margin): < 0% Severe (loss) · 0-5% Thin · 5-10% Healthy · > 10% Strong`,
+      allowed: [
+        rm('operating profit', Math.round(curr)),
+        rm('prior year operating profit', Math.round(prev)),
+        pct('operating margin', opMargin),
+        pct('prior operating margin', priorOpMargin),
+        pct('operating margin change ppts', marginChangePct),
+        ...(yoy != null ? [pct('yoy operating profit growth', yoy)] : []),
+      ],
+    };
+  },
+
+  async fin_net_profit(period) {
+    const s = await getFiscalSlice(period);
+    const curr = s.current.net_profit;
+    const prev = s.prior.net_profit;
+    const yoy = yoyPct(curr, prev);
+    const netMargin = s.current.net_sales > 0 ? (curr / s.current.net_sales) * 100 : 0;
+    const priorNetMargin = s.prior.net_sales > 0 ? (prev / s.prior.net_sales) * 100 : 0;
+    const otherIncome = s.current.other_income;
+    const label = yoyLabel(yoy, true);
+
+    return {
+      prompt:
+        `Profit / Loss (${s.rangeLabel}): RM ${Math.round(curr).toLocaleString('en-MY')}\n` +
+        `Net margin: ${netMargin.toFixed(1)}%\n` +
+        `Other income (non-operating): RM ${Math.round(otherIncome).toLocaleString('en-MY')}\n` +
+        `Prior-year same window: RM ${Math.round(prev).toLocaleString('en-MY')} (margin ${priorNetMargin.toFixed(1)}%)\n` +
+        `YoY net-profit growth: ${yoy == null ? 'n/a' : yoy.toFixed(1) + '%'} — ${label}\n\n` +
+        `Net Profit = Operating Profit + Other Income (pre-tax view). Compare this to Operating Profit —\n` +
+        `if net profit is mainly carried by other income (rental, interest, disposal gains), the core business may be\n` +
+        `weaker than the headline suggests.\n` +
+        `Thresholds (net margin): < 0% Severe · 0-3% Thin · 3-7% Healthy · > 7% Strong`,
+      allowed: [
+        rm('net profit', Math.round(curr)),
+        rm('prior year net profit', Math.round(prev)),
+        rm('other income', Math.round(otherIncome)),
+        pct('net margin', netMargin),
+        pct('prior net margin', priorNetMargin),
+        ...(yoy != null ? [pct('yoy net profit growth', yoy)] : []),
+      ],
+    };
+  },
+
+  async fin_monthly_trend(period) {
+    const s = await getFiscalSlice(period);
+    if (s.monthly.length === 0) {
+      return { prompt: `No monthly P&L data for ${s.rangeLabel}.`, allowed: [] };
+    }
+
+    const allowed: AllowedValue[] = [];
+    let table =
+      '| Month | Net Sales | COGS | Gross Profit | OpEx | Operating Profit |\n' +
+      '|-------|-----------|------|--------------|------|------------------|\n';
+
+    let peak = { label: s.monthly[0].label, value: Number.NEGATIVE_INFINITY };
+    let low  = { label: s.monthly[0].label, value: Number.POSITIVE_INFINITY };
+    let profitMonths = 0;
+    let lossMonths = 0;
+
+    for (const r of s.monthly) {
+      table +=
+        `| ${r.label} ` +
+        `| RM ${Math.round(r.net_sales).toLocaleString('en-MY')} ` +
+        `| RM ${Math.round(r.cogs).toLocaleString('en-MY')} ` +
+        `| RM ${Math.round(r.gross_profit).toLocaleString('en-MY')} ` +
+        `| RM ${Math.round(r.expenses).toLocaleString('en-MY')} ` +
+        `| RM ${Math.round(r.operating_profit).toLocaleString('en-MY')} |\n`;
+
+      allowed.push(rm(`${r.label} net sales`, Math.round(r.net_sales)));
+      allowed.push(rm(`${r.label} cogs`, Math.round(r.cogs)));
+      allowed.push(rm(`${r.label} gross profit`, Math.round(r.gross_profit)));
+      allowed.push(rm(`${r.label} opex`, Math.round(r.expenses)));
+      allowed.push(rm(`${r.label} operating profit`, Math.round(r.operating_profit)));
+
+      if (r.operating_profit > peak.value) peak = { label: r.label, value: r.operating_profit };
+      if (r.operating_profit < low.value)  low  = { label: r.label, value: r.operating_profit };
+      if (r.operating_profit >= 0) profitMonths++;
+      else lossMonths++;
+    }
+
+    const first = s.monthly[0];
+    const last = s.monthly[s.monthly.length - 1];
+    const nsGrowth = first.net_sales > 0 ? ((last.net_sales - first.net_sales) / first.net_sales) * 100 : 0;
+    const opGrowth = first.operating_profit !== 0
+      ? ((last.operating_profit - first.operating_profit) / Math.abs(first.operating_profit)) * 100
+      : 0;
+
+    allowed.push(cnt('months in window', s.monthly.length));
+    allowed.push(cnt('profit months', profitMonths));
+    allowed.push(cnt('loss months', lossMonths));
+    allowed.push(rm('peak operating profit', Math.round(peak.value)));
+    allowed.push(rm('lowest operating profit', Math.round(low.value)));
+    allowed.push(pct('first-to-last net sales growth', nsGrowth));
+    allowed.push(pct('first-to-last operating profit growth', opGrowth));
+
+    const preCalc =
+      `Population: months with P&L activity in ${s.rangeLabel}.\n\n` +
+      `Pre-calculated roll-ups (cite these directly — do not recompute):\n` +
+      `- Months in window: ${s.monthly.length} (${profitMonths} profit · ${lossMonths} loss)\n` +
+      `- Peak operating-profit month: ${peak.label} at RM ${Math.round(peak.value).toLocaleString('en-MY')}\n` +
+      `- Lowest operating-profit month: ${low.label} at RM ${Math.round(low.value).toLocaleString('en-MY')}\n` +
+      `- First-to-last net-sales growth: ${nsGrowth.toFixed(1)}%\n` +
+      `- First-to-last operating-profit growth: ${opGrowth.toFixed(1)}%\n\n` +
+      `Thresholds:\n` +
+      `- Any single loss month = Watch signal\n` +
+      `- Loss months ÷ window > 30% = Concern\n` +
+      `- First-to-last operating profit decline > 25% = Severe\n\n`;
+
+    return {
+      prompt: preCalc + 'Monthly P&L trend (fiscal order):\n' + table,
+      allowed,
+    };
+  },
+};
+
 // ─── Scope classification ────────────────────────────────────────────────────
 
-type ScopeType = 'period' | 'snapshot';
+type ScopeType = 'period' | 'snapshot' | 'fiscal_period';
 
 const SECTION_SCOPE: Record<SectionKey, ScopeType> = {
   payment_collection_trend: 'period',
@@ -3023,6 +3453,7 @@ const SECTION_SCOPE: Record<SectionKey, ScopeType> = {
   return_unsettled: 'snapshot',
   expense_overview: 'period',
   expense_breakdown: 'period',
+  financial_overview: 'fiscal_period',
 };
 
 // Per-section snapshot source: each snapshot section anchors its "as of" date on a different table.
@@ -3035,10 +3466,16 @@ async function buildScopeLabel(
   scope: ScopeType,
   dateRange: DateRange | null,
   sectionKey: SectionKey,
+  fiscalPeriod?: FiscalPeriod | null,
 ): Promise<string> {
   if (scope === 'period') {
     if (!dateRange) return 'Scope: Period-based metric (no date range provided).';
     return `Scope: PERIOD-BASED metric — filtered to ${dateRange.start} through ${dateRange.end}. All figures reflect activity WITHIN this date range only. Do NOT describe these numbers as "outstanding balance" or "total receivables" — they are period flows, not point-in-time balances.`;
+  }
+  if (scope === 'fiscal_period') {
+    if (!fiscalPeriod) return 'Scope: Fiscal-period metric (no fiscal period provided).';
+    const window = rangeLabel(fiscalPeriod.range, fiscalPeriod.fiscalYear);
+    return `Scope: FISCAL-PERIOD metric — filtered to ${window}. All figures reflect P&L activity WITHIN this fiscal window only, sourced from pc_pnl_period (period_no indexed, not calendar dates). Compare against prior-year same window for YoY context. Do NOT describe these numbers as calendar-date flows or point-in-time balances — they are fiscal-year flows.`;
   }
   const table = SNAPSHOT_SOURCE_TABLE[sectionKey];
   if (!table) {
@@ -3060,16 +3497,31 @@ export async function fetchComponentData(
   componentKey: string,
   sectionKey: SectionKey,
   dateRange: DateRange | null,
+  fiscalPeriod?: FiscalPeriod | null,
 ): Promise<FetcherResult> {
-  const fetcher = fetchers[componentKey];
-  if (!fetcher) {
-    return { prompt: `No data fetcher defined for component: ${componentKey}`, allowed: [] };
-  }
+  const scope = SECTION_SCOPE[sectionKey];
 
   try {
-    const { prompt, allowed } = await fetcher(dateRange);
-    const scopeLabel = await buildScopeLabel(SECTION_SCOPE[sectionKey], dateRange, sectionKey);
-    return { prompt: `${scopeLabel}\n\n${prompt}`, allowed };
+    let fetched: FetcherResult;
+    if (scope === 'fiscal_period') {
+      const fetcher = fiscalPeriodFetchers[componentKey];
+      if (!fetcher) {
+        return { prompt: `No fiscal-period fetcher defined for component: ${componentKey}`, allowed: [] };
+      }
+      if (!fiscalPeriod) {
+        return { prompt: `Fiscal-period component ${componentKey} invoked without a fiscal period.`, allowed: [] };
+      }
+      fetched = await fetcher(fiscalPeriod);
+    } else {
+      const fetcher = fetchers[componentKey];
+      if (!fetcher) {
+        return { prompt: `No data fetcher defined for component: ${componentKey}`, allowed: [] };
+      }
+      fetched = await fetcher(dateRange);
+    }
+
+    const scopeLabel = await buildScopeLabel(scope, dateRange, sectionKey, fiscalPeriod);
+    return { prompt: `${scopeLabel}\n\n${fetched.prompt}`, allowed: fetched.allowed };
   } catch (err) {
     console.error(`Data fetch error for ${componentKey}:`, err);
     return {

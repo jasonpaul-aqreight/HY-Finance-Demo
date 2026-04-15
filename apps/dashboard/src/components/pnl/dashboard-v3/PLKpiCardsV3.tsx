@@ -5,6 +5,7 @@ import { useStableData } from '@/hooks/useStableData';
 import { Card, CardContent } from '@/components/ui/card';
 import { formatRM, formatPct } from '@/lib/pnl/format';
 import { cn } from '@/lib/utils';
+import { AnalyzeIcon } from '@/components/ai-insight/AnalyzeIcon';
 
 interface Props {
   fy: string;
@@ -16,9 +17,10 @@ interface KpiCardProps {
   subtitle?: string;
   alarm?: 'positive' | 'negative' | null;
   valueColor?: 'red' | 'green' | null;
+  componentKey?: string;
 }
 
-function KpiCard({ title, value, subtitle, alarm, valueColor }: KpiCardProps) {
+function KpiCard({ title, value, subtitle, alarm, valueColor, componentKey }: KpiCardProps) {
   return (
     <Card className={cn(
       'rounded-xl',
@@ -27,7 +29,10 @@ function KpiCard({ title, value, subtitle, alarm, valueColor }: KpiCardProps) {
       !alarm && 'ring-1 ring-foreground/10',
     )}>
       <CardContent className="p-4">
-        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">{title}</p>
+        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1 flex items-center gap-1">
+          {title}
+          {componentKey && <AnalyzeIcon sectionKey="financial_overview" componentKey={componentKey} />}
+        </p>
         <p className={cn(
           'text-2xl font-bold',
           valueColor === 'red' && 'text-red-600',
@@ -82,28 +87,35 @@ export function PLKpiCardsV3({ fy }: Props) {
     currentRatio = cl !== 0 ? ca / cl : 0;
   }
 
-  // Row 1: Revenue & Costs
+  // Row 1: Revenue & Costs — 4 of the 6 AI-analyzable profitability waterfall metrics
   const row1: KpiCardProps[] = [
-    { title: 'Net Sales', value: formatRM(data.net_sales) },
+    { title: 'Net Sales', value: formatRM(data.net_sales), componentKey: 'fin_net_sales' },
     { title: 'Cost of Sales', value: formatRM(cogs),
-      subtitle: 'Direct costs of products sold' },
+      subtitle: 'Direct costs of products sold',
+      componentKey: 'fin_cost_of_sales' },
     { title: 'Gross Profit', value: formatRM(data.gross_profit),
       subtitle: 'Sales - Cost of Sales',
-      valueColor: data.gross_profit < 0 ? 'red' : 'green' },
+      valueColor: data.gross_profit < 0 ? 'red' : 'green',
+      componentKey: 'fin_gross_profit' },
     { title: 'Operating Costs', value: formatRM(data.expenses),
-      subtitle: 'Day-to-day business costs' },
+      subtitle: 'Day-to-day business costs',
+      componentKey: 'fin_operating_costs' },
   ];
 
-  // Row 2: Profitability & Ratios
+  // Row 2: Profitability & Ratios — Operating Profit + Profit/Loss are the
+  // remaining 2 AI-analyzable KPIs. Expense Ratio + Current Ratio are derivative /
+  // balance-sheet metrics and intentionally not wired to the insight engine in §9.
   const row2: KpiCardProps[] = [
     { title: 'Operating Profit', value: formatRM(operating_profit),
       subtitle: 'Gross Profit − Operating Costs',
       alarm: operating_profit < 0 ? 'negative' : 'positive',
-      valueColor: operating_profit < 0 ? 'red' : 'green' },
+      valueColor: operating_profit < 0 ? 'red' : 'green',
+      componentKey: 'fin_operating_profit' },
     { title: 'Profit/Loss', value: formatRM(data.net_profit),
       subtitle: `Operating Profit + Other Income - Tax | Margin: ${formatPct(net_margin_pct)}`,
       alarm: data.net_profit < 0 ? 'negative' : 'positive',
-      valueColor: data.net_profit < 0 ? 'red' : 'green' },
+      valueColor: data.net_profit < 0 ? 'red' : 'green',
+      componentKey: 'fin_net_profit' },
     { title: 'Expense Ratio', value: formatPct(data.expense_ratio),
       subtitle: 'Operating Costs ÷ Net Sales' },
     { title: 'Current Ratio', value: currentRatio.toFixed(2),

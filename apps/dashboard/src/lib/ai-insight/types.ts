@@ -1,6 +1,6 @@
 // ─── AI Insight Engine — Shared Types ────────────────────────────────────────
 
-export type PageKey = 'payment' | 'sales' | 'customer-margin' | 'supplier-performance' | 'return' | 'expenses';
+export type PageKey = 'payment' | 'sales' | 'customer-margin' | 'supplier-performance' | 'return' | 'expenses' | 'financial';
 
 export type SectionKey =
   | 'payment_collection_trend'
@@ -14,7 +14,8 @@ export type SectionKey =
   | 'return_trend'
   | 'return_unsettled'
   | 'expense_overview'
-  | 'expense_breakdown';
+  | 'expense_breakdown'
+  | 'financial_overview';
 
 export type ComponentType = 'kpi' | 'chart' | 'table' | 'breakdown';
 
@@ -30,10 +31,22 @@ export interface DateRange {
   end: string;
 }
 
+// Fiscal-period scope — used by the Financial page, which filters by fiscal year
+// + a named window ('fy' = full FY, 'last12' = trailing 12 months, 'ytd' = year-to-date)
+// instead of calendar {start, end}. Sibling type to DateRange, not a union, so
+// existing calendar-scoped fetchers keep their signatures unchanged.
+export type FiscalRange = 'fy' | 'last12' | 'ytd';
+
+export interface FiscalPeriod {
+  fiscalYear: string; // e.g. "FY2025"
+  range: FiscalRange;
+}
+
 export interface AnalyzeRequest {
   page: PageKey;
   section_key: SectionKey;
-  date_range: DateRange | null; // null for snapshot sections
+  date_range: DateRange | null;            // calendar scope + null for snapshots
+  fiscal_period?: FiscalPeriod | null;     // fiscal_period scope (Financial page)
   user_name: string;
 }
 

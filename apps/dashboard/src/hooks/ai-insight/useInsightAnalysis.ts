@@ -5,6 +5,7 @@ import type {
   SectionKey,
   PageKey,
   DateRange,
+  FiscalPeriod,
   SSEProgressData,
   LockStatus,
   SummaryJson,
@@ -75,7 +76,7 @@ export function useInsightAnalysis(page: PageKey, sectionKey: SectionKey) {
 
   // Start analysis via SSE
   const analyze = useCallback(
-    async (dateRange: DateRange | null, userName: string) => {
+    async (dateRange: DateRange | null, userName: string, fiscalPeriod: FiscalPeriod | null = null) => {
       // Check lock first
       const lock = await checkLock();
       if (lock?.locked) {
@@ -94,6 +95,7 @@ export function useInsightAnalysis(page: PageKey, sectionKey: SectionKey) {
           page,
           section_key: sectionKey,
           date_range: dateRange,
+          fiscal_period: fiscalPeriod,
           user_name: userName,
         }),
       });

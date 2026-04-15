@@ -21,7 +21,7 @@ import {
   logSummaryResponse,
   logSessionEnd,
 } from './debug-logger';
-import type { SectionKey, DateRange, ComponentResult, SummaryJson, SummaryInsight, ComponentType, AllowedValue } from './types';
+import type { SectionKey, DateRange, FiscalPeriod, ComponentResult, SummaryJson, SummaryInsight, ComponentType, AllowedValue } from './types';
 
 const MAX_CONCURRENCY = 2; // Keep low to avoid rate limits on lower-tier API plans
 const MAX_TOOL_CALLS_PER_SUMMARY = 2; // Summary can drill down for root causes
@@ -47,6 +47,7 @@ export async function runSectionAnalysis(
   dateRange: DateRange | null,
   abortController: AbortController,
   onProgress: ProgressCallback,
+  fiscalPeriod: FiscalPeriod | null = null,
 ): Promise<AnalysisResult> {
   const components = SECTION_COMPONENTS[sectionKey];
   if (!components) throw new Error(`Unknown section: ${sectionKey}`);
@@ -82,7 +83,7 @@ export async function runSectionAnalysis(
       onProgress(comp.key, 'analyzing');
 
       try {
-        const result = await analyzeComponent(comp.key, comp.name, comp.type, sectionKey, dateRange, abortSignal, logFile);
+        const result = await analyzeComponent(comp.key, comp.name, comp.type, sectionKey, dateRange, abortSignal, logFile, fiscalPeriod);
         componentResults.push(result);
         totalTokens += result.token_count;
         totalCost += estimateCost(result.input_tokens, result.output_tokens);
@@ -121,7 +122,7 @@ export async function runSectionAnalysis(
 
     // Step 2: Run summary analysis
     onProgress('summary', 'analyzing');
-    const summary = await runSummaryAnalysis(sectionKey, dateRange, componentResults, abortSignal, logFile);
+    const summary = await runSummaryAnalysis(sectionKey, dateRange, componentResults, abortSignal, logFile, fiscalPeriod);
     totalTokens += summary.tokenCount;
     totalCost += estimateCost(summary.inputTokens, summary.outputTokens, SUMMARY_MODEL);
     onProgress('summary', 'complete');
@@ -172,11 +173,12 @@ async function analyzeComponent(
   dateRange: DateRange | null,
   abortSignal: AbortSignal,
   logFile: string | null,
+  fiscalPeriod: FiscalPeriod | null = null,
 ): Promise<ComponentResult> {
   const client = getAnthropicClient();
 
   // Fetch dashboard data for this component
-  const { prompt: formattedValues, allowed } = await fetchComponentData(componentKey, sectionKey, dateRange);
+  const { prompt: formattedValues, allowed } = await fetchComponentData(componentKey, sectionKey, dateRange, fiscalPeriod);
 
   const systemPrompt = getComponentSystemPrompt(componentKey);
   const userPrompt = buildComponentUserPrompt({
@@ -184,6 +186,7 @@ async function analyzeComponent(
     componentName,
     componentType,
     dateRange,
+    fiscalPeriod,
     formattedValues,
   });
 
@@ -243,6 +246,7 @@ async function runSummaryAnalysis(
   componentResults: ComponentResult[],
   abortSignal: AbortSignal,
   logFile: string | null,
+  fiscalPeriod: FiscalPeriod | null = null,
 ): Promise<{ json: SummaryJson; tokenCount: number; inputTokens: number; outputTokens: number }> {
   if (abortSignal.aborted) throw new Error('Analysis aborted');
 
@@ -253,6 +257,7 @@ async function runSummaryAnalysis(
   const userPrompt = buildSummaryUserPrompt({
     sectionKey,
     dateRange,
+    fiscalPeriod,
     componentResults: componentResults.map(cr => {
       const compDef = components.find(c => c.key === cr.component_key);
       return {

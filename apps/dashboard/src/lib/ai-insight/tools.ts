@@ -18,6 +18,7 @@ const LOCAL_WHITELIST: Record<string, string[]> = {
   pc_return_aging: ['snapshot_date', 'bucket', 'count', 'amount'],
   pc_return_by_customer: ['month', 'debtor_code', 'company_name', 'cn_count', 'cn_total', 'knock_off_total', 'refund_total', 'unresolved', 'outstanding_count'],
   pc_expense_monthly: ['month', 'acc_no', 'account_name', 'acc_type', 'net_amount'],
+  pc_pnl_period: ['period_no', 'acc_type', 'acc_no', 'account_name', 'parent_acc_no', 'home_dr', 'home_cr', 'proj_no'],
 };
 
 const RDS_WHITELIST: Record<string, string[]> = {

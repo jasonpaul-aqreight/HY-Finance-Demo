@@ -25,10 +25,16 @@ CREATE TABLE IF NOT EXISTS ai_insight_section (
   cost_usd         NUMERIC(8,4),
   date_range_start DATE,
   date_range_end   DATE,
+  fiscal_year      TEXT,          -- e.g. "FY2025" — populated for fiscal_period scope sections
+  fiscal_range     TEXT,          -- 'fy' | 'last12' | 'ytd'
   generated_by     TEXT NOT NULL,
   generated_at     TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   UNIQUE (page, section_key)
 );
+
+-- Idempotent migration for existing databases predating fiscal_period scope (§9 financial_overview).
+ALTER TABLE ai_insight_section ADD COLUMN IF NOT EXISTS fiscal_year  TEXT;
+ALTER TABLE ai_insight_section ADD COLUMN IF NOT EXISTS fiscal_range TEXT;
 
 -- 3. Component-level insight (individual analyses)
 CREATE TABLE IF NOT EXISTS ai_insight_component (

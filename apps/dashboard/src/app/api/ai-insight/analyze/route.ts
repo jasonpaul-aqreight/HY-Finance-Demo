@@ -12,7 +12,7 @@ export { activeControllers };
 
 export async function POST(req: NextRequest) {
   const body = (await req.json()) as AnalyzeRequest;
-  const { page, section_key, date_range, user_name } = body;
+  const { page, section_key, date_range, fiscal_period, user_name } = body;
 
   // Validate section key
   if (!SECTION_COMPONENTS[section_key as SectionKey]) {
@@ -60,6 +60,7 @@ export async function POST(req: NextRequest) {
           (component, status, message) => {
             sendEvent('progress', { component, status, message });
           },
+          fiscal_period ?? null,
         );
 
         const analysisTimeS = parseFloat(((Date.now() - startTime) / 1000).toFixed(1));
@@ -73,6 +74,7 @@ export async function POST(req: NextRequest) {
           tokenCount: result.totalTokens,
           costUsd: result.totalCost,
           dateRange: date_range,
+          fiscalPeriod: fiscal_period ?? null,
           generatedBy: user_name,
           components: result.components,
         });

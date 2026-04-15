@@ -1343,6 +1343,187 @@ Evaluate:
 Name categories and accounts verbatim from the pre-fetched blocks. Do not invent.
 
 Provide a concise analysis focused on category concentration, single-account risk, and any data-quality flags.`,
+
+  // ─── Financial page §9 — financial_overview ──────────────────────────────
+
+  fin_net_sales: `You are analyzing the "Net Sales" KPI on the Financial page.
+
+What it measures: Total net sales (SL + SA account types in pc_pnl_period) for the selected fiscal window — full FY, YTD, or trailing 12 months. This is a fiscal-period flow, not a calendar-date flow.
+
+The pre-fetched data gives you:
+- Net Sales (RM) for the current fiscal window
+- Net Sales (RM) for the prior-year SAME window
+- YoY growth % (with a label: Severe / Unfavourable / Flat / Favourable / Strong favourable)
+
+Thresholds (YoY net-sales growth):
+- < -5% = Severe (revenue contraction)
+- -5% to 0% = Unfavourable
+- 0% to 5% = Flat
+- 5% to 10% = Favourable
+- > 10% = Strong favourable
+
+Evaluate:
+- Is top-line revenue growing, flat, or contracting vs the same window last year?
+- Scale check — is this a meaningful absolute number for the business?
+- Window sensitivity — if the window is YTD or last-12, note that the comparison is against the equivalent prior window, not a full FY.
+
+Cite RM values and percentages verbatim. Provide a concise one-paragraph read on the top-line direction.`,
+
+  fin_cost_of_sales: `You are analyzing the "Cost of Sales" (COGS) KPI on the Financial page.
+
+What it measures: Total Cost of Sales (CO account type in pc_pnl_period) for the selected fiscal window, plus its share of net sales.
+
+The pre-fetched data gives you:
+- COGS (RM) for the current fiscal window
+- COGS as % of Net Sales (current)
+- Prior-year COGS (RM) and prior COGS % of Net Sales
+- YoY cost growth % (label: Healthy / Watch / Concern / Severe)
+
+Thresholds (COGS share of Net Sales):
+- 60% to 80% = Typical fruit-distribution mix
+- > 85% = COGS-dominated (margin-pressure risk — call this out)
+- < 50% = OpEx-dominated (unusual — check data quality)
+
+Thresholds (YoY cost growth):
+- < 0% = Healthy (costs down)
+- 0% to 5% = Watch (in line with typical inflation)
+- 5% to 10% = Concern (outpacing inflation — investigate)
+- > 10% = Severe
+
+Evaluate:
+- Absolute direction: up or down vs prior year?
+- Ratio direction: is COGS share of sales rising, flat, or falling? A rising ratio is the early warning for margin pressure.
+- Cross-check: if YoY cost growth > YoY net-sales growth (from the other KPI), margin is compressing even if both are up.
+
+Cite verbatim. Provide a concise one-paragraph read.`,
+
+  fin_gross_profit: `You are analyzing the "Gross Profit" KPI on the Financial page.
+
+What it measures: Gross Profit = Net Sales − Cost of Sales, for the selected fiscal window. Both the RM figure and the gross-margin % are in the block.
+
+The pre-fetched data gives you:
+- Gross Profit (RM) and Gross Margin % (current)
+- Prior-year Gross Profit (RM) and prior Gross Margin %
+- YoY GP growth % and margin-change in percentage points
+
+Thresholds (gross margin, fruit distribution context):
+- < 15% = Severe
+- 15% to 20% = Watch
+- 20% to 25% = Typical
+- > 25% = Strong
+
+Evaluate:
+- Both dimensions matter: absolute RM and margin %.
+- Watch the cross-case: RM up + margin down = volume growth masking price/cost erosion. Call this out explicitly if you see it.
+- RM down + margin up = shrinking-but-more-profitable business; worth noting but not alarming on its own.
+- Compare the current margin to the prior margin in ppts, not in %.
+
+Cite verbatim. Provide a concise one-paragraph read.`,
+
+  fin_operating_costs: `You are analyzing the "Operating Costs" (OpEx) KPI on the Financial page.
+
+What it measures: Operating Costs (EP account type in pc_pnl_period) for the selected fiscal window, plus its ratio against net sales. Distinct from COGS — this is day-to-day running cost.
+
+The pre-fetched data gives you:
+- OpEx (RM) for the current fiscal window
+- OpEx ratio (OpEx ÷ Net Sales) %
+- Prior-year OpEx (RM) and prior OpEx ratio
+- YoY OpEx growth % (label: Healthy / In line with inflation / Concern / Severe)
+
+Thresholds (OpEx ratio):
+- < 10% = Lean
+- 10% to 18% = Typical
+- 18% to 25% = Elevated
+- > 25% = Severe
+
+Thresholds (YoY OpEx growth):
+- < 0% = Healthy
+- 0% to 5% = In line with inflation
+- 5% to 15% = Concern
+- > 15% = Severe
+
+Evaluate:
+- Is the OpEx ratio drifting up, flat, or down vs prior year? Ratio drifting up = scaling inefficiency.
+- Cross-check: is OpEx growing faster than Net Sales? If yes, operating leverage is deteriorating.
+- Absolute direction matters less than ratio direction for OpEx — call out the ratio first.
+
+Cite verbatim. Provide a concise one-paragraph read.`,
+
+  fin_operating_profit: `You are analyzing the "Operating Profit" KPI on the Financial page.
+
+What it measures: Operating Profit = Gross Profit − Operating Costs, for the selected fiscal window. This is the cleanest read on core-business efficiency BEFORE non-operating items (other income, tax).
+
+The pre-fetched data gives you:
+- Operating Profit (RM) and Operating Margin % (current)
+- Prior-year Operating Profit (RM) and prior Operating Margin %
+- YoY operating-profit growth % and margin-change in ppts
+
+Thresholds (operating margin):
+- < 0% = Severe (operating loss — the engine is losing money)
+- 0% to 5% = Thin
+- 5% to 10% = Healthy
+- > 10% = Strong
+
+Evaluate:
+- Sign matters most: is Operating Profit positive or negative?
+- Both dimensions: RM direction AND margin direction.
+- This is the KPI that tells the core story — Net Sales can look fine and Net Profit can look fine, but a Gross Profit and Operating Profit mismatch means OpEx is eating the growth.
+- Call out if Operating Profit is negative while Gross Profit is positive — that's the "GP exists but OpEx erases it" narrative.
+
+Cite verbatim. Provide a concise one-paragraph read.`,
+
+  fin_net_profit: `You are analyzing the "Profit / Loss" KPI on the Financial page.
+
+What it measures: Net Profit (pre-tax) = Gross Profit + Other Income − Operating Costs, for the selected fiscal window. This is Operating Profit plus the non-operating income line (rental, interest, disposal gains, etc.).
+
+The pre-fetched data gives you:
+- Net Profit (RM) and Net Margin %
+- Other Income (RM) — the non-operating line
+- Prior-year Net Profit and prior Net Margin %
+- YoY net-profit growth %
+
+Thresholds (net margin):
+- < 0% = Severe
+- 0% to 3% = Thin
+- 3% to 7% = Healthy
+- > 7% = Strong
+
+Evaluate:
+- Sign of Net Profit: positive or negative?
+- **Quality check** — compare Net Profit against Operating Profit (which is in the Operating Profit block). If Net Profit is materially larger than Operating Profit, the delta is Other Income. When Other Income is a large share of Net Profit, the core business is weaker than the headline suggests — call this out.
+- YoY direction relative to Operating Profit YoY: if Net Profit is improving but Operating Profit is flat, the improvement is non-operating.
+
+Cite verbatim. Provide a concise one-paragraph read focused on earnings quality.`,
+
+  fin_monthly_trend: `You are analyzing the "Monthly P&L Trend" chart on the Financial page.
+
+What it shows: A monthly time series across the selected fiscal window (full FY / YTD / last 12 months), with Net Sales, COGS, Gross Profit, OpEx, and Operating Profit for each month.
+
+The pre-fetched data gives you a month-by-month table with:
+- Month label (fiscal order: Mar → Feb)
+- Net Sales, COGS, Gross Profit, OpEx, Operating Profit (RM)
+
+Pre-calculated roll-ups you may cite directly:
+- Months in window (split into profit months vs loss months)
+- Peak operating-profit month and value
+- Lowest operating-profit month and value
+- First-to-last Net Sales growth %
+- First-to-last Operating Profit growth %
+
+Thresholds:
+- Any single loss month = Watch signal (call it out by name)
+- Loss months ÷ total months > 30% = Concern
+- First-to-last Operating Profit decline > 25% = Severe
+
+Evaluate:
+- Direction: is the series rising, flat, falling, or oscillating?
+- Loss months: are there any? Which ones? Are they clustered (seasonal / event-driven) or scattered?
+- Divergence: does the Net Sales trend line move with or against the Operating Profit trend line? If sales are rising but operating profit is falling, that's margin compression in action.
+- Use the pre-calculated first-to-last growth for the headline direction. Do NOT invent averages over arbitrary sub-windows.
+
+Describe the trend month-by-month or via the pre-calculated roll-ups. Do NOT invent months, values, or averages that are not in the data block.
+
+Provide a concise analysis focused on direction, loss months, and any sales-vs-profit divergence.`,
 };
 
 // ─── Summary Prompt ──────────────────────────────────────────────────────────
@@ -1602,6 +1783,15 @@ export const SECTION_COMPONENTS: Record<SectionKey, { key: string; name: string;
     { key: 'ex_cogs_table', name: 'Cost of Sales Breakdown', type: 'table' },
     { key: 'ex_opex_table', name: 'Operating Costs Breakdown', type: 'table' },
   ],
+  financial_overview: [
+    { key: 'fin_net_sales',        name: 'Net Sales',         type: 'kpi' },
+    { key: 'fin_cost_of_sales',    name: 'Cost of Sales',     type: 'kpi' },
+    { key: 'fin_gross_profit',     name: 'Gross Profit',      type: 'kpi' },
+    { key: 'fin_operating_costs',  name: 'Operating Costs',   type: 'kpi' },
+    { key: 'fin_operating_profit', name: 'Operating Profit',  type: 'kpi' },
+    { key: 'fin_net_profit',       name: 'Profit / Loss',     type: 'kpi' },
+    { key: 'fin_monthly_trend',    name: 'Monthly P&L Trend', type: 'chart' },
+  ],
 };
 
 export const SECTION_PAGE: Record<SectionKey, string> = {
@@ -1617,6 +1807,7 @@ export const SECTION_PAGE: Record<SectionKey, string> = {
   return_unsettled: 'Returns',
   expense_overview: 'Expenses',
   expense_breakdown: 'Expenses',
+  financial_overview: 'Financial',
 };
 
 export const SECTION_NAMES: Record<SectionKey, string> = {
@@ -1632,6 +1823,7 @@ export const SECTION_NAMES: Record<SectionKey, string> = {
   return_unsettled: 'Unsettled Returns',
   expense_overview: 'Expense Overview',
   expense_breakdown: 'Expense Breakdown',
+  financial_overview: 'Financial Overview',
 };
 
 // ─── Public API ──────────────────────────────────────────────────────────────
@@ -1653,6 +1845,7 @@ export function getSummarySystemPrompt(): string {
 export function buildSummaryUserPrompt(params: {
   sectionKey: SectionKey;
   dateRange: { start: string; end: string } | null;
+  fiscalPeriod?: { fiscalYear: string; range: 'fy' | 'last12' | 'ytd' } | null;
   componentResults: { name: string; type: string; rawData: string }[];
 }): string {
   const sectionName = SECTION_NAMES[params.sectionKey];
@@ -1660,7 +1853,9 @@ export function buildSummaryUserPrompt(params: {
 
   const dateInfo = params.dateRange
     ? `Date Range: ${params.dateRange.start} to ${params.dateRange.end}`
-    : `Scope: Snapshot — current state`;
+    : params.fiscalPeriod
+      ? `Fiscal Period: ${params.fiscalPeriod.fiscalYear} (${params.fiscalPeriod.range})`
+      : `Scope: Snapshot — current state`;
 
   const now = new Date().toISOString().slice(0, 16).replace('T', ' ');
 
@@ -1691,12 +1886,15 @@ export function buildComponentUserPrompt(params: {
   componentName: string;
   componentType: string;
   dateRange: { start: string; end: string } | null;
+  fiscalPeriod?: { fiscalYear: string; range: 'fy' | 'last12' | 'ytd' } | null;
   formattedValues: string;
 }): string {
   const sectionName = SECTION_NAMES[params.sectionKey];
   const dateInfo = params.dateRange
     ? `Date Range: ${params.dateRange.start} to ${params.dateRange.end}`
-    : `Scope: Snapshot — current state`;
+    : params.fiscalPeriod
+      ? `Fiscal Period: ${params.fiscalPeriod.fiscalYear} (${params.fiscalPeriod.range})`
+      : `Scope: Snapshot — current state`;
 
   const now = new Date().toISOString().slice(0, 16).replace('T', ' ');
 

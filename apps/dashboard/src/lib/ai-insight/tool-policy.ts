@@ -17,6 +17,7 @@ const SECTION_POLICY: Record<SectionKey, ToolPolicy> = {
   return_unsettled: 'full',
   expense_overview: 'aggregate_only',
   expense_breakdown: 'full',
+  financial_overview: 'aggregate_only',
 };
 
 const AGGREGATE_LOCAL_TABLES = new Set([
@@ -28,6 +29,7 @@ const AGGREGATE_LOCAL_TABLES = new Set([
   'pc_return_monthly',
   'pc_return_products',
   'pc_expense_monthly',
+  'pc_pnl_period',
 ]);
 
 export function policyForSection(sectionKey: SectionKey): ToolPolicy {

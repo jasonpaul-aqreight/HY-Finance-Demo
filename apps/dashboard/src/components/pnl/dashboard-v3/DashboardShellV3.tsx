@@ -9,6 +9,8 @@ import { PLStatementTableV3 } from './PLStatementTableV3';
 import { YoYComparisonV3 } from './YoYComparisonV3';
 import { BSTrendChartV3 } from './BSTrendChartV3';
 import { BSStatementTableV3 } from './BSStatementTableV3';
+import { InsightSectionHeader } from '@/components/ai-insight/InsightSectionHeader';
+import type { FiscalPeriod } from '@/lib/ai-insight/types';
 
 function SectionHeader({ title }: { title: string }) {
   return (
@@ -34,6 +36,9 @@ export function DashboardShellV3() {
   const months = monthlyData?.data ?? [];
   const latestMonth = months.length > 0 ? months[months.length - 1].label : undefined;
 
+  // Fiscal-period scope for the AI insight engine — covers §9 Financial Overview.
+  const fiscalPeriod: FiscalPeriod = { fiscalYear: filters.fiscalYear, range: filters.range };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Filter bar — not sticky, matches finalize pattern */}
@@ -44,6 +49,16 @@ export function DashboardShellV3() {
       </div>
 
       <main className="max-w-[1600px] mx-auto px-6 py-6 space-y-6">
+        {/* ═══ Section §9: Financial Overview — KPI summary + trend ═══ */}
+        <InsightSectionHeader
+          title="Financial Overview"
+          subtitle={`${filters.fiscalYear} · ${filters.range.toUpperCase()}`}
+          page="financial"
+          sectionKey="financial_overview"
+          dateRange={null}
+          fiscalPeriod={fiscalPeriod}
+        />
+
         {/* Section 1: KPI Summary Cards */}
         <PLKpiCardsV3 fy={filters.fiscalYear} />
 
