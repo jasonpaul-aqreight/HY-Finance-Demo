@@ -15,7 +15,8 @@ export type SectionKey =
   | 'return_unsettled'
   | 'expense_overview'
   | 'expense_breakdown'
-  | 'financial_overview';
+  | 'financial_overview'
+  | 'financial_pnl';
 
 export type ComponentType = 'kpi' | 'chart' | 'table' | 'breakdown';
 

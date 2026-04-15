@@ -36,6 +36,7 @@ import {
   getTopExpensesByType,
 } from '../expenses/queries';
 import { fyNameToNumber, fyToPeriodRange, periodLabel } from '../pnl/period-utils';
+import { getV2PLStatement, getMultiYearPL } from '../pnl/queries';
 import type {
   SectionKey,
   DateRange,
@@ -3434,6 +3435,244 @@ const fiscalPeriodFetchers: Record<string, FiscalPeriodFetcher> = {
       allowed,
     };
   },
+
+  // ─── Section §10 — financial_pnl ──────────────────────────────────────────
+
+  async fin_pl_statement(period) {
+    // Full-FY view regardless of selector — the statement table is annual.
+    const stmt = await getV2PLStatement(period.fiscalYear);
+
+    const groups = stmt.groups.filter(g => g.subtotal.ytd !== 0 || g.subtotal.prior_ytd !== 0);
+
+    const groupLines: string[] = [];
+    const allowed: AllowedValue[] = [];
+
+    for (const g of groups) {
+      const curr = g.subtotal.ytd;
+      const prior = g.subtotal.prior_ytd;
+      const yoy = yoyPct(curr, prior);
+      groupLines.push(
+        `- ${g.acc_type_name} (${g.acc_type}): RM ${Math.round(curr).toLocaleString('en-MY')} ` +
+        `vs prior RM ${Math.round(prior).toLocaleString('en-MY')} ` +
+        `(YoY ${yoy == null ? 'n/a' : yoy.toFixed(1) + '%'})`,
+      );
+      allowed.push(rm(`${g.acc_type_name} ytd`, Math.round(curr)));
+      allowed.push(rm(`${g.acc_type_name} prior ytd`, Math.round(prior)));
+      if (yoy != null) allowed.push(pct(`${g.acc_type_name} yoy`, yoy));
+    }
+
+    // Derived totals
+    const gpCurr = stmt.computed.gross_profit.ytd;
+    const gpPrior = stmt.computed.gross_profit.prior_ytd;
+    const npCurr = stmt.computed.net_profit.ytd;
+    const npPrior = stmt.computed.net_profit.prior_ytd;
+    const npatCurr = stmt.computed.net_profit_after_tax.ytd;
+    const npatPrior = stmt.computed.net_profit_after_tax.prior_ytd;
+    const gpmCurr = stmt.computed.gpm.ytd;
+    const gpmPrior = stmt.computed.gpm.prior_ytd;
+    const npmCurr = stmt.computed.npm.ytd;
+    const npmPrior = stmt.computed.npm.prior_ytd;
+
+    allowed.push(rm('gross profit ytd', Math.round(gpCurr)));
+    allowed.push(rm('gross profit prior ytd', Math.round(gpPrior)));
+    allowed.push(rm('net profit ytd', Math.round(npCurr)));
+    allowed.push(rm('net profit prior ytd', Math.round(npPrior)));
+    allowed.push(rm('net profit after tax ytd', Math.round(npatCurr)));
+    allowed.push(rm('net profit after tax prior ytd', Math.round(npatPrior)));
+    allowed.push(pct('gross margin ytd', gpmCurr));
+    allowed.push(pct('gross margin prior ytd', gpmPrior));
+    allowed.push(pct('net margin ytd', npmCurr));
+    allowed.push(pct('net margin prior ytd', npmPrior));
+
+    // Sign-flip detection
+    const signFlips: string[] = [];
+    if ((gpCurr >= 0) !== (gpPrior >= 0)) signFlips.push('Gross Profit');
+    if ((npCurr >= 0) !== (npPrior >= 0)) signFlips.push('Net Profit');
+    if ((npatCurr >= 0) !== (npatPrior >= 0)) signFlips.push('Net Profit After Tax');
+
+    // Margin drift
+    const gpmDrift = gpmCurr - gpmPrior;
+    const npmDrift = npmCurr - npmPrior;
+    allowed.push(pct('gross margin drift pp', gpmDrift));
+    allowed.push(pct('net margin drift pp', npmDrift));
+
+    // Top 5 biggest detail-account movers by |Δ RM|
+    interface Mover {
+      group: string;
+      description: string;
+      curr: number;
+      prior: number;
+      delta: number;
+    }
+    const movers: Mover[] = [];
+    for (const g of groups) {
+      for (const a of g.accounts) {
+        const delta = a.ytd - a.prior_ytd;
+        if (delta === 0) continue;
+        movers.push({
+          group: g.acc_type_name,
+          description: a.description,
+          curr: a.ytd,
+          prior: a.prior_ytd,
+          delta,
+        });
+      }
+    }
+    movers.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
+    const topMovers = movers.slice(0, 5);
+
+    const moverLines = topMovers.map(m => {
+      const yoy = yoyPct(m.curr, m.prior);
+      return `- [${m.group}] ${m.description}: RM ${Math.round(m.curr).toLocaleString('en-MY')} ` +
+        `vs prior RM ${Math.round(m.prior).toLocaleString('en-MY')} ` +
+        `(Δ RM ${Math.round(m.delta).toLocaleString('en-MY')}, ${yoy == null ? 'n/a' : yoy.toFixed(1) + '%'})`;
+    });
+    for (const m of topMovers) {
+      allowed.push(rm(`${m.description} ytd`, Math.round(m.curr)));
+      allowed.push(rm(`${m.description} prior ytd`, Math.round(m.prior)));
+      allowed.push(rm(`${m.description} yoy delta`, Math.round(m.delta)));
+    }
+
+    const prompt =
+      `Population: Full-FY P&L statement for ${period.fiscalYear} vs ${period.fiscalYear.replace(/\d{4}/, s => String(parseInt(s, 10) - 1))}, from pc_pnl_period (YTD = current period through latest; Prior YTD = prior FY same window).\n\n` +
+      `Group subtotals (YTD vs prior YTD):\n${groupLines.join('\n')}\n\n` +
+      `Derived totals:\n` +
+      `- Gross Profit: RM ${Math.round(gpCurr).toLocaleString('en-MY')} vs prior RM ${Math.round(gpPrior).toLocaleString('en-MY')} (Gross Margin ${gpmCurr.toFixed(1)}% vs ${gpmPrior.toFixed(1)}% — drift ${gpmDrift.toFixed(1)}pp)\n` +
+      `- Net Profit (pre-tax): RM ${Math.round(npCurr).toLocaleString('en-MY')} vs prior RM ${Math.round(npPrior).toLocaleString('en-MY')} (Net Margin ${npmCurr.toFixed(1)}% vs ${npmPrior.toFixed(1)}% — drift ${npmDrift.toFixed(1)}pp)\n` +
+      `- Net Profit After Tax: RM ${Math.round(npatCurr).toLocaleString('en-MY')} vs prior RM ${Math.round(npatPrior).toLocaleString('en-MY')}\n\n` +
+      (signFlips.length > 0 ? `⚠ SIGN FLIPS (SEVERE — call out explicitly): ${signFlips.join(', ')}\n\n` : '') +
+      `Top 5 detail-account movers by |Δ RM| (use these — do not invent others):\n${moverLines.join('\n')}\n\n` +
+      `Thresholds:\n` +
+      `- Group YoY subtotal: < ±5% Flat · ±5-15% Moderate · > ±15% Material\n` +
+      `- Gross Margin drift: ±3pp Material · ±5pp Severe\n` +
+      `- Net Margin drift: ±2pp Material · ±3pp Severe\n` +
+      `- Any sign flip on GP/NP/NPAT = Severe (always called out)\n\n` +
+      `Focus on structure: which groups carry the RM direction, whether margin expanded or compressed, and which 1-2 named accounts are the biggest drivers. Do NOT invent account names beyond the top-5 movers list.`;
+
+    return { prompt, allowed };
+  },
+
+  async fin_yoy_comparison(period) {
+    const allRows = await getMultiYearPL();
+    const fyNum = fyNameToNumber(period.fiscalYear);
+    // 4-year window: selected FY and the 3 priors (mirrors YoYComparisonV3 default)
+    const window = allRows.filter(r => r.fyNumber >= fyNum - 3 && r.fyNumber <= fyNum);
+
+    if (window.length === 0) {
+      return { prompt: `No multi-year P&L data available for ${period.fiscalYear}.`, allowed: [] };
+    }
+
+    const allowed: AllowedValue[] = [];
+    let table =
+      '| FY | Net Sales | COGS | Gross Profit | GM% | OpEx | Net Profit | NM% | NPAT |\n' +
+      '|----|-----------|------|--------------|-----|------|------------|-----|------|\n';
+    for (const r of window) {
+      const marker = r.isPartial ? '*' : '';
+      table +=
+        `| ${r.fy}${marker} ` +
+        `| RM ${Math.round(r.net_sales).toLocaleString('en-MY')} ` +
+        `| RM ${Math.round(r.cogs).toLocaleString('en-MY')} ` +
+        `| RM ${Math.round(r.gross_profit).toLocaleString('en-MY')} ` +
+        `| ${r.gross_margin_pct.toFixed(1)}% ` +
+        `| RM ${Math.round(r.expenses).toLocaleString('en-MY')} ` +
+        `| RM ${Math.round(r.net_profit).toLocaleString('en-MY')} ` +
+        `| ${r.net_margin_pct.toFixed(1)}% ` +
+        `| RM ${Math.round(r.npat).toLocaleString('en-MY')} |\n`;
+
+      allowed.push(rm(`${r.fy} net sales`, Math.round(r.net_sales)));
+      allowed.push(rm(`${r.fy} cogs`, Math.round(r.cogs)));
+      allowed.push(rm(`${r.fy} gross profit`, Math.round(r.gross_profit)));
+      allowed.push(pct(`${r.fy} gross margin`, r.gross_margin_pct));
+      allowed.push(rm(`${r.fy} operating costs`, Math.round(r.expenses)));
+      allowed.push(rm(`${r.fy} net profit`, Math.round(r.net_profit)));
+      allowed.push(pct(`${r.fy} net margin`, r.net_margin_pct));
+      allowed.push(rm(`${r.fy} npat`, Math.round(r.npat)));
+    }
+
+    // Roll-ups on FULL fiscal years only (exclude partial)
+    const full = window.filter(r => !r.isPartial);
+    const preCalcLines: string[] = [];
+
+    if (full.length >= 2) {
+      const first = full[0];
+      const last = full[full.length - 1];
+      const years = last.fyNumber - first.fyNumber;
+
+      // Net Sales CAGR
+      let nsCagr: number | null = null;
+      if (years > 0 && first.net_sales > 0 && last.net_sales > 0) {
+        nsCagr = (Math.pow(last.net_sales / first.net_sales, 1 / years) - 1) * 100;
+      }
+      if (nsCagr != null) {
+        allowed.push(pct('net sales cagr', nsCagr));
+        preCalcLines.push(`- Net Sales CAGR (${first.fy}→${last.fy}, ${years}yr): ${nsCagr.toFixed(1)}%`);
+      }
+
+      // Margin drift first→last
+      const gpmDrift = last.gross_margin_pct - first.gross_margin_pct;
+      const nmDrift = last.net_margin_pct - first.net_margin_pct;
+      allowed.push(pct('gross margin drift pp', gpmDrift));
+      allowed.push(pct('net margin drift pp', nmDrift));
+      preCalcLines.push(`- Gross Margin drift (${first.fy}→${last.fy}): ${gpmDrift.toFixed(1)}pp`);
+      preCalcLines.push(`- Net Margin drift (${first.fy}→${last.fy}): ${nmDrift.toFixed(1)}pp`);
+
+      // Net-profit direction streak
+      let declineStreak = 0;
+      let improveStreak = 0;
+      let maxDecline = 0;
+      let maxImprove = 0;
+      for (let i = 1; i < full.length; i++) {
+        if (full[i].net_profit < full[i - 1].net_profit) {
+          declineStreak++;
+          improveStreak = 0;
+        } else if (full[i].net_profit > full[i - 1].net_profit) {
+          improveStreak++;
+          declineStreak = 0;
+        } else {
+          declineStreak = 0;
+          improveStreak = 0;
+        }
+        if (declineStreak > maxDecline) maxDecline = declineStreak;
+        if (improveStreak > maxImprove) maxImprove = improveStreak;
+      }
+      allowed.push(cnt('longest decline streak years', maxDecline));
+      allowed.push(cnt('longest improvement streak years', maxImprove));
+      preCalcLines.push(`- Longest consecutive Net Profit decline: ${maxDecline} year(s)`);
+      preCalcLines.push(`- Longest consecutive Net Profit improvement: ${maxImprove} year(s)`);
+
+      // Sign flips on NPAT
+      let signFlips = 0;
+      for (let i = 1; i < full.length; i++) {
+        if ((full[i].npat >= 0) !== (full[i - 1].npat >= 0)) signFlips++;
+      }
+      allowed.push(cnt('npat sign flips', signFlips));
+      if (signFlips > 0) preCalcLines.push(`- NPAT sign flips in window: ${signFlips}`);
+    }
+
+    const partialNote = window.some(r => r.isPartial)
+      ? '\n\n* Partial fiscal year (data incomplete) — excluded from CAGR and direction roll-ups. Still listed in the table for reference but do NOT include it in trend narratives.'
+      : '';
+
+    const prompt =
+      `Population: Fiscal-year P&L roll-ups from pc_pnl_period, window = ${window[0].fy} to ${window[window.length - 1].fy}.\n\n` +
+      `Multi-year P&L (in fiscal order):\n${table}` +
+      (preCalcLines.length > 0
+        ? `\nPre-calculated roll-ups (cite these directly — do not recompute):\n${preCalcLines.join('\n')}\n`
+        : '') +
+      `\nThresholds:\n` +
+      `- Net Sales CAGR: < -5% Declining · -5 to 5% Flat · 5-15% Growing · > 15% Fast growth\n` +
+      `- Net Profit direction: 3+ consecutive declines = Severe · 3+ consecutive improvements = Strong\n` +
+      `- Gross Margin drift (first→last full FY): > ±3pp = Material structural change\n` +
+      `- Net Margin drift (first→last full FY): > ±2pp = Material\n` +
+      `- Any NPAT sign flip = Severe\n\n` +
+      `Evaluate:\n` +
+      `- Trajectory: is the business growing, flat, or shrinking on Net Sales?\n` +
+      `- Earnings direction: is Net Profit improving, oscillating, or declining? Cite the longest streak.\n` +
+      `- Margin structure: is the business becoming more or less profitable per RM of sales over the window?\n` +
+      `- Use the pre-calculated CAGR and drift figures for headline direction — do NOT recompute averages over arbitrary sub-windows.${partialNote}`;
+
+    return { prompt, allowed };
+  },
 };
 
 // ─── Scope classification ────────────────────────────────────────────────────
@@ -3454,6 +3693,7 @@ const SECTION_SCOPE: Record<SectionKey, ScopeType> = {
   expense_overview: 'period',
   expense_breakdown: 'period',
   financial_overview: 'fiscal_period',
+  financial_pnl: 'fiscal_period',
 };
 
 // Per-section snapshot source: each snapshot section anchors its "as of" date on a different table.

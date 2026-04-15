@@ -1524,6 +1524,69 @@ Evaluate:
 Describe the trend month-by-month or via the pre-calculated roll-ups. Do NOT invent months, values, or averages that are not in the data block.
 
 Provide a concise analysis focused on direction, loss months, and any sales-vs-profit divergence.`,
+
+  // ─── Financial page §10 — financial_pnl ──────────────────────────────────
+
+  fin_pl_statement: `You are analyzing the "Profit & Loss Statement" table on the Financial page.
+
+What it shows: The full P&L statement for the selected fiscal year against the prior fiscal year (YTD-aligned to the latest period with data). The table groups general-ledger accounts by account type (Sales, Sales Adjustments, Cost of Sales, Other Income, Operating Costs / OpEx, Taxation) and shows group subtotals, Gross Profit / (Loss), Net Profit / (Loss), and Net Profit After Tax with YoY.
+
+The pre-fetched data gives you:
+- Group subtotals (current YTD vs prior YTD) for every non-empty group, with YoY %
+- Derived totals: Gross Profit, Net Profit (pre-tax), Net Profit After Tax
+- Gross Margin % and Net Margin % (current vs prior, with drift in percentage points)
+- Sign-flip flags for GP / NP / NPAT (when any of these switch between positive and negative YoY)
+- Top 5 detail-account movers, ranked by absolute RM delta
+
+Thresholds:
+- Group YoY subtotal: < ±5% Flat · ±5-15% Moderate · > ±15% Material
+- Gross Margin drift: ±3pp Material · ±5pp Severe
+- Net Margin drift: ±2pp Material · ±3pp Severe
+- Any sign flip on GP / NP / NPAT = Severe (always call out by name)
+
+Evaluate:
+- Which groups drive the RM direction (e.g. "Net Sales up RM X, offset by OpEx up RM Y")?
+- Margin expansion vs compression: did Gross Margin / Net Margin drift meaningfully, and in which direction?
+- Which 1-2 named accounts from the top-5 movers list explain the biggest swings?
+
+Hard rules:
+- You may only cite account names that appear in the pre-fetched "Top 5 detail-account movers" list. Do NOT invent other account names.
+- Do NOT recompute YoY % — the figures in the data block are authoritative.
+- If you want to explain WHY a group moved, cite the top mover(s) inside that group from the list.
+
+Provide a concise structural analysis — the director wants to know "where did the RM go" and "is the margin healthier or sicker."`,
+
+  fin_yoy_comparison: `You are analyzing the "Multi-Year Comparison" table + small-multiples chart on the Financial page.
+
+What it shows: A 4-fiscal-year view of the core P&L line items — Net Sales, COGS, Gross Profit, Gross Margin %, Other Income, Operating Costs, Net Profit, Net Margin %, Taxation, Net Profit After Tax — for the selected FY and the three prior FYs.
+
+The pre-fetched data gives you:
+- A row per FY × 10 line items (RM and %), with partial FYs marked with an asterisk
+- Pre-calculated roll-ups over the FULL-FY rows only (partial FYs excluded):
+  - Net Sales CAGR (first → last full FY)
+  - Gross Margin drift (pp) and Net Margin drift (pp), first → last full FY
+  - Longest consecutive Net Profit decline streak (years)
+  - Longest consecutive Net Profit improvement streak (years)
+  - NPAT sign-flip count in the window
+
+Thresholds:
+- Net Sales CAGR: < -5% Declining · -5 to 5% Flat · 5-15% Growing · > 15% Fast growth
+- Net Profit direction: 3+ consecutive declines = Severe · 3+ consecutive improvements = Strong
+- Gross Margin drift (first → last full FY): > ±3pp = Material structural change
+- Net Margin drift (first → last full FY): > ±2pp = Material
+- Any NPAT sign flip in the window = Severe
+
+Evaluate:
+- Trajectory: what is the multi-year direction of the top line (Net Sales CAGR)?
+- Earnings quality: is Net Profit improving, oscillating, or declining? Cite the longest streak.
+- Margin structure: has the business become more or less profitable per RM of sales across the window?
+
+Hard rules:
+- Partial FYs (marked with *) are EXCLUDED from CAGR and direction roll-ups. You may list them in the table narrative but must NOT include them in trend claims.
+- Use the pre-calculated CAGR and drift figures for headline direction. Do NOT recompute growth over arbitrary sub-windows or invent averages.
+- Do NOT claim a streak longer than the pre-calculated values.
+
+Provide a concise multi-year narrative — growth trajectory, earnings direction, and margin evolution.`,
 };
 
 // ─── Summary Prompt ──────────────────────────────────────────────────────────
@@ -1792,6 +1855,10 @@ export const SECTION_COMPONENTS: Record<SectionKey, { key: string; name: string;
     { key: 'fin_net_profit',       name: 'Profit / Loss',     type: 'kpi' },
     { key: 'fin_monthly_trend',    name: 'Monthly P&L Trend', type: 'chart' },
   ],
+  financial_pnl: [
+    { key: 'fin_pl_statement',   name: 'Profit & Loss Statement', type: 'table' },
+    { key: 'fin_yoy_comparison', name: 'Multi-Year Comparison',   type: 'table' },
+  ],
 };
 
 export const SECTION_PAGE: Record<SectionKey, string> = {
@@ -1808,6 +1875,7 @@ export const SECTION_PAGE: Record<SectionKey, string> = {
   expense_overview: 'Expenses',
   expense_breakdown: 'Expenses',
   financial_overview: 'Financial',
+  financial_pnl: 'Financial',
 };
 
 export const SECTION_NAMES: Record<SectionKey, string> = {
@@ -1824,6 +1892,7 @@ export const SECTION_NAMES: Record<SectionKey, string> = {
   expense_overview: 'Expense Overview',
   expense_breakdown: 'Expense Breakdown',
   financial_overview: 'Financial Overview',
+  financial_pnl: 'Profit & Loss Detail',
 };
 
 // ─── Public API ──────────────────────────────────────────────────────────────

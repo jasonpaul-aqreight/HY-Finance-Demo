@@ -65,12 +65,20 @@ export function DashboardShellV3() {
         {/* Section 2: Monthly P&L Trend */}
         <MonthlyPLTrendV3 fy={filters.fiscalYear} range={filters.range} />
 
+        {/* ═══ Section §10: Profit & Loss Detail — statement + multi-year ═══ */}
+        <InsightSectionHeader
+          title="Profit & Loss Detail"
+          subtitle={`${filters.fiscalYear} · Full FY`}
+          page="financial"
+          sectionKey="financial_pnl"
+          dateRange={null}
+          fiscalPeriod={{ fiscalYear: filters.fiscalYear, range: 'fy' }}
+        />
+
         {/* Section 3: Profit & Loss Statement */}
-        <SectionHeader title="Profit & Loss Statement" />
         <PLStatementTableV3 fy={filters.fiscalYear} />
 
         {/* Section 4: Multi-Year Comparison */}
-        <SectionHeader title="Multi-Year Comparison" />
         <YoYComparisonV3 fy={filters.fiscalYear} />
 
         {/* Section 5: Balance Sheet */}

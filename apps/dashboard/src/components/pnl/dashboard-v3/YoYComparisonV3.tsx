@@ -9,6 +9,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { formatRMCompact, formatPct } from '@/lib/pnl/format';
+import { AnalyzeIcon } from '@/components/ai-insight/AnalyzeIcon';
 import {
   BarChart,
   Bar,
@@ -158,8 +159,9 @@ export function YoYComparisonV3({ fy }: Props) {
       {/* Small Multiples — one mini chart per category */}
       <Card className="rounded-xl ring-1 ring-foreground/10">
         <CardContent className="p-6">
-          <h3 className="text-base font-semibold mb-4">
+          <h3 className="text-base font-semibold mb-4 flex items-center gap-1">
             P&L Trend ({data[0]?.fy} – {data[data.length - 1]?.fy})
+            <AnalyzeIcon sectionKey="financial_pnl" componentKey="fin_yoy_comparison" />
           </h3>
           <div className="grid grid-cols-2 gap-x-6 gap-y-4">
             {CHART_CATEGORIES.map(cat => {
