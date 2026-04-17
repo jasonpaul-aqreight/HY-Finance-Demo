@@ -12,14 +12,6 @@ import { BSStatementTableV3 } from './BSStatementTableV3';
 import { InsightSectionHeader } from '@/components/ai-insight/InsightSectionHeader';
 import type { FiscalPeriod } from '@/lib/ai-insight/types';
 
-function SectionHeader({ title }: { title: string }) {
-  return (
-    <div className="rounded-md bg-primary/5 border border-primary/10 px-4 py-2.5 mt-10 mb-6">
-      <h2 className="text-base font-semibold tracking-tight text-foreground">{title}</h2>
-    </div>
-  );
-}
-
 export function DashboardShellV3() {
   const { filters, setFilters } = useDashboardFiltersV3();
   const { data: monthlyData } = useV3Monthly(filters.fiscalYear ?? '', filters.range);
@@ -81,8 +73,16 @@ export function DashboardShellV3() {
         {/* Section 4: Multi-Year Comparison */}
         <YoYComparisonV3 fy={filters.fiscalYear} />
 
-        {/* Section 5: Balance Sheet */}
-        <SectionHeader title="Balance Sheet" />
+        {/* ═══ Section §11: Balance Sheet — trend chart + statement table ═══ */}
+        <InsightSectionHeader
+          title="Balance Sheet"
+          subtitle={`${filters.fiscalYear} · ${filters.range.toUpperCase()}`}
+          page="financial"
+          sectionKey="financial_balance_sheet"
+          dateRange={null}
+          fiscalPeriod={fiscalPeriod}
+        />
+
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
           <BSTrendChartV3 fy={filters.fiscalYear} range={filters.range} />
           <BSStatementTableV3 fy={filters.fiscalYear} />

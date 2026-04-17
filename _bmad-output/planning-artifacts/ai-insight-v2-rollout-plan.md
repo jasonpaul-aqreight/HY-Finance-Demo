@@ -1,6 +1,6 @@
 # AI Insight Engine v2 — Roll-Out Plan
 
-**Status:** Active
+**Status:** ✅ COMPLETE (2026-04-15) — all 11 sections shipped under Phase A
 **Mode:** Phase A only (no live API calls — offline-verifiable work)
 **Approach:** Spec-first, section-by-section. No PR batching.
 **Quality bar:** [ai-insight-engine-spec.md](./ai-insight-engine-spec.md) (v1 spec — do not modify)
@@ -31,13 +31,13 @@ Legend: ⬜ Not started · 🟡 Spec in progress · 🔵 Spec signed off · 🟢
 | 2 | `customer_margin_breakdown` | Customer Margin | period | full | ✅ Done |
 | 3 | `supplier_margin_overview` | Supplier Performance | period | aggregate_only | ✅ Done |
 | 4 | `supplier_margin_breakdown` | Supplier Performance | period | full | ✅ Done |
-| 5 | `return_trend` | Returns | period | aggregate_only | ⬜ |
-| 6 | `return_unsettled` | Returns | snapshot | full | ⬜ |
-| 7 | `expense_overview` | Expenses | period | aggregate_only | ⬜ |
-| 8 | `expense_breakdown` | Expenses | period | full | ⬜ |
-| 9 | `financial_overview` | Financial | **fiscal_period** (new) | aggregate_only | ⬜ |
-| 10 | `financial_pnl` | Financial | **fiscal_period** | aggregate_only | ⬜ |
-| 11 | `financial_balance_sheet` | Financial | **fiscal_period** | aggregate_only | ⬜ |
+| 5 | `return_trend` | Returns | period | aggregate_only | ✅ Done |
+| 6 | `return_unsettled` | Returns | snapshot | full | ✅ Done |
+| 7 | `expense_overview` | Expenses | period | aggregate_only | ✅ Done |
+| 8 | `expense_breakdown` | Expenses | period | full | ✅ Done |
+| 9 | `financial_overview` | Financial | **fiscal_period** (new) | aggregate_only | ✅ Done |
+| 10 | `financial_pnl` | Financial | **fiscal_period** | aggregate_only | ✅ Done |
+| 11 | `financial_balance_sheet` | Financial | **fiscal_period** | aggregate_only | ✅ Done |
 
 ---
 
@@ -111,3 +111,7 @@ Legend: ⬜ Not started · 🟡 Spec in progress · 🔵 Spec signed off · 🟢
 | 2026-04-14 | 4 | Section 4 (`supplier_margin_breakdown`) spec drafted with §4.9 per-component icons checklist. 4 components: TopBottomChart (2×2 lens matrix), SupplierTable, ItemPricingPanel (anchor-item anchor = highest-revenue item), PriceScatterChart (top-50 sample + 5-bucket distribution). Tool policy `full` (mirrors §2). User accepted all proposal recommendations verbatim. |
 | 2026-04-14 | 4 | Section 4 implementation: types → prompts (SECTION_COMPONENTS/PAGE/NAMES + 4 component prompts) → 4 fetchers (all reuse `getTopBottomSuppliersV2` / `getTopBottomItemsV2` / `getSupplierTableV2` / `getItemListV2` / `getItemSupplierSummaryV2` / `getPriceSpread` — zero new SQL) → scope `period` → policy `full` (no whitelist changes) → second `InsightSectionHeader` mounted above `TopBottomChart` in `DashboardShell.tsx` → `COMPONENT_INFO` + 4 `AnalyzeIcon` wirings (`TopBottomChart`, `SupplierTable`, `ItemPricingPanel` on Supplier Comparison card, `PriceScatterChart`). Truth queries written (8 queries, T1–T8). `tsc --noEmit` clean. `npm run build` clean. |
 | 2026-04-14 | 4 | Playwright offline verify: "Supplier Margin Breakdown" section header renders with Get Insight button, 3 immediately-visible breakdown icons present (top_bottom, supplier_table, price_scatter), dialog opens with correct About section on `sm_supplier_table` click (dialog heading "Supplier Analysis Table"). `sm_item_pricing` icon lives inside the Price Comparison tab's Supplier Comparison card and only renders once a user selects an item — wiring verified in source. Only pre-existing console errors; no new JS errors introduced. Live LLM run still deferred on credit balance. |
+| 2026-04-15 | 5–10 | Tracker backfill: sections 5 (`return_trend`), 6 (`return_unsettled`), 7 (`expense_overview`), 8 (`expense_breakdown`), 9 (`financial_overview`), 10 (`financial_pnl`) all shipped between 2026-04-14 and 2026-04-15 (commits `24795ce`, prior returns unsettled commit, `6574677`, `45ae773`, `575b079`, `11f99f0`). Status rows updated to ✅ Done to match git truth. |
+| 2026-04-15 | 11 | Section 11 (`financial_balance_sheet`) implemented — final section of v2 rollout. 2 components: `bs_trend` (BSTrendChartV3) + `bs_statement` (BSStatementTableV3). Tool policy `aggregate_only` (no new tables — `pc_pnl_period` already allowlisted). Scope `fiscal_period`, `filters.range` passed through (not hard-coded `fy` like §10 — BS trend is range-aware, BS statement is range-insensitive so it doesn't care either way). Thresholds: Asset trajectory bands + equity decline streak + gearing drift + negative-equity month flag (trend); Current Ratio / Debt-to-Equity / Equity Ratio bands + NCA and Total Equity sign flips + top-3 movers across 8 line items (statement). 9-step playbook executed: types → tool-policy → data-fetcher (2 fiscal fetchers reusing `getV3BSTrend` / `getV3BSComparison` — zero new SQL) → prompts (registries + 2 component prompts) → component-info (2 About entries) → `InsightSectionHeader` replacing plain `SectionHeader` in `DashboardShellV3.tsx` (removed now-orphaned helper) → `COMPONENT_INFO` + 2 `AnalyzeIcon` wirings (BSTrendChartV3 beside the existing `<h3>`, BSStatementTableV3 got a new `<h3>Balance Sheet Statement</h3>` in its CardHeader since the card had only an Export button before). `tsc --noEmit` clean. `npm run build` clean. |
+| 2026-04-15 | 11 | Playwright offline verify: Financial page renders 11 analyze icons total (6 KPIs + Monthly P&L Trend + P&L Statement + Multi-Year + bs_trend + bs_statement). Both §11 icons at expected headings. `ComponentInsightDialog` opens on `bs_statement` click with full About section populated (verified dialog text includes "balance sheet in full detail", ratios narrative, top-3 movers mention). Console: 7 errors, all pre-existing 404s on `/api/ai-insight/section/{financial_overview,financial_pnl,financial_balance_sheet}` — expected Phase A baseline (no saved insights, live LLM blocked on credit balance). No new regressions. |
+| 2026-04-15 | — | **v2 rollout ✅ COMPLETE.** All 11 sections shipped under Phase A across Customer Margin, Supplier Performance, Returns, Expenses, and Financial pages. Retro: (1) The 9-step playbook scaled cleanly from §1 to §11 — zero rework, each section ~1 commit. (2) The `fiscal_period` scope introduced for §9–§11 was the only non-trivial core edit of the rollout and paid for itself three times. (3) `aggregate_only` tool policy held up — every Financial section reused `pc_pnl_period` with zero new allowlist entries. (4) The "pre-computed roll-ups + top-N movers + hard rule against inventing names" pattern from §10 transferred directly to §11 with no modification. (5) Tracker drift (sections 5–10 were shipped without ticking the status column) was the one process miss — captured in the backfill above. (6) Live LLM verification remains deferred Phase B pending API credit top-up — all component prompts, allowed-value whitelists, and offline dialog plumbing are ready to run as soon as credits are available. |

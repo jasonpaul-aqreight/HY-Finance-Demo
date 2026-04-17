@@ -1587,6 +1587,77 @@ Hard rules:
 - Do NOT claim a streak longer than the pre-calculated values.
 
 Provide a concise multi-year narrative — growth trajectory, earnings direction, and margin evolution.`,
+
+  // ─── Financial page §11 — financial_balance_sheet ────────────────────────
+
+  bs_trend: `You are analyzing the "Assets, Liabilities & Equity Trend" line chart on the Financial page.
+
+What it shows: A monthly time series across the selected fiscal window (full FY / YTD / last 12 months), with three lines — Total Assets, Total Liabilities, and Equity — rebuilt for each month from opening balance + cumulative movements through pc_pnl_period.
+
+The pre-fetched data gives you:
+- A month-by-month table (fiscal order) of Total Assets, Total Liabilities, Equity (RM)
+- Pre-calculated roll-ups you may cite directly:
+  - Months in window
+  - First-to-last Total Assets growth %
+  - First-to-last Total Liabilities growth %
+  - First-to-last Equity growth %
+  - Gearing (Total Liabilities ÷ Total Assets): first value, last value, and drift in pp
+  - Longest consecutive Equity-decline streak (months)
+  - Any months where Total Liabilities exceeded Total Assets (negative-equity flag)
+
+Thresholds:
+- Asset trajectory (first→last): < -5% Shrinking · ±5% Flat · 5-15% Growing · > 15% Fast growth
+- Equity direction: first→last declining = Watch · 3+ consecutive decline months = Severe
+- Liability vs Asset divergence: Liabilities growing > 10% while Assets flat/shrinking = Material · > 20% = Severe
+- Gearing drift: > +3pp Material deterioration · > +5pp Severe
+- Any month where Total Liabilities > Total Assets = Severe (insolvency — always call out by month name)
+
+Evaluate:
+- Direction: are the three lines rising, flat, falling, or diverging from one another?
+- Leverage: is the business taking on more debt relative to its asset base? Cite gearing drift.
+- Equity health: is equity building, holding, or eroding? Cite the decline streak.
+
+Hard rules:
+- Use the pre-calculated first-to-last growth and gearing drift for headline direction. Do NOT recompute averages over arbitrary sub-windows.
+- If there are negative-equity months in the pre-fetched list, you MUST call them out by month name.
+- Do NOT invent months, values, or ratios that are not in the data block.
+
+Provide a concise structural analysis — the director wants to know "is the balance sheet strengthening or weakening, and is leverage moving in the right direction."`,
+
+  bs_statement: `You are analyzing the "Balance Sheet Statement" table on the Financial page.
+
+What it shows: The full balance sheet for the selected fiscal year vs 12 periods prior (YTD-aligned snapshot). Eight line items by account type — Fixed Assets, Other Assets, Current Assets, Current Liabilities, Long Term Liabilities, Other Liabilities, Capital, Retained Earnings (including current-year P&L) — plus derived totals and key solvency ratios.
+
+The pre-fetched data gives you:
+- Line items (current vs prior) with RM delta and YoY % for every non-zero line
+- Derived totals: Net Current Assets, Total Assets, Total Liabilities, Total Equity (current + prior)
+- Key ratios (current + prior + drift):
+  - Current Ratio (Current Assets ÷ Current Liabilities)
+  - Debt-to-Equity (Total Liabilities ÷ Total Equity)
+  - Equity Ratio (Total Equity ÷ Total Assets)
+- Sign-flip flags for Net Current Assets and Total Equity
+- Top 3 biggest |Δ RM| line-item movers across the 8 line items
+
+Thresholds:
+- Line-item YoY: < ±5% Flat · ±5-15% Moderate · > ±15% Material
+- Current Ratio: < 1.0 Severe · 1.0-1.2 Thin · 1.2-2.0 Healthy · > 2.0 Strong · YoY drift > ±0.3 = Material
+- Debt-to-Equity: < 0.5 Conservative · 0.5-1.0 Typical · 1.0-2.0 Leveraged · > 2.0 Severe · YoY drift > ±0.3 = Material
+- Equity Ratio: < 20% Severe · 20-40% Thin · 40-60% Healthy · > 60% Strong · YoY drift > ±5pp = Material
+- Net Current Assets sign flip (pos→neg) = Severe (working-capital failure, always call out)
+- Total Equity sign flip = Severe (insolvency, always call out)
+
+Evaluate:
+- Liquidity: does the Current Ratio sit in the Healthy band, and is it drifting toward safer or thinner ground?
+- Leverage: where does Debt-to-Equity sit, and is it moving up or down vs prior?
+- Solvency cushion: is the Equity Ratio thick enough, and is it thickening or eroding?
+- Drivers: which 1-2 named line items from the top-3 movers explain the biggest RM swings?
+
+Hard rules:
+- You may only cite line-item names that appear in the pre-fetched "Top 3 biggest movers" list. Do NOT invent other account names.
+- Do NOT recompute YoY % or ratios — the figures in the data block are authoritative.
+- If you want to explain WHY Total Assets or Total Liabilities moved, cite the relevant mover(s) from the list.
+
+Provide a concise structural read — the director wants to know "is the balance sheet stronger or weaker than a year ago, and what drove the change."`,
 };
 
 // ─── Summary Prompt ──────────────────────────────────────────────────────────
@@ -1859,6 +1930,10 @@ export const SECTION_COMPONENTS: Record<SectionKey, { key: string; name: string;
     { key: 'fin_pl_statement',   name: 'Profit & Loss Statement', type: 'table' },
     { key: 'fin_yoy_comparison', name: 'Multi-Year Comparison',   type: 'table' },
   ],
+  financial_balance_sheet: [
+    { key: 'bs_trend',     name: 'Assets, Liabilities & Equity Trend', type: 'chart' },
+    { key: 'bs_statement', name: 'Balance Sheet Statement',            type: 'table' },
+  ],
 };
 
 export const SECTION_PAGE: Record<SectionKey, string> = {
@@ -1876,6 +1951,7 @@ export const SECTION_PAGE: Record<SectionKey, string> = {
   expense_breakdown: 'Expenses',
   financial_overview: 'Financial',
   financial_pnl: 'Financial',
+  financial_balance_sheet: 'Financial',
 };
 
 export const SECTION_NAMES: Record<SectionKey, string> = {
@@ -1893,6 +1969,7 @@ export const SECTION_NAMES: Record<SectionKey, string> = {
   expense_breakdown: 'Expense Breakdown',
   financial_overview: 'Financial Overview',
   financial_pnl: 'Profit & Loss Detail',
+  financial_balance_sheet: 'Balance Sheet',
 };
 
 // ─── Public API ──────────────────────────────────────────────────────────────

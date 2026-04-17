@@ -19,6 +19,7 @@ const SECTION_POLICY: Record<SectionKey, ToolPolicy> = {
   expense_breakdown: 'full',
   financial_overview: 'aggregate_only',
   financial_pnl: 'aggregate_only',
+  financial_balance_sheet: 'aggregate_only',
 };
 
 const AGGREGATE_LOCAL_TABLES = new Set([

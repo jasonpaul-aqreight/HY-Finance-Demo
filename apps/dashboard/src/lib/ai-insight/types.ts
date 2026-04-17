@@ -16,7 +16,8 @@ export type SectionKey =
   | 'expense_overview'
   | 'expense_breakdown'
   | 'financial_overview'
-  | 'financial_pnl';
+  | 'financial_pnl'
+  | 'financial_balance_sheet';
 
 export type ComponentType = 'kpi' | 'chart' | 'table' | 'breakdown';
 

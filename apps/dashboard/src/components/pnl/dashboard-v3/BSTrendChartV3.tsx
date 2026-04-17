@@ -3,6 +3,7 @@
 import { useV3BSTrend } from '@/hooks/pnl/usePLDataV3';
 import { useStableData } from '@/hooks/useStableData';
 import { Card, CardContent } from '@/components/ui/card';
+import { AnalyzeIcon } from '@/components/ai-insight/AnalyzeIcon';
 import { formatRMCompact } from '@/lib/pnl/format';
 import {
   LineChart,
@@ -48,8 +49,9 @@ export function BSTrendChartV3({ fy, range }: Props) {
   return (
     <Card className="rounded-xl ring-1 ring-foreground/10 h-full">
       <CardContent className="p-6">
-        <h3 className="text-base font-semibold mb-4">
+        <h3 className="text-base font-semibold mb-4 flex items-center gap-1.5">
           Assets, Liabilities & Equity Trend
+          <AnalyzeIcon sectionKey="financial_balance_sheet" componentKey="bs_trend" />
         </h3>
         <div className="h-[320px]">
           <ResponsiveContainer width="100%" height="100%">

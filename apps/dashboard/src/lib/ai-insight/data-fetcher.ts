@@ -36,7 +36,7 @@ import {
   getTopExpensesByType,
 } from '../expenses/queries';
 import { fyNameToNumber, fyToPeriodRange, periodLabel } from '../pnl/period-utils';
-import { getV2PLStatement, getMultiYearPL } from '../pnl/queries';
+import { getV2PLStatement, getMultiYearPL, getV3BSTrend, getV3BSComparison } from '../pnl/queries';
 import type {
   SectionKey,
   DateRange,
@@ -3673,6 +3673,240 @@ const fiscalPeriodFetchers: Record<string, FiscalPeriodFetcher> = {
 
     return { prompt, allowed };
   },
+
+  // ─── Section §11 — financial_balance_sheet ────────────────────────────────
+
+  async bs_trend(period) {
+    const rows = await getV3BSTrend(period.fiscalYear, period.range);
+
+    if (rows.length === 0) {
+      return { prompt: `No balance-sheet trend data available for ${period.fiscalYear} (${period.range}).`, allowed: [] };
+    }
+
+    const first = rows[0];
+    const last = rows[rows.length - 1];
+
+    const assetGrowth = first.total_assets !== 0
+      ? ((last.total_assets - first.total_assets) / Math.abs(first.total_assets)) * 100
+      : 0;
+    const liabGrowth = first.total_liabilities !== 0
+      ? ((last.total_liabilities - first.total_liabilities) / Math.abs(first.total_liabilities)) * 100
+      : 0;
+    const equityGrowth = first.equity !== 0
+      ? ((last.equity - first.equity) / Math.abs(first.equity)) * 100
+      : 0;
+
+    // Gearing = Total Liabilities ÷ Total Assets (percent)
+    const firstGearing = first.total_assets !== 0 ? (first.total_liabilities / first.total_assets) * 100 : 0;
+    const lastGearing  = last.total_assets  !== 0 ? (last.total_liabilities  / last.total_assets)  * 100 : 0;
+    const gearingDrift = lastGearing - firstGearing;
+
+    // Equity declining streak (consecutive month-over-month declines)
+    let maxEquityDeclineStreak = 0;
+    let curStreak = 0;
+    for (let i = 1; i < rows.length; i++) {
+      if (rows[i].equity < rows[i - 1].equity) {
+        curStreak++;
+        if (curStreak > maxEquityDeclineStreak) maxEquityDeclineStreak = curStreak;
+      } else {
+        curStreak = 0;
+      }
+    }
+
+    // Negative-equity months (where Liabilities > Assets)
+    const negEquityMonths = rows
+      .filter(r => r.total_liabilities > r.total_assets)
+      .map(r => r.label);
+
+    const allowed: AllowedValue[] = [];
+    let table =
+      '| Month | Total Assets | Total Liabilities | Equity |\n' +
+      '|-------|--------------|-------------------|--------|\n';
+    for (const r of rows) {
+      table +=
+        `| ${r.label} ` +
+        `| RM ${Math.round(r.total_assets).toLocaleString('en-MY')} ` +
+        `| RM ${Math.round(r.total_liabilities).toLocaleString('en-MY')} ` +
+        `| RM ${Math.round(r.equity).toLocaleString('en-MY')} |\n`;
+      allowed.push(rm(`${r.label} total assets`, Math.round(r.total_assets)));
+      allowed.push(rm(`${r.label} total liabilities`, Math.round(r.total_liabilities)));
+      allowed.push(rm(`${r.label} equity`, Math.round(r.equity)));
+    }
+
+    allowed.push(pct('first-to-last total assets growth', assetGrowth));
+    allowed.push(pct('first-to-last total liabilities growth', liabGrowth));
+    allowed.push(pct('first-to-last equity growth', equityGrowth));
+    allowed.push(pct('gearing first', firstGearing));
+    allowed.push(pct('gearing last', lastGearing));
+    allowed.push(pct('gearing drift pp', gearingDrift));
+    allowed.push(cnt('longest equity decline streak months', maxEquityDeclineStreak));
+    allowed.push(cnt('negative equity months', negEquityMonths.length));
+
+    const prompt =
+      `Population: Monthly balance-sheet snapshots across ${rangeLabel(period.range, period.fiscalYear)}, from pc_pnl_period (opening balance + cumulative movements up to each period_no).\n\n` +
+      `Balance-sheet trend (fiscal order, one row per month):\n${table}\n` +
+      `Pre-calculated roll-ups (cite these directly — do not recompute):\n` +
+      `- Months in window: ${rows.length}\n` +
+      `- First-to-last Total Assets growth: ${assetGrowth.toFixed(1)}%\n` +
+      `- First-to-last Total Liabilities growth: ${liabGrowth.toFixed(1)}%\n` +
+      `- First-to-last Equity growth: ${equityGrowth.toFixed(1)}%\n` +
+      `- Gearing (Total Liabilities ÷ Total Assets): ${firstGearing.toFixed(1)}% → ${lastGearing.toFixed(1)}% (drift ${gearingDrift.toFixed(1)}pp)\n` +
+      `- Longest consecutive Equity decline: ${maxEquityDeclineStreak} month(s)\n` +
+      (negEquityMonths.length > 0
+        ? `- ⚠ NEGATIVE EQUITY MONTHS (SEVERE — Liabilities > Assets): ${negEquityMonths.join(', ')}\n`
+        : `- Negative equity months: none\n`) +
+      `\nThresholds:\n` +
+      `- Asset trajectory (first→last): < -5% Shrinking · ±5% Flat · 5-15% Growing · > 15% Fast growth\n` +
+      `- Equity direction: first→last declining = Watch · 3+ consecutive decline months = Severe\n` +
+      `- Liability vs Asset divergence: Liabilities growing > 10% while Assets flat/shrinking = Material · > 20% = Severe\n` +
+      `- Gearing drift: > +3pp Material deterioration · > +5pp Severe\n` +
+      `- Any month where Total Liabilities > Total Assets = Severe (insolvency — always call out by month)\n\n` +
+      `Evaluate:\n` +
+      `- Direction: are Total Assets, Total Liabilities, and Equity rising, flat, falling, or diverging?\n` +
+      `- Leverage: is the business taking on more debt relative to its asset base? Cite gearing drift.\n` +
+      `- Equity health: is equity building, holding, or eroding? Cite the decline streak.\n` +
+      `- Use the pre-calculated first-to-last growth for headline direction. Do NOT invent averages over arbitrary sub-windows.`;
+
+    return { prompt, allowed };
+  },
+
+  async bs_statement(period) {
+    const { current, prior } = await getV3BSComparison(period.fiscalYear);
+
+    // Build 8-row line items in the same order as the on-screen table
+    interface Line { key: string; label: string; curr: number; prior: number; }
+    const findBal = (items: { AccType: string; balance: number }[], at: string) =>
+      items.find(i => i.AccType === at)?.balance || 0;
+
+    const cFA = findBal(current.items, 'FA');
+    const cOA = findBal(current.items, 'OA');
+    const cCA = findBal(current.items, 'CA');
+    const cCL = findBal(current.items, 'CL');
+    const cLL = findBal(current.items, 'LL');
+    const cOL = findBal(current.items, 'OL');
+    const cCP = findBal(current.items, 'CP');
+    const cRE = findBal(current.items, 'RE') + current.current_year_pl;
+
+    const pFA = findBal(prior.items, 'FA');
+    const pOA = findBal(prior.items, 'OA');
+    const pCA = findBal(prior.items, 'CA');
+    const pCL = findBal(prior.items, 'CL');
+    const pLL = findBal(prior.items, 'LL');
+    const pOL = findBal(prior.items, 'OL');
+    const pCP = findBal(prior.items, 'CP');
+    const pRE = findBal(prior.items, 'RE') + prior.current_year_pl;
+
+    const lines: Line[] = [
+      { key: 'fixed_assets',          label: 'Fixed Assets',          curr: cFA, prior: pFA },
+      { key: 'other_assets',          label: 'Other Assets',          curr: cOA, prior: pOA },
+      { key: 'current_assets',        label: 'Current Assets',        curr: cCA, prior: pCA },
+      { key: 'current_liabilities',   label: 'Current Liabilities',   curr: cCL, prior: pCL },
+      { key: 'long_term_liabilities', label: 'Long Term Liabilities', curr: cLL, prior: pLL },
+      { key: 'other_liabilities',     label: 'Other Liabilities',     curr: cOL, prior: pOL },
+      { key: 'capital',               label: 'Capital',               curr: cCP, prior: pCP },
+      { key: 'retained_earnings',     label: 'Retained Earnings',     curr: cRE, prior: pRE },
+    ];
+
+    const allowed: AllowedValue[] = [];
+    let table =
+      '| Line Item | Current | Prior | Change (RM) | YoY % |\n' +
+      '|-----------|---------|-------|-------------|-------|\n';
+    for (const l of lines) {
+      const delta = l.curr - l.prior;
+      const yoy = yoyPct(l.curr, l.prior);
+      table +=
+        `| ${l.label} ` +
+        `| RM ${Math.round(l.curr).toLocaleString('en-MY')} ` +
+        `| RM ${Math.round(l.prior).toLocaleString('en-MY')} ` +
+        `| RM ${Math.round(delta).toLocaleString('en-MY')} ` +
+        `| ${yoy == null ? 'n/a' : yoy.toFixed(1) + '%'} |\n`;
+      allowed.push(rm(`${l.label} current`, Math.round(l.curr)));
+      allowed.push(rm(`${l.label} prior`, Math.round(l.prior)));
+      allowed.push(rm(`${l.label} delta`, Math.round(delta)));
+      if (yoy != null) allowed.push(pct(`${l.label} yoy`, yoy));
+    }
+
+    // Derived totals (current)
+    const ncaCurr = cCA - cCL;
+    const ncaPrior = pCA - pCL;
+    const totalAssetsCurr = cFA + cOA + ncaCurr;
+    const totalAssetsPrior = pFA + pOA + ncaPrior;
+    const totalLiabCurr = cCL + cLL + cOL;
+    const totalLiabPrior = pCL + pLL + pOL;
+    const totalEquityCurr = cCP + cRE;
+    const totalEquityPrior = pCP + pRE;
+
+    // Key ratios
+    const currRatioCurr  = cCL !== 0 ? cCA / cCL : 0;
+    const currRatioPrior = pCL !== 0 ? pCA / pCL : 0;
+    const deCurr  = totalEquityCurr  !== 0 ? totalLiabCurr  / totalEquityCurr  : 0;
+    const dePrior = totalEquityPrior !== 0 ? totalLiabPrior / totalEquityPrior : 0;
+    const eqRatioCurr  = totalAssetsCurr  !== 0 ? (totalEquityCurr  / totalAssetsCurr)  * 100 : 0;
+    const eqRatioPrior = totalAssetsPrior !== 0 ? (totalEquityPrior / totalAssetsPrior) * 100 : 0;
+
+    allowed.push(rm('net current assets current', Math.round(ncaCurr)));
+    allowed.push(rm('net current assets prior', Math.round(ncaPrior)));
+    allowed.push(rm('total assets current', Math.round(totalAssetsCurr)));
+    allowed.push(rm('total assets prior', Math.round(totalAssetsPrior)));
+    allowed.push(rm('total liabilities current', Math.round(totalLiabCurr)));
+    allowed.push(rm('total liabilities prior', Math.round(totalLiabPrior)));
+    allowed.push(rm('total equity current', Math.round(totalEquityCurr)));
+    allowed.push(rm('total equity prior', Math.round(totalEquityPrior)));
+    allowed.push(pct('current ratio current', currRatioCurr));
+    allowed.push(pct('current ratio prior', currRatioPrior));
+    allowed.push(pct('debt to equity current', deCurr));
+    allowed.push(pct('debt to equity prior', dePrior));
+    allowed.push(pct('equity ratio current', eqRatioCurr));
+    allowed.push(pct('equity ratio prior', eqRatioPrior));
+
+    // Sign-flip flags
+    const signFlips: string[] = [];
+    if ((ncaCurr >= 0) !== (ncaPrior >= 0))             signFlips.push('Net Current Assets');
+    if ((totalEquityCurr >= 0) !== (totalEquityPrior >= 0)) signFlips.push('Total Equity');
+
+    // Top 3 biggest absolute RM movers across the 8 line items
+    const movers = [...lines]
+      .map(l => ({ ...l, delta: l.curr - l.prior }))
+      .filter(m => m.delta !== 0)
+      .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))
+      .slice(0, 3);
+
+    const moverLines = movers.map(m => {
+      const yoy = yoyPct(m.curr, m.prior);
+      return `- ${m.label}: RM ${Math.round(m.curr).toLocaleString('en-MY')} ` +
+        `vs prior RM ${Math.round(m.prior).toLocaleString('en-MY')} ` +
+        `(Δ RM ${Math.round(m.delta).toLocaleString('en-MY')}, ${yoy == null ? 'n/a' : yoy.toFixed(1) + '%'})`;
+    });
+
+    const prompt =
+      `Population: Balance-sheet statement for ${period.fiscalYear} vs 12 periods prior (YTD-aligned snapshot at period_no = ${current.period_to}), from pc_pnl_period opening balance + movements.\n\n` +
+      `Line items (YoY per AccType):\n${table}\n` +
+      `Derived totals:\n` +
+      `- Net Current Assets: RM ${Math.round(ncaCurr).toLocaleString('en-MY')} vs prior RM ${Math.round(ncaPrior).toLocaleString('en-MY')}\n` +
+      `- Total Assets: RM ${Math.round(totalAssetsCurr).toLocaleString('en-MY')} vs prior RM ${Math.round(totalAssetsPrior).toLocaleString('en-MY')}\n` +
+      `- Total Liabilities: RM ${Math.round(totalLiabCurr).toLocaleString('en-MY')} vs prior RM ${Math.round(totalLiabPrior).toLocaleString('en-MY')}\n` +
+      `- Total Equity: RM ${Math.round(totalEquityCurr).toLocaleString('en-MY')} vs prior RM ${Math.round(totalEquityPrior).toLocaleString('en-MY')}\n\n` +
+      `Key ratios:\n` +
+      `- Current Ratio (Current Assets ÷ Current Liabilities): ${currRatioCurr.toFixed(2)} vs prior ${currRatioPrior.toFixed(2)} (drift ${(currRatioCurr - currRatioPrior).toFixed(2)})\n` +
+      `- Debt-to-Equity (Total Liabilities ÷ Total Equity): ${deCurr.toFixed(2)} vs prior ${dePrior.toFixed(2)} (drift ${(deCurr - dePrior).toFixed(2)})\n` +
+      `- Equity Ratio (Total Equity ÷ Total Assets): ${eqRatioCurr.toFixed(1)}% vs prior ${eqRatioPrior.toFixed(1)}% (drift ${(eqRatioCurr - eqRatioPrior).toFixed(1)}pp)\n\n` +
+      (signFlips.length > 0 ? `⚠ SIGN FLIPS (SEVERE — call out explicitly): ${signFlips.join(', ')}\n\n` : '') +
+      `Top 3 biggest |Δ RM| movers across the 8 line items (use these — do not invent others):\n${moverLines.join('\n') || '- (no movement)'}\n\n` +
+      `Thresholds:\n` +
+      `- Line-item YoY: < ±5% Flat · ±5-15% Moderate · > ±15% Material\n` +
+      `- Current Ratio: < 1.0 Severe · 1.0-1.2 Thin · 1.2-2.0 Healthy · > 2.0 Strong · YoY drift > ±0.3 = Material\n` +
+      `- Debt-to-Equity: < 0.5 Conservative · 0.5-1.0 Typical · 1.0-2.0 Leveraged · > 2.0 Severe · YoY drift > ±0.3 = Material\n` +
+      `- Equity Ratio: < 20% Severe · 20-40% Thin · 40-60% Healthy · > 60% Strong · YoY drift > ±5pp = Material\n` +
+      `- Net Current Assets sign flip (pos→neg) = Severe (working-capital failure)\n` +
+      `- Total Equity sign flip = Severe (insolvency)\n\n` +
+      `Hard rules:\n` +
+      `- You may only cite named line items that appear in the pre-fetched "Top 3 biggest movers" list. Do NOT invent other account names.\n` +
+      `- Do NOT recompute YoY % or ratios — the figures in the data block are authoritative.\n` +
+      `- If you want to explain WHY Total Assets or Total Liabilities moved, cite the relevant mover(s) from the list.\n\n` +
+      `Provide a concise structural read: leverage direction, liquidity direction, equity health, and which 1-2 named line items drove the change.`;
+
+    return { prompt, allowed };
+  },
 };
 
 // ─── Scope classification ────────────────────────────────────────────────────
@@ -3694,6 +3928,7 @@ const SECTION_SCOPE: Record<SectionKey, ScopeType> = {
   expense_breakdown: 'period',
   financial_overview: 'fiscal_period',
   financial_pnl: 'fiscal_period',
+  financial_balance_sheet: 'fiscal_period',
 };
 
 // Per-section snapshot source: each snapshot section anchors its "as of" date on a different table.

@@ -4,6 +4,7 @@ import { useV3BSComparison } from '@/hooks/pnl/usePLDataV3';
 import { useStableData } from '@/hooks/useStableData';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { AnalyzeIcon } from '@/components/ai-insight/AnalyzeIcon';
 import { exportToExcel } from '@/lib/export-excel';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -106,7 +107,11 @@ export function BSStatementTableV3({ fy }: Props) {
 
   return (
     <Card className="rounded-xl ring-1 ring-foreground/10 h-full">
-      <CardHeader className="flex-row items-center justify-end pb-0 pt-2 px-4">
+      <CardHeader className="flex-row items-center justify-between pb-0 pt-3 px-4">
+        <h3 className="text-base font-semibold flex items-center gap-1.5">
+          Balance Sheet Statement
+          <AnalyzeIcon sectionKey="financial_balance_sheet" componentKey="bs_statement" />
+        </h3>
         <Button variant="outline" size="sm" onClick={handleExportExcel}>
           Export Excel
         </Button>
