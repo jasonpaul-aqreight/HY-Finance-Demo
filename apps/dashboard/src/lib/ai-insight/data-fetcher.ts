@@ -1,6 +1,7 @@
 import { getPool } from '../postgres';
 import {
   getMarginKpi,
+  getCustomerMarginSummary,
   getMarginTrend,
   getMarginDistribution,
   getCustomerMargins,
@@ -36,6 +37,7 @@ import {
   getTopExpensesByType,
 } from '../expenses/queries';
 import { fyNameToNumber, fyToPeriodRange, periodLabel } from '../pnl/period-utils';
+import { getSettingsV2 } from '../payment/settings';
 import { getV2PLStatement, getMultiYearPL, getV3BSTrend, getV3BSComparison } from '../pnl/queries';
 import type {
   SectionKey,
@@ -560,7 +562,10 @@ const fetchers: Record<string, DataFetcher> = {
 
   async customer_credit_health() {
     const pool = getPool();
-    const { rows: [latest] } = await pool.query(`SELECT MAX(snapshot_date) AS d FROM pc_ar_customer_snapshot`);
+    const [{ rows: [latest] }, settings] = await Promise.all([
+      pool.query(`SELECT MAX(snapshot_date) AS d FROM pc_ar_customer_snapshot`),
+      getSettingsV2(),
+    ]);
     if (!latest?.d) return { prompt: 'No snapshot data available.', allowed: [] };
     const { rows: summary } = await pool.query(
       `SELECT risk_tier, COUNT(*) AS count, SUM(total_outstanding) AS total_outstanding
@@ -644,14 +649,27 @@ const fetchers: Record<string, DataFetcher> = {
       allowed.push(rm(`${r.company_name} outstanding`, Number(r.total_outstanding)));
     }
 
+    const w = settings.creditScoreWeights;
+    const t = settings.riskThresholds;
+    allowed.push(
+      pct('utilization weight', w.utilization),
+      pct('overdue days weight', w.overdueDays),
+      pct('timeliness weight', w.timeliness),
+      pct('double breach weight', w.doubleBreach),
+      cnt('low risk threshold', t.low),
+      cnt('high risk threshold', t.high),
+    );
+
+    const scoreConfig = `\nScore Configuration:\n- Weights: Utilization ${w.utilization}%, Overdue Days ${w.overdueDays}%, Timeliness ${w.timeliness}%, Double Breach ${w.doubleBreach}%\n- Risk Thresholds: Score >= ${t.low} = Low Risk, Score <= ${t.high} = High Risk, between = Moderate`;
+
     return {
-      prompt: `Summary:\n- Total customers: ${totalCustomers}\n\nRisk distribution:\n${riskTable}\nTop 5 by outstanding amount:\n${outstandingTable}\nTop 5 by max overdue days (most delinquent):\n${overdueTable}\nTop 5 by utilization % (most over credit limit):\n${utilTable}`,
+      prompt: `Summary:\n- Total customers: ${totalCustomers}\n\nRisk distribution:\n${riskTable}\nTop 5 by outstanding amount:\n${outstandingTable}\nTop 5 by max overdue days (most delinquent):\n${overdueTable}\nTop 5 by utilization % (most over credit limit):\n${utilTable}${scoreConfig}`,
       allowed,
     };
   },
 
-  // Sales Section 3
-  async net_sales(dr) {
+  // Sales Section 3 — combined summary
+  async sales_summary(dr) {
     const pool = getPool();
     const { rows } = await pool.query(
       `SELECT COALESCE(SUM(invoice_total), 0) AS invoice_sales,
@@ -665,76 +683,30 @@ const fetchers: Record<string, DataFetcher> = {
     const r = rows[0];
     const inv = Number(r.invoice_sales);
     const cash = Number(r.cash_sales);
-    const cn = Number(r.credit_notes);
-    const net = Number(r.net_sales);
-    const allowed: AllowedValue[] = [
-      rm('net sales', net),
-      rm('invoice sales', inv),
-      rm('cash sales', cash),
-      rm('credit notes', Math.abs(cn)),
-    ];
-    return {
-      prompt: `Value: RM ${net.toLocaleString('en-MY')}\nInvoice Sales: RM ${inv.toLocaleString('en-MY')}\nCash Sales: RM ${cash.toLocaleString('en-MY')}\nCredit Notes: -RM ${Math.abs(cn).toLocaleString('en-MY')}`,
-      allowed,
-    };
-  },
-
-  async invoice_sales(dr) {
-    const pool = getPool();
-    const { rows } = await pool.query(
-      `SELECT COALESCE(SUM(invoice_total), 0) AS invoice_sales,
-              COALESCE(SUM(net_revenue), 0) AS net_sales
-       FROM pc_sales_daily
-       WHERE doc_date BETWEEN $1 AND $2`,
-      [dr!.start, dr!.end],
-    );
-    const r = rows[0];
-    const inv = Number(r.invoice_sales);
-    const net = Number(r.net_sales);
-    const sharePct = net > 0 ? (inv / net) * 100 : 0;
-    return {
-      prompt: `Value: RM ${inv.toLocaleString('en-MY')}\nAs % of net sales: ${sharePct.toFixed(1)}%`,
-      allowed: [rm('invoice sales', inv), rm('net sales', net), pct('invoice share of net', sharePct)],
-    };
-  },
-
-  async cash_sales(dr) {
-    const pool = getPool();
-    const { rows } = await pool.query(
-      `SELECT COALESCE(SUM(cash_total), 0) AS cash_sales,
-              COALESCE(SUM(net_revenue), 0) AS net_sales
-       FROM pc_sales_daily
-       WHERE doc_date BETWEEN $1 AND $2`,
-      [dr!.start, dr!.end],
-    );
-    const r = rows[0];
-    const cash = Number(r.cash_sales);
-    const net = Number(r.net_sales);
-    const sharePct = net > 0 ? (cash / net) * 100 : 0;
-    return {
-      prompt: `Value: RM ${cash.toLocaleString('en-MY')}\nAs % of net sales: ${sharePct.toFixed(1)}%`,
-      allowed: [rm('cash sales', cash), rm('net sales', net), pct('cash share of net', sharePct)],
-    };
-  },
-
-  async credit_notes(dr) {
-    const pool = getPool();
-    const { rows } = await pool.query(
-      `SELECT COALESCE(SUM(cn_total), 0) AS credit_notes,
-              COALESCE(SUM(invoice_total + cash_total), 0) AS gross_sales
-       FROM pc_sales_daily
-       WHERE doc_date BETWEEN $1 AND $2`,
-      [dr!.start, dr!.end],
-    );
-    const r = rows[0];
     const cnAbs = Math.abs(Number(r.credit_notes));
-    const gross = Number(r.gross_sales);
-    const sharePct = gross > 0 ? (cnAbs / gross) * 100 : 0;
-    const color = sharePct <= 1 ? 'Green (Good)' : sharePct <= 3 ? 'Yellow (Monitor)' : 'Red (Concern)';
+    const net = Number(r.net_sales);
+    const gross = inv + cash;
+    const invShare = net > 0 ? (inv / net) * 100 : 0;
+    const cashShare = net > 0 ? (cash / net) * 100 : 0;
+    const cnShare = gross > 0 ? (cnAbs / gross) * 100 : 0;
 
     return {
-      prompt: `Value: -RM ${cnAbs.toLocaleString('en-MY')}\nAs % of gross sales: ${sharePct.toFixed(2)}%\nColor: ${color}`,
-      allowed: [rm('credit notes', cnAbs), rm('gross sales', gross), pct('cn share of gross', sharePct)],
+      prompt:
+        `Net Sales: RM ${net.toLocaleString('en-MY')}\n` +
+        `Breakdown:\n` +
+        `- Invoice Sales: RM ${inv.toLocaleString('en-MY')} (${invShare.toFixed(1)}% of net)\n` +
+        `- Cash Sales: RM ${cash.toLocaleString('en-MY')} (${cashShare.toFixed(1)}% of net)\n` +
+        `- Credit Notes: -RM ${cnAbs.toLocaleString('en-MY')} (${cnShare.toFixed(2)}% of gross sales)`,
+      allowed: [
+        rm('net sales', net),
+        rm('invoice sales', inv),
+        rm('cash sales', cash),
+        rm('credit notes', cnAbs),
+        rm('gross sales', gross),
+        pct('invoice share of net', invShare),
+        pct('cash share of net', cashShare),
+        pct('cn share of gross', cnShare),
+      ],
     };
   },
 
@@ -951,75 +923,82 @@ const fetchers: Record<string, DataFetcher> = {
   // dashboard and the AI see identical numbers (three-way match guaranteed).
 
   async cm_net_sales(dr) {
-    const filters: MarginFilters = { start: dr!.start, end: dr!.end };
-    const kpi = await getMarginKpi(filters);
-    const net = Number(kpi.total_revenue);
-    const cogs = Number(kpi.total_cogs);
-    const gp = Number(kpi.gross_profit);
+    const summary = await getCustomerMarginSummary(dr!.start, dr!.end);
+    const net = Number(summary.current.total_revenue);
+    const prevNet = Number(summary.previous.total_revenue);
+    const growthPct = summary.growth.revenue_pct;
+    const deltaRm = net - prevNet;
 
     return {
       prompt:
         `Value: RM ${net.toLocaleString('en-MY')}\n` +
-        `Period COGS: RM ${cogs.toLocaleString('en-MY')}\n` +
-        `Period Gross Profit: RM ${gp.toLocaleString('en-MY')}`,
+        `Prior period Net Sales: RM ${prevNet.toLocaleString('en-MY')}\n` +
+        `Delta: RM ${deltaRm.toLocaleString('en-MY')}\n` +
+        `Delta %: ${growthPct != null ? `${growthPct.toFixed(2)}%` : 'n/a'}`,
       allowed: [
         rm('net sales', net),
-        rm('cogs', cogs),
-        rm('gross profit', gp),
+        rm('prior net sales', prevNet),
+        rm('net sales delta rm', deltaRm),
+        ...(growthPct != null ? [pct('net sales delta pct', growthPct)] : []),
       ],
     };
   },
 
   async cm_cogs(dr) {
-    const filters: MarginFilters = { start: dr!.start, end: dr!.end };
-    const kpi = await getMarginKpi(filters);
-    const net = Number(kpi.total_revenue);
-    const cogs = Number(kpi.total_cogs);
+    const summary = await getCustomerMarginSummary(dr!.start, dr!.end);
+    const net = Number(summary.current.total_revenue);
+    const cogs = Number(summary.current.total_cogs);
+    const prevCogs = Number(summary.previous.total_cogs);
     const cogsRatio = net > 0 ? (cogs / net) * 100 : 0;
+    const deltaRm = cogs - prevCogs;
 
     return {
       prompt:
         `Value: RM ${cogs.toLocaleString('en-MY')}\n` +
         `Period Net Sales: RM ${net.toLocaleString('en-MY')}\n` +
-        `COGS as % of Net Sales: ${cogsRatio.toFixed(1)}%`,
+        `COGS as % of Net Sales: ${cogsRatio.toFixed(1)}%\n` +
+        `Prior period COGS: RM ${prevCogs.toLocaleString('en-MY')}\n` +
+        `COGS delta: RM ${deltaRm.toLocaleString('en-MY')}`,
       allowed: [
         rm('cogs', cogs),
         rm('net sales', net),
         pct('cogs share of net sales', cogsRatio),
+        rm('prior cogs', prevCogs),
+        rm('cogs delta rm', deltaRm),
       ],
     };
   },
 
   async cm_gross_profit(dr) {
-    const filters: MarginFilters = { start: dr!.start, end: dr!.end };
-    const kpi = await getMarginKpi(filters);
-    const net = Number(kpi.total_revenue);
-    const cogs = Number(kpi.total_cogs);
-    const gp = Number(kpi.gross_profit);
-    const marginPct = Number(kpi.margin_pct);
+    const summary = await getCustomerMarginSummary(dr!.start, dr!.end);
+    const gp = Number(summary.current.gross_profit);
+    const prevGp = Number(summary.previous.gross_profit);
+    const growthPct = summary.growth.profit_pct;
+    const deltaRm = gp - prevGp;
+    const marginPct = Number(summary.current.margin_pct);
 
     return {
       prompt:
         `Value: RM ${gp.toLocaleString('en-MY')}\n` +
-        `Period Net Sales: RM ${net.toLocaleString('en-MY')}\n` +
-        `Period COGS: RM ${cogs.toLocaleString('en-MY')}\n` +
-        `Implied Margin %: ${marginPct.toFixed(2)}%`,
+        `Implied Margin %: ${marginPct.toFixed(2)}%\n` +
+        `Prior period Gross Profit: RM ${prevGp.toLocaleString('en-MY')}\n` +
+        `Delta: RM ${deltaRm.toLocaleString('en-MY')}\n` +
+        `Delta %: ${growthPct != null ? `${growthPct.toFixed(2)}%` : 'n/a'}`,
       allowed: [
         rm('gross profit', gp),
-        rm('net sales', net),
-        rm('cogs', cogs),
         pct('margin pct', marginPct),
+        rm('prior gross profit', prevGp),
+        rm('gross profit delta rm', deltaRm),
+        ...(growthPct != null ? [pct('gross profit delta pct', growthPct)] : []),
       ],
     };
   },
 
   async cm_margin_pct(dr) {
-    const filters: MarginFilters = { start: dr!.start, end: dr!.end };
-    const kpi = await getMarginKpi(filters);
-    const marginPct = Number(kpi.margin_pct);
-    const net = Number(kpi.total_revenue);
-    const cogs = Number(kpi.total_cogs);
-    const gp = Number(kpi.gross_profit);
+    const summary = await getCustomerMarginSummary(dr!.start, dr!.end);
+    const marginPct = Number(summary.current.margin_pct);
+    const prevMarginPct = Number(summary.previous.margin_pct);
+    const marginDelta = summary.growth.margin_delta;
     const color =
       marginPct >= 15 ? 'Green (Good)' :
       marginPct >= 10 ? 'Yellow (Neutral)' :
@@ -1032,34 +1011,37 @@ const fetchers: Record<string, DataFetcher> = {
         `Good threshold: >= 15%\n` +
         `Neutral threshold: 10% to 15%\n` +
         `Bad threshold: < 10%\n` +
-        `Period Net Sales: RM ${net.toLocaleString('en-MY')}\n` +
-        `Period COGS: RM ${cogs.toLocaleString('en-MY')}\n` +
-        `Period Gross Profit: RM ${gp.toLocaleString('en-MY')}`,
+        `Prior period Margin %: ${prevMarginPct.toFixed(2)}%\n` +
+        `Margin delta: ${marginDelta != null ? `${marginDelta.toFixed(2)} ppts` : 'n/a'}`,
       allowed: [
         pct('margin pct', marginPct),
+        pct('prior margin pct', prevMarginPct),
+        ...(marginDelta != null ? [pct('margin delta ppts', marginDelta)] : []),
         pct('good threshold', 15),
         pct('neutral threshold', 10),
-        rm('net sales', net),
-        rm('cogs', cogs),
-        rm('gross profit', gp),
       ],
     };
   },
 
   async cm_active_customers(dr) {
-    const filters: MarginFilters = { start: dr!.start, end: dr!.end };
-    const kpi = await getMarginKpi(filters);
-    const activeCustomers = Number(kpi.active_customers);
-    const net = Number(kpi.total_revenue);
+    const summary = await getCustomerMarginSummary(dr!.start, dr!.end);
+    const activeCustomers = Number(summary.current.active_customers);
+    const prevActiveCustomers = Number(summary.previous.active_customers);
+    const net = Number(summary.current.total_revenue);
     const avgPerCustomer = activeCustomers > 0 ? net / activeCustomers : 0;
+    const delta = activeCustomers - prevActiveCustomers;
 
     return {
       prompt:
         `Value: ${activeCustomers.toLocaleString('en-MY')}\n` +
+        `Prior period active customers: ${prevActiveCustomers.toLocaleString('en-MY')}\n` +
+        `Delta: ${delta >= 0 ? '+' : ''}${delta}\n` +
         `Period Net Sales: RM ${net.toLocaleString('en-MY')}\n` +
         `Avg Net Sales per active customer: RM ${Math.round(avgPerCustomer).toLocaleString('en-MY')}`,
       allowed: [
         cnt('active customers', activeCustomers),
+        cnt('prior active customers', prevActiveCustomers),
+        cnt('active customers delta', delta),
         rm('net sales', net),
         rm('avg net sales per customer', Math.round(avgPerCustomer)),
       ],
@@ -1293,45 +1275,25 @@ const fetchers: Record<string, DataFetcher> = {
 
   async cm_customer_table(dr) {
     const filters: MarginFilters = { start: dr!.start, end: dr!.end };
-    const [kpi, top10, bottom10, distribution] = await Promise.all([
+    const [kpi, bottom10, distribution] = await Promise.all([
       getMarginKpi(filters),
-      getCustomerMargins(filters, 'gross_profit', 'desc', 1, 10),
       getCustomerMargins(filters, 'gross_profit', 'asc', 1, 10),
       getMarginDistribution(filters),
     ]);
 
-    const periodGp = Number(kpi.gross_profit);
     const activeCustomers = Number(kpi.active_customers);
-    const totalInTable = Number(top10.total);
 
     const lossBucket = distribution.find(b => b.bucket === '< 0%');
     const lossCount = lossBucket ? Number(lossBucket.count) : 0;
     const lossShare = activeCustomers > 0 ? (lossCount / activeCustomers) * 100 : 0;
 
-    const top10GpSum = top10.rows.reduce((s, r) => s + Number(r.gross_profit), 0);
-    const top10Share = periodGp > 0 ? (top10GpSum / periodGp) * 100 : 0;
-
-    const marginPcts = [...top10.rows, ...bottom10.rows].map(r => Number(r.margin_pct));
-    const avgMarginSample = marginPcts.length > 0
-      ? marginPcts.reduce((s, v) => s + v, 0) / marginPcts.length
-      : 0;
-    const marginSpread = marginPcts.length > 0
-      ? Math.max(...marginPcts) - Math.min(...marginPcts)
-      : 0;
-
     const allowed: AllowedValue[] = [
-      rm('period gross profit', periodGp),
-      rm('top 10 gp sum', top10GpSum),
-      pct('top 10 share of gp', top10Share),
       cnt('active customers', activeCustomers),
       cnt('loss making customers', lossCount),
       pct('loss maker share of active', lossShare),
-      cnt('customers in table (unpaginated)', totalInTable),
-      pct('avg margin (top+bottom sample)', avgMarginSample),
-      pct('margin spread (top-bottom sample)', marginSpread),
     ];
 
-    const renderRow = (r: typeof top10.rows[0], i: number) => {
+    const renderRow = (r: typeof bottom10.rows[0], i: number) => {
       const rev = Number(r.revenue);
       const cogs = Number(r.cogs);
       const gp = Number(r.gross_profit);
@@ -1352,27 +1314,26 @@ const fetchers: Record<string, DataFetcher> = {
       '| # | Code | Customer | Type | Agent | Revenue | COGS | GP | Margin % | Return % |\n' +
       '|---|------|----------|------|-------|---------|------|----|---------:|---------:|\n';
 
-    let topTable = header;
-    top10.rows.forEach((r, i) => { topTable += renderRow(r, i); });
-
     let bottomTable = header;
     bottom10.rows.forEach((r, i) => { bottomTable += renderRow(r, i); });
+
+    let distTable = '| Margin Bucket | Count |\n|---------------|------:|\n';
+    for (const b of distribution) {
+      const c = Number(b.count);
+      distTable += `| ${b.bucket} | ${c} |\n`;
+      allowed.push(cnt(`distribution ${b.bucket}`, c));
+    }
 
     const preCalc =
       `Population: active customers with revenue during ${dr!.start} to ${dr!.end}.\n\n` +
       `Pre-calculated roll-ups (use these values directly — do not recompute):\n` +
-      `- Total active customers in table: ${activeCustomers}\n` +
-      `- Period Gross Profit: RM ${periodGp.toLocaleString('en-MY')}\n` +
-      `- Top 10 Gross Profit sum: RM ${top10GpSum.toLocaleString('en-MY')}\n` +
-      `- Top 10 share of total Gross Profit: ${top10Share.toFixed(2)}%\n` +
-      `- Loss-making customers (GP < 0): ${lossCount} (${lossShare.toFixed(2)}% of active)\n` +
-      `- Avg margin % across the top-10 + bottom-10 sample: ${avgMarginSample.toFixed(2)}%\n` +
-      `- Margin spread (best minus worst in the 20-row sample): ${marginSpread.toFixed(2)} percentage points\n`;
+      `- Total active customers: ${activeCustomers}\n` +
+      `- Loss-making customers (GP < 0): ${lossCount} (${lossShare.toFixed(2)}% of active)\n`;
 
     return {
       prompt:
-        `${preCalc}\n(A) Top 10 customers by Gross Profit (best performers):\n${topTable}\n` +
-        `(B) Bottom 10 customers by Gross Profit (worst performers):\n${bottomTable}`,
+        `${preCalc}\n(A) Bottom 10 customers by Gross Profit (worst performers):\n${bottomTable}\n` +
+        `(B) Margin distribution:\n${distTable}`,
       allowed,
     };
   },
@@ -1748,29 +1709,18 @@ const fetchers: Record<string, DataFetcher> = {
     const periodGp = Number(summary.current.profit);
 
     const [
-      supProfitTop, supProfitBot, supMarginTop, supMarginBot,
-      itemProfitTop, itemProfitBot, itemMarginTop, itemMarginBot,
+      supProfitTop, supProfitBot,
+      itemProfitTop, itemProfitBot,
     ] = await Promise.all([
       getTopBottomSuppliersV2(start, end, undefined, undefined, 10, 'desc', 'profit'),
       getTopBottomSuppliersV2(start, end, undefined, undefined, 10, 'asc',  'profit'),
-      getTopBottomSuppliersV2(start, end, undefined, undefined, 50, 'desc', 'margin_pct'),
-      getTopBottomSuppliersV2(start, end, undefined, undefined, 50, 'asc',  'margin_pct'),
       getTopBottomItemsV2(start, end, undefined, undefined, 10, 'desc', 'profit'),
       getTopBottomItemsV2(start, end, undefined, undefined, 10, 'asc',  'profit'),
-      getTopBottomItemsV2(start, end, undefined, undefined, 50, 'desc', 'margin_pct'),
-      getTopBottomItemsV2(start, end, undefined, undefined, 50, 'asc',  'margin_pct'),
     ]);
-
-    // Margin-% lists: apply revenue floor RM 10,000 to cut noise (mirrors §2)
-    const supMarginTopFiltered = supMarginTop.filter(r => Number(r.revenue) >= 10000).slice(0, 10);
-    const supMarginBotFiltered = supMarginBot.filter(r => Number(r.revenue) >= 10000).slice(0, 10);
-    const itemMarginTopFiltered = itemMarginTop.filter(r => Number(r.revenue) >= 10000).slice(0, 10);
-    const itemMarginBotFiltered = itemMarginBot.filter(r => Number(r.revenue) >= 10000).slice(0, 10);
 
     const allowed: AllowedValue[] = [
       rm('period net sales', periodRev),
       rm('period gross profit', periodGp),
-      rm('revenue floor', 10000),
     ];
 
     // Concentration (supplier profit)
@@ -1789,14 +1739,6 @@ const fetchers: Record<string, DataFetcher> = {
     const lossItems = itemProfitBot.filter(r => Number(r.profit) < 0);
     allowed.push(cnt('loss-making suppliers in bottom-10', lossSuppliers.length));
     allowed.push(cnt('loss-making items in bottom-10', lossItems.length));
-
-    // Star accounts: suppliers on both top-profit and top-margin
-    const supProfitCodes = new Set(supProfitTop.map(r => r.creditor_code));
-    const supStars = supMarginTopFiltered.filter(r => supProfitCodes.has(r.creditor_code));
-    const itemProfitCodes = new Set(itemProfitTop.map(r => r.item_code));
-    const itemStars = itemMarginTopFiltered.filter(r => itemProfitCodes.has(r.item_code));
-    allowed.push(cnt('star suppliers on both lists', supStars.length));
-    allowed.push(cnt('star items on both lists', itemStars.length));
 
     const renderSupRow = (r: typeof supProfitTop[0], i: number) => {
       const rev = Number(r.revenue);
@@ -1823,17 +1765,8 @@ const fetchers: Record<string, DataFetcher> = {
 
     let supTopProfitTable = supHeader;  supProfitTop.forEach((r, i) => { supTopProfitTable += renderSupRow(r, i); });
     let supBotProfitTable = supHeader;  supProfitBot.forEach((r, i) => { supBotProfitTable += renderSupRow(r, i); });
-    let supTopMarginTable = supHeader;  supMarginTopFiltered.forEach((r, i) => { supTopMarginTable += renderSupRow(r, i); });
-    let supBotMarginTable = supHeader;  supMarginBotFiltered.forEach((r, i) => { supBotMarginTable += renderSupRow(r, i); });
     let itemTopProfitTable = itemHeader; itemProfitTop.forEach((r, i) => { itemTopProfitTable += renderItemRow(r, i); });
     let itemBotProfitTable = itemHeader; itemProfitBot.forEach((r, i) => { itemBotProfitTable += renderItemRow(r, i); });
-    let itemTopMarginTable = itemHeader; itemMarginTopFiltered.forEach((r, i) => { itemTopMarginTable += renderItemRow(r, i); });
-    let itemBotMarginTable = itemHeader; itemMarginBotFiltered.forEach((r, i) => { itemBotMarginTable += renderItemRow(r, i); });
-
-    const starList = (
-      (supStars.length > 0 ? `Suppliers: ${supStars.map(s => s.company_name ?? s.creditor_code).join(', ')}` : '') +
-      (itemStars.length > 0 ? `${supStars.length > 0 ? '; ' : ''}Items: ${itemStars.map(s => s.item_name ?? s.item_code).join(', ')}` : '')
-    ) || 'none';
 
     const preCalc =
       `Population: active suppliers with purchase activity during ${start} to ${end}.\n\n` +
@@ -1843,21 +1776,15 @@ const fetchers: Record<string, DataFetcher> = {
       `- Top 1 supplier share of period GP: ${top1GpShare.toFixed(2)}%\n` +
       `- Top 3 supplier share of period GP: ${top3GpShare.toFixed(2)}%\n` +
       `- Top 10 supplier share of period GP: ${top10GpShare.toFixed(2)}%\n` +
-      `- Margin-% list revenue floor: RM 10,000\n` +
       `- Loss-making suppliers in bottom-10: ${lossSuppliers.length}\n` +
-      `- Loss-making items in bottom-10: ${lossItems.length}\n` +
-      `- Star accounts on BOTH top-profit AND top-margin lists — ${starList}\n`;
+      `- Loss-making items in bottom-10: ${lossItems.length}\n`;
 
     return {
       prompt:
         `${preCalc}\n(A) Top 10 suppliers by Est. Gross Profit:\n${supTopProfitTable}\n` +
         `(B) Bottom 10 suppliers by Est. Gross Profit:\n${supBotProfitTable}\n` +
-        `(C) Top 10 suppliers by Margin % (revenue ≥ RM 10,000):\n${supTopMarginTable}\n` +
-        `(D) Bottom 10 suppliers by Margin % (revenue ≥ RM 10,000):\n${supBotMarginTable}\n` +
-        `(E) Top 10 items by Est. Gross Profit:\n${itemTopProfitTable}\n` +
-        `(F) Bottom 10 items by Est. Gross Profit:\n${itemBotProfitTable}\n` +
-        `(G) Top 10 items by Margin % (revenue ≥ RM 10,000):\n${itemTopMarginTable}\n` +
-        `(H) Bottom 10 items by Margin % (revenue ≥ RM 10,000):\n${itemBotMarginTable}`,
+        `(C) Top 10 items by Est. Gross Profit:\n${itemTopProfitTable}\n` +
+        `(D) Bottom 10 items by Est. Gross Profit:\n${itemBotProfitTable}`,
       allowed,
     };
   },
@@ -3192,176 +3119,84 @@ function yoyLabel(pctVal: number | null, higherIsBetter: boolean): string {
 type FiscalPeriodFetcher = (period: FiscalPeriod) => Promise<FetcherResult>;
 
 const fiscalPeriodFetchers: Record<string, FiscalPeriodFetcher> = {
-  async fin_net_sales(period) {
+  async fin_pnl_summary(period) {
     const s = await getFiscalSlice(period);
-    const curr = s.current.net_sales;
-    const prev = s.prior.net_sales;
-    const yoy = yoyPct(curr, prev);
-    const label = yoyLabel(yoy, true);
+    const c = s.current;
+    const p = s.prior;
+
+    // Compute all metrics once
+    const ns = Math.round(c.net_sales);
+    const cogs = Math.round(c.cogs);
+    const gp = Math.round(c.gross_profit);
+    const opex = Math.round(c.expenses);
+    const op = Math.round(c.operating_profit);
+    const np = Math.round(c.net_profit);
+    const oi = Math.round(c.other_income);
+
+    const pNs = Math.round(p.net_sales);
+    const pCogs = Math.round(p.cogs);
+    const pGp = Math.round(p.gross_profit);
+    const pOpex = Math.round(p.expenses);
+    const pOp = Math.round(p.operating_profit);
+    const pNp = Math.round(p.net_profit);
+
+    const cogsPct = c.net_sales > 0 ? (c.cogs / c.net_sales) * 100 : 0;
+    const gpMargin = c.net_sales > 0 ? (c.gross_profit / c.net_sales) * 100 : 0;
+    const opexRatio = c.net_sales > 0 ? (c.expenses / c.net_sales) * 100 : 0;
+    const opMargin = c.net_sales > 0 ? (c.operating_profit / c.net_sales) * 100 : 0;
+    const netMargin = c.net_sales > 0 ? (c.net_profit / c.net_sales) * 100 : 0;
+
+    const pGpMargin = p.net_sales > 0 ? (p.gross_profit / p.net_sales) * 100 : 0;
+    const pOpexRatio = p.net_sales > 0 ? (p.expenses / p.net_sales) * 100 : 0;
+    const pOpMargin = p.net_sales > 0 ? (p.operating_profit / p.net_sales) * 100 : 0;
+    const pNetMargin = p.net_sales > 0 ? (p.net_profit / p.net_sales) * 100 : 0;
+
+    const yoyNs = yoyPct(c.net_sales, p.net_sales);
+    const yoyCogs = yoyPct(c.cogs, p.cogs);
+    const yoyGp = yoyPct(c.gross_profit, p.gross_profit);
+    const yoyOpex = yoyPct(c.expenses, p.expenses);
+    const yoyOp = yoyPct(c.operating_profit, p.operating_profit);
+    const yoyNp = yoyPct(c.net_profit, p.net_profit);
+
+    const fmtYoy = (v: number | null) => v == null ? 'n/a' : `${v.toFixed(1)}%`;
+    const fmtRm = (v: number) => `RM ${v.toLocaleString('en-MY')}`;
+
+    const allowed: AllowedValue[] = [
+      rm('net sales', ns), rm('prior net sales', pNs),
+      rm('cost of sales', cogs), rm('prior cost of sales', pCogs),
+      rm('gross profit', gp), rm('prior gross profit', pGp),
+      rm('operating costs', opex), rm('prior operating costs', pOpex),
+      rm('operating profit', op), rm('prior operating profit', pOp),
+      rm('net profit', np), rm('prior net profit', pNp),
+      rm('other income', oi),
+      pct('cogs share', cogsPct),
+      pct('gross margin', gpMargin), pct('prior gross margin', pGpMargin),
+      pct('opex ratio', opexRatio), pct('prior opex ratio', pOpexRatio),
+      pct('operating margin', opMargin), pct('prior operating margin', pOpMargin),
+      pct('net margin', netMargin), pct('prior net margin', pNetMargin),
+    ];
+    if (yoyNs != null) allowed.push(pct('yoy net sales growth', yoyNs));
+    if (yoyCogs != null) allowed.push(pct('yoy cogs growth', yoyCogs));
+    if (yoyGp != null) allowed.push(pct('yoy gross profit growth', yoyGp));
+    if (yoyOpex != null) allowed.push(pct('yoy opex growth', yoyOpex));
+    if (yoyOp != null) allowed.push(pct('yoy operating profit growth', yoyOp));
+    if (yoyNp != null) allowed.push(pct('yoy net profit growth', yoyNp));
+
+    const waterfall =
+      `| Line Item | Current (${s.rangeLabel}) | Prior Year | YoY % | Margin/Ratio |\n` +
+      `|-----------|--------------------------|------------|-------|-------------:|\n` +
+      `| Net Sales | ${fmtRm(ns)} | ${fmtRm(pNs)} | ${fmtYoy(yoyNs)} | — |\n` +
+      `| Cost of Sales | ${fmtRm(cogs)} | ${fmtRm(pCogs)} | ${fmtYoy(yoyCogs)} | ${cogsPct.toFixed(1)}% of sales |\n` +
+      `| **Gross Profit** | ${fmtRm(gp)} | ${fmtRm(pGp)} | ${fmtYoy(yoyGp)} | ${gpMargin.toFixed(1)}% (prior ${pGpMargin.toFixed(1)}%) |\n` +
+      `| Operating Costs | ${fmtRm(opex)} | ${fmtRm(pOpex)} | ${fmtYoy(yoyOpex)} | ${opexRatio.toFixed(1)}% of sales |\n` +
+      `| **Operating Profit** | ${fmtRm(op)} | ${fmtRm(pOp)} | ${fmtYoy(yoyOp)} | ${opMargin.toFixed(1)}% (prior ${pOpMargin.toFixed(1)}%) |\n` +
+      `| Other Income | ${fmtRm(oi)} | — | — | — |\n` +
+      `| **Net Profit** | ${fmtRm(np)} | ${fmtRm(pNp)} | ${fmtYoy(yoyNp)} | ${netMargin.toFixed(1)}% (prior ${pNetMargin.toFixed(1)}%) |\n`;
 
     return {
       prompt:
-        `Population: P&L postings (SL + SA account types) for ${s.rangeLabel}, from pc_pnl_period.\n\n` +
-        `Net Sales (${s.rangeLabel}): RM ${Math.round(curr).toLocaleString('en-MY')}\n` +
-        `Prior-year same window: RM ${Math.round(prev).toLocaleString('en-MY')}\n` +
-        `YoY growth: ${yoy == null ? 'n/a' : yoy.toFixed(1) + '%'} — ${label}\n\n` +
-        `Thresholds (YoY net-sales growth): < -5% Severe · -5 to 0% Unfavourable · 0-5% Flat · 5-10% Favourable · > 10% Strong favourable`,
-      allowed: [
-        rm('net sales', Math.round(curr)),
-        rm('prior year net sales', Math.round(prev)),
-        ...(yoy != null ? [pct('yoy net sales growth', yoy)] : []),
-      ],
-    };
-  },
-
-  async fin_cost_of_sales(period) {
-    const s = await getFiscalSlice(period);
-    const curr = s.current.cogs;
-    const prev = s.prior.cogs;
-    const yoy = yoyPct(curr, prev);
-    const cogsPct = s.current.net_sales > 0 ? (curr / s.current.net_sales) * 100 : 0;
-    const priorCogsPct = s.prior.net_sales > 0 ? (prev / s.prior.net_sales) * 100 : 0;
-    const label = yoyLabel(yoy, false);
-
-    return {
-      prompt:
-        `Population: P&L postings (CO account type) for ${s.rangeLabel}, from pc_pnl_period.\n\n` +
-        `Cost of Sales (${s.rangeLabel}): RM ${Math.round(curr).toLocaleString('en-MY')}\n` +
-        `- COGS share of net sales: ${cogsPct.toFixed(1)}%\n` +
-        `Prior-year same window: RM ${Math.round(prev).toLocaleString('en-MY')} (${priorCogsPct.toFixed(1)}% of prior net sales)\n` +
-        `YoY cost growth: ${yoy == null ? 'n/a' : yoy.toFixed(1) + '%'} — ${label}\n\n` +
-        `Thresholds (COGS share of net sales): 60-80% = Typical fruit-distribution mix · > 85% = COGS-dominated (margin pressure) · < 50% = OpEx-dominated\n` +
-        `Thresholds (YoY cost growth): < 0% Healthy · 0-5% Watch · 5-10% Concern · > 10% Severe`,
-      allowed: [
-        rm('cost of sales', Math.round(curr)),
-        rm('prior year cost of sales', Math.round(prev)),
-        pct('cogs share of net sales', cogsPct),
-        pct('prior cogs share of net sales', priorCogsPct),
-        ...(yoy != null ? [pct('yoy cogs growth', yoy)] : []),
-      ],
-    };
-  },
-
-  async fin_gross_profit(period) {
-    const s = await getFiscalSlice(period);
-    const curr = s.current.gross_profit;
-    const prev = s.prior.gross_profit;
-    const yoy = yoyPct(curr, prev);
-    const gpMargin = s.current.net_sales > 0 ? (curr / s.current.net_sales) * 100 : 0;
-    const priorGpMargin = s.prior.net_sales > 0 ? (prev / s.prior.net_sales) * 100 : 0;
-    const marginChangePct = gpMargin - priorGpMargin;
-    const label = yoyLabel(yoy, true);
-
-    return {
-      prompt:
-        `Gross Profit (${s.rangeLabel}): RM ${Math.round(curr).toLocaleString('en-MY')}\n` +
-        `Gross margin: ${gpMargin.toFixed(1)}%\n` +
-        `Prior-year same window: RM ${Math.round(prev).toLocaleString('en-MY')} (margin ${priorGpMargin.toFixed(1)}%)\n` +
-        `YoY GP growth: ${yoy == null ? 'n/a' : yoy.toFixed(1) + '%'} — ${label}\n` +
-        `Margin change: ${marginChangePct >= 0 ? '+' : ''}${marginChangePct.toFixed(1)} ppts\n\n` +
-        `Gross Profit = Net Sales − Cost of Sales. Track BOTH the absolute RM and the margin %.\n` +
-        `A rising RM with a falling margin means volume growth is masking price/cost erosion.\n` +
-        `Thresholds (gross margin): < 15% Severe · 15-20% Watch · 20-25% Typical · > 25% Strong (fruit distribution)`,
-      allowed: [
-        rm('gross profit', Math.round(curr)),
-        rm('prior year gross profit', Math.round(prev)),
-        pct('gross margin', gpMargin),
-        pct('prior gross margin', priorGpMargin),
-        pct('gross margin change ppts', marginChangePct),
-        ...(yoy != null ? [pct('yoy gross profit growth', yoy)] : []),
-      ],
-    };
-  },
-
-  async fin_operating_costs(period) {
-    const s = await getFiscalSlice(period);
-    const curr = s.current.expenses;
-    const prev = s.prior.expenses;
-    const yoy = yoyPct(curr, prev);
-    const opexRatio = s.current.net_sales > 0 ? (curr / s.current.net_sales) * 100 : 0;
-    const priorOpexRatio = s.prior.net_sales > 0 ? (prev / s.prior.net_sales) * 100 : 0;
-    const label = yoyLabel(yoy, false);
-
-    return {
-      prompt:
-        `Operating Costs / OpEx (${s.rangeLabel}): RM ${Math.round(curr).toLocaleString('en-MY')}\n` +
-        `- OpEx ratio (OpEx ÷ Net Sales): ${opexRatio.toFixed(1)}%\n` +
-        `Prior-year same window: RM ${Math.round(prev).toLocaleString('en-MY')} (ratio ${priorOpexRatio.toFixed(1)}%)\n` +
-        `YoY OpEx growth: ${yoy == null ? 'n/a' : yoy.toFixed(1) + '%'} — ${label}\n\n` +
-        `Day-to-day running costs — distinct from COGS. Watch whether OpEx is growing faster than Net Sales\n` +
-        `(ratio drifting up = scaling inefficiency).\n` +
-        `Thresholds (OpEx ratio): < 10% Lean · 10-18% Typical · 18-25% Elevated · > 25% Severe\n` +
-        `Thresholds (YoY OpEx growth): < 0% Healthy · 0-5% In line with inflation · 5-15% Concern · > 15% Severe`,
-      allowed: [
-        rm('operating costs', Math.round(curr)),
-        rm('prior year operating costs', Math.round(prev)),
-        pct('opex ratio', opexRatio),
-        pct('prior opex ratio', priorOpexRatio),
-        ...(yoy != null ? [pct('yoy opex growth', yoy)] : []),
-      ],
-    };
-  },
-
-  async fin_operating_profit(period) {
-    const s = await getFiscalSlice(period);
-    const curr = s.current.operating_profit;
-    const prev = s.prior.operating_profit;
-    const yoy = yoyPct(curr, prev);
-    const opMargin = s.current.net_sales > 0 ? (curr / s.current.net_sales) * 100 : 0;
-    const priorOpMargin = s.prior.net_sales > 0 ? (prev / s.prior.net_sales) * 100 : 0;
-    const marginChangePct = opMargin - priorOpMargin;
-    const label = yoyLabel(yoy, true);
-
-    return {
-      prompt:
-        `Operating Profit (${s.rangeLabel}): RM ${Math.round(curr).toLocaleString('en-MY')}\n` +
-        `Operating margin: ${opMargin.toFixed(1)}%\n` +
-        `Prior-year same window: RM ${Math.round(prev).toLocaleString('en-MY')} (margin ${priorOpMargin.toFixed(1)}%)\n` +
-        `YoY operating-profit growth: ${yoy == null ? 'n/a' : yoy.toFixed(1) + '%'} — ${label}\n` +
-        `Margin change: ${marginChangePct >= 0 ? '+' : ''}${marginChangePct.toFixed(1)} ppts\n\n` +
-        `Operating Profit = Gross Profit − Operating Costs. This is the cleanest read on core-business efficiency\n` +
-        `before non-operating items (other income, tax). Negative = the operating engine is losing money.\n` +
-        `Thresholds (operating margin): < 0% Severe (loss) · 0-5% Thin · 5-10% Healthy · > 10% Strong`,
-      allowed: [
-        rm('operating profit', Math.round(curr)),
-        rm('prior year operating profit', Math.round(prev)),
-        pct('operating margin', opMargin),
-        pct('prior operating margin', priorOpMargin),
-        pct('operating margin change ppts', marginChangePct),
-        ...(yoy != null ? [pct('yoy operating profit growth', yoy)] : []),
-      ],
-    };
-  },
-
-  async fin_net_profit(period) {
-    const s = await getFiscalSlice(period);
-    const curr = s.current.net_profit;
-    const prev = s.prior.net_profit;
-    const yoy = yoyPct(curr, prev);
-    const netMargin = s.current.net_sales > 0 ? (curr / s.current.net_sales) * 100 : 0;
-    const priorNetMargin = s.prior.net_sales > 0 ? (prev / s.prior.net_sales) * 100 : 0;
-    const otherIncome = s.current.other_income;
-    const label = yoyLabel(yoy, true);
-
-    return {
-      prompt:
-        `Profit / Loss (${s.rangeLabel}): RM ${Math.round(curr).toLocaleString('en-MY')}\n` +
-        `Net margin: ${netMargin.toFixed(1)}%\n` +
-        `Other income (non-operating): RM ${Math.round(otherIncome).toLocaleString('en-MY')}\n` +
-        `Prior-year same window: RM ${Math.round(prev).toLocaleString('en-MY')} (margin ${priorNetMargin.toFixed(1)}%)\n` +
-        `YoY net-profit growth: ${yoy == null ? 'n/a' : yoy.toFixed(1) + '%'} — ${label}\n\n` +
-        `Net Profit = Operating Profit + Other Income (pre-tax view). Compare this to Operating Profit —\n` +
-        `if net profit is mainly carried by other income (rental, interest, disposal gains), the core business may be\n` +
-        `weaker than the headline suggests.\n` +
-        `Thresholds (net margin): < 0% Severe · 0-3% Thin · 3-7% Healthy · > 7% Strong`,
-      allowed: [
-        rm('net profit', Math.round(curr)),
-        rm('prior year net profit', Math.round(prev)),
-        rm('other income', Math.round(otherIncome)),
-        pct('net margin', netMargin),
-        pct('prior net margin', priorNetMargin),
-        ...(yoy != null ? [pct('yoy net profit growth', yoy)] : []),
-      ],
+        `P&L Summary for ${s.rangeLabel} (from pc_pnl_period):\n\n${waterfall}`,
+      allowed,
     };
   },
 

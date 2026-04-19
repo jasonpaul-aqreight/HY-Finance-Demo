@@ -217,52 +217,21 @@ Evaluate:
 Provide a concise analysis of the customer credit health landscape. Do not list every customer — focus on patterns and outliers.`,
 
   // Sales Section 3: Sales Trend
-  net_sales: `You are analyzing the "Net Sales" KPI.
+  sales_summary: `You are analyzing the "Sales Summary" KPI on the Sales page.
 
-What it measures: Total net sales for the selected period.
-Formula: Invoice Sales + Cash Sales - Credit Notes
-
-Performance thresholds:
-- Month-over-month growth >= 5% = Good
-- Month-over-month growth 0% to 5% = Neutral
-- Month-over-month decline < 0% = Bad
-
-Provide a concise analysis of this metric. If trend data is available, comment on the growth direction.`,
-
-  invoice_sales: `You are analyzing the "Invoice Sales" KPI.
-
-What it measures: Total sales billed on credit terms to customers.
+What it measures: Net Sales and its breakdown — Invoice Sales, Cash Sales, and Credit Notes.
+Formula: Net Sales = Invoice Sales + Cash Sales - Credit Notes
 
 Evaluate:
-- Invoice sales as % of net sales: >=90% is normal for a distribution business with established credit customers
-- If invoice sales ratio is dropping, it may signal a shift toward cash/retail or loss of credit customers
+1. Net Sales level — is the total healthy for this business?
+2. Invoice vs Cash ratio — invoice >= 90% of net is normal for a distribution business with credit customers. A dropping ratio may signal a shift toward cash/retail or loss of credit customers.
+3. Cash sales context — higher cash = lower credit risk and faster cash flow, but may signal smaller/retail customers.
+4. Credit notes as % of gross sales:
+   - <= 1% = Good (normal returns)
+   - 1-3% = Monitor
+   - > 3% = Concern (quality/accuracy issues)
 
-Provide a concise analysis of this metric.`,
-
-  cash_sales: `You are analyzing the "Cash Sales" KPI.
-
-What it measures: Total sales from immediate-payment transactions (includes POS and cash-on-delivery).
-
-Cash sales are contextual — not inherently good or bad:
-- Higher cash sales = lower credit risk, faster cash flow
-- But may signal smaller/retail customers vs wholesale relationships
-
-Evaluate the cash-to-total ratio and whether it's changing over time.
-
-Provide a concise analysis of this metric.`,
-
-  credit_notes: `You are analyzing the "Credit Notes" KPI.
-
-What it measures: Total value of credit notes issued — represents goods returns and pricing adjustments. Displayed as a negative (red).
-
-Performance thresholds:
-- Credit notes <= 1% of gross sales = Good (normal returns)
-- Credit notes 1-3% of gross sales = Neutral (monitor)
-- Credit notes > 3% of gross sales = Bad (quality/accuracy issues)
-
-Gross sales = Invoice Sales + Cash Sales (before credit notes).
-
-Provide a concise analysis of this metric. If you notice a spike in any month, flag it for the summary to investigate.`,
+Provide a concise analysis covering all four metrics.`,
 
   net_sales_trend: `You are analyzing the "Net Sales Trend" stacked bar chart.
 
@@ -346,83 +315,67 @@ Provide a concise analysis.`,
   // Customer Margin Section: Overview
   cm_net_sales: `You are analyzing the "Net Sales" KPI on the Customer Margin overview.
 
-What it measures: Total net sales for the selected period, summed across all active customers after subtracting credit notes.
-Formula: SUM(iv_revenue + dn_revenue - cn_revenue) from pc_customer_margin.
-
-Context:
-- This is the same Net Sales figure as the Sales page but scoped to the customer-margin view (active customers only).
-- Small variance vs the Sales page Net Sales is expected and is NOT an error.
+What it measures: Total net sales for the selected period, with prior-period comparison.
 
 Performance thresholds:
-- Growth over the period = Good
-- Flat = Neutral
+- Growth > 5% = Good
+- Growth 0-5% = Neutral
 - Decline = Bad
-- A drop > 10% in the full period vs a comparable prior period warrants flagging.
+- Decline > 10% = Flag
 
-Evaluate the level and, if trend data is included in the pre-fetched block, the direction.
+Evaluate the current value and the period-over-period delta. Cite the RM delta and percentage change.
 
 Provide a concise analysis of this metric.`,
 
   cm_cogs: `You are analyzing the "Cost of Goods Sold (COGS)" KPI on the Customer Margin overview.
 
-What it measures: Total landed cost of goods sold for the selected period.
-Formula: SUM(iv_cost + dn_cost - cn_cost) from pc_customer_margin.
+What it measures: Total landed cost of goods sold, with prior-period comparison.
 
-Context:
-- For a fruit distribution business, COGS is expected to be the dominant expense line — typically 80-90% of Net Sales.
-- COGS rising faster than Net Sales is the leading indicator of margin compression (upstream price pressure or sourcing mix shift).
+Context: For a fruit distribution business, COGS is typically 80-90% of Net Sales. COGS rising faster than Net Sales signals margin compression.
 
 Evaluate:
-- COGS-to-Net-Sales ratio for the period
-- Whether COGS is moving in the same direction as Net Sales
+- COGS-to-Net-Sales ratio
+- Whether COGS delta is outpacing Net Sales delta (margin compression signal)
 - Do NOT evaluate COGS in isolation — always frame it relative to Net Sales.
 
 Provide a concise analysis of this metric.`,
 
   cm_gross_profit: `You are analyzing the "Gross Profit" KPI on the Customer Margin overview.
 
-What it measures: Net Sales minus COGS for the selected period.
-Formula: Net Sales - COGS (both from pc_customer_margin).
+What it measures: Net Sales minus COGS, with prior-period comparison.
 
 Performance thresholds:
-- Gross Profit growing while Net Sales also grows = Good
-- Gross Profit flat while Net Sales grows = Neutral (watch for margin erosion)
-- Gross Profit declining while Net Sales grows = Bad (cost pressure)
-- Gross Profit declining while Net Sales declines = Bad (volume loss)
+- GP growing while Net Sales also grows = Good
+- GP flat while Net Sales grows = Neutral (margin erosion)
+- GP declining while Net Sales grows = Bad (cost pressure)
+- GP declining while Net Sales declines = Bad (volume loss)
 
-The most important signal is whether Gross Profit is growing faster or slower than Net Sales — that reveals whether the business is gaining or losing pricing power.
+The key signal is whether Gross Profit is growing faster or slower than Net Sales — this reveals pricing power. Cite the RM delta and percentage change.
 
 Provide a concise analysis of this metric.`,
 
   cm_margin_pct: `You are analyzing the "Gross Margin %" KPI on the Customer Margin overview.
 
-What it measures: Gross Profit as a percentage of Net Sales.
-Formula: (Gross Profit / Net Sales) x 100.
+What it measures: Gross Profit as a percentage of Net Sales, with prior-period comparison.
 
 Performance thresholds (fruit distribution benchmarks):
 - Margin % >= 15% = Good
-- Margin % 10% to 15% = Neutral
+- Margin % 10-15% = Neutral
 - Margin % < 10% = Bad
 
-Evaluate:
-- Current margin level vs the benchmark bands
-- Whether movement is driven by Net Sales change, COGS change, or both — the pre-fetched block contains both numerator and denominator
+Evaluate the current margin level vs benchmarks and the period-over-period margin delta in percentage points.
 
 Provide a concise analysis of this metric.`,
 
   cm_active_customers: `You are analyzing the "Active Customers" KPI on the Customer Margin overview.
 
-What it measures: Count of distinct active customers that had activity in the selected period.
-Formula: COUNT(DISTINCT debtor_code) from pc_customer_margin with is_active = 'T'.
+What it measures: Count of distinct active customers with activity in the selected period, with prior-period comparison.
 
-Context:
-- This is a period-scoped count of active customers, not a total customer base count.
-- Stability is the baseline — steady numbers are healthy for a mature distribution business.
-- Changes matter more than the absolute number.
+Context: Stability is the baseline — steady numbers are healthy for a mature distribution business. Changes matter more than the absolute number.
 
 Evaluate:
-- Direction of the number vs any prior context in the data block
-- Whether the count correlates with Net Sales movement (a drop in active customers but steady Net Sales = revenue concentrating on fewer accounts)
+- Period-over-period change in customer count
+- Whether the count correlates with Net Sales movement (fewer customers but steady sales = revenue concentrating)
 
 Provide a concise analysis of this metric.`,
 
@@ -502,29 +455,23 @@ Provide a concise analysis focused on concentration, quality of top accounts, an
   cm_customer_table: `You are analyzing the "Customer Margin Table" on the Customer Margin breakdown.
 
 What it shows:
-- A sortable, paginated table of all active customers with columns for Code, Name, Type, Net Sales, COGS, Gross Profit, Margin %, Return Rate %.
-- The pre-fetched data gives you:
-  (A) Top 10 customers by Gross Profit (the best performers)
-  (B) Bottom 10 customers by Gross Profit (the worst performers, including loss-makers)
-  (C) Aggregate roll-ups: total customers, loss-making customer count, average margin %, top-10 share of total GP.
+- Bottom 10 customers by Gross Profit (the worst performers, including loss-makers)
+- Margin distribution: how customers are spread across margin buckets
 
 Performance thresholds:
-- Top 10 share of GP > 60% = Bad (over-concentrated)
-- Top 10 share of GP 40-60% = Neutral (typical for distribution)
-- Top 10 share of GP < 40% = Good (well spread)
 - Loss-making customers > 10% of active count = Bad (unhealthy tail)
-- Margin spread (best minus worst) > 50 percentage points = Polarized portfolio
-- Any bottom-10 customer with meaningful revenue (> RM 100,000) AND negative margin = Critical flag — they are actively destroying margin.
+- Any bottom-10 customer with revenue > RM 100,000 AND negative margin = Critical flag
+- High concentration in < 10% margin buckets = Portfolio margin risk
 
 Evaluate:
-- Concentration: how much of the profit is in the top few names?
-- The bottom tail: who is losing money, and is the problem big (high-revenue loss-makers) or small (many tiny negative-margin accounts)?
+- The bottom tail: who is losing money, and is the problem big (high-revenue loss-makers) or small?
 - Customer type / sales agent clustering in the bottom 10
-- Whether the bottom 10 have unusually high return rates (signal of quality or service problem)
+- Whether the bottom 10 have unusually high return rates
+- Distribution shape: is the portfolio clustered in healthy (>15%) or thin (<10%) buckets?
 
-Cite named customers from the pre-fetched top/bottom blocks. Do not invent names.
+Cite named customers from the pre-fetched bottom block. Do not invent names.
 
-Provide a concise analysis focused on concentration risk and the at-risk tail.`,
+Provide a concise analysis focused on the at-risk tail and portfolio margin distribution.`,
 
   cm_credit_note_impact: `You are analyzing the "Credit Note Impact on Margins" table.
 
@@ -702,27 +649,22 @@ Provide a concise analysis focused on distribution shape, concentration, and the
   sm_top_bottom: `You are analyzing the "Top/Bottom Suppliers & Items" chart on the Supplier Performance breakdown.
 
 What it shows:
-- The UI has THREE toggles: Entity (Suppliers ↔ Items), Metric (Profit ↔ Margin %), Direction (Highest ↔ Lowest).
-- The pre-fetched data contains ALL four "highest" lens combinations plus the complementary bottom lists:
+- The pre-fetched data contains 4 tables sorted by Est. Gross Profit:
   (A) Top 10 suppliers by Est. Gross Profit
-  (B) Top 10 suppliers by Gross Margin % (min revenue RM 10,000)
+  (B) Bottom 10 suppliers by Est. Gross Profit
   (C) Top 10 items by Est. Gross Profit
-  (D) Top 10 items by Gross Margin % (min revenue RM 10,000)
-  Plus bottom-10 counterparts (worst performers / loss-makers) for each entity/metric.
-- Your analysis must cover every lens the user can toggle to, not just the default view.
+  (D) Bottom 10 items by Est. Gross Profit
 
 Performance thresholds:
 - Top 1 supplier > 15% of period Est. Gross Profit = Bad (supplier concentration risk)
 - Top 10 suppliers > 60% of period Est. Gross Profit = Bad (concentrated sourcing)
 - Top 10 suppliers < 40% of period Est. Gross Profit = Good (diversified sourcing)
-- Any bottom-list supplier with margin % < 0 = Critical (sourcing at a loss)
-- Any bottom-list item with margin % < 0 AND meaningful revenue = Flag (product-level loss-maker)
-- Any entity appearing on BOTH top-profit AND top-margin lists = Star — name them explicitly.
+- Any bottom-list supplier with profit < 0 = Critical (sourcing at a loss)
+- Any bottom-list item with profit < 0 AND meaningful revenue = Flag (product-level loss-maker)
 
 Evaluate:
-- Supplier-side vs item-side concentration (are the top profit suppliers the SAME as top margin suppliers?)
+- Supplier-side vs item-side concentration
 - Loss-makers: which are bigger problems — loss-making suppliers or loss-making items?
-- Whether star suppliers / items also appear in the bottom scan (inconsistency signals sourcing mix issues)
 - Item group or supplier clustering in the bottom lists
 
 Cite named suppliers and items from the pre-fetched data. Do not invent names or numbers.
@@ -1346,154 +1288,26 @@ Provide a concise analysis focused on category concentration, single-account ris
 
   // ─── Financial page §9 — financial_overview ──────────────────────────────
 
-  fin_net_sales: `You are analyzing the "Net Sales" KPI on the Financial page.
+  fin_pnl_summary: `You are analyzing the "P&L Summary" on the Financial page.
 
-What it measures: Total net sales (SL + SA account types in pc_pnl_period) for the selected fiscal window — full FY, YTD, or trailing 12 months. This is a fiscal-period flow, not a calendar-date flow.
+What it shows: A full P&L waterfall for the selected fiscal window — Net Sales, Cost of Sales, Gross Profit, Operating Costs, Operating Profit, Other Income, and Net Profit — each with current RM, prior-year RM, YoY %, and margin/ratio.
 
-The pre-fetched data gives you:
-- Net Sales (RM) for the current fiscal window
-- Net Sales (RM) for the prior-year SAME window
-- YoY growth % (with a label: Severe / Unfavourable / Flat / Favourable / Strong favourable)
+Thresholds:
+- Gross margin: < 15% Severe · 15-20% Watch · 20-25% Typical · > 25% Strong
+- OpEx ratio: < 10% Lean · 10-18% Typical · 18-25% Elevated · > 25% Severe
+- Operating margin: < 0% Severe (loss) · 0-5% Thin · 5-10% Healthy · > 10% Strong
+- Net margin: < 0% Severe · 0-3% Thin · 3-7% Healthy · > 7% Strong
+- COGS share: 60-80% = Typical · > 85% = Margin pressure
 
-Thresholds (YoY net-sales growth):
-- < -5% = Severe (revenue contraction)
-- -5% to 0% = Unfavourable
-- 0% to 5% = Flat
-- 5% to 10% = Favourable
-- > 10% = Strong favourable
+Evaluate (top to bottom):
+1. Top-line: Is Net Sales growing or contracting YoY?
+2. Cost pressure: Is COGS growing faster than Net Sales? (rising COGS share = margin compression)
+3. Gross Profit: Both RM and margin %. RM up + margin down = volume masking cost erosion.
+4. OpEx: Is the ratio drifting up? OpEx growing faster than sales = scaling inefficiency.
+5. Operating Profit: Positive or negative? This is the core-business read.
+6. Earnings quality: If Net Profit >> Operating Profit, the delta is Other Income (non-operating). Core business may be weaker than headline.
 
-Evaluate:
-- Is top-line revenue growing, flat, or contracting vs the same window last year?
-- Scale check — is this a meaningful absolute number for the business?
-- Window sensitivity — if the window is YTD or last-12, note that the comparison is against the equivalent prior window, not a full FY.
-
-Cite RM values and percentages verbatim. Provide a concise one-paragraph read on the top-line direction.`,
-
-  fin_cost_of_sales: `You are analyzing the "Cost of Sales" (COGS) KPI on the Financial page.
-
-What it measures: Total Cost of Sales (CO account type in pc_pnl_period) for the selected fiscal window, plus its share of net sales.
-
-The pre-fetched data gives you:
-- COGS (RM) for the current fiscal window
-- COGS as % of Net Sales (current)
-- Prior-year COGS (RM) and prior COGS % of Net Sales
-- YoY cost growth % (label: Healthy / Watch / Concern / Severe)
-
-Thresholds (COGS share of Net Sales):
-- 60% to 80% = Typical fruit-distribution mix
-- > 85% = COGS-dominated (margin-pressure risk — call this out)
-- < 50% = OpEx-dominated (unusual — check data quality)
-
-Thresholds (YoY cost growth):
-- < 0% = Healthy (costs down)
-- 0% to 5% = Watch (in line with typical inflation)
-- 5% to 10% = Concern (outpacing inflation — investigate)
-- > 10% = Severe
-
-Evaluate:
-- Absolute direction: up or down vs prior year?
-- Ratio direction: is COGS share of sales rising, flat, or falling? A rising ratio is the early warning for margin pressure.
-- Cross-check: if YoY cost growth > YoY net-sales growth (from the other KPI), margin is compressing even if both are up.
-
-Cite verbatim. Provide a concise one-paragraph read.`,
-
-  fin_gross_profit: `You are analyzing the "Gross Profit" KPI on the Financial page.
-
-What it measures: Gross Profit = Net Sales − Cost of Sales, for the selected fiscal window. Both the RM figure and the gross-margin % are in the block.
-
-The pre-fetched data gives you:
-- Gross Profit (RM) and Gross Margin % (current)
-- Prior-year Gross Profit (RM) and prior Gross Margin %
-- YoY GP growth % and margin-change in percentage points
-
-Thresholds (gross margin, fruit distribution context):
-- < 15% = Severe
-- 15% to 20% = Watch
-- 20% to 25% = Typical
-- > 25% = Strong
-
-Evaluate:
-- Both dimensions matter: absolute RM and margin %.
-- Watch the cross-case: RM up + margin down = volume growth masking price/cost erosion. Call this out explicitly if you see it.
-- RM down + margin up = shrinking-but-more-profitable business; worth noting but not alarming on its own.
-- Compare the current margin to the prior margin in ppts, not in %.
-
-Cite verbatim. Provide a concise one-paragraph read.`,
-
-  fin_operating_costs: `You are analyzing the "Operating Costs" (OpEx) KPI on the Financial page.
-
-What it measures: Operating Costs (EP account type in pc_pnl_period) for the selected fiscal window, plus its ratio against net sales. Distinct from COGS — this is day-to-day running cost.
-
-The pre-fetched data gives you:
-- OpEx (RM) for the current fiscal window
-- OpEx ratio (OpEx ÷ Net Sales) %
-- Prior-year OpEx (RM) and prior OpEx ratio
-- YoY OpEx growth % (label: Healthy / In line with inflation / Concern / Severe)
-
-Thresholds (OpEx ratio):
-- < 10% = Lean
-- 10% to 18% = Typical
-- 18% to 25% = Elevated
-- > 25% = Severe
-
-Thresholds (YoY OpEx growth):
-- < 0% = Healthy
-- 0% to 5% = In line with inflation
-- 5% to 15% = Concern
-- > 15% = Severe
-
-Evaluate:
-- Is the OpEx ratio drifting up, flat, or down vs prior year? Ratio drifting up = scaling inefficiency.
-- Cross-check: is OpEx growing faster than Net Sales? If yes, operating leverage is deteriorating.
-- Absolute direction matters less than ratio direction for OpEx — call out the ratio first.
-
-Cite verbatim. Provide a concise one-paragraph read.`,
-
-  fin_operating_profit: `You are analyzing the "Operating Profit" KPI on the Financial page.
-
-What it measures: Operating Profit = Gross Profit − Operating Costs, for the selected fiscal window. This is the cleanest read on core-business efficiency BEFORE non-operating items (other income, tax).
-
-The pre-fetched data gives you:
-- Operating Profit (RM) and Operating Margin % (current)
-- Prior-year Operating Profit (RM) and prior Operating Margin %
-- YoY operating-profit growth % and margin-change in ppts
-
-Thresholds (operating margin):
-- < 0% = Severe (operating loss — the engine is losing money)
-- 0% to 5% = Thin
-- 5% to 10% = Healthy
-- > 10% = Strong
-
-Evaluate:
-- Sign matters most: is Operating Profit positive or negative?
-- Both dimensions: RM direction AND margin direction.
-- This is the KPI that tells the core story — Net Sales can look fine and Net Profit can look fine, but a Gross Profit and Operating Profit mismatch means OpEx is eating the growth.
-- Call out if Operating Profit is negative while Gross Profit is positive — that's the "GP exists but OpEx erases it" narrative.
-
-Cite verbatim. Provide a concise one-paragraph read.`,
-
-  fin_net_profit: `You are analyzing the "Profit / Loss" KPI on the Financial page.
-
-What it measures: Net Profit (pre-tax) = Gross Profit + Other Income − Operating Costs, for the selected fiscal window. This is Operating Profit plus the non-operating income line (rental, interest, disposal gains, etc.).
-
-The pre-fetched data gives you:
-- Net Profit (RM) and Net Margin %
-- Other Income (RM) — the non-operating line
-- Prior-year Net Profit and prior Net Margin %
-- YoY net-profit growth %
-
-Thresholds (net margin):
-- < 0% = Severe
-- 0% to 3% = Thin
-- 3% to 7% = Healthy
-- > 7% = Strong
-
-Evaluate:
-- Sign of Net Profit: positive or negative?
-- **Quality check** — compare Net Profit against Operating Profit (which is in the Operating Profit block). If Net Profit is materially larger than Operating Profit, the delta is Other Income. When Other Income is a large share of Net Profit, the core business is weaker than the headline suggests — call this out.
-- YoY direction relative to Operating Profit YoY: if Net Profit is improving but Operating Profit is flat, the improvement is non-operating.
-
-Cite verbatim. Provide a concise one-paragraph read focused on earnings quality.`,
+Cite RM values and percentages from the waterfall table. Provide a concise analysis covering all P&L layers.`,
 
   fin_monthly_trend: `You are analyzing the "Monthly P&L Trend" chart on the Financial page.
 
@@ -1850,10 +1664,7 @@ export const SECTION_COMPONENTS: Record<SectionKey, { key: string; name: string;
     { key: 'customer_credit_health', name: 'Customer Credit Health', type: 'table' },
   ],
   sales_trend: [
-    { key: 'net_sales', name: 'Net Sales', type: 'kpi' },
-    { key: 'invoice_sales', name: 'Invoice Sales', type: 'kpi' },
-    { key: 'cash_sales', name: 'Cash Sales', type: 'kpi' },
-    { key: 'credit_notes', name: 'Credit Notes', type: 'kpi' },
+    { key: 'sales_summary', name: 'Sales Summary', type: 'kpi' },
     { key: 'net_sales_trend', name: 'Net Sales Trend', type: 'chart' },
   ],
   sales_breakdown: [
@@ -1918,12 +1729,7 @@ export const SECTION_COMPONENTS: Record<SectionKey, { key: string; name: string;
     { key: 'ex_opex_table', name: 'Operating Costs Breakdown', type: 'table' },
   ],
   financial_overview: [
-    { key: 'fin_net_sales',        name: 'Net Sales',         type: 'kpi' },
-    { key: 'fin_cost_of_sales',    name: 'Cost of Sales',     type: 'kpi' },
-    { key: 'fin_gross_profit',     name: 'Gross Profit',      type: 'kpi' },
-    { key: 'fin_operating_costs',  name: 'Operating Costs',   type: 'kpi' },
-    { key: 'fin_operating_profit', name: 'Operating Profit',  type: 'kpi' },
-    { key: 'fin_net_profit',       name: 'Profit / Loss',     type: 'kpi' },
+    { key: 'fin_pnl_summary',     name: 'P&L Summary',       type: 'kpi' },
     { key: 'fin_monthly_trend',    name: 'Monthly P&L Trend', type: 'chart' },
   ],
   financial_pnl: [

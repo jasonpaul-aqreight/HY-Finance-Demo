@@ -19,6 +19,7 @@ import {
   logComponentEnd,
   logSummaryStart,
   logSummaryResponse,
+  logNumericGuard,
   logSessionEnd,
 } from './debug-logger';
 import type { SectionKey, DateRange, FiscalPeriod, ComponentResult, SummaryJson, SummaryInsight, ComponentType, AllowedValue } from './types';
@@ -218,13 +219,13 @@ async function analyzeComponent(
   const inputTokens = response.usage?.input_tokens ?? 0;
   const outputTokens = response.usage?.output_tokens ?? 0;
 
-  logApiResponse(logFile, 1, response);
+  logApiResponse(logFile, 1, response, AI_MODEL);
 
   const textBlock = response.content.find(
     (b): b is Anthropic.TextBlock => b.type === 'text',
   );
   const analysis = textBlock?.text ?? 'No analysis generated.';
-  logComponentEnd(logFile, componentKey, analysis, inputTokens, outputTokens, 0);
+  logComponentEnd(logFile, componentKey, analysis, inputTokens, outputTokens, 0, AI_MODEL);
 
   return {
     component_key: componentKey,
@@ -335,6 +336,7 @@ async function runSummaryAnalysis(
 
     const guard = runNumericGuard(lastText, allAllowed);
     unmatched = guard.unmatched;
+    logNumericGuard(logFile, attempt, guard.ok, unmatched.map(u => ({ raw: u.raw, value: u.value, unit: u.unit })));
 
     if (guard.ok) break;
 
@@ -410,7 +412,7 @@ async function runSummaryAgentLoop(p: AgentLoopParams): Promise<AgentLoopResult>
 
     inputTokens += response.usage?.input_tokens ?? 0;
     outputTokens += response.usage?.output_tokens ?? 0;
-    logApiResponse(p.logFile, turnNumber, response);
+    logApiResponse(p.logFile, turnNumber, response, SUMMARY_MODEL);
 
     const finalize = (): AgentLoopResult => {
       const textBlock = response.content.find(

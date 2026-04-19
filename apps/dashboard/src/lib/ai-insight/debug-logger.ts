@@ -1,6 +1,7 @@
 import { writeFileSync, appendFileSync, mkdirSync, existsSync } from 'fs';
 import path from 'path';
 import type Anthropic from '@anthropic-ai/sdk';
+import { estimateCost } from './client';
 
 export const DEBUG_FILE_ENABLED = process.env.AI_INSIGHT_DEBUG_FILE === 'true';
 
@@ -51,6 +52,7 @@ export function logComponentStart(
     '',
     DIVIDER,
     `COMPONENT: ${componentName} (${componentKey})`,
+    `Started at : ${new Date().toISOString()}`,
     DIVIDER,
     '',
     `${SUB_DIVIDER}`,
@@ -70,15 +72,26 @@ export function logApiResponse(
   logFile: string | null,
   turnNumber: number,
   response: Anthropic.Message,
+  model?: string,
 ) {
   if (!logFile) return;
+
+  const usage = response.usage;
+  const inputTokens = usage?.input_tokens ?? 0;
+  const outputTokens = usage?.output_tokens ?? 0;
+  const cacheCreation = (usage as { cache_creation_input_tokens?: number })?.cache_creation_input_tokens ?? 0;
+  const cacheRead = (usage as { cache_read_input_tokens?: number })?.cache_read_input_tokens ?? 0;
+  const cost = estimateCost(inputTokens, outputTokens, model);
 
   const lines: string[] = [
     `${SUB_DIVIDER}`,
     `TURN ${turnNumber} — Claude Response`,
     `${SUB_DIVIDER}`,
+    `model      : ${response.model}`,
     `stop_reason: ${response.stop_reason}`,
-    `tokens: input=${response.usage?.input_tokens ?? 0}, output=${response.usage?.output_tokens ?? 0}`,
+    `tokens     : input=${inputTokens}, output=${outputTokens}, total=${inputTokens + outputTokens}`,
+    `cache      : created=${cacheCreation}, read=${cacheRead}`,
+    `cost       : $${cost.toFixed(6)}`,
     '',
   ];
 
@@ -128,14 +141,18 @@ export function logComponentEnd(
   inputTokens: number,
   outputTokens: number,
   toolCallCount: number,
+  model?: string,
 ) {
   if (!logFile) return;
+  const cost = estimateCost(inputTokens, outputTokens, model);
   append(logFile, [
     `${SUB_DIVIDER}`,
     `COMPONENT COMPLETE: ${componentKey}`,
     `${SUB_DIVIDER}`,
+    `Finished at: ${new Date().toISOString()}`,
     `Tool calls : ${toolCallCount}`,
     `Tokens     : input=${inputTokens}, output=${outputTokens}, total=${inputTokens + outputTokens}`,
+    `Cost       : $${cost.toFixed(6)}`,
     '',
     '[FINAL ANALYSIS]',
     finalAnalysis,
@@ -160,6 +177,7 @@ export function logSummaryStart(
     DIVIDER,
     `SUMMARY GENERATION: ${sectionKey}`,
     ...(summaryModel ? [`Summary Model: ${summaryModel}`] : []),
+    `Started at : ${new Date().toISOString()}`,
     DIVIDER,
     '',
     '[SYSTEM PROMPT]',
@@ -177,16 +195,43 @@ export function logSummaryResponse(
   parsedText: string,
 ) {
   if (!logFile) return;
+
+  const usage = response.usage;
+  const cacheCreation = (usage as { cache_creation_input_tokens?: number })?.cache_creation_input_tokens ?? 0;
+  const cacheRead = (usage as { cache_read_input_tokens?: number })?.cache_read_input_tokens ?? 0;
+
   append(logFile, [
     `${SUB_DIVIDER}`,
     'SUMMARY RESPONSE',
     `${SUB_DIVIDER}`,
-    `tokens: input=${response.usage?.input_tokens ?? 0}, output=${response.usage?.output_tokens ?? 0}`,
+    `model  : ${response.model}`,
+    `tokens : input=${response.usage?.input_tokens ?? 0}, output=${response.usage?.output_tokens ?? 0}`,
+    `cache  : created=${cacheCreation}, read=${cacheRead}`,
     '',
     '[RAW RESPONSE]',
     parsedText,
     '',
     DIVIDER,
+    '',
+  ]);
+}
+
+// ─── Numeric guard logging ──────────────────────────────────────────────────
+
+export function logNumericGuard(
+  logFile: string | null,
+  attempt: number,
+  passed: boolean,
+  unmatched: { raw: string; value: number; unit: string }[],
+) {
+  if (!logFile) return;
+  append(logFile, [
+    `${SUB_DIVIDER}`,
+    `NUMERIC GUARD — Attempt ${attempt}`,
+    `${SUB_DIVIDER}`,
+    `Passed    : ${passed}`,
+    `Unmatched : ${unmatched.length}`,
+    ...(unmatched.length > 0 ? unmatched.map(u => `  - "${u.raw}" (${u.value} ${u.unit})`) : []),
     '',
   ]);
 }

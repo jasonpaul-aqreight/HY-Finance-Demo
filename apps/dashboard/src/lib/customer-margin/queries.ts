@@ -240,6 +240,29 @@ export async function getMarginKpi(filters: MarginFilters): Promise<KpiData> {
   return row;
 }
 
+/** Summary with prior-period comparison (mirrors supplier-margin getMarginSummary) */
+export async function getCustomerMarginSummary(start: string, end: string) {
+  const { getPreviousPeriod } = await import('./date-utils');
+  const current = await getMarginKpi({ start, end });
+  const { prevStart, prevEnd } = getPreviousPeriod(start, end);
+  const previous = await getMarginKpi({ start: prevStart, end: prevEnd });
+
+  const growthPct = (cur: number, prev: number) =>
+    prev !== 0 ? ((cur - prev) / Math.abs(prev)) * 100 : null;
+
+  return {
+    period: { start, end, prevStart, prevEnd },
+    current,
+    previous,
+    growth: {
+      revenue_pct: growthPct(current.total_revenue, previous.total_revenue),
+      cogs_pct: growthPct(current.total_cogs, previous.total_cogs),
+      profit_pct: growthPct(current.gross_profit, previous.gross_profit),
+      margin_delta: current.margin_pct - previous.margin_pct,
+    },
+  };
+}
+
 // ─── 2. Margin Trend ─────────────────────────────────────────────────────────
 
 export async function getMarginTrend(filters: MarginFilters): Promise<TrendRow[]> {
