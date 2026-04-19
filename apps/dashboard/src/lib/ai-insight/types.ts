@@ -54,7 +54,7 @@ export interface AnalyzeRequest {
 
 export interface SummaryInsight {
   title: string;
-  metric?: string; // Short label for the metric area, e.g. "DSO", "Collection Rate"
+  metric?: string; // Short label for the metric area, e.g. "Collection Days", "Collection Rate"
   summary?: string; // One-line plain-text preview shown on the collapsed card (no markdown)
   detail: string;
 }

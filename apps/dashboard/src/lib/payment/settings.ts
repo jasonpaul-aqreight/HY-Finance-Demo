@@ -89,7 +89,7 @@ export async function saveSettings(s: Settings): Promise<{ ok: boolean; error?: 
   }
 
   if (s.dsoBenchmark <= 0) {
-    return { ok: false, error: 'DSO benchmark must be positive' };
+    return { ok: false, error: 'Collection Days benchmark must be positive' };
   }
   if (s.lookbackMonths <= 0 || s.lookbackMonths > 60) {
     return { ok: false, error: 'Lookback period must be between 1 and 60 months' };

@@ -74,7 +74,7 @@ const fetchers: Record<string, DataFetcher> = {
       `SELECT month,
               CASE WHEN invoiced > 0
                 THEN ROUND((total_outstanding::numeric / invoiced) * 30, 1)
-                ELSE NULL END AS dso
+                ELSE NULL END AS collection_days
        FROM pc_ar_monthly
        WHERE month BETWEEN $1 AND $2
        ORDER BY month`,
@@ -84,51 +84,51 @@ const fetchers: Record<string, DataFetcher> = {
       return { prompt: 'No data available for selected period.', allowed: [] };
     }
 
-    const valid = rows.filter((r: { dso: number | null }) => r.dso !== null);
+    const valid = rows.filter((r: { collection_days: number | null }) => r.collection_days !== null);
     const avg = valid.length > 0
-      ? (valid.reduce((s: number, r: { dso: number }) => s + Number(r.dso), 0) / valid.length).toFixed(1)
+      ? (valid.reduce((s: number, r: { collection_days: number }) => s + Number(r.collection_days), 0) / valid.length).toFixed(1)
       : '--';
 
-    const dsoNum = parseFloat(avg);
-    const color = isNaN(dsoNum) ? 'No data' : dsoNum <= 30 ? 'Green (Good)' : dsoNum <= 60 ? 'Yellow (Warning)' : 'Red (Critical)';
+    const avgNum = parseFloat(avg);
+    const color = isNaN(avgNum) ? 'No data' : avgNum <= 30 ? 'Green (Good)' : avgNum <= 60 ? 'Yellow (Warning)' : 'Red (Critical)';
 
-    const daysAboveGood = isNaN(dsoNum) ? null : +(dsoNum - 30).toFixed(1);
-    const daysAboveWarning = isNaN(dsoNum) ? null : +(dsoNum - 60).toFixed(1);
-    const dsoValues = valid.map((r: { dso: number }) => Number(r.dso));
-    const minDso = dsoValues.length ? Math.min(...dsoValues) : null;
-    const maxDso = dsoValues.length ? Math.max(...dsoValues) : null;
-    const minRow = valid.find((r: { dso: number }) => Number(r.dso) === minDso);
-    const maxRow = valid.find((r: { dso: number }) => Number(r.dso) === maxDso);
-    const monthsAbove60 = dsoValues.filter((d: number) => d > 60).length;
-    const monthsAbove30 = dsoValues.filter((d: number) => d > 30).length;
+    const daysAboveGood = isNaN(avgNum) ? null : +(avgNum - 30).toFixed(1);
+    const daysAboveWarning = isNaN(avgNum) ? null : +(avgNum - 60).toFixed(1);
+    const cdValues = valid.map((r: { collection_days: number }) => Number(r.collection_days));
+    const minCd = cdValues.length ? Math.min(...cdValues) : null;
+    const maxCd = cdValues.length ? Math.max(...cdValues) : null;
+    const minRow = valid.find((r: { collection_days: number }) => Number(r.collection_days) === minCd);
+    const maxRow = valid.find((r: { collection_days: number }) => Number(r.collection_days) === maxCd);
+    const monthsAbove60 = cdValues.filter((d: number) => d > 60).length;
+    const monthsAbove30 = cdValues.filter((d: number) => d > 30).length;
 
     let table = '| Month | Collection Days |\n|-------|----------------|\n';
     for (const r of rows) {
-      table += `| ${r.month} | ${r.dso != null ? r.dso + ' days' : 'N/A'} |\n`;
+      table += `| ${r.month} | ${r.collection_days != null ? r.collection_days + ' days' : 'N/A'} |\n`;
     }
     const preCalc =
       `Pre-calculated gaps (use these values directly — do not recompute):\n` +
       `- Period average: ${avg} days\n` +
       (daysAboveGood !== null ? `- Days above 30-day (Good) benchmark: ${daysAboveGood > 0 ? '+' : ''}${daysAboveGood} days\n` : '') +
       (daysAboveWarning !== null ? `- Days above 60-day (Warning) benchmark: ${daysAboveWarning > 0 ? '+' : ''}${daysAboveWarning} days\n` : '') +
-      (minRow ? `- Best month: ${minRow.month} at ${minDso} days\n` : '') +
-      (maxRow ? `- Worst month: ${maxRow.month} at ${maxDso} days\n` : '') +
-      `- Months above 30-day benchmark: ${monthsAbove30} of ${dsoValues.length}\n` +
-      `- Months above 60-day benchmark: ${monthsAbove60} of ${dsoValues.length}\n`;
+      (minRow ? `- Best month: ${minRow.month} at ${minCd} days\n` : '') +
+      (maxRow ? `- Worst month: ${maxRow.month} at ${maxCd} days\n` : '') +
+      `- Months above 30-day benchmark: ${monthsAbove30} of ${cdValues.length}\n` +
+      `- Months above 60-day benchmark: ${monthsAbove60} of ${cdValues.length}\n`;
 
     const allowed: AllowedValue[] = [];
     allowed.push(days('30-day benchmark', 30));
     allowed.push(days('60-day benchmark', 60));
-    if (!isNaN(dsoNum)) allowed.push(days('period avg collection days', dsoNum));
+    if (!isNaN(avgNum)) allowed.push(days('period avg collection days', avgNum));
     if (daysAboveGood !== null) allowed.push(days('days above 30-day benchmark', daysAboveGood));
     if (daysAboveWarning !== null) allowed.push(days('days above 60-day benchmark', daysAboveWarning));
-    if (minDso !== null) allowed.push(days('best month days', minDso));
-    if (maxDso !== null) allowed.push(days('worst month days', maxDso));
+    if (minCd !== null) allowed.push(days('best month days', minCd));
+    if (maxCd !== null) allowed.push(days('worst month days', maxCd));
     allowed.push(cnt('months above 30-day benchmark', monthsAbove30));
     allowed.push(cnt('months above 60-day benchmark', monthsAbove60));
-    allowed.push(cnt('total months in period', dsoValues.length));
+    allowed.push(cnt('total months in period', cdValues.length));
     for (const r of rows) {
-      if (r.dso != null) allowed.push(days(`${r.month} dso`, Number(r.dso)));
+      if (r.collection_days != null) allowed.push(days(`${r.month} collection days`, Number(r.collection_days)));
     }
 
     return {
@@ -196,27 +196,27 @@ const fetchers: Record<string, DataFetcher> = {
       `SELECT month,
               CASE WHEN invoiced > 0
                 THEN ROUND((total_outstanding::numeric / invoiced) * 30, 1)
-                ELSE NULL END AS dso
+                ELSE NULL END AS collection_days
        FROM pc_ar_monthly
        WHERE month BETWEEN $1 AND $2
        ORDER BY month`,
       [toMonth(dr!.start), toMonth(dr!.end)],
     );
-    const valid = rows.filter((r: { dso: number | null }) => r.dso !== null);
+    const valid = rows.filter((r: { collection_days: number | null }) => r.collection_days !== null);
     const avgNum = valid.length > 0
-      ? valid.reduce((s: number, r: { dso: number }) => s + Number(r.dso), 0) / valid.length
+      ? valid.reduce((s: number, r: { collection_days: number }) => s + Number(r.collection_days), 0) / valid.length
       : NaN;
     const avg = isNaN(avgNum) ? '--' : avgNum.toFixed(1);
 
     let table = '| Month | Collection Days |\n|-------|----------------|\n';
     for (const r of rows) {
-      table += `| ${r.month} | ${r.dso != null ? r.dso + ' days' : 'N/A'} |\n`;
+      table += `| ${r.month} | ${r.collection_days != null ? r.collection_days + ' days' : 'N/A'} |\n`;
     }
 
     const allowed: AllowedValue[] = [];
     if (!isNaN(avgNum)) allowed.push(days('period avg collection days', avgNum));
     for (const r of rows) {
-      if (r.dso != null) allowed.push(days(`${r.month} dso`, Number(r.dso)));
+      if (r.collection_days != null) allowed.push(days(`${r.month} collection days`, Number(r.collection_days)));
     }
 
     return { prompt: `Data points:\n${table}\nAverage: ${avg} days`, allowed };

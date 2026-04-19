@@ -7,7 +7,7 @@ import PeriodKpiCards from './PeriodKpiCards';
 import AgingChartV2 from './AgingChartV2';
 import CollectionTrendChartV2 from './CollectionTrendChartV2';
 import CreditUtilizationChartV2 from './CreditUtilizationChartV2';
-import DsoTrendChartV2 from './DsoTrendChartV2';
+import CollectionDaysTrendChart from './CollectionDaysTrendChart';
 import CustomerTableV2 from './CustomerTableV2';
 import { InsightSectionHeader } from '@/components/ai-insight/InsightSectionHeader';
 
@@ -47,7 +47,7 @@ export function DashboardShellV2() {
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <DsoTrendChartV2 filters={filters} />
+        <CollectionDaysTrendChart filters={filters} />
         <CollectionTrendChartV2 filters={filters} />
       </div>
 

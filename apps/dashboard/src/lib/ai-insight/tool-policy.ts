@@ -5,7 +5,7 @@ import type { SectionKey } from './types';
 export type ToolPolicy = 'none' | 'aggregate_only' | 'full';
 
 const SECTION_POLICY: Record<SectionKey, ToolPolicy> = {
-  payment_collection_trend: 'none',
+  payment_collection_trend: 'aggregate_only',
   payment_outstanding: 'full',
   sales_trend: 'aggregate_only',
   sales_breakdown: 'full',

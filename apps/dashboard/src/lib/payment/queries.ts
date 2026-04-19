@@ -23,12 +23,12 @@ export interface AgingBucket {
 export interface KpiData {
   total_outstanding: number;
   overdue_amount: number;
-  dso: number | null;
+  collection_days: number | null;
   collection_rate: number | null;
   over_credit_count: number;
   prev_total_outstanding: number | null;
   prev_overdue_amount: number | null;
-  prev_dso: number | null;
+  prev_collection_days: number | null;
   prev_collection_rate: number | null;
   prev_over_credit_count: number | null;
 }
@@ -41,9 +41,9 @@ export interface CollectionRow {
   invoice_count: number;
 }
 
-export interface DsoRow {
+export interface CollectionDaysRow {
   month: string;
-  dso: number | null;
+  collection_days: number | null;
   ar_outstanding: number;
   credit_sales: number;
 }
@@ -373,9 +373,9 @@ export async function getCollectionTrend(startMonth: string, endMonth: string, f
   };
 }
 
-// ─── DSO Trend (from pc_ar_monthly — already has cumulative outstanding) ────
+// ─── Collection Days Trend (from pc_ar_monthly — already has cumulative outstanding)
 
-export async function getDsoTrend(startMonth: string, endMonth: string): Promise<DsoRow[]> {
+export async function getCollectionDaysTrend(startMonth: string, endMonth: string): Promise<CollectionDaysRow[]> {
   const pool = getPool();
 
   const { rows } = await pool.query(`
@@ -389,13 +389,13 @@ export async function getDsoTrend(startMonth: string, endMonth: string): Promise
   `, [startMonth, endMonth]);
 
   return rows.map((r: { month: string; ar_outstanding: number; credit_sales: number }) => {
-    const days = daysInMonth(r.month);
-    const dso = r.credit_sales > 0
-      ? Math.round((r.ar_outstanding / r.credit_sales) * days * 10) / 10
+    const d = daysInMonth(r.month);
+    const collection_days = r.credit_sales > 0
+      ? Math.round((r.ar_outstanding / r.credit_sales) * d * 10) / 10
       : null;
     return {
       month: r.month,
-      dso,
+      collection_days,
       ar_outstanding: Math.round(r.ar_outstanding),
       credit_sales: Math.round(r.credit_sales),
     };
@@ -439,8 +439,8 @@ export async function getKpis(refDate: string, filters: Filters = {}): Promise<K
 
   const { rows: [latest] } = await pool.query(`SELECT MAX(snapshot_date) AS d FROM pc_ar_customer_snapshot`);
   if (!latest?.d) {
-    return { total_outstanding: 0, overdue_amount: 0, dso: null, collection_rate: null, over_credit_count: 0,
-      prev_total_outstanding: null, prev_overdue_amount: null, prev_dso: null, prev_collection_rate: null, prev_over_credit_count: null };
+    return { total_outstanding: 0, overdue_amount: 0, collection_days: null, collection_rate: null, over_credit_count: 0,
+      prev_total_outstanding: null, prev_overdue_amount: null, prev_collection_days: null, prev_collection_rate: null, prev_over_credit_count: null };
   }
 
   const { where, params } = buildSnapshotFilter(filters, 's', 2);
@@ -467,15 +467,15 @@ export async function getKpis(refDate: string, filters: Filters = {}): Promise<K
       ${where}
   `, [latest.d, ...params])).rows[0] as { cnt: number };
 
-  // KPI 3: DSO
+  // KPI 3: Collection Days
   const currentMonth = toYearMonth(refDate);
-  const dsoData = await getDsoTrend(currentMonth, currentMonth);
-  const currentDso = dsoData.length > 0 ? dsoData[0].dso : null;
+  const cdData = await getCollectionDaysTrend(currentMonth, currentMonth);
+  const currentCd = cdData.length > 0 ? cdData[0].collection_days : null;
 
   // KPI 4: Collection Rate
   const prevMonthYM = priorMonth(currentMonth);
-  const dsoAll = await getDsoTrend(prevMonthYM, prevMonthYM);
-  const arAtMonthStart = dsoAll.length > 0 ? dsoAll[0].ar_outstanding : 0;
+  const cdPrev = await getCollectionDaysTrend(prevMonthYM, prevMonthYM);
+  const arAtMonthStart = cdPrev.length > 0 ? cdPrev[0].ar_outstanding : 0;
 
   const collMonthRow = (await pool.query(`
     SELECT COALESCE(collected, 0)::float AS collected
@@ -485,10 +485,10 @@ export async function getKpis(refDate: string, filters: Filters = {}): Promise<K
   const collectionRate = arAtMonthStart > 0 ? Math.round((collected / arAtMonthStart) * 1000) / 10 : null;
 
   // Prior month deltas
-  const prevDso = dsoAll.length > 0 ? dsoAll[0].dso : null;
+  const prevCd = cdPrev.length > 0 ? cdPrev[0].collection_days : null;
   const prevPrevMonthYM = priorMonth(prevMonthYM);
-  const dsoAllPrev = await getDsoTrend(prevPrevMonthYM, prevPrevMonthYM);
-  const arAtPrevMonthStart = dsoAllPrev.length > 0 ? dsoAllPrev[0].ar_outstanding : 0;
+  const cdPrevPrev = await getCollectionDaysTrend(prevPrevMonthYM, prevPrevMonthYM);
+  const arAtPrevMonthStart = cdPrevPrev.length > 0 ? cdPrevPrev[0].ar_outstanding : 0;
 
   const prevCollMonthRow = (await pool.query(`
     SELECT COALESCE(collected, 0)::float AS collected
@@ -500,12 +500,12 @@ export async function getKpis(refDate: string, filters: Filters = {}): Promise<K
   return {
     total_outstanding: osRow.total_outstanding ?? 0,
     overdue_amount: osRow.overdue_amount ?? 0,
-    dso: currentDso,
+    collection_days: currentCd,
     collection_rate: collectionRate,
     over_credit_count: overCreditRow.cnt,
     prev_total_outstanding: null,
     prev_overdue_amount: null,
-    prev_dso: prevDso,
+    prev_collection_days: prevCd,
     prev_collection_rate: prevCollectionRate,
     prev_over_credit_count: null,
   };
@@ -652,7 +652,7 @@ export interface KpiV2Data {
   overdue_customers: number;
   overdue_amount: number;
   overdue_pct: number;
-  dso: number | null;
+  collection_days: number | null;
   collection_rate: number | null;
   credit_limit_breaches: number;
   avg_monthly_collection: number | null;
@@ -664,9 +664,9 @@ export interface CreditUtilizationRow {
   total_outstanding: number;
 }
 
-export interface DsoTrendRow {
+export interface CollectionDaysTrendRow {
   month: string;
-  dso: number | null;
+  collection_days: number | null;
   ar_outstanding: number;
   credit_sales: number;
 }
@@ -707,7 +707,7 @@ export async function getKpisV2(startDate: string, endDate: string): Promise<Kpi
   const { rows: [latest] } = await pool.query(`SELECT MAX(snapshot_date) AS d FROM pc_ar_customer_snapshot`);
   if (!latest?.d) {
     return { total_outstanding: 0, overdue_customers: 0, overdue_amount: 0, overdue_pct: 0,
-      dso: null, collection_rate: null, credit_limit_breaches: 0, avg_monthly_collection: null };
+      collection_days: null, collection_rate: null, credit_limit_breaches: 0, avg_monthly_collection: null };
   }
 
   // Snapshot: Total Outstanding
@@ -730,11 +730,11 @@ export async function getKpisV2(startDate: string, endDate: string): Promise<Kpi
   const totalOs = osRow?.total_outstanding ?? 0;
   const overduePct = totalOs > 0 ? Math.round((overdueRow.overdue_amount / totalOs) * 1000) / 10 : 0;
 
-  // Period: DSO
-  const dsoTrend = await getDsoTrendV2(startDate, endDate);
-  const validDsoPoints = dsoTrend.filter(d => d.dso != null);
-  const dso = validDsoPoints.length > 0
-    ? Math.round((validDsoPoints.reduce((s, d) => s + (d.dso ?? 0), 0) / validDsoPoints.length) * 10) / 10
+  // Period: Collection Days
+  const cdTrend = await getCollectionDaysTrendV2(startDate, endDate);
+  const validCdPoints = cdTrend.filter(d => d.collection_days != null);
+  const collectionDays = validCdPoints.length > 0
+    ? Math.round((validCdPoints.reduce((s, d) => s + (d.collection_days ?? 0), 0) / validCdPoints.length) * 10) / 10
     : null;
 
   // Period: Collection Rate (from pc_ar_monthly)
@@ -773,7 +773,7 @@ export async function getKpisV2(startDate: string, endDate: string): Promise<Kpi
     overdue_customers: overdueRow.cnt,
     overdue_amount: overdueRow.overdue_amount,
     overdue_pct: overduePct,
-    dso,
+    collection_days: collectionDays,
     collection_rate: collectionRate,
     credit_limit_breaches: breachRow.cnt,
     avg_monthly_collection: avgMonthlyCollection,
@@ -807,9 +807,9 @@ export async function getCreditUtilizationV2(): Promise<CreditUtilizationRow[]> 
   return rows;
 }
 
-// ─── DSO Trend V2 (from pc_ar_monthly) ─────────────────────────────────────
+// ─── Collection Days Trend V2 (from pc_ar_monthly) ──────────────────────────
 
-export async function getDsoTrendV2(startDate: string, endDate: string): Promise<DsoTrendRow[]> {
+export async function getCollectionDaysTrendV2(startDate: string, endDate: string): Promise<CollectionDaysTrendRow[]> {
   const pool = getPool();
   const startMonth = startDate.substring(0, 7);
   const endMonth = endDate.substring(0, 7);
@@ -825,13 +825,13 @@ export async function getDsoTrendV2(startDate: string, endDate: string): Promise
   `, [startMonth, endMonth]);
 
   return rows.map((r: { month: string; ar_outstanding: number; credit_sales: number }) => {
-    const days = daysInMonth(r.month);
-    const dso = r.credit_sales > 0
-      ? Math.round((r.ar_outstanding / r.credit_sales) * days * 10) / 10
+    const d = daysInMonth(r.month);
+    const collection_days = r.credit_sales > 0
+      ? Math.round((r.ar_outstanding / r.credit_sales) * d * 10) / 10
       : null;
     return {
       month: r.month,
-      dso,
+      collection_days,
       ar_outstanding: Math.round(r.ar_outstanding),
       credit_sales: Math.round(r.credit_sales),
     };

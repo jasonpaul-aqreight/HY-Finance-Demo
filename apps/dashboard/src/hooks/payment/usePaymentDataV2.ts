@@ -5,7 +5,7 @@ import type { DashboardFiltersV2 } from './useDashboardFiltersV2';
 import type {
   KpiV2Data,
   CreditUtilizationRow,
-  DsoTrendRow,
+  CollectionDaysTrendRow,
   CreditHealthV2Row,
 } from '@/lib/payment/queries';
 import type { SettingsV2 } from '@/lib/payment/settings';
@@ -60,10 +60,10 @@ export function useCreditUtilizationV2() {
   );
 }
 
-// V2 DSO Trend (period)
-export function useDsoTrendV2(filters: DashboardFiltersV2) {
-  return useSWR<DsoTrendRow[]>(
-    filters.startDate ? `/api/payment/v2/dso-trend?${dateParams(filters)}` : null,
+// V2 Collection Days Trend (period)
+export function useCollectionDaysTrend(filters: DashboardFiltersV2) {
+  return useSWR<CollectionDaysTrendRow[]>(
+    filters.startDate ? `/api/payment/v2/collection-days-trend?${dateParams(filters)}` : null,
     fetcher,
     { revalidateOnFocus: false },
   );

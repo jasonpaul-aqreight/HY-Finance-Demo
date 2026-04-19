@@ -57,16 +57,16 @@ export default function PeriodKpiCards({ filters }: PeriodKpiCardsProps) {
     );
   }
 
-  const dsoColor = data.dso == null ? '' : data.dso <= 30 ? 'text-emerald-600' : data.dso <= 60 ? 'text-yellow-600' : 'text-red-600';
+  const cdColor = data.collection_days == null ? '' : data.collection_days <= 30 ? 'text-emerald-600' : data.collection_days <= 60 ? 'text-yellow-600' : 'text-red-600';
   const collColor = data.collection_rate == null ? '' : data.collection_rate >= 80 ? 'text-emerald-600' : data.collection_rate >= 50 ? 'text-yellow-600' : 'text-red-600';
 
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
       <KpiCard
         title="Avg Collection Days"
-        value={data.dso != null ? formatDays(data.dso) : '--'}
+        value={data.collection_days != null ? formatDays(data.collection_days) : '--'}
         subtitle="avg days to collect payment"
-        colorClass={dsoColor}
+        colorClass={cdColor}
         extra={
           <AnalyzeIcon sectionKey="payment_collection_trend" componentKey="avg_collection_days" />
         }

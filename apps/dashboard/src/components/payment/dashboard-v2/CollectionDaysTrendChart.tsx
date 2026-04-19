@@ -3,26 +3,26 @@
 import { useMemo } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { AnalyzeIcon } from '@/components/ai-insight/AnalyzeIcon';
-import { useDsoTrendV2 } from '@/hooks/payment/usePaymentDataV2';
+import { useCollectionDaysTrend } from '@/hooks/payment/usePaymentDataV2';
 import { useStableData } from '@/hooks/useStableData';
 import type { DashboardFiltersV2 } from '@/hooks/payment/useDashboardFiltersV2';
 import {
   ComposedChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine,
 } from 'recharts';
 
-interface DsoTrendChartV2Props {
+interface CollectionDaysTrendChartProps {
   filters: DashboardFiltersV2;
 }
 
-export default function DsoTrendChartV2({ filters }: DsoTrendChartV2Props) {
-  const { data: rawData } = useDsoTrendV2(filters);
+export default function CollectionDaysTrendChart({ filters }: CollectionDaysTrendChartProps) {
+  const { data: rawData } = useCollectionDaysTrend(filters);
   const data = useStableData(rawData);
 
-  const avgDso = useMemo(() => {
+  const avgCd = useMemo(() => {
     if (!data || data.length === 0) return null;
-    const validPoints = data.filter(d => d.dso != null);
+    const validPoints = data.filter(d => d.collection_days != null);
     if (validPoints.length === 0) return null;
-    const sum = validPoints.reduce((s, d) => s + (d.dso ?? 0), 0);
+    const sum = validPoints.reduce((s, d) => s + (d.collection_days ?? 0), 0);
     return Math.round((sum / validPoints.length) * 10) / 10;
   }, [data]);
 
@@ -52,13 +52,13 @@ export default function DsoTrendChartV2({ filters }: DsoTrendChartV2Props) {
                   'Days',
                 ]}
               />
-              {avgDso != null && (
+              {avgCd != null && (
                 <ReferenceLine
-                  y={avgDso}
+                  y={avgCd}
                   stroke="#2E5090"
                   strokeDasharray="3 3"
                   label={{
-                    value: `Avg ${avgDso.toFixed(1)}d`,
+                    value: `Avg ${avgCd.toFixed(1)}d`,
                     position: 'insideBottomRight',
                     fontSize: 10,
                     fill: '#2E5090',
@@ -67,7 +67,7 @@ export default function DsoTrendChartV2({ filters }: DsoTrendChartV2Props) {
               )}
               <Line
                 type="monotone"
-                dataKey="dso"
+                dataKey="collection_days"
                 stroke="#2E5090"
                 strokeWidth={2}
                 dot={{ r: 3 }}

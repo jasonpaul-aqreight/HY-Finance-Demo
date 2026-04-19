@@ -123,7 +123,7 @@ export const searchIndex: SearchEntry[] = [
     title: 'Payment Collection',
     section: 'Finance',
     content:
-      'payment collection outstanding payments aging buckets credit utilization customer payment health days sales outstanding DSO credit score coming soon',
+      'payment collection outstanding payments aging buckets credit utilization customer payment health collection days credit score coming soon',
   },
   {
     href: '/manual/finance/return',
