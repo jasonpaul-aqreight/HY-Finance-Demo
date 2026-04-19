@@ -88,9 +88,9 @@ export function DashboardShellV3() {
           <BSStatementTableV3 fy={filters.fiscalYear} />
         </div>
 
-        {/* ═══ Section §12: P&L Variance Analysis — FP&A (budget vs actual) ═══ */}
+        {/* ═══ Section §12: Variance, Forecast & Budget ═══ */}
         <InsightSectionHeader
-          title="P&L Variance Analysis"
+          title="Variance, Forecast & Budget"
           subtitle={`${filters.fiscalYear} · ${filters.range.toUpperCase()}`}
           page="financial"
           sectionKey="financial_variance"

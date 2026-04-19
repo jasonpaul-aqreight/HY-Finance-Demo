@@ -3942,24 +3942,44 @@ const fiscalPeriodFetchers: Record<string, FiscalPeriodFetcher> = {
       allowed.push(rm(`${r.label} net profit`, np));
     }
 
-    // Compute simple linear trend: average month-over-month change
+    // Compute 3-month weighted moving average forecast
+    // Weights: most recent 3 months weighted 0.5, 0.3, 0.2 (newest first)
+    const weights = [0.5, 0.3, 0.2];
     const metrics = [
       { name: 'Net Sales',    values: s.monthly.map(r => r.net_sales) },
       { name: 'Gross Profit', values: s.monthly.map(r => r.gross_profit) },
       { name: 'Net Profit',   values: s.monthly.map(r => r.net_profit) },
     ];
 
-    const forecasts: string[] = [];
+    // Per-metric: compute MoM changes, weighted average change, then project 3 months
+    const forecastSummaries: string[] = [];
+    let forecastTable =
+      '| Line Item | Month+1 | Month+2 | Month+3 | Trend | Confidence |\n' +
+      '|-----------|---------|---------|---------|-------|------------|\n';
+
     for (const m of metrics) {
       const changes: number[] = [];
       for (let i = 1; i < m.values.length; i++) {
         changes.push(m.values[i] - m.values[i - 1]);
       }
-      const avgChange = changes.reduce((s, v) => s + v, 0) / changes.length;
+
+      // Weighted average of most recent 3 changes (or fewer if not enough data)
+      const recentChanges = changes.slice(-3);
+      let weightedChange = 0;
+      let weightSum = 0;
+      for (let i = 0; i < recentChanges.length; i++) {
+        const w = weights[i] ?? weights[weights.length - 1];
+        weightedChange += recentChanges[recentChanges.length - 1 - i] * w;
+        weightSum += w;
+      }
+      weightedChange = weightedChange / weightSum;
+
       const lastValue = m.values[m.values.length - 1];
-      const forecast = Math.round(lastValue + avgChange);
-      const direction = avgChange > 0 ? 'rising' : avgChange < 0 ? 'falling' : 'flat';
-      const lastLabel = s.monthly[s.monthly.length - 1].label;
+      const f1 = Math.round(lastValue + weightedChange);
+      const f2 = Math.round(lastValue + weightedChange * 2);
+      const f3 = Math.round(lastValue + weightedChange * 3);
+
+      const direction = weightedChange > 0 ? 'rising' : weightedChange < 0 ? 'falling' : 'flat';
 
       // Consistency: how many months moved in the same direction?
       const consistentMonths = changes.filter(c =>
@@ -3967,35 +3987,162 @@ const fiscalPeriodFetchers: Record<string, FiscalPeriodFetcher> = {
       ).length;
       const strength = consistentMonths >= changes.length * 0.7 ? 'Strong' : 'Weak';
 
-      // Sign flip warning
-      const signFlip = (lastValue >= 0 && forecast < 0) || (lastValue < 0 && forecast >= 0);
+      // Confidence narrows if trend is consistent, widens if volatile
+      const confidence = strength === 'Strong' ? 'Narrowing (consistent trend)' : 'Widening (volatile trend)';
 
-      forecasts.push(
+      // Sign flip warning on any of the 3 forecast months
+      const signFlips: string[] = [];
+      if ((lastValue >= 0 && f1 < 0) || (lastValue < 0 && f1 >= 0)) signFlips.push('Month+1');
+      if ((lastValue >= 0 && f2 < 0) || (lastValue < 0 && f2 >= 0)) signFlips.push('Month+2');
+      if ((lastValue >= 0 && f3 < 0) || (lastValue < 0 && f3 >= 0)) signFlips.push('Month+3');
+
+      forecastTable += `| ${m.name} | ${fmtRm(f1)} | ${fmtRm(f2)} | ${fmtRm(f3)} | ${direction} (${strength}) | ${confidence} |\n`;
+
+      forecastSummaries.push(
         `- **${m.name}**: Trend ${direction} (${strength} signal — ${consistentMonths}/${changes.length} months consistent). ` +
-        `Avg monthly change: ${fmtRm(Math.round(avgChange))}. ` +
-        `Last actual (${lastLabel}): ${fmtRm(Math.round(lastValue))}. ` +
-        `**Next-period forecast: approximately ${fmtRm(forecast)}**` +
-        (signFlip ? ' ⚠ WARNING: forecast projects a sign flip (profit ↔ loss)' : ''),
+        `Weighted avg monthly change: ${fmtRm(Math.round(weightedChange))}. ` +
+        `Last actual: ${fmtRm(Math.round(lastValue))}. ` +
+        `Forecasts: Month+1 ≈ ${fmtRm(f1)}, Month+2 ≈ ${fmtRm(f2)}, Month+3 ≈ ${fmtRm(f3)}` +
+        (signFlips.length > 0 ? ` ⚠ WARNING: sign flip projected at ${signFlips.join(', ')}` : ''),
       );
 
-      allowed.push(rm(`${m.name.toLowerCase()} avg monthly change`, Math.round(avgChange)));
-      allowed.push(rm(`${m.name.toLowerCase()} forecast`, forecast));
+      allowed.push(rm(`${m.name.toLowerCase()} weighted avg change`, Math.round(weightedChange)));
+      allowed.push(rm(`${m.name.toLowerCase()} forecast month+1`, f1));
+      allowed.push(rm(`${m.name.toLowerCase()} forecast month+2`, f2));
+      allowed.push(rm(`${m.name.toLowerCase()} forecast month+3`, f3));
+      allowed.push(rm(`${m.name.toLowerCase()} last actual`, Math.round(lastValue)));
       allowed.push(cnt(`${m.name.toLowerCase()} consistent months`, consistentMonths));
       allowed.push(cnt(`${m.name.toLowerCase()} total change months`, changes.length));
     }
 
     return {
       prompt:
-        `Trend Forecast for ${s.rangeLabel} — projecting next period based on ${s.monthly.length}-month trend.\n` +
-        `Method: Simple trend extrapolation (average month-over-month change applied to last actual).\n` +
+        `Multi-Period Trend Forecast for ${s.rangeLabel} — projecting 3 months ahead based on ${s.monthly.length}-month trend.\n` +
+        `Method: 3-month weighted moving average (weights: 50% most recent, 30% prior, 20% earliest). Each subsequent forecast month applies the same weighted change cumulatively.\n` +
         `⚠ These are AI estimates based on historical trends — NOT formal financial projections.\n\n` +
         `Monthly trend data:\n${table}\n` +
-        `Pre-computed forecasts (cite these directly — do NOT invent your own):\n` +
-        forecasts.join('\n') + '\n\n' +
+        `3-Month Forecast:\n${forecastTable}\n` +
+        `Detail:\n` +
+        forecastSummaries.join('\n') + '\n\n' +
         `Thresholds:\n` +
         `- Trend consistent 4+ months = Strong signal\n` +
         `- Trend mixed / oscillating = Weak signal (state this explicitly)\n` +
-        `- Forecast projects sign flip = Severe warning\n`,
+        `- Forecast projects sign flip = Severe warning\n` +
+        `- Month+2 and Month+3 carry increasing uncertainty — state this\n`,
+      allowed,
+    };
+  },
+
+  // ─── Section §12 — financial_variance: AI Budget Suggestions ───────────────
+
+  async fv_budget_suggestions(period) {
+    const s = await getFiscalSlice(period);
+    const stmt = await getV2PLStatement(period.fiscalYear);
+
+    const fmtRm = (v: number) => `RM ${v.toLocaleString('en-MY')}`;
+    const allowed: AllowedValue[] = [];
+
+    // ── 1. Category-level budget suggestions from P&L statement ──────────
+
+    // Map acc_type to higher-is-better
+    const higherIsBetter: Record<string, boolean> = {
+      SL: true, CO: false, EP: false, OI: true,
+    };
+
+    const stmtMonthCount = stmt.months.length || 1;
+    const categoryRows: string[] = [];
+    for (const g of stmt.groups) {
+      const ytd = g.subtotal.ytd;
+      const priorYtd = g.subtotal.prior_ytd;
+      if (ytd === 0 && priorYtd === 0) continue;
+
+      const growthPct = priorYtd !== 0
+        ? ((ytd - priorYtd) / Math.abs(priorYtd)) * 100
+        : null;
+
+      // Monthly average from current FY (annualise for full-year suggestion)
+      const monthCount = stmtMonthCount;
+      const monthlyAvg = Math.round(ytd / monthCount);
+      const suggestedAnnual = monthlyAvg * 12;
+
+      // Trend direction from monthly data
+      const monthlyTotals = g.subtotal.monthly;
+      let risingCount = 0;
+      let fallingCount = 0;
+      for (let i = 1; i < monthlyTotals.length; i++) {
+        if (monthlyTotals[i] > monthlyTotals[i - 1]) risingCount++;
+        else if (monthlyTotals[i] < monthlyTotals[i - 1]) fallingCount++;
+      }
+      const totalChanges = risingCount + fallingCount;
+      const direction = risingCount > fallingCount ? 'rising' : fallingCount > risingCount ? 'falling' : 'flat';
+      const consistency = totalChanges > 0
+        ? Math.max(risingCount, fallingCount) / totalChanges
+        : 0;
+      const signal = consistency >= 0.7 ? 'Strong' : 'Weak';
+
+      categoryRows.push(
+        `| ${g.acc_type_name} (${g.acc_type}) | ${fmtRm(Math.round(ytd))} | ${fmtRm(Math.round(priorYtd))} | ${growthPct != null ? growthPct.toFixed(1) + '%' : 'n/a'} | ${fmtRm(monthlyAvg)}/mo | ${fmtRm(suggestedAnnual)} | ${direction} (${signal}) |`,
+      );
+
+      allowed.push(rm(`${g.acc_type_name} ytd actual`, Math.round(ytd)));
+      allowed.push(rm(`${g.acc_type_name} prior ytd`, Math.round(priorYtd)));
+      if (growthPct != null) allowed.push(pct(`${g.acc_type_name} yoy growth`, growthPct));
+      allowed.push(rm(`${g.acc_type_name} monthly avg`, monthlyAvg));
+      allowed.push(rm(`${g.acc_type_name} suggested annual`, suggestedAnnual));
+      allowed.push(cnt(`${g.acc_type_name} rising months`, risingCount));
+      allowed.push(cnt(`${g.acc_type_name} falling months`, fallingCount));
+    }
+
+    const categoryTable =
+      `| Category | Current YTD | Prior YTD | YoY Growth | Monthly Avg | Suggested Annual Budget | Trend |\n` +
+      `|----------|-------------|-----------|------------|-------------|------------------------|-------|\n` +
+      categoryRows.join('\n');
+
+    // ── 2. Headline P&L suggestions ──────────────────────────────────────
+
+    const c = s.current;
+    const p = s.prior;
+    const monthCount = s.monthly.length || 1;
+
+    const headlines = [
+      { name: 'Net Sales',       curr: c.net_sales,       prior: p.net_sales },
+      { name: 'Cost of Sales',   curr: c.cogs,            prior: p.cogs },
+      { name: 'Gross Profit',    curr: c.gross_profit,    prior: p.gross_profit },
+      { name: 'Operating Costs', curr: c.expenses,        prior: p.expenses },
+      { name: 'Net Profit',      curr: c.net_profit,      prior: p.net_profit },
+    ];
+
+    let headlineTable =
+      `| P&L Line | Current Period | Prior Period | YoY Change | Suggested Monthly Budget | Suggested Annual Budget |\n` +
+      `|----------|---------------|-------------|------------|--------------------------|------------------------|\n`;
+
+    for (const h of headlines) {
+      const growth = p[h.name === 'Net Sales' ? 'net_sales' : h.name === 'Cost of Sales' ? 'cogs' : h.name === 'Gross Profit' ? 'gross_profit' : h.name === 'Operating Costs' ? 'expenses' : 'net_profit'];
+      const growthPct = growth !== 0 ? ((h.curr - h.prior) / Math.abs(h.prior)) * 100 : null;
+      const monthlyBudget = Math.round(h.curr / monthCount);
+      const annualBudget = monthlyBudget * 12;
+
+      headlineTable += `| ${h.name} | ${fmtRm(Math.round(h.curr))} | ${fmtRm(Math.round(h.prior))} | ${growthPct != null ? growthPct.toFixed(1) + '%' : 'n/a'} | ${fmtRm(monthlyBudget)} | ${fmtRm(annualBudget)} |\n`;
+
+      allowed.push(rm(`${h.name.toLowerCase()} current`, Math.round(h.curr)));
+      allowed.push(rm(`${h.name.toLowerCase()} prior`, Math.round(h.prior)));
+      if (growthPct != null) allowed.push(pct(`${h.name.toLowerCase()} yoy growth`, growthPct));
+      allowed.push(rm(`${h.name.toLowerCase()} monthly budget`, monthlyBudget));
+      allowed.push(rm(`${h.name.toLowerCase()} annual budget`, annualBudget));
+    }
+
+    return {
+      prompt:
+        `AI Budget Suggestions for ${s.rangeLabel} — based on historical P&L data.\n` +
+        `Method: Monthly average of current-period actuals, annualised to 12 months. YoY growth rate and trend direction provided for context.\n` +
+        `⚠ These are AI-generated suggestions based on historical data — NOT formal budgets or targets.\n\n` +
+        `Headline P&L Budget Suggestions:\n${headlineTable}\n\n` +
+        `Category-Level Budget Suggestions (by account type):\n${categoryTable}\n\n` +
+        `Context:\n` +
+        `- Current period covers ${monthCount} month(s) in ${s.rangeLabel}\n` +
+        `- "Suggested Annual Budget" = monthly average × 12\n` +
+        `- YoY Growth shows how current period compares to the same window last year\n` +
+        `- Trend direction based on month-over-month movement within current period\n`,
       allowed,
     };
   },
