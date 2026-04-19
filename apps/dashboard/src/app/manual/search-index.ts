@@ -137,7 +137,7 @@ export const searchIndex: SearchEntry[] = [
     title: 'Financial Statements',
     section: 'Finance',
     content:
-      'financial statements profit loss P&L balance sheet income statement revenue expenses profitable coming soon',
+      'financial statements profit loss P&L balance sheet income statement revenue expenses variance analysis forecast budget approve budget suggestions 12-month projection actual vs budget actual vs prior year YoY favourable unfavourable planning FP&A budgeting tracking KPI net sales gross profit operating costs net profit fiscal year',
   },
   {
     href: '/manual/finance/expenses',

@@ -16,9 +16,9 @@ export default function AiInsightPage() {
       </p>
 
       <p className="text-base text-foreground">
-        AI Insight is available on the <strong>Payment Collection</strong> and{' '}
-        <strong>Sales Report</strong> pages. Each page is split into sections, and each section
-        has its own AI analysis.
+        AI Insight is available on the <strong>Payment Collection</strong>,{' '}
+        <strong>Sales Report</strong>, <strong>Financial Statements</strong>, and other pages.
+        Each page is split into sections, and each section has its own AI analysis.
       </p>
 
       <Callout type="warning" title="Do not navigate away during analysis">
@@ -254,10 +254,30 @@ export default function AiInsightPage() {
               <td className="py-2 pr-4">Sales Trend</td>
               <td className="py-2">Net sales, invoice, cash, credit notes, sales trend chart</td>
             </tr>
-            <tr>
+            <tr className="border-b">
               <td className="py-2 pr-4">Sales</td>
               <td className="py-2 pr-4">Sales Breakdown</td>
               <td className="py-2">Sales by customer, product, agent, outlet</td>
+            </tr>
+            <tr className="border-b">
+              <td className="py-2 pr-4">Financial</td>
+              <td className="py-2 pr-4">Financial Overview</td>
+              <td className="py-2">KPI summary cards and monthly P&amp;L trend</td>
+            </tr>
+            <tr className="border-b">
+              <td className="py-2 pr-4">Financial</td>
+              <td className="py-2 pr-4">Profit &amp; Loss Detail</td>
+              <td className="py-2">P&amp;L statement and multi-year comparison</td>
+            </tr>
+            <tr className="border-b">
+              <td className="py-2 pr-4">Financial</td>
+              <td className="py-2 pr-4">Balance Sheet</td>
+              <td className="py-2">Assets, liabilities, equity trend and statement</td>
+            </tr>
+            <tr>
+              <td className="py-2 pr-4">Financial</td>
+              <td className="py-2 pr-4">Variance, Forecast &amp; Budget</td>
+              <td className="py-2">P&amp;L variance, 12-month forecast, budget suggestions and approval</td>
             </tr>
           </tbody>
         </table>
