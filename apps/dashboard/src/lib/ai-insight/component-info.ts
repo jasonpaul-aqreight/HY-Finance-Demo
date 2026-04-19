@@ -494,6 +494,32 @@ export const COMPONENT_INFO: Record<string, ComponentInfo> = {
     about: 'The balance sheet is a snapshot — this chart stretches three of its key aggregates across the fiscal window so you can see the DIRECTION, not just the latest number.\n\nRead the three lines as a system, not individually:\n\n• If Total Assets and Equity both rise, the business is building real value.\n• If Total Assets rise while Equity is flat, the growth is being financed by liabilities — leverage is increasing.\n• If Total Liabilities rise faster than Total Assets, gearing is deteriorating even if the headline Assets number looks healthy.\n• If Equity is drifting down month after month, the business is either paying out more than it earns or absorbing losses into reserves. Either way, the equity cushion is thinning.\n\nThe single most important flag is any month where Total Liabilities exceed Total Assets — that is balance-sheet insolvency, and it must always be called out explicitly by month. The pre-computed first-to-last growth figures are authoritative; the AI is not allowed to invent averages over arbitrary sub-windows.',
   },
 
+  // ─── Financial page §12 — financial_variance (FP&A) ──────────────────────
+
+  fv_variance_summary: {
+    name: 'P&L Variance Summary',
+    whatItMeasures: 'Comparison of each P&L line item (Net Sales, COGS, Gross Profit, OpEx, Operating Profit, Other Income, Net Profit) against the same period last year, with favourable/unfavourable classification and margin drift.',
+    formula: 'Variance = Actual − Baseline (prior year same window). Var % = (Actual − Baseline) ÷ |Baseline| × 100. Favourable = revenue up or cost down; Unfavourable = revenue down or cost up.',
+    indicator: '±5% = On Track · ±5–15% = Moderate · > ±15% = Material · Sign flip = Severe',
+    about: 'The variance summary compares your current fiscal window against the SAME window last year — this is your baseline. It is NOT a formal budget; it is what your business actually did in the same period 12 months ago.\n\nEach line item is classified as Favourable (better than baseline) or Unfavourable (worse). Revenue lines are favourable when they go up; cost lines are favourable when they go down.\n\nThe margin drift (in percentage points) is the most important number here — a small RM variance can hide a meaningful margin shift, and vice versa.',
+  },
+
+  fv_variance_breakdown: {
+    name: 'Variance by Account',
+    whatItMeasures: 'Account-level breakdown of P&L variance within each category (Sales, COGS, OpEx, Other Income), showing which specific GL accounts drove the overall variance.',
+    formula: 'Per-account: Variance = Current YTD − Prior YTD. Concentration = Top 3 accounts |variance| ÷ category total |variance| × 100.',
+    indicator: 'Single account > 30% of category variance = Concentrated · Top 3 > 70% = Highly concentrated · Account variance > ±50% = Flag',
+    about: 'This breakdown answers "which specific accounts explain the variance." The top movers per category are shown first.\n\nConcentration matters — if one or two accounts drive most of the category variance, the variance has a clear, addressable cause. If variance is spread across many small accounts, the movement is structural rather than account-specific.\n\nAccount names come from the GL (general ledger) in AutoCount.',
+  },
+
+  fv_trend_forecast: {
+    name: 'Trend Forecast',
+    whatItMeasures: 'Next-period projection of Net Sales, Gross Profit, and Net Profit based on the recent monthly trend within the selected fiscal window.',
+    formula: 'Avg Monthly Change = mean of month-over-month deltas. Forecast = Last Actual + Avg Monthly Change. Consistency = months moving in same direction ÷ total months.',
+    indicator: 'Consistent 4+ months = Strong signal · Mixed/oscillating = Weak signal · Forecast sign flip = Severe',
+    about: 'This forecast is a simple trend extrapolation — it takes the average month-over-month change and projects it one period forward. It is NOT a statistical model or formal financial projection.\n\nThe signal strength tells you how reliable the trend is: if most months moved in the same direction, the forecast is on firmer ground. If months oscillated, the forecast is directional guidance only.\n\nThe forecast is clearly labelled as an AI estimate. When formal budgets are available, they will replace this derived baseline.',
+  },
+
   bs_statement: {
     name: 'Balance Sheet Statement',
     whatItMeasures: 'The full balance sheet for the selected fiscal year vs 12 periods prior (YTD-aligned), with all 8 line items by account type, derived totals (Net Current Assets, Total Assets, Total Liabilities, Total Equity), and solvency ratios (Current Ratio, Debt-to-Equity, Equity Ratio).',

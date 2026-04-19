@@ -87,6 +87,16 @@ export function DashboardShellV3() {
           <BSTrendChartV3 fy={filters.fiscalYear} range={filters.range} />
           <BSStatementTableV3 fy={filters.fiscalYear} />
         </div>
+
+        {/* ═══ Section §12: P&L Variance Analysis — FP&A (budget vs actual) ═══ */}
+        <InsightSectionHeader
+          title="P&L Variance Analysis"
+          subtitle={`${filters.fiscalYear} · ${filters.range.toUpperCase()}`}
+          page="financial"
+          sectionKey="financial_variance"
+          dateRange={null}
+          fiscalPeriod={fiscalPeriod}
+        />
       </main>
     </div>
   );

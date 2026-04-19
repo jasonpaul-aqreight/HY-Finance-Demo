@@ -3742,6 +3742,263 @@ const fiscalPeriodFetchers: Record<string, FiscalPeriodFetcher> = {
 
     return { prompt, allowed };
   },
+
+  // ─── Section §12 — financial_variance (FP&A) ──────────────────────────────
+
+  async fv_variance_summary(period) {
+    const s = await getFiscalSlice(period);
+    const c = s.current;
+    const p = s.prior;
+
+    const fmtRm = (v: number) => `RM ${v.toLocaleString('en-MY')}`;
+    const fmtPct = (v: number | null) => v == null ? 'n/a' : `${v.toFixed(1)}%`;
+
+    // Compute variance for each P&L line item
+    const lines = [
+      { name: 'Net Sales',        curr: c.net_sales,        base: p.net_sales,        higherIsBetter: true },
+      { name: 'Cost of Sales',    curr: c.cogs,             base: p.cogs,             higherIsBetter: false },
+      { name: 'Gross Profit',     curr: c.gross_profit,     base: p.gross_profit,     higherIsBetter: true },
+      { name: 'Operating Costs',  curr: c.expenses,         base: p.expenses,         higherIsBetter: false },
+      { name: 'Operating Profit', curr: c.operating_profit, base: p.operating_profit, higherIsBetter: true },
+      { name: 'Other Income',     curr: c.other_income,     base: p.other_income,     higherIsBetter: true },
+      { name: 'Net Profit',       curr: c.net_profit,       base: p.net_profit,       higherIsBetter: true },
+    ];
+
+    const allowed: AllowedValue[] = [];
+    let table =
+      `| Line Item | Actual (${s.rangeLabel}) | Baseline (Prior Year) | Variance (RM) | Var % | Status |\n` +
+      `|-----------|-------------------------|----------------------|---------------|-------|--------|\n`;
+
+    for (const l of lines) {
+      const actual = Math.round(l.curr);
+      const baseline = Math.round(l.base);
+      const variance = actual - baseline;
+      const varPct = yoyPct(l.curr, l.base);
+      const status = variance === 0
+        ? 'On Track'
+        : l.higherIsBetter
+          ? (variance > 0 ? 'Favourable' : 'Unfavourable')
+          : (variance < 0 ? 'Favourable' : 'Unfavourable');
+
+      table += `| ${l.name} | ${fmtRm(actual)} | ${fmtRm(baseline)} | ${fmtRm(variance)} | ${fmtPct(varPct)} | ${status} |\n`;
+
+      allowed.push(rm(`${l.name.toLowerCase()} actual`, actual));
+      allowed.push(rm(`${l.name.toLowerCase()} baseline`, baseline));
+      allowed.push(rm(`${l.name.toLowerCase()} variance`, variance));
+      if (varPct != null) allowed.push(pct(`${l.name.toLowerCase()} variance pct`, varPct));
+    }
+
+    // Margin comparison
+    const gpMargin = c.net_sales > 0 ? (c.gross_profit / c.net_sales) * 100 : 0;
+    const pGpMargin = p.net_sales > 0 ? (p.gross_profit / p.net_sales) * 100 : 0;
+    const netMargin = c.net_sales > 0 ? (c.net_profit / c.net_sales) * 100 : 0;
+    const pNetMargin = p.net_sales > 0 ? (p.net_profit / p.net_sales) * 100 : 0;
+    const gpmDrift = gpMargin - pGpMargin;
+    const npmDrift = netMargin - pNetMargin;
+
+    allowed.push(pct('gross margin actual', gpMargin));
+    allowed.push(pct('gross margin baseline', pGpMargin));
+    allowed.push(pct('gross margin drift pp', gpmDrift));
+    allowed.push(pct('net margin actual', netMargin));
+    allowed.push(pct('net margin baseline', pNetMargin));
+    allowed.push(pct('net margin drift pp', npmDrift));
+
+    // Sign-flip detection
+    const signFlips: string[] = [];
+    if ((c.gross_profit >= 0) !== (p.gross_profit >= 0)) signFlips.push('Gross Profit');
+    if ((c.net_profit >= 0) !== (p.net_profit >= 0)) signFlips.push('Net Profit');
+    if ((c.operating_profit >= 0) !== (p.operating_profit >= 0)) signFlips.push('Operating Profit');
+
+    const marginBlock =
+      `\nMargin comparison:\n` +
+      `- Gross Margin: ${gpMargin.toFixed(1)}% (baseline ${pGpMargin.toFixed(1)}%) — drift ${gpmDrift.toFixed(1)}pp\n` +
+      `- Net Margin: ${netMargin.toFixed(1)}% (baseline ${pNetMargin.toFixed(1)}%) — drift ${npmDrift.toFixed(1)}pp\n`;
+
+    const signFlipBlock = signFlips.length > 0
+      ? `\n⚠ SIGN FLIPS (SEVERE): ${signFlips.join(', ')} switched between profit and loss vs baseline.\n`
+      : '';
+
+    return {
+      prompt:
+        `P&L Variance Summary for ${s.rangeLabel} — actual vs same period last year (baseline).\n` +
+        `Note: "Baseline" = same fiscal window in the prior year. This is NOT a formal budget.\n\n` +
+        table + marginBlock + signFlipBlock +
+        `\nThresholds:\n` +
+        `- Variance within ±5% = On Track\n` +
+        `- Variance ±5–15% = Moderate deviation\n` +
+        `- Variance beyond ±15% = Material deviation\n` +
+        `- Any sign flip = Severe\n`,
+      allowed,
+    };
+  },
+
+  async fv_variance_breakdown(period) {
+    const stmt = await getV2PLStatement(period.fiscalYear);
+    const groups = stmt.groups.filter(g => g.subtotal.ytd !== 0 || g.subtotal.prior_ytd !== 0);
+
+    const allowed: AllowedValue[] = [];
+    const sections: string[] = [];
+
+    for (const g of groups) {
+      // Filter accounts with non-zero variance
+      const accounts = g.accounts
+        .map(a => ({
+          description: a.description,
+          curr: a.ytd,
+          prior: a.prior_ytd,
+          variance: a.ytd - a.prior_ytd,
+          varPct: yoyPct(a.ytd, a.prior_ytd),
+        }))
+        .filter(a => Math.abs(a.variance) > 0.5)
+        .sort((a, b) => Math.abs(b.variance) - Math.abs(a.variance));
+
+      if (accounts.length === 0) continue;
+
+      // Determine if higher is better for this category
+      const higherIsBetter = !['CO', 'EP'].includes(g.acc_type);
+
+      let table =
+        `### ${g.acc_type_name} (${g.acc_type})\n` +
+        `| Account | Current YTD | Prior YTD | Variance (RM) | Var % | Status |\n` +
+        `|---------|------------|-----------|---------------|-------|--------|\n`;
+
+      // Show top 10 accounts max
+      const topAccounts = accounts.slice(0, 10);
+      for (const a of topAccounts) {
+        const status = a.variance === 0
+          ? 'On Track'
+          : higherIsBetter
+            ? (a.variance > 0 ? 'Favourable' : 'Unfavourable')
+            : (a.variance < 0 ? 'Favourable' : 'Unfavourable');
+
+        table += `| ${a.description} | RM ${Math.round(a.curr).toLocaleString('en-MY')} | RM ${Math.round(a.prior).toLocaleString('en-MY')} | RM ${Math.round(a.variance).toLocaleString('en-MY')} | ${a.varPct == null ? 'n/a' : a.varPct.toFixed(1) + '%'} | ${status} |\n`;
+
+        allowed.push(rm(`${a.description} current`, Math.round(a.curr)));
+        allowed.push(rm(`${a.description} baseline`, Math.round(a.prior)));
+        allowed.push(rm(`${a.description} variance`, Math.round(a.variance)));
+        if (a.varPct != null) allowed.push(pct(`${a.description} var pct`, a.varPct));
+      }
+
+      // Group subtotal
+      const subtotalVar = g.subtotal.ytd - g.subtotal.prior_ytd;
+      const subtotalVarPct = yoyPct(g.subtotal.ytd, g.subtotal.prior_ytd);
+      table += `| **${g.acc_type_name} Total** | **RM ${Math.round(g.subtotal.ytd).toLocaleString('en-MY')}** | **RM ${Math.round(g.subtotal.prior_ytd).toLocaleString('en-MY')}** | **RM ${Math.round(subtotalVar).toLocaleString('en-MY')}** | **${subtotalVarPct == null ? 'n/a' : subtotalVarPct.toFixed(1) + '%'}** | — |\n`;
+
+      allowed.push(rm(`${g.acc_type_name} total current`, Math.round(g.subtotal.ytd)));
+      allowed.push(rm(`${g.acc_type_name} total baseline`, Math.round(g.subtotal.prior_ytd)));
+      allowed.push(rm(`${g.acc_type_name} total variance`, Math.round(subtotalVar)));
+      if (subtotalVarPct != null) allowed.push(pct(`${g.acc_type_name} total var pct`, subtotalVarPct));
+
+      // Concentration: top 3 share of total category variance
+      if (accounts.length >= 3 && Math.abs(subtotalVar) > 0) {
+        const top3VarSum = accounts.slice(0, 3).reduce((s, a) => s + Math.abs(a.variance), 0);
+        const top3Share = (top3VarSum / Math.abs(subtotalVar)) * 100;
+        allowed.push(pct(`${g.acc_type_name} top 3 concentration`, top3Share));
+        table += `\nTop 3 accounts explain ${top3Share.toFixed(0)}% of ${g.acc_type_name} total variance.\n`;
+      }
+
+      sections.push(table);
+    }
+
+    return {
+      prompt:
+        `P&L Variance by Account for ${period.fiscalYear} — current YTD vs prior YTD, from pc_pnl_period.\n` +
+        `Note: "Prior YTD" is the baseline (same fiscal window last year). This is NOT a formal budget.\n\n` +
+        sections.join('\n') +
+        `\nThresholds:\n` +
+        `- Single account > 30% of category variance = Concentrated risk\n` +
+        `- Top 3 accounts > 70% of category variance = Highly concentrated\n` +
+        `- Any account variance > ±50% = Flag for investigation\n\n` +
+        `Focus on the top movers per category — do not narrate every small account.`,
+      allowed,
+    };
+  },
+
+  async fv_trend_forecast(period) {
+    const s = await getFiscalSlice(period);
+
+    if (s.monthly.length < 3) {
+      return {
+        prompt: `Insufficient data for trend forecast — only ${s.monthly.length} month(s) available in ${s.rangeLabel}. At least 3 months needed.`,
+        allowed: [],
+      };
+    }
+
+    const fmtRm = (v: number) => `RM ${v.toLocaleString('en-MY')}`;
+    const allowed: AllowedValue[] = [];
+
+    // Build monthly trend table
+    let table =
+      '| Month | Net Sales | Gross Profit | Net Profit |\n' +
+      '|-------|-----------|--------------|------------|\n';
+
+    for (const r of s.monthly) {
+      const ns = Math.round(r.net_sales);
+      const gp = Math.round(r.gross_profit);
+      const np = Math.round(r.net_profit);
+      table += `| ${r.label} | ${fmtRm(ns)} | ${fmtRm(gp)} | ${fmtRm(np)} |\n`;
+      allowed.push(rm(`${r.label} net sales`, ns));
+      allowed.push(rm(`${r.label} gross profit`, gp));
+      allowed.push(rm(`${r.label} net profit`, np));
+    }
+
+    // Compute simple linear trend: average month-over-month change
+    const metrics = [
+      { name: 'Net Sales',    values: s.monthly.map(r => r.net_sales) },
+      { name: 'Gross Profit', values: s.monthly.map(r => r.gross_profit) },
+      { name: 'Net Profit',   values: s.monthly.map(r => r.net_profit) },
+    ];
+
+    const forecasts: string[] = [];
+    for (const m of metrics) {
+      const changes: number[] = [];
+      for (let i = 1; i < m.values.length; i++) {
+        changes.push(m.values[i] - m.values[i - 1]);
+      }
+      const avgChange = changes.reduce((s, v) => s + v, 0) / changes.length;
+      const lastValue = m.values[m.values.length - 1];
+      const forecast = Math.round(lastValue + avgChange);
+      const direction = avgChange > 0 ? 'rising' : avgChange < 0 ? 'falling' : 'flat';
+      const lastLabel = s.monthly[s.monthly.length - 1].label;
+
+      // Consistency: how many months moved in the same direction?
+      const consistentMonths = changes.filter(c =>
+        direction === 'rising' ? c > 0 : direction === 'falling' ? c < 0 : Math.abs(c) < 1,
+      ).length;
+      const strength = consistentMonths >= changes.length * 0.7 ? 'Strong' : 'Weak';
+
+      // Sign flip warning
+      const signFlip = (lastValue >= 0 && forecast < 0) || (lastValue < 0 && forecast >= 0);
+
+      forecasts.push(
+        `- **${m.name}**: Trend ${direction} (${strength} signal — ${consistentMonths}/${changes.length} months consistent). ` +
+        `Avg monthly change: ${fmtRm(Math.round(avgChange))}. ` +
+        `Last actual (${lastLabel}): ${fmtRm(Math.round(lastValue))}. ` +
+        `**Next-period forecast: approximately ${fmtRm(forecast)}**` +
+        (signFlip ? ' ⚠ WARNING: forecast projects a sign flip (profit ↔ loss)' : ''),
+      );
+
+      allowed.push(rm(`${m.name.toLowerCase()} avg monthly change`, Math.round(avgChange)));
+      allowed.push(rm(`${m.name.toLowerCase()} forecast`, forecast));
+      allowed.push(cnt(`${m.name.toLowerCase()} consistent months`, consistentMonths));
+      allowed.push(cnt(`${m.name.toLowerCase()} total change months`, changes.length));
+    }
+
+    return {
+      prompt:
+        `Trend Forecast for ${s.rangeLabel} — projecting next period based on ${s.monthly.length}-month trend.\n` +
+        `Method: Simple trend extrapolation (average month-over-month change applied to last actual).\n` +
+        `⚠ These are AI estimates based on historical trends — NOT formal financial projections.\n\n` +
+        `Monthly trend data:\n${table}\n` +
+        `Pre-computed forecasts (cite these directly — do NOT invent your own):\n` +
+        forecasts.join('\n') + '\n\n' +
+        `Thresholds:\n` +
+        `- Trend consistent 4+ months = Strong signal\n` +
+        `- Trend mixed / oscillating = Weak signal (state this explicitly)\n` +
+        `- Forecast projects sign flip = Severe warning\n`,
+      allowed,
+    };
+  },
 };
 
 // ─── Scope classification ────────────────────────────────────────────────────
@@ -3764,6 +4021,7 @@ const SECTION_SCOPE: Record<SectionKey, ScopeType> = {
   financial_overview: 'fiscal_period',
   financial_pnl: 'fiscal_period',
   financial_balance_sheet: 'fiscal_period',
+  financial_variance: 'fiscal_period',
 };
 
 // Per-section snapshot source: each snapshot section anchors its "as of" date on a different table.
