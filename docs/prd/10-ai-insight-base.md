@@ -112,20 +112,20 @@ Analysis runs in two sequential phases.
 
 | Parameter | Value | Purpose |
 |-----------|-------|---------|
-| Global Lock | Singleton row in lock table | Only one analysis runs at a time across all users |
+| Global Lock | One analysis at a time | Only one analysis runs at a time across all users and all sections. Simple and sufficient for a small team |
 | Stale Lock Expiry | 6 minutes | Auto-releases locks from crashed sessions |
 | Parallel Component Limit | 2 | Parallel LLM calls per phase (avoids rate limits) |
 | Rate Limit Retries | 3 attempts, exponential backoff (15s base) | Handles 429 errors from the LLM API |
-| Max Cost Per Section | $0.50 USD | Hard cost cap per analysis run |
+| Max Cost Per Section | $0.50 USD | Hard cost cap per analysis run — abort if exceeded |
 | Max Runtime | 5 minutes | Timeout — aborts via controller |
 | Max Tool Calls Per Summary | 2 | Summary can drill down for root causes |
 
 ### Lock Lifecycle
 
-1. `POST /analyze` → acquire lock (update where unlocked or stale).
+1. `POST /analyze` → acquire lock (update singleton row where unlocked or stale).
 2. If lock held by another user → return 409 with lock owner info.
 3. On analysis complete, error, or cancel → release lock.
-4. On status check → auto-release if lock age exceeds the stale threshold.
+4. On status check → auto-release if lock age exceeds the stale threshold (6 minutes).
 
 ---
 
@@ -185,7 +185,7 @@ Policy is enforced per section. If the LLM requests a tool that violates the pol
 
 | Column | Type | Purpose |
 |--------|------|---------|
-| id | Integer (PK, constrained to 1) | Singleton row |
+| id | Integer (PK, constrained to 1) | Singleton row — only one lock exists at a time |
 | locked_by | Text | User who acquired the lock |
 | locked_at | Timestamp with time zone | When lock was acquired |
 | section_key | Text | Which section is being analyzed |
@@ -405,7 +405,73 @@ Scope classification is injected into each component prompt so the LLM uses appr
 
 ---
 
-## 15. Extensibility Contract
+## 15. Data Protection: Column Whitelisting
+
+The standard PII/data protection strategy across all domains is **column whitelisting at the SQL query layer**. This is the simplest approach that works for both Finance and HR.
+
+### How It Works
+
+1. **Define allowed columns per table** — each domain declares a whitelist of columns the LLM's tools can access (e.g., `LOCAL_WHITELIST`, `RDS_WHITELIST`).
+2. **Validate at query time** — `validateColumns()` rejects any tool call requesting columns not in the whitelist.
+3. **Sensitive columns never appear** — emails, phone numbers, bank accounts, personal IDs are simply never added to any whitelist.
+
+### What Gets Exposed (By Design)
+
+- **Finance:** Customer/company names, debtor/creditor codes, sales agent names, invoice numbers — needed for actionable insights ("Customer ABC owes RM 500K").
+- **HR:** Department names, aggregate counts, flagged status — employee names and personal details are never whitelisted.
+
+### Domain-Specific Extensions
+
+Each domain may add extra protection layers on top of column whitelisting:
+
+- **HR pre-flagging:** Backend computes flagged/not-flagged status against `hr_settings` thresholds before sending to AI. The AI reads flags, not raw threshold values.
+- **HR aggregate-only prompts:** Component prompts instruct the AI to analyze department-level patterns, not individuals.
+
+### What Columns to Whitelist
+
+When adding a new domain, list every column the AI needs to see. Everything else is blocked by default. Err on the side of fewer columns — you can always add more later.
+
+---
+
+## 16. Deterministic Summary Questions
+
+Each section must define a fixed set of **summary questions** that the AI answers during Phase 2 (summary synthesis). This makes the summary output predictable — same data always produces answers to the same questions.
+
+### How It Works
+
+The summary system prompt includes a section like:
+
+```
+Answer these questions in order:
+1. [Specific question about the data]
+2. [Specific question about the data]
+3. [Specific question about the data]
+```
+
+### Guidelines for Writing Summary Questions
+
+- **Be specific, not broad.** Bad: "Is the company healthy?" Good: "Is current ratio above 1.5?"
+- **Include thresholds.** Bad: "Is attendance good?" Good: "Is monthly avg attendance above 85%?"
+- **2–4 questions per section.** More than 4 makes the summary too long.
+- **Questions must be answerable from the component data.** Don't ask questions that require data the AI doesn't have.
+
+Each domain PRD (docs 11 and 12) lists the specific summary questions per section.
+
+---
+
+## 17. RBAC (Role-Based Access Control)
+
+Each domain defines its own RBAC rules. The base engine provides the hooks:
+
+- **Server-side:** Data-scoping service injects role-based filters into every fetcher query.
+- **Client-side:** UI hides/shows the "Analyze" button based on user role.
+- **Cache scoping:** When different users see different data, storage must include `user_id` in the unique constraint.
+
+See each domain PRD for specific role definitions and access rules.
+
+---
+
+## 18. Extensibility Contract
 
 The base engine is domain-agnostic. To add a new domain, provide:
 
@@ -423,17 +489,17 @@ The base engine is domain-agnostic. To add a new domain, provide:
 
 ---
 
-## 16. Implementation Guardrails
+## 19. Implementation Guardrails
 
 These patterns were discovered during implementation and validated through accuracy testing. They prevent specific classes of bugs — removing any of them reintroduces known failures.
 
-### 16.1 Pre-Calculated Totals in Fetchers
+### 19.1 Pre-Calculated Totals in Fetchers
 
 Data fetchers that pass monthly breakdowns must also include pre-calculated totals, ratios, and percentages in the prompt output. The component-analysis model (Haiku) cannot do arithmetic reliably — it summed 12 monthly values incorrectly (RM 87M vs actual RM 82M) and hallucinated percentages (claimed 95% when actual was 58%).
 
 All fetchers include a `"Pre-calculated roll-ups (use these values directly — do not recompute)"` block above their data tables.
 
-### 16.2 Tool Call Exhaustion Nudge
+### 19.2 Tool Call Exhaustion Nudge
 
 When the summary uses all allowed tool calls, the orchestrator injects a user message:
 
@@ -441,27 +507,27 @@ When the summary uses all allowed tool calls, the orchestrator injects a user me
 
 Without this nudge, the model outputs reasoning text instead of the required delimiter format, causing the parser to fall back to a generic output.
 
-### 16.3 Snapshot Table Deduplication
+### 19.3 Snapshot Table Deduplication
 
 The `pc_ar_customer_snapshot` table contains multiple rows per customer (one per snapshot date). Tool queries against this table are automatically deduplicated by the tool executor: filter to latest `snapshot_date` and apply `DISTINCT ON (debtor_code)`.
 
 Without deduplication, a "top 10 customers" query returns duplicate rows of the same customers, making root-cause analysis useless.
 
-### 16.4 Summary Tool Call Guidance
+### 19.4 Summary Tool Call Guidance
 
 The summary system prompt explicitly instructs the LLM not to re-query data already available in the raw data blocks. Without this guidance, the summary wastes both tool calls re-querying monthly data already available, leaving none for actual root-cause investigation.
 
-### 16.5 Summary Reads Raw Fetcher Data, Not Narrations
+### 19.5 Summary Reads Raw Fetcher Data, Not Narrations
 
 The summary stage receives the raw fetcher markdown blocks (the same formatted string each component originally saw) — NOT the Haiku component narrations. The `ComponentResult` type carries a `raw_data_md` field populated from the fetcher output. The summary system prompt enforces a GROUND TRUTH RULE: every number must be traceable to a specific line in the raw blocks or to a tool-call result.
 
 Without this, the summary model invents numbers to fill tables because narrations (~150 words) don't contain source values. This single fix eliminated all hard fabrications across ~115 numeric claims.
 
-### 16.6 Population Labels
+### 19.6 Population Labels
 
 Each data fetcher includes a population label in its output header describing which records are included (e.g., "Population: active customers only (is_active = 'T')"). This prevents the LLM from cross-referencing numbers between components that use different populations and getting confused by the mismatch.
 
-### 16.7 Active Customer Filtering
+### 19.7 Active Customer Filtering
 
 Fetchers that query `pc_ar_customer_snapshot` apply different `is_active` filters depending on the query purpose:
 
@@ -474,9 +540,9 @@ Fetchers that query `pc_ar_customer_snapshot` apply different `is_active` filter
 
 ---
 
-## 17. Known Limitations & Gaps
+## 20. Known Limitations & Gaps
 
-### 17.1 Implemented Behaviors
+### 20.1 Implemented Behaviors
 
 | Item | Detail | Impact |
 |---|---|---|
@@ -485,7 +551,7 @@ Fetchers that query `pc_ar_customer_snapshot` apply different `is_active` filter
 | Data-fetcher date format | `toMonth()` helper converts `YYYY-MM-DD` to `YYYY-MM` for `pc_ar_monthly` queries. Without this, string comparison silently excludes the first month. | Low |
 | Blocked PII columns | `attention, phone1, mobile, email_address` are not in column whitelists — implicitly blocked from AI access. | Medium |
 
-### 17.2 Not Yet Implemented
+### 20.2 Not Yet Implemented
 
 These safety rules were specified in planning artifacts but are not yet enforced in code:
 

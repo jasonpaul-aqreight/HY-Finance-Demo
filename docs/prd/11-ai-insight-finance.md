@@ -465,6 +465,68 @@ After analysis completes:
 
 ---
 
-## 8. In-App User Guide
+## 8. Deterministic Summary Questions
+
+Each section has fixed questions the AI must answer during summary synthesis. This makes the summary output predictable — same data always answers the same questions. See doc 10, §16 for the shared pattern.
+
+| Section | Summary Questions |
+|---------|-------------------|
+| payment_collection_trend | 1. Is avg collection days improving or worsening vs last month? 2. Is collection rate above or below 80%? 3. Which month had the worst collection? |
+| payment_outstanding | 1. How much total is outstanding? 2. What % is in the >60 days bucket? 3. Which customers have the highest outstanding? |
+| sales_trend | 1. Is net sales up or down vs last month and vs same month last year? 2. What's the month-over-month growth rate? |
+| sales_breakdown | 1. Does the top customer exceed 25% of total sales? 2. Which product category drives the most revenue? 3. Is credit note ratio below 1%? |
+| customer_margin_overview | 1. Is overall gross margin above 15%? 2. Is margin trending up or down over the last 3 months? 3. How many customers have negative margin? |
+| customer_margin_breakdown | 1. Who are the top 3 customers by gross profit? 2. Who are the bottom 3 by margin %? 3. Any customer with margin below 5%? |
+| supplier_margin_overview | 1. Is supplier margin above 10%? 2. Is margin trending up or down? 3. How many suppliers have negative margin? |
+| supplier_margin_breakdown | 1. Which supplier gives the best margin? 2. Which items have the biggest gap between purchase and selling price? 3. Any supplier with margin below 5%? |
+| return_trend | 1. Is return rate above 5%? 2. Is the return trend increasing or decreasing? 3. Which items have the most returns? |
+| return_unsettled | 1. How much total unsettled returns? 2. What % is older than 60 days? 3. Which customers have the most unsettled returns? |
+| expense_overview | 1. Is total cost up or down vs same period last year? 2. Which cost category grew the most? 3. What are the top 3 expenses? |
+| expense_breakdown | 1. What's the COGS to revenue ratio? 2. Which OpEx line item is the largest? 3. Any expense category with >10% YoY increase? |
+| financial_overview | 1. Is net profit positive or negative? 2. Is profit margin improving or declining? |
+| financial_pnl | 1. Which revenue line changed the most vs last year? 2. Which expense line changed the most? 3. Is gross profit margin stable? |
+| financial_balance_sheet | 1. Are total assets growing? 2. Is current ratio above 1.5 (can pay short-term debts)? 3. Is debt increasing or decreasing? |
+| financial_variance | 1. Which accounts missed budget by more than 15%? 2. Is the total variance favorable or unfavorable? 3. What's the biggest single variance item? |
+
+---
+
+## 9. RBAC (Role-Based Access Control)
+
+| Role | Can Trigger Analysis | Can View Insights |
+|------|---------------------|-------------------|
+| Superadmin | Yes | Yes |
+| Finance | Yes | Yes |
+| Director | Yes | Yes |
+| Other roles | No | View cached insights only |
+
+**Current implementation:** Client-side only. The "Analyze" button is hidden for non-authorized roles via `useRole()` context. No server-side role validation on API routes.
+
+See doc 10, §17 for the shared RBAC pattern.
+
+---
+
+## 10. Column Whitelisting (Data Protection)
+
+Finance uses column whitelisting to control what data the LLM's tools can access. See doc 10, §15 for the shared pattern.
+
+### Local PostgreSQL Whitelist
+
+Each `pc_*` table has a declared list of allowed columns in `tools.ts` (`LOCAL_WHITELIST`). Only these columns can be queried by the LLM.
+
+**Intentionally exposed:** Customer/company names (`company_name`), debtor/creditor codes, sales agent names, invoice numbers — needed for actionable insights.
+
+**Blocked by omission:** Customer emails, phone numbers, contact persons, bank account details — never in any whitelist.
+
+### Remote RDS Whitelist
+
+Each `dbo.*` table has a declared list in `tools.ts` (`RDS_WHITELIST`). Transaction-level columns like `DocNo`, `DocDate`, `DebtorCode`, `LocalNetTotal` are allowed. No personal contact details.
+
+### Runtime Enforcement
+
+`validateColumns()` in `tools.ts` rejects any tool call requesting columns not in the whitelist. This is enforced at query execution time, not prompt-level.
+
+---
+
+## 11. In-App User Guide
 
 An end-user manual page is available at `/manual/general/ai-insight` explaining how to use the AI Insight feature. Includes 5 annotated screenshots covering: collapsed panel, analysis results, insight detail dialog, component icon, and component dialog.
