@@ -25,7 +25,7 @@ import {
 import type { SectionKey, DateRange, FiscalPeriod, ComponentResult, SummaryJson, SummaryInsight, ComponentType, AllowedValue } from './types';
 
 const MAX_CONCURRENCY = 2; // Keep low to avoid rate limits on lower-tier API plans
-const MAX_TOOL_CALLS_PER_SUMMARY = 2; // Summary can drill down for root causes
+const MAX_TOOL_CALLS_PER_SUMMARY = 4; // Summary can drill down for evidence/root causes — stop once enough context
 const MAX_COST_PER_SECTION = 0.50;
 const MAX_RUNTIME_MS = 5 * 60 * 1000; // 5 minutes
 const SUMMARY_MAX_TOKENS = 4096; // Summary needs more tokens for tool reasoning + formatted output
