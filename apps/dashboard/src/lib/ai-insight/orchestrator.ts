@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { getAnthropicClient, AI_MODEL, SUMMARY_MODEL, MAX_TOKENS, estimateCost, LOG_PROMPTS } from './client';
 import {
-  getComponentSystemPrompt,
+  getGlobalSystemPrompt,
   getSummarySystemPrompt,
   buildComponentUserPrompt,
   buildSummaryUserPrompt,
@@ -181,8 +181,9 @@ async function analyzeComponent(
   // Fetch dashboard data for this component
   const { prompt: formattedValues, allowed } = await fetchComponentData(componentKey, sectionKey, dateRange, fiscalPeriod);
 
-  const systemPrompt = getComponentSystemPrompt(componentKey);
+  const systemPrompt = getGlobalSystemPrompt();
   const userPrompt = buildComponentUserPrompt({
+    componentKey,
     sectionKey,
     componentName,
     componentType,

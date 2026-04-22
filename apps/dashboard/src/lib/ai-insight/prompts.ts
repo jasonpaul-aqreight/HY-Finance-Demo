@@ -2,42 +2,18 @@ import type { SectionKey } from './types';
 
 // ─── Global System Prompt (prepended to all component calls) ─────────────────
 
-const GLOBAL_SYSTEM = `You are a senior financial analyst reviewing a dashboard for a Malaysian fruit distribution company (Hoi-Yong). You are explaining what you see to a senior director.
+const GLOBAL_SYSTEM = `You are a senior financial analyst at Hoi-Yong (Malaysian fruit distribution). You explain dashboard metrics to a senior director.
 
 Rules:
-- Be direct and concise. No jargon.
-- State facts, not recommendations.
-- Use Malaysian Ringgit (RM) for all monetary values.
-- Format numbers with thousands separators (e.g., RM 5,841,378).
-- Structure your analysis using bullet points for observations and findings. Use Markdown tables for data comparisons.
-- When referencing trends, compare at least 3 data points.
-- If the data is insufficient to draw a conclusion, say so.
-- Do not fabricate numbers — only reference data you have been given.
-
-Length rules:
-- Keep your analysis under 150 words. Be concise — state the key facts and what they mean.
-- Do NOT re-derive totals or sums from the data. Use the values as given.
-- Do NOT list what additional data you would need. Work with what you have.
-
-Scope discipline — CRITICAL:
-- Every Current Values block starts with a "Scope:" line that tells you whether the metric is PERIOD-BASED (filtered by a date range) or SNAPSHOT (current state, not time-filtered).
-- PERIOD-BASED numbers describe activity WITHIN a date range (e.g. "invoiced Nov 2024 – Oct 2025"). Do not describe them as "outstanding balance", "total receivables", or "what customers owe us". They are flows, not balances.
-- SNAPSHOT numbers describe a point-in-time balance (e.g. "as of 2026-04-10"). Do not describe them as "collected in the period" or "invoiced during the range". They are cumulative balances that ignore the date-range selector.
-- Never compare a period figure to a snapshot figure as if they were the same kind of number. A period collection shortfall is NOT the same thing as total outstanding balance, even if both are large RM amounts.
-- When you cite a number, use language that matches its scope: "in the period ..." for period metrics, "as of [date]" or "currently" for snapshot metrics.
-- EXCEPTION — historical anchoring: you MAY cite a historical snapshot value (e.g. "outstanding was RM 6–7M in 2021–2022") alongside a current snapshot value as a trend anchor, PROVIDED both values are clearly labeled as snapshots at their respective dates. This is how you tell the director whether a balance is structurally better or worse than its history. Do not use this exception to compare a snapshot to a period metric.
-
-Self-verification (apply before writing your final analysis):
-- Cross-check every number you cite against the data you were given. If you state "Total X = RM Y", verify Y appears in your data.
-- Verify arithmetic: if you cite a gap (A minus B), confirm A - B equals the gap you stated.
-- Confirm the scope: for every number you cite, re-read the Scope line and make sure your wording matches (period vs snapshot). Never call a period gap "outstanding" or a snapshot balance "collected in the period".
-- If you cannot verify a number, do not include it.
-
-Verbatim-copy rule — CRITICAL (prevents number fabrication):
-- Any RM amount, percentage, day-count, or count you put in a table cell or bullet MUST match a value that appears verbatim in the data block you were given. You may round ONLY for display (e.g. RM 2,286,846.76 → RM 2,286,847 or RM 2.29M) — you may NEVER reconstruct, back-solve, approximate, or invent a value.
-- NEVER back-solve a component of an equation from the result. Example of the forbidden pattern: you know the monthly gap is −RM 2.29M, so you write "invoiced RM 7.3M, collected RM 5.0M" because 7.3 − 5.0 ≈ 2.3. This is FABRICATION even though the math checks out. If the exact invoiced and collected values for that row are not in your data block, OMIT THE ROW.
-- When building a table, copy each row's numbers straight from the data block. If a required column value is missing for a row, drop that row rather than guess.
-- Before finalising, spot-check at least one number in every table you produce by locating its source line in the data block.`;
+- Be direct, concise, no jargon. State facts, not recommendations.
+- Use RM with thousands separators (e.g., RM 5,841,378).
+- Bullet points for observations. Markdown tables for comparisons.
+- Compare at least 3 data points for trends.
+- If data is insufficient, say so.
+- Keep analysis under 150 words.
+- Do NOT re-derive totals. Use values as given.
+- Every number you cite MUST appear in the data block. Display rounding OK (e.g., RM 2,286,847 → RM 2.29M). Never back-solve or invent values.
+- Match your language to the Scope line in the data (period vs snapshot vs fiscal).`;
 
 // ─── Component System Prompts ────────────────────────────────────────────────
 
@@ -1917,12 +1893,6 @@ export function getGlobalSystemPrompt(): string {
   return GLOBAL_SYSTEM;
 }
 
-export function getComponentSystemPrompt(componentKey: string): string {
-  const prompt = COMPONENT_PROMPTS[componentKey];
-  if (!prompt) throw new Error(`No prompt defined for component: ${componentKey}`);
-  return `${GLOBAL_SYSTEM}\n\n${prompt}`;
-}
-
 export function getSummarySystemPrompt(): string {
   return SUMMARY_SYSTEM;
 }
@@ -1967,6 +1937,7 @@ Produce the summary now using the ===INSIGHT=== delimiter format.`;
 }
 
 export function buildComponentUserPrompt(params: {
+  componentKey: string;
   sectionKey: SectionKey;
   componentName: string;
   componentType: string;
@@ -1974,6 +1945,9 @@ export function buildComponentUserPrompt(params: {
   fiscalPeriod?: { fiscalYear: string; range: 'fy' | 'last12' | 'ytd' } | null;
   formattedValues: string;
 }): string {
+  const componentPrompt = COMPONENT_PROMPTS[params.componentKey];
+  if (!componentPrompt) throw new Error(`No prompt defined for component: ${params.componentKey}`);
+
   const sectionName = SECTION_NAMES[params.sectionKey];
   const dateInfo = params.dateRange
     ? `Date Range: ${params.dateRange.start} to ${params.dateRange.end}`
@@ -1981,17 +1955,12 @@ export function buildComponentUserPrompt(params: {
       ? `Fiscal Period: ${params.fiscalPeriod.fiscalYear} (${params.fiscalPeriod.range})`
       : `Scope: Snapshot — current state`;
 
-  const now = new Date().toISOString().slice(0, 16).replace('T', ' ');
+  return `${componentPrompt}
 
-  return `Section: ${sectionName}
-Component: ${params.componentName}
-Component Type: ${params.componentType}
+Section: ${sectionName}
+Component: ${params.componentName} (${params.componentType})
 ${dateInfo}
-Generated: ${now}
 
 Current Values:
-${params.formattedValues}
-
----
-Analyze this component. Be concise and direct.`;
+${params.formattedValues}`;
 }

@@ -4264,25 +4264,25 @@ async function buildScopeLabel(
   fiscalPeriod?: FiscalPeriod | null,
 ): Promise<string> {
   if (scope === 'period') {
-    if (!dateRange) return 'Scope: Period-based metric (no date range provided).';
-    return `Scope: PERIOD-BASED metric — filtered to ${dateRange.start} through ${dateRange.end}. All figures reflect activity WITHIN this date range only. Do NOT describe these numbers as "outstanding balance" or "total receivables" — they are period flows, not point-in-time balances.`;
+    if (!dateRange) return 'Scope: PERIOD-BASED (no date range provided).';
+    return `Scope: PERIOD-BASED — activity within ${dateRange.start} to ${dateRange.end} only.`;
   }
   if (scope === 'fiscal_period') {
-    if (!fiscalPeriod) return 'Scope: Fiscal-period metric (no fiscal period provided).';
+    if (!fiscalPeriod) return 'Scope: FISCAL-PERIOD (no fiscal period provided).';
     const window = rangeLabel(fiscalPeriod.range, fiscalPeriod.fiscalYear);
-    return `Scope: FISCAL-PERIOD metric — filtered to ${window}. All figures reflect P&L activity WITHIN this fiscal window only, sourced from pc_pnl_period (period_no indexed, not calendar dates). Compare against prior-year same window for YoY context. Do NOT describe these numbers as calendar-date flows or point-in-time balances — they are fiscal-year flows.`;
+    return `Scope: FISCAL-PERIOD — ${window}.`;
   }
   const table = SNAPSHOT_SOURCE_TABLE[sectionKey];
   if (!table) {
-    return 'Scope: SNAPSHOT metric — current state. Point-in-time balances, not filtered by date range.';
+    return 'Scope: SNAPSHOT — current state.';
   }
   try {
     const pool = getPool();
     const { rows } = await pool.query(`SELECT MAX(snapshot_date) AS d FROM ${table}`);
     const d = rows[0]?.d ? new Date(rows[0].d).toISOString().slice(0, 10) : 'unknown';
-    return `Scope: SNAPSHOT metric — current state as of ${d}. These are point-in-time balances NOT filtered by any date range. Do NOT describe these numbers as "period collection" or "invoiced in the period" — they are cumulative balances. Do NOT apply any date-range context to these numbers.`;
+    return `Scope: SNAPSHOT — current state as of ${d}.`;
   } catch {
-    return 'Scope: SNAPSHOT metric — current state. Point-in-time balances, not filtered by date range.';
+    return 'Scope: SNAPSHOT — current state.';
   }
 }
 
