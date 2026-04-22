@@ -61,7 +61,7 @@
 | Component narration | Haiku 4.5 | 2,048 | Fast, cheap per-component analysis (no tools, 150-word cap) |
 | Summary synthesis | Sonnet 4.6 | 4,096 | Smart synthesis, `===INSIGHT===` output, tool access per section policy (see §6) |
 
-Tool access is currently `none` for all sections but planned to be upgraded (see §6).
+Tool access varies per section — see §7 for per-section policy.
 
 ---
 
@@ -74,7 +74,7 @@ Tool access is currently `none` for all sections but planned to be upgraded (see
 | **Section Key** | `workforce_demographic` |
 | **Page** | workforce |
 | **Scope** | snapshot |
-| **Tool Policy** | none |
+| **Tool Policy** | aggregate_only |
 | **Data Sources** | `employee_list` |
 | **Components** | 3 |
 
@@ -119,7 +119,7 @@ Tool access is currently `none` for all sections but planned to be upgraded (see
 | **Section Key** | `workforce_movement` |
 | **Page** | workforce |
 | **Scope** | period |
-| **Tool Policy** | none |
+| **Tool Policy** | aggregate_only |
 | **Data Sources** | `employee_list` (join_date, resign_date) |
 | **Components** | 1 |
 
@@ -187,7 +187,7 @@ Tool access is currently `none` for all sections but planned to be upgraded (see
 | **Section Key** | `attendance_monthly` |
 | **Page** | attendance |
 | **Scope** | period |
-| **Tool Policy** | none |
+| **Tool Policy** | aggregate_only |
 | **Data Sources** | `attendance_list` |
 | **Components** | 4 |
 
@@ -240,7 +240,7 @@ Tool access is currently `none` for all sections but planned to be upgraded (see
 | **Section Key** | `attendance_flagged` |
 | **Page** | attendance |
 | **Scope** | period |
-| **Tool Policy** | none |
+| **Tool Policy** | full |
 | **Data Sources** | `attendance_list`, `hr_settings` (thresholds), `pattern-detection.service` |
 | **Components** | 1 |
 
@@ -268,7 +268,7 @@ Tool access is currently `none` for all sections but planned to be upgraded (see
 | **Section Key** | `leave_application` |
 | **Page** | leave |
 | **Scope** | period |
-| **Tool Policy** | none |
+| **Tool Policy** | aggregate_only |
 | **Data Sources** | `leave_transaction` |
 | **Components** | 3 |
 
@@ -312,7 +312,7 @@ Tool access is currently `none` for all sections but planned to be upgraded (see
 | **Section Key** | `leave_analysis` |
 | **Page** | leave |
 | **Scope** | period |
-| **Tool Policy** | none |
+| **Tool Policy** | full |
 | **Data Sources** | `leave_transaction`, `leave_balance`, `public_holiday`, `hr_settings` |
 | **Components** | 3 |
 
@@ -358,7 +358,7 @@ Tool access is currently `none` for all sections but planned to be upgraded (see
 | **Section Key** | `leave_balance` |
 | **Page** | leave |
 | **Scope** | snapshot |
-| **Tool Policy** | none |
+| **Tool Policy** | aggregate_only |
 | **Data Sources** | `leave_balance` |
 | **Components** | 1 |
 
@@ -387,7 +387,7 @@ Tool access is currently `none` for all sections but planned to be upgraded (see
 | **Section Key** | `performance_full` |
 | **Page** | performance |
 | **Scope** | period |
-| **Tool Policy** | none |
+| **Tool Policy** | full |
 | **Data Sources** | `appraisal`, `appraisal_form_template` |
 | **Components** | 3 |
 
@@ -436,7 +436,7 @@ Tool access is currently `none` for all sections but planned to be upgraded (see
 | **Section Key** | `disciplinary_records` |
 | **Page** | disciplinary |
 | **Scope** | snapshot |
-| **Tool Policy** | none |
+| **Tool Policy** | aggregate_only |
 | **Data Sources** | `hr_warnings`, `hr_offense_categories` |
 | **Components** | 2 |
 
@@ -472,7 +472,7 @@ Tool access is currently `none` for all sections but planned to be upgraded (see
 | **Section Key** | `disciplinary_analysis` |
 | **Page** | disciplinary |
 | **Scope** | period |
-| **Tool Policy** | none |
+| **Tool Policy** | full |
 | **Data Sources** | `hr_warnings` |
 | **Components** | 1 |
 
@@ -496,7 +496,7 @@ Tool access is currently `none` for all sections but planned to be upgraded (see
 | **Section Key** | `probation_full` |
 | **Page** | probation |
 | **Scope** | snapshot |
-| **Tool Policy** | none |
+| **Tool Policy** | aggregate_only |
 | **Data Sources** | `employee_list`, `probation_settings` |
 | **Components** | 2 |
 
@@ -532,7 +532,7 @@ Tool access is currently `none` for all sections but planned to be upgraded (see
 | **Section Key** | `payroll_overview` |
 | **Page** | payroll |
 | **Scope** | period |
-| **Tool Policy** | none (pending tool access investigation) |
+| **Tool Policy** | none (page not built, tables TBD) |
 | **Data Sources** | TBD (payroll tables not yet defined) |
 | **Components** | 3 |
 
@@ -574,7 +574,7 @@ Tool access is currently `none` for all sections but planned to be upgraded (see
 | **Section Key** | `payroll_breakdown` |
 | **Page** | payroll |
 | **Scope** | period |
-| **Tool Policy** | none (pending tool access investigation) |
+| **Tool Policy** | none (page not built, tables TBD) |
 | **Data Sources** | TBD (payroll tables not yet defined) |
 | **Components** | 2 |
 
@@ -626,16 +626,73 @@ Each section has fixed questions the AI must answer during summary synthesis. Se
 
 ## 7. Tool Policy
 
-**Current: All sections `none`** — no tool access for either Haiku (component) or Sonnet (summary).
+### Design
 
-**Planned: Add tool access for HR drill-down.** HR needs tool access (like Finance) so the AI can drill down into root causes and find evidence for its insights. This requires:
-1. Mapping HR database tables and columns at `/Users/aqreight/Documents/Projects/Hoi-Yong_HR`
-2. Defining `HR_LOCAL_WHITELIST` (which columns the AI can access)
-3. Assigning tool policy tiers per section (none/aggregate_only/full)
+HR uses a single tool `query_hr_table` — all data is in local PostgreSQL (no remote RDS like Finance). The tool enforces column whitelisting and a `ROW_LIMIT = 100` per query. The AI can query any date range or filter, but results are capped at 100 rows.
 
-This is a **separate investigation session** — the column whitelisting from §9 will serve as the PII protection layer when tools are enabled.
+Only Sonnet (summary synthesis) gets tool access. Haiku (component narration) never has tools.
 
-Until tool access is added, all data is pre-fetched and pre-computed by fetchers.
+### Three Tiers
+
+| Tier | Tables Available | Tools |
+|------|-----------------|-------|
+| `none` | — | No tools, all data pre-fetched |
+| `aggregate_only` | `HR_AGGREGATE_TABLES` only via `query_hr_table` | 1 tool |
+| `full` | All whitelisted tables via `query_hr_table` | 1 tool |
+
+### Policy Per Section
+
+| Section | Policy | Rationale |
+|---------|--------|-----------|
+| workforce_demographic | aggregate_only | Snapshot KPIs — drill into dept-level counts |
+| workforce_movement | aggregate_only | Period trend — joiners/leavers by month |
+| attendance_daily | none | Single day, all data pre-fetched |
+| attendance_monthly | aggregate_only | Period aggregates — attendance trends, OT patterns |
+| attendance_flagged | full | Drill into specific flag categories, dept breakdown |
+| leave_application | aggregate_only | Period stats — approval rates, type distribution |
+| leave_analysis | full | Outlier investigation needs full table access |
+| leave_balance | aggregate_only | Snapshot — balance distributions by type |
+| performance_full | full | Score distributions, dept comparisons, YoY changes |
+| disciplinary_records | aggregate_only | Snapshot — active warning counts by dept/type |
+| disciplinary_analysis | full | Trend investigation, multi-warning patterns |
+| probation_full | aggregate_only | Snapshot — overdue/upcoming counts |
+| payroll_overview | none | Page not built, tables TBD |
+| payroll_breakdown | none | Page not built, tables TBD |
+
+### `HR_LOCAL_WHITELIST`
+
+PII columns (names, ICs, contact, salary, bank, tax, spouse info) are never whitelisted. See §10 for the full exclusion list.
+
+| Table | Whitelisted Columns |
+|-------|-------------------|
+| `employee_list` | `department_code`, `department_description`, `job_title`, `employee_type_code`, `employee_group_title`, `gender`, `nationality_description`, `is_foreigner`, `is_active`, `join_date`, `confirm_date`, `resign_date`, `branch_code`, `branch_description`, `wages_type`, `is_disable` |
+| `attendance_list` | `date`, `work_type`, `status`, `shift`, `start_work`, `end_work`, `hour_worked`, `ot`, `lateness`, `early_out` |
+| `attendance_upload` | `uploaded_at`, `row_count`, `employee_count`, `date_range_start`, `date_range_end`, `status` |
+| `leave_transaction` | `leave_date`, `leave_type_code`, `leave_type_description`, `apply_date`, `apply_status`, `apply_status_description`, `day_no`, `hour_no`, `days`, `is_hourly`, `is_credit`, `is_adjustment`, `is_adjacent_holiday`, `adjacent_holiday_name`, `days_from_holiday` |
+| `leave_balance` | `leave_type`, `bf`, `entitled`, `credits`, `expiring_credits`, `expired_credits`, `taken`, `available`, `pending`, `balance_year`, `balance_month` |
+| `public_holiday` | `date`, `holiday_name`, `location`, `is_active` |
+| `appraisal` | `appraisal_year`, `department`, `job_title`, `appraised_date`, `rating_1`–`rating_20`, `final_score`, `status`, `hr_validated`, `director_validated`, `employee_acknowledged` |
+| `appraisal_form_template` | `form_name`, `in_use`, `criteria_1_name`–`criteria_20_name`, `criteria_1_weight`–`criteria_20_weight` |
+| `hr_warnings` | `department_code`, `department_description`, `incident_date`, `stage`, `stage_name`, `offense_category`, `status`, `di_required`, `final_decision`, `version`, `created_at` |
+| `hr_offense_categories` | `name`, `examples`, `is_default`, `is_active` |
+
+### `HR_AGGREGATE_TABLES`
+
+Tables allowed under `aggregate_only` policy (reference + high-level data):
+
+- `employee_list`
+- `attendance_list`
+- `leave_balance`
+- `leave_transaction`
+- `public_holiday`
+- `hr_offense_categories`
+
+Tables only available under `full` policy (granular drill-down):
+
+- `appraisal`
+- `appraisal_form_template`
+- `hr_warnings`
+- `attendance_upload`
 
 ---
 
