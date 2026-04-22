@@ -839,9 +839,7 @@ Global lock — only one analysis at a time across all users. 6-minute stale exp
 
 ## 14. Output Format
 
-Internal: Finance's `===INSIGHT===` delimiter format with `sentiment: good|bad`.
-
-API response: Adapter maps to E2E-expected format (`severity: high|medium|low|info`, `detail_bullets[]`).
+Same as Finance: `===INSIGHT===` delimiter format with `sentiment: good|bad`. Thresholds in the component and summary prompts determine whether a finding is positive or negative. No severity mapping — keep it simple.
 
 ---
 

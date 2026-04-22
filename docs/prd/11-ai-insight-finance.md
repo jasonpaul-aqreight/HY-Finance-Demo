@@ -499,7 +499,9 @@ Each section has fixed questions the AI must answer during summary synthesis. Th
 | Director | Yes | Yes |
 | Other roles | No | View cached insights only |
 
-**Current implementation:** Client-side only. The "Analyze" button is hidden for non-authorized roles via `useRole()` context. No server-side role validation on API routes.
+**Current implementation:** Client-side only. The "Analyze" button is hidden for non-authorized roles via `useRole()` context.
+
+**Required:** Add server-side role validation on `/api/ai-insight/analyze` and `/api/ai-insight/cancel` routes. Reject requests from unauthorized roles with 403.
 
 See doc 10, §17 for the shared RBAC pattern.
 

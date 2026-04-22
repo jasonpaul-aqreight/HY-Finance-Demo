@@ -116,7 +116,7 @@ Analysis runs in two sequential phases.
 | Stale Lock Expiry | 6 minutes | Auto-releases locks from crashed sessions |
 | Parallel Component Limit | 2 | Parallel LLM calls per phase (avoids rate limits) |
 | Rate Limit Retries | 3 attempts, exponential backoff (15s base) | Handles 429 errors from the LLM API |
-| Max Cost Per Section | $0.50 USD | Hard cost cap per analysis run — abort if exceeded |
+| Max Cost Per Section | $0.20 USD | Hard cost cap per analysis run — abort if exceeded |
 | Max Runtime | 5 minutes | Timeout — aborts via controller |
 | Max Tool Calls Per Summary | 2 | Summary can drill down for root causes |
 
@@ -546,15 +546,14 @@ Fetchers that query `pc_ar_customer_snapshot` apply different `is_active` filter
 
 | Item | Detail | Impact |
 |---|---|---|
-| Error handling | Cost limit abort ($0.50/section), timeout auto-cancel (5 min), rate limit retry (3 attempts, 15s exponential backoff) | Medium |
+| Error handling | Cost limit abort ($0.20/section), timeout auto-cancel (5 min), rate limit retry (3 attempts, 15s exponential backoff) | Medium |
 | Navigation limitation | SSE disconnects on page change; stale lock auto-releases after 6 minutes. Users should stay on the page during analysis. | Low |
 | Data-fetcher date format | `toMonth()` helper converts `YYYY-MM-DD` to `YYYY-MM` for `pc_ar_monthly` queries. Without this, string comparison silently excludes the first month. | Low |
 | Blocked PII columns | `attention, phone1, mobile, email_address` are not in column whitelists — implicitly blocked from AI access. | Medium |
 
-### 20.2 Not Yet Implemented
+### 20.2 Required — Not Yet Implemented
 
-These safety rules were specified in planning artifacts but are not yet enforced in code:
+These safety rules must be enforced in code before HR goes live:
 
-- **Server-side `Cancelled = 'F'` injection** — currently prompt-level only. The tool description tells the LLM to include the filter, but `executeRdsQuery()` does not inject it server-side if the LLM omits it.
-- **SQL injection guard** — `where_clause` from the LLM is passed directly into SQL without pattern checking (no rejection of `;`, `UNION`, `DROP`, `DELETE`, `--`, or subqueries).
-- **Row truncation warning** — when the 100-row limit is hit, no warning is appended to the result. The LLM may treat 100 rows as the complete dataset and derive incorrect totals.
+- **Server-side `Cancelled = 'F'` injection** — currently prompt-level only. The tool description tells the LLM to include the filter, but `executeRdsQuery()` does not inject it server-side if the LLM omits it. **Fix:** Inject `Cancelled = 'F'` server-side in `executeRdsQuery()` for all RDS tables that have the column.
+- **SQL injection guard** — `where_clause` from the LLM is passed directly into SQL without pattern checking. **Fix:** Reject WHERE clauses containing `;`, `UNION`, `DROP`, `DELETE`, `UPDATE`, `INSERT`, `--`, or subqueries before execution.
