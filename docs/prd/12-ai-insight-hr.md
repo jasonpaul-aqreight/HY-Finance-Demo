@@ -1,10 +1,14 @@
 # AI Insight Engine — HR Configuration
 
-> HR-specific configuration for the AI Insight Engine (see [10-ai-insight-base.md](10-ai-insight-base.md) for the shared platform). Covers all 7 pages, 14 sections, and 31 components deployed on the Hoi-Yong HR dashboard.
+> **Status: Specification only — not yet implemented. Epic 4 was deferred on 2026-04-15.**
+
+> HR-specific configuration for the AI Insight Engine. This document is self-contained: a junior developer can read it top-to-bottom and understand the full HR AI Insight specification. Shared platform patterns live in [doc 10 (10-ai-insight-base.md)](10-ai-insight-base.md) and are referenced as "See doc 10, §X" where needed — you do not need to read doc 10 unless you want deeper platform-level context.
 
 ---
 
 ## 1. Overview
+
+The HR configuration plugs into the base AI Insight Engine (doc 10) to provide automated analysis across seven dashboard pages:
 
 | # | Page | Route | Sections | Components |
 |---|------|-------|----------|------------|
@@ -20,29 +24,54 @@
 
 **Excluded:** Employee Directory (Workforce — searchable list, no analysis value), Probation Settings (config page, no data to analyze).
 
+**How it works (simplified):**
+
+1. User clicks "Analyze" on a section header.
+2. The orchestrator fetches pre-computed data from PostgreSQL (with PII stripped and thresholds pre-flagged).
+3. Phase 1: Each component is analyzed in parallel by a fast model (Haiku) using the component prompt + data.
+4. Phase 2: A summary model (Sonnet) reads all component results and produces 1-6 structured insight cards (good + bad findings).
+5. Results are stored in PostgreSQL and displayed in the UI.
+
+See doc 10, §2 for the full architecture diagram and §4 for the analysis lifecycle.
+
 ---
 
 ## 2. Analysis Persona
 
-> "You are an HR analyst reviewing the HR dashboard for a Malaysian company (Hoi-Yong). You are explaining what you see to HR management."
+The global system prompt is sent as the `system` parameter on every component-level LLM call. It is the same for all 31 components. Component-specific prompts (documented in section 5) are prepended to the `user` message, not the system message. This keeps the system prompt cacheable across all calls.
 
-### Prompt Rules
+### Full Global System Prompt
+
+> You are an HR analyst at Hoi-Yong (Malaysian fruit distribution). You explain HR dashboard metrics to HR management.
+>
+> Rules:
+> - Be direct, concise, no HR jargon. State facts, not recommendations.
+> - Bullet points for observations. Markdown tables for comparisons.
+> - Compare at least 3 data points for trends.
+> - If data is insufficient, say so.
+> - Keep analysis under 150 words.
+> - Do NOT re-derive totals. Use values as given.
+> - Every number you cite MUST appear in the data block. Display rounding OK. Never back-solve or invent values.
+> - Match your language to the Scope line in the data (daily vs period vs snapshot).
+> - Never reference employee names, IDs, or IC numbers. Use department-level or aggregate language only.
+
+### Prompt Rules (extracted)
 
 | Rule | Detail |
 |------|--------|
-| Language | Direct, concise, no HR jargon unless necessary |
+| Language | Direct, concise, no HR jargon |
 | Format | Bullet points for observations, markdown tables for comparisons |
 | Component word limit | Max 150 words |
-| Summary detail word limit | 220–320 words |
+| Summary detail word limit | Max 150 words |
 | Verbatim-copy rule | Every number must match a value from the data block (display rounding OK) |
-| Scope discipline | Period-based vs snapshot — language must match the scope type |
-| Self-verification | Cross-check numbers, arithmetic, and scope before writing |
+| Scope discipline | Match language to the Scope line in the data (daily vs period vs snapshot) |
 | PII ban | Never reference employee names, IDs, IC numbers — columns containing PII are never whitelisted. Use department-level or aggregate language only |
-| Threshold awareness | Fetchers pre-flag data against configurable thresholds. AI sees "flagged" vs "not flagged" — do not re-evaluate raw numbers against thresholds |
 
 ---
 
 ## 3. Scope Assignments
+
+Each section uses one of three scope types. The scope controls what language the AI uses when describing numbers and how date filtering works. See doc 10, §13 for scope type definitions.
 
 | Scope | Sections | How determined |
 |-------|----------|---------------|
@@ -54,18 +83,25 @@
 
 ---
 
-## 4. Dual-Model Strategy
+## 4. Dual-Model Strategy (HR)
 
-| Role | Model | Max Tokens | Purpose |
-|------|-------|-----------|---------|
-| Component narration | Haiku 4.5 | 2,048 | Fast, cheap per-component analysis (no tools, 150-word cap) |
-| Summary synthesis | Sonnet 4.6 | 4,096 | Smart synthesis, `===INSIGHT===` output, tool access per section policy (see §6) |
+HR uses the shared dual-model strategy from the base platform. See doc 10, §3 for full details.
 
-Tool access varies per section — see §7 for per-section policy.
+| Phase | Model | Max Tokens | Purpose | HR notes |
+|-------|-------|-----------|---------|----------|
+| Phase 1 — Component analysis | Haiku 4.5 | 2,048 | Fast, parallel analysis of each component (no tools, 150-word cap) | 31 components across 14 sections. Haiku keeps cost low. |
+| Phase 2 — Summary synthesis | Sonnet 4.6 | 4,096 | Synthesis of all component results into insight cards | Has tool access for root-cause investigation per section policy (see §7). Max 4 tool calls per summary; stop once enough context. |
 
 ---
 
 ## 5. Section & Component Catalog
+
+This section documents all 14 sections and their 31 components. For each section you will find:
+1. A metadata table (section key, page, scope, tool policy, data sources, component count)
+2. A component table (key, name, type, what it measures, thresholds)
+3. The exact component prompt for each component, shown in a blockquote
+
+---
 
 ### 5.1 Workforce — Demographic
 
@@ -603,7 +639,7 @@ Tool access varies per section — see §7 for per-section policy.
 
 ## 6. Deterministic Summary Questions
 
-Each section has fixed questions the AI must answer during summary synthesis. See doc 10, §16 for the shared pattern.
+Each section has fixed questions the AI must answer during summary synthesis. This makes the summary output predictable — same data always answers the same questions. See doc 10, §16 for the shared pattern.
 
 | Section | Summary Questions |
 |---------|-------------------|
@@ -626,6 +662,8 @@ Each section has fixed questions the AI must answer during summary synthesis. Se
 
 ## 7. Tool Policy
 
+The tool policy controls whether the LLM can make database queries during analysis. See doc 10, §7 for the shared tool-use system.
+
 ### Design
 
 HR uses a single tool `query_hr_table` — all data is in local PostgreSQL (no remote RDS like Finance). The tool enforces column whitelisting and a `ROW_LIMIT = 100` per query. The AI can query any date range or filter, but results are capped at 100 rows.
@@ -634,16 +672,16 @@ Only Sonnet (summary synthesis) gets tool access. Haiku (component narration) ne
 
 ### Three Tiers
 
-| Tier | Tables Available | Tools |
-|------|-----------------|-------|
-| `none` | — | No tools, all data pre-fetched |
-| `aggregate_only` | `HR_AGGREGATE_TABLES` only via `query_hr_table` | 1 tool |
-| `full` | All whitelisted tables via `query_hr_table` | 1 tool |
+| Tier | What the LLM Can Do | When Used |
+|------|---------------------|-----------|
+| `none` | No tool access. LLM receives only the pre-fetched data block. | Single-day attendance (all data pre-fetched), payroll (page not built). |
+| `aggregate_only` | Can query `HR_AGGREGATE_TABLES` only via `query_hr_table`. | Overview/snapshot sections — data is already pre-aggregated, tools for light drill-down. |
+| `full` | Can query all whitelisted tables via `query_hr_table`. | Analysis/flagged sections — used for root-cause investigation. |
 
-### Policy Per Section
+### Per-Section Assignments
 
-| Section | Policy | Rationale |
-|---------|--------|-----------|
+| Section Key | Policy | Rationale |
+|-------------|--------|-----------|
 | workforce_demographic | aggregate_only | Snapshot KPIs — drill into dept-level counts |
 | workforce_movement | aggregate_only | Period trend — joiners/leavers by month |
 | attendance_daily | none | Single day, all data pre-fetched |
@@ -659,40 +697,7 @@ Only Sonnet (summary synthesis) gets tool access. Haiku (component narration) ne
 | payroll_overview | none | Page not built, tables TBD |
 | payroll_breakdown | none | Page not built, tables TBD |
 
-### `HR_LOCAL_WHITELIST`
-
-PII columns (names, ICs, contact, salary, bank, tax, spouse info) are never whitelisted. See §10 for the full exclusion list.
-
-| Table | Whitelisted Columns |
-|-------|-------------------|
-| `employee_list` | `department_code`, `department_description`, `job_title`, `employee_type_code`, `employee_group_title`, `gender`, `nationality_description`, `is_foreigner`, `is_active`, `join_date`, `confirm_date`, `resign_date`, `branch_code`, `branch_description`, `wages_type`, `is_disable` |
-| `attendance_list` | `date`, `work_type`, `status`, `shift`, `start_work`, `end_work`, `hour_worked`, `ot`, `lateness`, `early_out` |
-| `attendance_upload` | `uploaded_at`, `row_count`, `employee_count`, `date_range_start`, `date_range_end`, `status` |
-| `leave_transaction` | `leave_date`, `leave_type_code`, `leave_type_description`, `apply_date`, `apply_status`, `apply_status_description`, `day_no`, `hour_no`, `days`, `is_hourly`, `is_credit`, `is_adjustment`, `is_adjacent_holiday`, `adjacent_holiday_name`, `days_from_holiday` |
-| `leave_balance` | `leave_type`, `bf`, `entitled`, `credits`, `expiring_credits`, `expired_credits`, `taken`, `available`, `pending`, `balance_year`, `balance_month` |
-| `public_holiday` | `date`, `holiday_name`, `location`, `is_active` |
-| `appraisal` | `appraisal_year`, `department`, `job_title`, `appraised_date`, `rating_1`–`rating_20`, `final_score`, `status`, `hr_validated`, `director_validated`, `employee_acknowledged` |
-| `appraisal_form_template` | `form_name`, `in_use`, `criteria_1_name`–`criteria_20_name`, `criteria_1_weight`–`criteria_20_weight` |
-| `hr_warnings` | `department_code`, `department_description`, `incident_date`, `stage`, `stage_name`, `offense_category`, `status`, `di_required`, `final_decision`, `version`, `created_at` |
-| `hr_offense_categories` | `name`, `examples`, `is_default`, `is_active` |
-
-### `HR_AGGREGATE_TABLES`
-
-Tables allowed under `aggregate_only` policy (reference + high-level data):
-
-- `employee_list`
-- `attendance_list`
-- `leave_balance`
-- `leave_transaction`
-- `public_holiday`
-- `hr_offense_categories`
-
-Tables only available under `full` policy (granular drill-down):
-
-- `appraisal`
-- `appraisal_form_template`
-- `hr_warnings`
-- `attendance_upload`
+**Pattern:** Snapshot/overview sections use `aggregate_only`. Analysis/flagged sections use `full`. Payroll and daily attendance use `none`.
 
 ---
 
@@ -718,12 +723,12 @@ All HR data lives in Prisma-managed PostgreSQL (no remote RDS like Finance).
 
 ## 9. Configurable Thresholds (from `hr_settings`)
 
-Unlike Finance (hardcoded thresholds), HR thresholds are configurable via Settings UI.
+Unlike Finance (hardcoded thresholds), HR thresholds are configurable via the Settings UI and stored in `hr_settings`.
 
 **Design:** Fetchers pre-flag data using thresholds. The AI sees flagged/not-flagged results. Thresholds are NOT injected into prompts — the fetcher does the evaluation.
 
-| Category | Keys Used By | Default Values |
-|----------|-------------|----------------|
+| Category | Used By Section | Default Values |
+|----------|----------------|----------------|
 | `alert_chronic_lateness` | attendance_flagged | chronic_lateness_threshold = 3 |
 | `alert_high_absence` | attendance_flagged | high_absence_threshold = 3 |
 | `alert_early_departure` | attendance_flagged | early_departure_threshold = 3 |
@@ -737,17 +742,47 @@ Unlike Finance (hardcoded thresholds), HR thresholds are configurable via Settin
 
 ---
 
-## 10. Data Protection: Column Whitelisting
+## 10. Column Whitelisting (Data Protection)
 
-HR uses the same column whitelisting strategy as Finance (see doc 10, §15). PII-containing columns are never whitelisted — the LLM cannot access them.
+HR uses the same column whitelisting strategy as Finance. See doc 10, §15 for the shared pattern. PII-containing columns are never whitelisted — the LLM cannot access them.
 
 ### HR Column Whitelist
 
 Each HR table declares allowed columns. Only these columns appear in fetcher output and tool queries.
 
-**Allowed (examples):** department, date, leave_type, status, score, warning_stage, offence_category, aggregate counts, computed flags.
+| Table | Whitelisted Columns |
+|-------|-------------------|
+| `employee_list` | `department_code`, `department_description`, `job_title`, `employee_type_code`, `employee_group_title`, `gender`, `nationality_description`, `is_foreigner`, `is_active`, `join_date`, `confirm_date`, `resign_date`, `branch_code`, `branch_description`, `wages_type`, `is_disable` |
+| `attendance_list` | `date`, `work_type`, `status`, `shift`, `start_work`, `end_work`, `hour_worked`, `ot`, `lateness`, `early_out` |
+| `attendance_upload` | `uploaded_at`, `row_count`, `employee_count`, `date_range_start`, `date_range_end`, `status` |
+| `leave_transaction` | `leave_date`, `leave_type_code`, `leave_type_description`, `apply_date`, `apply_status`, `apply_status_description`, `day_no`, `hour_no`, `days`, `is_hourly`, `is_credit`, `is_adjustment`, `is_adjacent_holiday`, `adjacent_holiday_name`, `days_from_holiday` |
+| `leave_balance` | `leave_type`, `bf`, `entitled`, `credits`, `expiring_credits`, `expired_credits`, `taken`, `available`, `pending`, `balance_year`, `balance_month` |
+| `public_holiday` | `date`, `holiday_name`, `location`, `is_active` |
+| `appraisal` | `appraisal_year`, `department`, `job_title`, `appraised_date`, `rating_1`–`rating_20`, `final_score`, `status`, `hr_validated`, `director_validated`, `employee_acknowledged` |
+| `appraisal_form_template` | `form_name`, `in_use`, `criteria_1_name`–`criteria_20_name`, `criteria_1_weight`–`criteria_20_weight` |
+| `hr_warnings` | `department_code`, `department_description`, `incident_date`, `stage`, `stage_name`, `offense_category`, `status`, `di_required`, `final_decision`, `version`, `created_at` |
+| `hr_offense_categories` | `name`, `examples`, `is_default`, `is_active` |
 
-**Never whitelisted:**
+### Aggregate vs Full Table Access
+
+Tables allowed under `aggregate_only` policy (reference + high-level data):
+
+- `employee_list`
+- `attendance_list`
+- `leave_balance`
+- `leave_transaction`
+- `public_holiday`
+- `hr_offense_categories`
+
+Tables only available under `full` policy (granular drill-down):
+
+- `appraisal`
+- `appraisal_form_template`
+- `hr_warnings`
+- `attendance_upload`
+
+### PII Exclusions — Never Whitelisted
+
 - **Names:** first_name, last_name, full_name, employee_name
 - **IDs:** employee_code, employee_id, ic_number, passport_number
 - **Contact:** email, phone_number, mobile_number, address fields
@@ -763,7 +798,9 @@ Backend fetchers pre-compute flagged/not-flagged status against `hr_settings` th
 1. **Frontend display** — flagged badges shown in the dashboard UI
 2. **AI input** — AI reads flags, not raw threshold values
 
-This is an HR-specific extension on top of the shared column whitelisting pattern.
+### Runtime Enforcement
+
+`validateColumns()` rejects any tool call requesting columns not in the whitelist. Enforced at query execution time, not prompt-level.
 
 ### Prompt Guidance
 
@@ -771,25 +808,95 @@ Component prompts state: "Employee names/IDs are not included. Focus on aggregat
 
 ---
 
-## 11. RBAC Scoping
+## 11. RBAC Scoping (Role-Based Access Control)
 
-| Role | Data Scope | Insight Access |
-|------|-----------|---------------|
-| Superadmin / HR / Director | All employees | Full access to all sections |
-| Finance | Own department only | Department-scoped insights |
-| Manager | Own dept + direct reports | Team-scoped insights |
-| Sale / Operation | Denied | 403, no insight panel shown |
+| Role | Can Trigger Analysis | Can View Insights |
+|------|---------------------|-------------------|
+| Superadmin / HR / Director | Yes | Yes |
+| Finance | No | Yes |
+| Manager | No | Yes |
+| Sale / Operation | No | No (403) |
 
-**Implementation:**
-- Scope filter from `data-scoping-service.ts` injected into every fetcher query
-- Different users see different data → per-user caching required
+Analysis always runs against all employees (no department scoping). All authorized viewers see the same shared result.
+
+**Implementation (planned):**
+- Client-side: `canTriggerAnalysis = ['superadmin', 'hr', 'director'].includes(userRole)`
 - Client-side: `canViewInsights = userRole !== 'sale' && userRole !== 'operation'`
+- Server-side: role validation on generate/latest endpoints. Unauthorized roles get 403.
+
+See doc 10, §18 for the shared RBAC pattern.
 
 ---
 
-## 12. Storage Schema
+## 12. Summary System Prompt
 
-Same structure as Finance with `user_id` dimension for RBAC-scoped caching:
+The summary system prompt is used in Phase 2 when Sonnet synthesizes all component results into insight cards. It shares the same base rules as the component prompt (conciseness, no jargon, scope matching, PII ban) plus tool access and output format rules. Full text:
+
+> You are an HR analyst synthesizing HR dashboard data for HR management at Hoi-Yong (Malaysian fruit distribution).
+>
+> Rules:
+> - Be direct, concise, no HR jargon. State facts, not recommendations.
+> - Bullet points for observations. Markdown tables for comparisons.
+> - Compare at least 3 data points for trends.
+> - If data is insufficient, say so.
+> - Do NOT re-derive totals. Use values as given.
+> - Every number you cite MUST come from the raw data blocks or a tool-call result. Display rounding OK. Never back-solve or invent values.
+> - Match your language to the Scope line in the data (daily vs period vs snapshot).
+> - Never reference employee names, IDs, or IC numbers. Use department-level or aggregate language only.
+>
+> ===============================================================================
+> TOOL ACCESS
+> ===============================================================================
+>
+> You can query the HR database to find supporting evidence or root causes. Use tools for both positive and negative findings — identify which departments, leave types, offence categories, or months drove the result.
+>
+> Rules:
+> - Maximum 4 tool calls. Stop once you have enough context to explain the finding — do not go deeper than needed.
+> - Do not query data already in the raw data blocks.
+> - Use `query_hr_table` only. Tables available depend on section tool policy (see §7).
+> - Row limit: 100 per query. PII columns are blocked at the whitelist layer.
+>
+> ===============================================================================
+> OUTPUT FORMAT
+> ===============================================================================
+>
+> Use this EXACT delimiter structure (no JSON, no code blocks):
+>
+> ===INSIGHT===
+> sentiment: good|bad
+> title: Punchy headline (max 50 chars, no verbs like "is"/"has"/"shows")
+> metric: Key number e.g. 84.3%, 12 days, 23 staff (max 25 chars)
+> summary: One plain-text sentence — card preview (max 80 chars, no markdown)
+> ---DETAIL---
+> Concise markdown analysis (max 150 words)
+> ===END===
+>
+> Max 3 good + 3 bad insights. Rank by business impact.
+>
+> Detail structure (all sections MANDATORY):
+>
+> **Current Status**: 1-2 bullets with headline number and scope.
+>
+> **Key Observations**: 2-3 bullets with specific numbers/dates.
+>
+> **Evidence** (positive) or **Root Cause** (negative):
+> - Name top 3-5 contributors (departments, leave types, offence categories). Include a Markdown table (min 3 rows) when top-N data exists.
+>
+> **Implication**: 1 bullet — bottom-line consequence.
+>
+> Content rules:
+> - Use exact dashboard metric names. No HR jargon.
+> - Cross-reference components — synthesize, don't isolate.
+> - No contradicting good/bad insights on same metric.
+> - Use department-level language only. Never name individual employees.
+
+See doc 10, §12 for the shared `===INSIGHT===` output format and sentiment mapping.
+
+---
+
+## 13. Storage DDL
+
+HR-specific database tables. Same shared-cache structure as Finance — one result per section, no per-user scoping.
 
 ```sql
 CREATE TABLE hr_ai_insight_section (
@@ -802,10 +909,9 @@ CREATE TABLE hr_ai_insight_section (
   cost_usd REAL,
   period_start TEXT,
   period_end TEXT,
-  user_id TEXT NOT NULL,
   generated_by TEXT NOT NULL,
   generated_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(module, section_key, user_id)
+  UNIQUE(module, section_key)
 );
 
 CREATE TABLE hr_ai_insight_component (
@@ -820,71 +926,35 @@ CREATE TABLE hr_ai_insight_component (
 );
 ```
 
----
-
-## 13. Concurrency: Global Lock
-
-```sql
-CREATE TABLE hr_ai_insight_lock (
-  id INT PRIMARY KEY CHECK (id = 1),
-  locked_by TEXT,
-  locked_at TIMESTAMPTZ,
-  section_key TEXT
-);
-```
-
-Global lock — only one analysis at a time across all users. 6-minute stale expiry. Same pattern as Finance (see doc 10, §5).
+Concurrency lock uses the same global lock pattern as Finance. See doc 10, §5 for the shared lock schema and stale expiry logic.
 
 ---
 
-## 14. Output Format
-
-Same as Finance: `===INSIGHT===` delimiter format with `sentiment: good|bad`. Thresholds in the component and summary prompts determine whether a finding is positive or negative. No severity mapping — keep it simple.
-
----
-
-## 15. Summary System Prompt
-
-> You are an HR analyst synthesizing dashboard data for HR management. Produce insights using the ===INSIGHT=== format.
->
-> Rules:
-> - Max 3 good + 3 bad insights, ranked by business impact
-> - Every number must trace to the raw data blocks below
-> - Use department-level language, never reference individual employees
-> - For "bad" insights: name specific departments, time periods, or categories with numbers
-> - For "good" insights: name the drivers of positive trends
->
-> Detail structure (mandatory sections):
-> 1. **Current Status** — headline number + business meaning
-> 2. **Key Observations** — 2-4 bullets with non-obvious patterns
-> 3. **Supporting Evidence** — markdown table (3+ rows) of top contributors, or 3-5 bullets of specific numbers
-> 4. **Implication** — 1-2 bullets on business consequence
-
----
-
-## 16. API Routes
+## 14. API Routes
 
 ```
 GET  /api/v1/hr/ai-insight/:module/insights/latest    -- cached or { cached: false }
 POST /api/v1/hr/ai-insight/:module/insights/generate   -- SSE stream
 ```
 
-SSE events: `progress`, `complete`, `error`, `cancelled` (same as Finance).
+SSE events: `progress`, `complete`, `error`, `cancelled` (same as Finance — see doc 10, §9 for the shared SSE pattern).
 
 ---
 
-## 17. File Structure
+## 15. File Structure
+
+Planned file structure for the HR AI Insight module:
 
 ```
 code/backend/src/modules/hr/ai-insight/
   types.ts              -- HR-specific types
   client.ts             -- Anthropic client config (Haiku + Sonnet)
-  prompts.ts            -- Registry + 25 component prompts + summary prompt
-  data-fetcher.ts       -- 25 fetcher functions
+  prompts.ts            -- Registry + 31 component prompts + summary prompt
+  data-fetcher.ts       -- 31 fetcher functions
   orchestrator.ts       -- Phase 1 (parallel components) + Phase 2 (summary)
   numeric-guard.ts      -- Whitelist validation (copy from Finance + add hours unit)
-  storage.ts            -- PostgreSQL read/upsert with user_id
-  lock.ts               -- Per-user-per-module lock
+  storage.ts            -- PostgreSQL read/upsert (shared cache, no user scoping)
+  lock.ts               -- Global lock (same pattern as Finance)
   column-whitelist.ts   -- HR_LOCAL_WHITELIST + validateColumns()
   settings-loader.ts    -- Batch-fetch hr_settings for threshold pre-flagging
   component-info.ts     -- Static "about" content per component
@@ -893,29 +963,68 @@ code/backend/src/modules/hr/ai-insight/
 
 ---
 
-## 18. Implementation Sequence
+## 16. Implementation Sequence
 
-1. **types.ts + client.ts** — copy from Finance, adapt types
-2. **prompts.ts** — registry (12 sections, 25 components) + all component prompts + summary prompt
-3. **settings-loader.ts** — batch query `hr_settings` by categories
-4. **column-whitelist.ts** — define HR_LOCAL_WHITELIST per table + validateColumns()
-5. **data-fetcher.ts** — 25 fetchers (start with Workforce, one module at a time)
-6. **numeric-guard.ts** — copy from Finance, add `hours` unit
-7. **orchestrator.ts** — copy from Finance, remove tool-use logic, add scope/PII threading
-8. **storage.ts + lock.ts** — adapt Finance pattern with `user_id` dimension
-9. **response-adapter.ts** — map good/bad → severity
-10. **API routes** — controller + SSE streaming
-11. **component-info.ts** — static "about" content
-12. **Frontend** — InsightSectionHeader + AiInsightPanel per section
+Build order for a developer implementing the HR AI Insight module:
+
+| Step | What | Depends On |
+|------|------|------------|
+| 1 | `types.ts` + `client.ts` — copy from Finance, adapt types | Nothing |
+| 2 | `prompts.ts` — registry (14 sections, 31 components) + all component prompts + summary prompt | types.ts |
+| 3 | `settings-loader.ts` — batch query `hr_settings` by categories | Database access |
+| 4 | `column-whitelist.ts` — define HR_LOCAL_WHITELIST per table + validateColumns() | types.ts |
+| 5 | `data-fetcher.ts` — 31 fetchers (start with Workforce, one module at a time) | settings-loader.ts, column-whitelist.ts |
+| 6 | `numeric-guard.ts` — copy from Finance, add `hours` unit | Nothing |
+| 7 | `orchestrator.ts` — copy from Finance, remove RDS tool-use logic, add scope/PII threading | All above |
+| 8 | `storage.ts` + `lock.ts` — same shared-cache pattern as Finance | Storage tables (DDL from §13) |
+| 9 | `response-adapter.ts` — map good/bad sentiment to output format | types.ts |
+| 10 | API routes — controller + SSE streaming | orchestrator.ts, lock.ts, storage.ts |
+| 11 | `component-info.ts` — static "about" content | Nothing |
+| 12 | Frontend — InsightSectionHeader + AiInsightPanel per section | API routes, client.ts |
 
 ---
 
-## 19. Verification Plan
+## 17. Verification Plan
 
-1. **Unit test each fetcher** — returns `{ prompt, allowed[] }`, PII stripped, thresholds applied
-2. **Integration test orchestrator** — mock AI responses, verify SSE events + storage writes
-3. **E2E test** — run against `ai-insight-parity.spec.ts` (response schema matches)
-4. **Numeric guard test** — hallucinated numbers caught
-5. **RBAC test** — different users get different cached results, sale/operation get 403
-6. **Column whitelist test** — no PII columns in any fetcher output or tool query result
-7. **Playwright browser verification** — click Analyze, verify UI shows insights correctly
+### Per-Section Smoke Test
+
+For each of the 14 sections:
+1. Click "Analyze" on the section header.
+2. Verify SSE stream shows progress events for each component.
+3. Verify all components complete (check count matches the catalog in §5).
+4. Verify summary produces 1-6 insight cards (good + bad).
+5. Verify cached results load on page refresh (GET latest endpoint).
+6. Verify component detail dialog shows markdown analysis.
+
+### Fetcher / PII Verification
+
+1. Unit test each fetcher — returns `{ prompt, allowed[] }`, PII stripped, thresholds applied.
+2. Column whitelist test — no PII columns in any fetcher output or tool query result.
+
+### Tool Policy Verification
+
+1. For `none` sections: verify no tool calls are made.
+2. For `aggregate_only` sections: verify tool calls only access `HR_AGGREGATE_TABLES`.
+3. For `full` sections: verify tool calls can access all whitelisted tables.
+4. Verify `validateColumns()` rejects queries with non-whitelisted columns.
+
+### Threshold Verification
+
+For each threshold in §9: provide data that triggers the flag and verify the fetcher pre-flags it correctly. The AI should see "flagged" — not re-evaluate raw numbers.
+
+### RBAC Verification
+
+1. Log in as Superadmin/HR/Director: verify "Analyze" button is visible, all data returned.
+2. Log in as Finance/Manager: verify "Analyze" button is hidden, but cached insights are viewable.
+3. Log in as Sale/Operation: verify 403 response, no insight panel shown.
+4. Verify all authorized viewers see the same cached result (shared cache, no per-user scoping).
+
+### Numeric Guard Verification
+
+1. Mock AI response with hallucinated numbers — verify numeric guard catches them.
+
+### Integration / E2E
+
+1. Integration test orchestrator — mock AI responses, verify SSE events + storage writes.
+2. E2E test — run against `ai-insight-parity.spec.ts` (response schema matches).
+3. Playwright browser verification — click Analyze, verify UI shows insights correctly.
