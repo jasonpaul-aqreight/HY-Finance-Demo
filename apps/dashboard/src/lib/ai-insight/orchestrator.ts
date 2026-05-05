@@ -9,7 +9,7 @@ import {
 } from './prompts';
 import { executeToolCall } from './tools';
 import { toolsForSection, validateToolForSection } from './tool-policy';
-import { runNumericGuard, formatGuardError, extractNumbers } from './numeric-guard';
+import { runNumericGuard, formatGuardError, extractNumbers, extractToolResultNumbers } from './numeric-guard';
 import { fetchComponentData } from './data-fetcher';
 import {
   initDebugSession,
@@ -22,7 +22,7 @@ import {
   logNumericGuard,
   logSessionEnd,
 } from './debug-logger';
-import type { SectionKey, DateRange, FiscalPeriod, ComponentResult, SummaryJson, SummaryInsight, ComponentType, AllowedValue } from './types';
+import type { SectionKey, DateRange, FiscalPeriod, ComponentResult, SummaryJson, SummaryInsight, ComponentType, AllowedValue, AllowedValueUnit } from './types';
 
 const MAX_CONCURRENCY = 2; // Keep low to avoid rate limits on lower-tier API plans
 const MAX_TOOL_CALLS_PER_SUMMARY = 4; // Summary can drill down for evidence/root causes — stop once enough context
@@ -329,9 +329,14 @@ async function runSummaryAnalysis(
 
     // Whitelist any number that appeared in a tool_result this attempt — it's
     // ground truth pulled live from the DB and the LLM is allowed to cite it.
+    // Tool results return bare numeric tokens (no RM/%/days suffix) so we use
+    // the permissive extractor and register each value under all four units.
+    const trUnits: AllowedValueUnit[] = ['RM', 'pct', 'days', 'count'];
     for (const trText of loopResult.toolResultTexts) {
-      for (const f of extractNumbers(trText)) {
-        allAllowed.push({ label: `tool result: ${f.raw}`, value: f.value, unit: f.unit });
+      for (const v of extractToolResultNumbers(trText)) {
+        for (const u of trUnits) {
+          allAllowed.push({ label: `tool result: ${v}`, value: v, unit: u });
+        }
       }
     }
 

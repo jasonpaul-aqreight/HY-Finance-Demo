@@ -57,10 +57,11 @@ const NUMBER_PATTERNS: { unit: AllowedValueUnit; regex: RegExp; parse: (m: RegEx
       return n * mult;
     },
   },
-  // -RM 1,234,567.89 — but skip when followed by a dash+digit (it's a range, handled above)
+  // -RM 1,234,567.89 — skip only when followed by hyphen+digit (range pattern,
+  // handled above). Em/en dashes are sentence punctuation, not range markers.
   {
     unit: 'RM',
-    regex: /-?\s*RM\s*(-?\d{1,3}(?:,\d{3})*(?:\.\d+)?|-?\d+(?:\.\d+)?)(?!\s*[-–—]\s*\d)/g,
+    regex: /-?\s*RM\s*(-?\d{1,3}(?:,\d{3})*(?:\.\d+)?|-?\d+(?:\.\d+)?)(?!\s*-\s*\d)/g,
     parse: (m) => {
       let n = parseFloat(m[1].replace(/,/g, ''));
       if (m[0].trimStart().startsWith('-') && n >= 0) n = -n;
@@ -73,23 +74,42 @@ const NUMBER_PATTERNS: { unit: AllowedValueUnit; regex: RegExp; parse: (m: RegEx
     regex: /(-?\d+(?:\.\d+)?)\s*(?:%|percent|pp|percentage points?)/gi,
     parse: (m) => parseFloat(m[1]),
   },
-  // 52 days
+  // 52 days, 1,873 days
   {
     unit: 'days',
-    regex: /(-?\d+(?:\.\d+)?)\s*days?\b/gi,
-    parse: (m) => parseFloat(m[1]),
+    regex: /(-?\d{1,3}(?:,\d{3})+(?:\.\d+)?|-?\d+(?:\.\d+)?)\s*days?\b/gi,
+    parse: (m) => parseFloat(m[1].replace(/,/g, '')),
   },
-  // bare integer counts: "29 customers", "12 of 12 months", "top 5"
+  // bare integer counts: "29 customers", "12 of 12 months", "top 5", "3,376 invoices"
   {
     unit: 'count',
-    regex: /\b(\d{1,4})\s+(?:customers?|months?|invoices?|breachers?|outlets?|agents?|products?|of)\b/gi,
-    parse: (m) => parseFloat(m[1]),
+    regex: /\b(\d{1,3}(?:,\d{3})+|\d{1,4})\s+(?:customers?|months?|invoices?|breachers?|outlets?|agents?|products?|of)\b/gi,
+    parse: (m) => parseFloat(m[1].replace(/,/g, '')),
   },
 ];
 
 function stripDates(text: string): string {
   let out = text;
   for (const re of DATE_LIKE) out = out.replace(re, ' ');
+  return out;
+}
+
+// Permissive extractor for tool-result text. Tool results return bare numeric
+// tokens (e.g. `3721296.25`, `162.49`, `20.66`) with no RM/%/days suffix, so
+// the labeled-format extractor above misses them. We pull every numeric token
+// and let the caller whitelist it under all four units — tool results are
+// ground truth pulled live from the DB, so permissive matching is acceptable.
+export function extractToolResultNumbers(text: string): number[] {
+  const cleaned = stripDates(text);
+  const out: number[] = [];
+  const re = /-?\d{1,3}(?:,\d{3})+(?:\.\d+)?|-?\d+(?:\.\d+)?/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(cleaned)) !== null) {
+    const n = parseFloat(m[0].replace(/,/g, ''));
+    if (Number.isNaN(n)) continue;
+    if (YEAR_TOKEN.test(m[0])) continue;
+    out.push(n);
+  }
   return out;
 }
 
@@ -143,6 +163,18 @@ function matchesAllowed(found: FoundNumber, allowed: AllowedValue[]): boolean {
       // Display-rounding: M/K suffixes — relative tolerance ±0.05 (5%)
       const rel = av.value !== 0 ? Math.abs(Math.abs(found.value) - Math.abs(av.value)) / Math.abs(av.value) : Infinity;
       if (rel <= 0.05) return true;
+    }
+    // pct: allow integer rounding of decimal values (594.5% → 594%) via
+    // ±1.0 absolute or ±1% relative tolerance.
+    if (found.unit === 'pct') {
+      if (Math.abs(found.value - av.value) <= 1.0) return true;
+      const rel = av.value !== 0 ? Math.abs(found.value - av.value) / Math.abs(av.value) : Infinity;
+      if (rel <= 0.01) return true;
+    }
+    // days: allow integer rounding of decimal values (666.4 → 666) via
+    // ±1.0 absolute tolerance.
+    if (found.unit === 'days') {
+      if (Math.abs(found.value - av.value) <= 1.0) return true;
     }
   }
   return false;
