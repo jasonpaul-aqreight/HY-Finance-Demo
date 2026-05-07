@@ -1,0 +1,103 @@
+{
+  "section_key": "financial_variance",
+  "scope": { "fiscalYear": "FY2025", "range": "fy" },
+  "captured_from": "baseline_financial_variance_run1_full_log.log",
+  "captured_at": "2026-05-07T14:07:42Z",
+  "note": "Source-of-truth values from the pre-fetched data block. Any number Sonnet writes in the final ===INSIGHT=== output should be traceable to one of these or to a successful tool-call result. Computed ratios (e.g., 2.6×, 9.2%) that aren't here are arithmetic hallucinations even if mathematically correct.",
+
+  "yoy_variance_summary": {
+    "net_sales":        { "actual": 81520186, "baseline": 79894310, "variance": 1625876,  "variance_pct": 2.0,    "status": "Favourable" },
+    "cost_of_sales":    { "actual": 75888549, "baseline": 72073433, "variance": 3815116,  "variance_pct": 5.3,    "status": "Unfavourable" },
+    "gross_profit":     { "actual": 5631637,  "baseline": 7820877,  "variance": -2189240, "variance_pct": -28.0,  "status": "Unfavourable" },
+    "operating_costs":  { "actual": 9050916,  "baseline": 6559078,  "variance": 2491838,  "variance_pct": 38.0,   "status": "Unfavourable" },
+    "operating_profit": { "actual": -3419280, "baseline": 1261799,  "variance": -4681079, "variance_pct": -371.0, "status": "Unfavourable" },
+    "other_income":     { "actual": 1458104,  "baseline": 118187,   "variance": 1339917,  "variance_pct": 1133.7, "status": "Favourable" },
+    "net_profit":       { "actual": -1961176, "baseline": 1379986,  "variance": -3341162, "variance_pct": -242.1, "status": "Unfavourable" }
+  },
+
+  "margin_comparison": {
+    "gross_margin_actual_pct":    6.9,
+    "gross_margin_baseline_pct":  9.8,
+    "gross_margin_drift_pp":     -2.9,
+    "net_margin_actual_pct":     -2.4,
+    "net_margin_baseline_pct":    1.7,
+    "net_margin_drift_pp":       -4.1
+  },
+
+  "sign_flips_severe": ["Net Profit", "Operating Profit"],
+
+  "budget_variance": {
+    "approved_date": "2026-04-19",
+    "lines": {
+      "net_sales":       { "actual": 81520186, "budget": 81520188, "variance": -2 },
+      "cost_of_sales":   { "actual": 75888549, "budget": 75888552, "variance": -3 },
+      "gross_profit":    { "actual": 5631637,  "budget": 5631636,  "variance": 1  },
+      "operating_costs": { "actual": 9050916,  "budget": 9050916,  "variance": 0  },
+      "net_profit":      { "actual": -1961176, "budget": -1961172, "variance": -4 }
+    },
+    "note": "Budget approved AFTER FY2025 closed (post-period). Variances are essentially zero by construction. Should be flagged as 'descriptive budget, not predictive'."
+  },
+
+  "variance_by_account": {
+    "sales_total":              { "current_ytd": 84153027, "prior_ytd": 82236513, "variance": 1916514, "variance_pct": 2.3 },
+    "credit_sales":             { "current_ytd": 76422437, "prior_ytd": 72777548, "variance": 3644889, "variance_pct": 5.0 },
+    "cash_sales":               { "current_ytd": 7730590,  "prior_ytd": 9458964,  "variance": -1728374, "variance_pct": -18.3 },
+    "sales_adjustments_total":  { "current_ytd": -2632841, "prior_ytd": -2342203, "variance": -290638, "variance_pct": -12.4 },
+    "return_inwards":           { "current_ytd": -1069278, "prior_ytd": -856592,  "variance": -212687, "variance_pct": -24.8 },
+    "discount_allowed":         { "current_ytd": -1563563, "prior_ytd": -1485611, "variance": -77951,  "variance_pct": -5.2 },
+    "cogs_total":               { "current_ytd": 75888549, "prior_ytd": 72073433, "variance": 3815116, "variance_pct": 5.3 },
+    "purchases":                { "current_ytd": 81255806, "prior_ytd": 76818285, "variance": 4437521, "variance_pct": 5.8 },
+    "purchases_return":         { "current_ytd": -2349143, "prior_ytd": -1395845, "variance": -953298, "variance_pct": -68.3 },
+    "discount_received":        { "current_ytd": -4048796, "prior_ytd": -4725022, "variance": 676226,  "variance_pct": 14.3 },
+    "other_incomes_total":      { "current_ytd": 1458104,  "prior_ytd": 118187,   "variance": 1339917, "variance_pct": 1133.7 },
+    "realised_fx_gain":         { "current_ytd": 464371,   "prior_ytd": 15023,    "variance": 449348,  "variance_pct": 2991.0 },
+    "rental_cold_room":         { "current_ytd": 400408,   "prior_ytd": 0,        "variance": 400408,  "variance_pct": null },
+    "rental_factory_no21":      { "current_ytd": 275000,   "prior_ytd": 0,        "variance": 275000,  "variance_pct": null },
+    "expenses_total":           { "current_ytd": 9050916,  "prior_ytd": 6559078,  "variance": 2491839, "variance_pct": 38.0 },
+    "people_payroll":           { "current_ytd": 4002996,  "prior_ytd": 3125703,  "variance": 877293,  "variance_pct": 28.1 },
+    "property_utilities":       { "current_ytd": 1468736,  "prior_ytd": 878904,   "variance": 589832,  "variance_pct": 67.1 },
+    "depreciation":             { "current_ytd": 1504927,  "prior_ytd": 964914,   "variance": 540012,  "variance_pct": 56.0 },
+    "professional_fees":        { "current_ytd": 238387,   "prior_ytd": 108509,   "variance": 129879,  "variance_pct": 119.7 },
+    "finance_banking":          { "current_ytd": 266926,   "prior_ytd": 141550,   "variance": 125375,  "variance_pct": 88.6 },
+    "taxation_total":           { "current_ytd": 0,        "prior_ytd": 222171,   "variance": -222171, "variance_pct": -100.0 }
+  },
+
+  "concentration": {
+    "cogs_top3_share_pct":     159,
+    "other_incomes_top3_share_pct": 84,
+    "expenses_top3_share_pct": 81,
+    "taxation_top3_share_pct": 106
+  },
+
+  "monthly_trend_fy2025": {
+    "Mar 2024": { "net_sales": 5762362, "gross_profit": 108344,    "net_profit": -477526 },
+    "Apr 2024": { "net_sales": 5856383, "gross_profit": 332986,    "net_profit": -171014 },
+    "May 2024": { "net_sales": 6628305, "gross_profit": -35593,    "net_profit": -415900 },
+    "Jun 2024": { "net_sales": 6678771, "gross_profit": 1064970,   "net_profit": 554814 },
+    "Jul 2024": { "net_sales": 7461332, "gross_profit": -3058424,  "net_profit": -3536151 },
+    "Aug 2024": { "net_sales": 8752692, "gross_profit": 2725796,   "net_profit": 2349765 },
+    "Sep 2024": { "net_sales": 6694821, "gross_profit": 1243108,   "net_profit": 755764 },
+    "Oct 2024": { "net_sales": 5850634, "gross_profit": 816837,    "net_profit": 455498 },
+    "Nov 2024": { "net_sales": 5948966, "gross_profit": 903926,    "net_profit": 390533 },
+    "Dec 2024": { "net_sales": 6143023, "gross_profit": -1513330,  "net_profit": -2111273 },
+    "Jan 2025": { "net_sales": 9588110, "gross_profit": 960838,    "net_profit": 182659 },
+    "Feb 2025": { "net_sales": 6154788, "gross_profit": 2082178,   "net_profit": 61656 }
+  },
+
+  "forecast_12m": {
+    "method": "3-month weighted moving average (50% / 30% / 20%)",
+    "net_sales":     { "weighted_avg_change": -644323, "month_1": 5510465, "month_3": 4221818, "month_6": 2288848, "month_10": -288445, "month_12": -1577092, "signal": "Weak (3/11)" },
+    "gross_profit":  { "weighted_avg_change": 819469,  "month_1": 2901647, "month_3": 4540585, "month_6": 6998993, "month_12": 11915808, "signal": "Weak (6/11)" },
+    "net_profit":    { "weighted_avg_change": 127317,  "month_1": 188972,  "month_3": 443605,  "month_6": 825555,  "month_12": 1589454,  "signal": "Weak (4/11)" },
+    "sign_flip_warnings": ["Net Sales: Month+10, Month+11, Month+12"]
+  },
+
+  "category_budget_suggestions_fy2025": {
+    "sales":              { "yoy_pct": 2.3,    "trend": "rising (Strong)",  "monthly_avg": 7012752,  "annual_budget": 84153024 },
+    "sales_adjustments":  { "yoy_pct": -12.4,  "trend": "falling (Weak)",   "monthly_avg": -219403,  "annual_budget": -2632836 },
+    "cogs":               { "yoy_pct": 5.3,    "trend": "falling (Weak)",   "monthly_avg": 6324046,  "annual_budget": 75888552 },
+    "other_income":       { "yoy_pct": 1133.7, "trend": "rising (Weak)",    "monthly_avg": 121509,   "annual_budget": 1458108 },
+    "expenses":           { "yoy_pct": 38.0,   "trend": "rising (Weak)",    "monthly_avg": 754243,   "annual_budget": 9050916 },
+    "taxation":           { "yoy_pct": -100.0, "trend": "flat (Weak)",      "monthly_avg": 0,        "annual_budget": 0 }
+  }
+}

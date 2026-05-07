@@ -1,0 +1,48 @@
+{
+  "_comment": "Ground truth numbers for payment_outstanding section. Every correct insight MUST report these accurately.",
+  "_snapshot_date": "2026-04-05",
+  "_captured": "2026-04-18",
+
+  "total_outstanding": {
+    "value_rm": 11349862.52,
+    "top_5": [
+      { "name": "MY HERO HYPERMARKET SDN BHD", "outstanding_rm": 2112369.40 },
+      { "name": "MLF TRADING SDN BHD", "outstanding_rm": 1137069.00 },
+      { "name": "WONDERFRUITS & VEGETABLES IMPORT AND EXPORT(M) S/B", "outstanding_rm": 1079871.10 },
+      { "name": "LO SIEW LIN SDN BHD", "outstanding_rm": 807239.10 },
+      { "name": "SEASONS AGRO SDN BHD", "outstanding_rm": 351476.00 }
+    ]
+  },
+
+  "overdue_amount": {
+    "value_rm": 11349862.52,
+    "overdue_pct": 100.0,
+    "overdue_customers": 227,
+    "total_customers": 227
+  },
+
+  "credit_limit_breaches": {
+    "count": 21
+  },
+
+  "aging_analysis": {
+    "buckets": [
+      { "bucket": "120+", "invoices": 3376, "amount_rm": 11349862.52 }
+    ],
+    "note": "All receivables are in the 120+ bucket. No other buckets have data."
+  },
+
+  "credit_usage_distribution": {
+    "within_limit": 300,
+    "near_limit": 10,
+    "over_limit": 21,
+    "no_limit": 34,
+    "total": 365
+  },
+
+  "risk_tier": {
+    "high": { "count": 29, "outstanding_rm": 6587822.96 },
+    "moderate": { "count": 139, "outstanding_rm": 4413431.32 },
+    "low": { "count": 207, "outstanding_rm": 348608.24 }
+  }
+}

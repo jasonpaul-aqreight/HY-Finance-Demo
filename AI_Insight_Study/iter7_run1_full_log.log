@@ -1,0 +1,1633 @@
+════════════════════════════════════════════════════════════════════════════════
+AI INSIGHT ENGINE — DEBUG LOG
+════════════════════════════════════════════════════════════════════════════════
+Timestamp  : 2026-05-07T14:31:12.811Z
+Section    : financial_variance
+Model      : claude-haiku-4-5-20251001
+Date Range : snapshot (all data)
+════════════════════════════════════════════════════════════════════════════════
+
+════════════════════════════════════════════════════════════════════════════════
+COMPONENT: P&L Variance Summary (fv_variance_summary)
+Started at : 2026-05-07T14:31:12.837Z
+════════════════════════════════════════════════════════════════════════════════
+
+────────────────────────────────────────────────────────────────────────────────
+TURN 0 — Initial Request
+────────────────────────────────────────────────────────────────────────────────
+
+[SYSTEM PROMPT]
+You are a senior financial analyst at Hoi-Yong (Malaysian fruit distribution). You explain dashboard metrics to a senior director.
+
+Rules:
+- Be direct, concise, no jargon. State facts, not recommendations.
+- Use RM with thousands separators (e.g., RM 5,841,378).
+- Bullet points for observations. Markdown tables for comparisons.
+- Compare at least 3 data points for trends.
+- If data is insufficient, say so.
+- Keep analysis under 150 words.
+- Do NOT re-derive totals. Use values as given.
+- Every number you cite MUST appear in the data block. Display rounding OK (e.g., RM 2,286,847 → RM 2.29M). Never back-solve or invent values.
+- Match your language to the Scope line in the data (period vs snapshot vs fiscal).
+
+[USER PROMPT]
+You are analyzing the "P&L Variance Summary" on the Financial page.
+
+What it shows: A comparison of the current fiscal window's P&L performance against TWO baselines:
+1. **YoY Variance** — actual vs same window in the prior fiscal year
+2. **Budget Variance** — actual vs approved budget (only present if a budget has been approved for this fiscal year)
+
+The pre-fetched data gives you:
+- YoY variance table: each line item (Net Sales, COGS, Gross Profit, OpEx, Operating Profit, Other Income, Net Profit) shows Actual, Baseline (prior year same window), Variance (RM), Variance %, and Status (Favourable / Unfavourable)
+- Budget variance table (if present): each line item shows Actual, Budget, Variance (RM), Variance %, and Status
+- Favourable/Unfavourable classification logic:
+  - Revenue lines (Net Sales, Gross Profit, Operating Profit, Net Profit, Other Income): higher actual = Favourable
+  - Cost lines (COGS, Operating Costs): lower actual = Favourable
+- Margin comparisons: Gross Margin % and Net Margin % (current vs baseline, drift in pp)
+
+Thresholds:
+- Variance within ±5% = On Track
+- Variance ±5–15% = Moderate deviation
+- Variance beyond ±15% = Material deviation
+- Any sign flip (profit → loss or vice versa) = Severe
+
+Evaluate:
+- Which P&L line items deviated most from baseline, and in which direction?
+- Is the deviation favourable or unfavourable for the business?
+- Are margin percentages improving or deteriorating vs the same period last year?
+- If budget variance is present: how does actual performance compare to the approved budget? Are we on track, over, or under budget?
+- What is the overall picture — is the business performing better or worse?
+
+Hard rules:
+- For YoY variance: always state the baseline is "same period last year"
+- For budget variance: clearly label it as comparison against the "approved budget"
+- Cite only figures from the pre-fetched data block. Do NOT invent numbers.
+- Do NOT recompute variance % — the figures in the data block are authoritative.
+- If no budget variance section is present, do NOT mention budgets — only analyze YoY variance
+
+Provide a concise variance summary — the director wants to know "am I on track compared to last year and my budget, and where are the biggest gaps."
+
+Section: Variance, Forecast & Budget
+Component: P&L Variance Summary (kpi)
+Fiscal Period: FY2025 (fy)
+
+Current Values:
+Scope: FISCAL-PERIOD — full FY2025.
+
+P&L Variance Summary for full FY2025.
+
+--- YoY Variance (Actual vs Prior Year) ---
+Note: "Baseline" = same fiscal window in the prior year.
+
+| Line Item | Actual (full FY2025) | Baseline (Prior Year) | Variance (RM) | Var % | Status |
+|-----------|-------------------------|----------------------|---------------|-------|--------|
+| Net Sales | RM 81,520,186 | RM 79,894,310 | RM 1,625,876 | 2.0% | Favourable |
+| Cost of Sales | RM 75,888,549 | RM 72,073,433 | RM 3,815,116 | 5.3% | Unfavourable |
+| Gross Profit | RM 5,631,637 | RM 7,820,877 | RM -2,189,240 | -28.0% | Unfavourable |
+| Operating Costs | RM 9,050,916 | RM 6,559,078 | RM 2,491,838 | 38.0% | Unfavourable |
+| Operating Profit | RM -3,419,280 | RM 1,261,799 | RM -4,681,079 | -371.0% | Unfavourable |
+| Other Income | RM 1,458,104 | RM 118,187 | RM 1,339,917 | 1133.7% | Favourable |
+| Net Profit | RM -1,961,176 | RM 1,379,986 | RM -3,341,162 | -242.1% | Unfavourable |
+
+Margin comparison:
+- Gross Margin: 6.9% (baseline 9.8%) — drift -2.9pp
+- Net Margin: -2.4% (baseline 1.7%) — drift -4.1pp
+
+⚠ SIGN FLIPS (SEVERE): Net Profit, Operating Profit switched between profit and loss vs baseline.
+
+--- Budget Variance (Actual vs Approved Budget) ---
+Budget approved on 4/19/2026
+
+| Line Item | Actual | Budget | Variance (RM) | Var % | Status |
+|-----------|--------|--------|---------------|-------|--------|
+| Net Sales | RM 81,520,186 | RM 81,520,188 | RM -2 | -0.0% | Unfavourable |
+| Cost of Sales | RM 75,888,549 | RM 75,888,552 | RM -3 | -0.0% | Favourable |
+| Gross Profit | RM 5,631,637 | RM 5,631,636 | RM 1 | 0.0% | Favourable |
+| Operating Costs | RM 9,050,916 | RM 9,050,916 | RM 0 | 0.0% | On Track |
+| Net Profit | RM -1,961,176 | RM -1,961,172 | RM -4 | -0.0% | Unfavourable |
+
+
+Thresholds:
+- Variance within ±5% = On Track
+- Variance ±5–15% = Moderate deviation
+- Variance beyond ±15% = Material deviation
+- Any sign flip = Severe
+
+
+
+════════════════════════════════════════════════════════════════════════════════
+COMPONENT: Variance by Account (fv_variance_breakdown)
+Started at : 2026-05-07T14:31:12.851Z
+════════════════════════════════════════════════════════════════════════════════
+
+────────────────────────────────────────────────────────────────────────────────
+TURN 0 — Initial Request
+────────────────────────────────────────────────────────────────────────────────
+
+[SYSTEM PROMPT]
+You are a senior financial analyst at Hoi-Yong (Malaysian fruit distribution). You explain dashboard metrics to a senior director.
+
+Rules:
+- Be direct, concise, no jargon. State facts, not recommendations.
+- Use RM with thousands separators (e.g., RM 5,841,378).
+- Bullet points for observations. Markdown tables for comparisons.
+- Compare at least 3 data points for trends.
+- If data is insufficient, say so.
+- Keep analysis under 150 words.
+- Do NOT re-derive totals. Use values as given.
+- Every number you cite MUST appear in the data block. Display rounding OK (e.g., RM 2,286,847 → RM 2.29M). Never back-solve or invent values.
+- Match your language to the Scope line in the data (period vs snapshot vs fiscal).
+
+[USER PROMPT]
+You are analyzing the "Variance by Account" breakdown on the Financial page.
+
+What it shows: A detailed account-level breakdown of P&L variance, showing which specific GL accounts within each category (Sales, COGS, OpEx, Other Income) contributed most to the overall variance. This answers the question "which specific accounts drove the difference from last year."
+
+The pre-fetched data gives you:
+- Per-account-type sections (COGS accounts, OpEx accounts, etc.)
+- For each account: current amount, baseline (prior year), variance RM, variance %, and favourable/unfavourable status
+- Accounts sorted by absolute variance (biggest movers first)
+- Only accounts with non-zero variance are shown
+- A "Monthly Operating Costs by Category" sub-table at the end, showing the top 5 OpEx categories' monthly RM totals for the fiscal year plus the peak-OpEx month — use this to answer WHEN the cost surge happened, not just which accounts. Do NOT query pc_expense_monthly or pc_pnl_period for this; it is already pre-computed here.
+
+Thresholds:
+- Single account driving > 30% of category variance = Concentrated risk
+- Top 3 accounts driving > 70% of category variance = Highly concentrated
+- Any account with variance > ±50% = Flag for investigation
+
+Evaluate:
+- Within each P&L category, which 1-3 named accounts are the biggest movers?
+- Is the variance concentrated in a few accounts or spread across many?
+- Are there any accounts with unusually large percentage swings that warrant attention?
+
+Hard rules:
+- You may only cite account names that appear in the pre-fetched data. Do NOT invent account names.
+- Cite RM amounts and percentages exactly as given. Do NOT recompute.
+- Focus on the top movers — do not narrate every small account.
+
+Provide a concise account-level analysis — the director wants to know "which specific accounts explain the variance, and should any of them concern me."
+
+Section: Variance, Forecast & Budget
+Component: Variance by Account (table)
+Fiscal Period: FY2025 (fy)
+
+Current Values:
+Scope: FISCAL-PERIOD — full FY2025.
+
+P&L Variance by Account for FY2025 — current YTD vs prior YTD, from pc_pnl_period.
+Note: "Prior YTD" is the baseline (same fiscal window last year). This is NOT a formal budget.
+
+### SALES (SL)
+| Account | Current YTD | Prior YTD | Variance (RM) | Var % | Status |
+|---------|------------|-----------|---------------|-------|--------|
+| CREDIT SALES | RM 76,422,437 | RM 72,777,548 | RM 3,644,889 | 5.0% | Favourable |
+| CASH SALES | RM 7,730,590 | RM 9,458,964 | RM -1,728,374 | -18.3% | Unfavourable |
+| **SALES Total** | **RM 84,153,027** | **RM 82,236,513** | **RM 1,916,514** | **2.3%** | — |
+
+### SALES ADJUSTMENTS (SA)
+| Account | Current YTD | Prior YTD | Variance (RM) | Var % | Status |
+|---------|------------|-----------|---------------|-------|--------|
+| RETURN INWARDS | RM -1,069,278 | RM -856,592 | RM -212,687 | -24.8% | Unfavourable |
+| DISCOUNT ALLOWED | RM -1,563,563 | RM -1,485,611 | RM -77,951 | -5.2% | Unfavourable |
+| **SALES ADJUSTMENTS Total** | **RM -2,632,841** | **RM -2,342,203** | **RM -290,638** | **-12.4%** | — |
+
+### COST OF GOODS SOLD (CO)
+| Account | Current YTD | Prior YTD | Variance (RM) | Var % | Status |
+|---------|------------|-----------|---------------|-------|--------|
+| PURCHASES | RM 81,255,806 | RM 76,818,285 | RM 4,437,521 | 5.8% | Unfavourable |
+| PURCHASES RETURN | RM -2,349,143 | RM -1,395,845 | RM -953,298 | -68.3% | Favourable |
+| DISCOUNT RECEIVED | RM -4,048,796 | RM -4,725,022 | RM 676,226 | 14.3% | Unfavourable |
+| CARRIAGE INWARDS | RM 908,445 | RM 1,101,132 | RM -192,687 | -17.5% | Favourable |
+| COLDROOM RENTAL  | RM 0 | RM 76,519 | RM -76,519 | -100.0% | Favourable |
+| CASH PURCHASES - SMALL BASKET | RM 71,325 | RM 124,901 | RM -53,576 | -42.9% | Favourable |
+| LABOUR FOR LOADING & UNLOADING CHARGE  | RM 7,802 | RM 25,868 | RM -18,066 | -69.8% | Favourable |
+| TRANSPORTATION/FREIGHT CHG (COGS) | RM 43,111 | RM 47,595 | RM -4,484 | -9.4% | Favourable |
+| **COST OF GOODS SOLD Total** | **RM 75,888,549** | **RM 72,073,433** | **RM 3,815,116** | **5.3%** | — |
+
+Top 3 accounts explain 159% of COST OF GOODS SOLD total variance.
+
+### OTHER INCOMES (OI)
+| Account | Current YTD | Prior YTD | Variance (RM) | Var % | Status |
+|---------|------------|-----------|---------------|-------|--------|
+| REALISED GAIN ON FOREIGN EXCHANGE | RM 464,371 | RM 15,023 | RM 449,348 | 2991.0% | Favourable |
+| RENTAL INCOME -COLD ROOM | RM 400,408 | RM 0 | RM 400,408 | n/a | Favourable |
+| RENTAL INCOME FOR NO.21 INDUSTRY FACTORY | RM 275,000 | RM 0 | RM 275,000 | n/a | Favourable |
+| OTHER INCOME -CARRIAGE OUTWARD FOR LOAD,UNLOAD &HANDLING CHARGES | RM 133,159 | RM 35,584 | RM 97,575 | 274.2% | Favourable |
+| GAIN/(LOSS) ON DISPOSAL  | RM 100,440 | RM 13,000 | RM 87,440 | 672.6% | Favourable |
+| INSURANCE CLAIMED  | RM 15,003 | RM 60,000 | RM -44,997 | -75.0% | Unfavourable |
+| MADANI GOVERNT DIESEL SUBSIDY  | RM 25,881 | RM 0 | RM 25,881 | n/a | Favourable |
+| HRDF CLAIMABLE TRAINING COURSE | RM 24,300 | RM 0 | RM 24,300 | n/a | Favourable |
+| UNREALISED GAIN/(LOSS) CURRENCY EXCHANGE | RM 4,479 | RM -18,951 | RM 23,430 | 123.6% | Favourable |
+| OTHER INCOME | RM 6,065 | RM 0 | RM 6,065 | n/a | Favourable |
+| **OTHER INCOMES Total** | **RM 1,458,104** | **RM 118,187** | **RM 1,339,917** | **1133.7%** | — |
+
+Top 3 accounts explain 84% of OTHER INCOMES total variance.
+
+### EXPENSES (EP)
+| Account | Current YTD | Prior YTD | Variance (RM) | Var % | Status |
+|---------|------------|-----------|---------------|-------|--------|
+| People & Payroll | RM 4,002,996 | RM 3,125,703 | RM 877,293 | 28.1% | Unfavourable |
+| Property & Utilities | RM 1,468,736 | RM 878,904 | RM 589,832 | 67.1% | Unfavourable |
+| Depreciation | RM 1,504,927 | RM 964,914 | RM 540,012 | 56.0% | Unfavourable |
+| Professional Fees | RM 238,387 | RM 108,509 | RM 129,879 | 119.7% | Unfavourable |
+| Finance & Banking | RM 266,926 | RM 141,550 | RM 125,375 | 88.6% | Unfavourable |
+| Office & Supplies | RM 447,459 | RM 348,775 | RM 98,684 | 28.3% | Unfavourable |
+| Vehicle & Transport | RM 497,224 | RM 400,943 | RM 96,281 | 24.0% | Unfavourable |
+| Other | RM 95,129 | RM 156,402 | RM -61,273 | -39.2% | Favourable |
+| Equipment & IT | RM 136,337 | RM 93,562 | RM 42,775 | 45.7% | Unfavourable |
+| Insurance | RM 232,363 | RM 200,868 | RM 31,494 | 15.7% | Unfavourable |
+| **EXPENSES Total** | **RM 9,050,916** | **RM 6,559,078** | **RM 2,491,839** | **38.0%** | — |
+
+Top 3 accounts explain 81% of EXPENSES total variance.
+
+### TAXATION (TX)
+| Account | Current YTD | Prior YTD | Variance (RM) | Var % | Status |
+|---------|------------|-----------|---------------|-------|--------|
+| TAXATION | RM 0 | RM 218,847 | RM -218,847 | -100.0% | Unfavourable |
+| TAXATION - UNDERPROVISION | RM 0 | RM 9,613 | RM -9,613 | -100.0% | Unfavourable |
+| TAXATION - OVERPROVISION | RM 0 | RM -6,289 | RM 6,289 | 100.0% | Favourable |
+| **TAXATION Total** | **RM 0** | **RM 222,171** | **RM -222,171** | **-100.0%** | — |
+
+Top 3 accounts explain 106% of TAXATION total variance.
+
+
+### Monthly Operating Costs by Category (top 5 categories, FYFY2025)
+Use this to explain WHEN the +38% OpEx surge happened — do not query pc_expense_monthly for this.
+
+| Month | People & Payroll | Depreciation | Property & Utilities | Vehicle & Transport | Office & Supplies | OpEx Total |
+|-------|------|------|------|------|------|------------|
+| Mar 2024 | RM 283,372 | RM 0 | RM 141,574 | RM 56,890 | RM 20,349 | RM 610,595 |
+| Apr 2024 | RM 255,743 | RM 0 | RM 125,588 | RM 35,605 | RM 36,819 | RM 557,219 |
+| May 2024 | RM 287,563 | RM 0 | RM 119,462 | RM 32,918 | RM 35,208 | RM 545,770 |
+| Jun 2024 | RM 293,928 | RM 0 | RM 114,098 | RM 52,131 | RM 15,933 | RM 554,358 |
+| Jul 2024 | RM 299,317 | RM 0 | RM 68,002 | RM 42,580 | RM 49,601 | RM 571,655 |
+| Aug 2024 | RM 311,049 | RM 0 | RM 65,448 | RM 58,621 | RM 38,514 | RM 552,717 |
+| Sep 2024 | RM 328,410 | RM 0 | RM 115,652 | RM 53,336 | RM 83,747 | RM 683,785 |
+| Oct 2024 | RM 316,439 | RM 0 | RM 116,977 | RM 27,897 | RM 30,982 | RM 571,609 |
+| Nov 2024 | RM 340,296 | RM 0 | RM 158,077 | RM 53,887 | RM 35,870 | RM 650,468 |
+| Dec 2024 | RM 362,119 | RM 0 | RM 172,256 | RM 28,318 | RM 41,241 | RM 730,245 |
+| Jan 2025 | RM 575,563 | RM 0 | RM 137,415 | RM 28,721 | RM 37,152 | RM 845,388 |
+| Feb 2025 | RM 349,197 | RM 1,504,927 | RM 134,186 | RM 26,320 | RM 22,043 | RM 2,177,107 |
+
+Peak OpEx month: Feb 2025 at RM 2,177,107 (24.1% of FY total).
+
+Thresholds:
+- Single account > 30% of category variance = Concentrated risk
+- Top 3 accounts > 70% of category variance = Highly concentrated
+- Any account variance > ±50% = Flag for investigation
+
+Focus on the top movers per category — do not narrate every small account.
+
+────────────────────────────────────────────────────────────────────────────────
+TURN 1 — Claude Response
+────────────────────────────────────────────────────────────────────────────────
+model      : claude-haiku-4-5-20251001
+stop_reason: end_turn
+tokens     : input=1686, output=406, total=2092
+cache      : created=0, read=0
+cost       : $0.002973
+
+[TEXT]
+# P&L Variance Summary – FY2025
+
+## Year-over-Year Performance (vs Prior Year)
+
+**Severe Issues:**
+- **Operating Profit & Net Profit flipped to losses.** Operating Profit fell RM 4,681,079 (–371%); Net Profit declined RM 3,341,162 (–242%), swinging from profit to loss.
+- **Gross Profit collapsed** RM 2,189,240 (–28%), driven by Cost of Sales rising RM 3,815,116 (+5.3%) while Net Sales grew only RM 1,625,876 (+2.0%).
+- **Operating Costs surged** RM 2,491,838 (+38%)—material unfavourable variance.
+
+**Margin Deterioration:**
+- Gross Margin: 6.9% vs 9.8% prior year (–2.9pp)
+- Net Margin: –2.4% vs +1.7% prior year (–4.1pp)
+
+**Offset:** Other Income nearly tripled to RM 1,458,104 (+RM 1,339,917, +1134%), but insufficient to cover operating losses.
+
+## Budget Performance (Approved Budget)
+
+**On Track.** Actual results align nearly perfectly with the approved budget—variances are negligible (–RM 2 to RM 1). All line items within ±0.0% tolerance.
+
+## Overall Picture
+
+**Unfavourable.** The business swung to loss despite modest sales growth. Cost control deteriorated sharply (COGS +5.3%, OpEx +38%), compressing margins below breakeven. Budget compliance is tight, but the budgeted position itself embedded a loss forecast.
+
+────────────────────────────────────────────────────────────────────────────────
+COMPONENT COMPLETE: fv_variance_summary
+────────────────────────────────────────────────────────────────────────────────
+Finished at: 2026-05-07T14:31:18.226Z
+Tool calls : 0
+Tokens     : input=1686, output=406, total=2092
+Cost       : $0.002973
+
+[FINAL ANALYSIS]
+# P&L Variance Summary – FY2025
+
+## Year-over-Year Performance (vs Prior Year)
+
+**Severe Issues:**
+- **Operating Profit & Net Profit flipped to losses.** Operating Profit fell RM 4,681,079 (–371%); Net Profit declined RM 3,341,162 (–242%), swinging from profit to loss.
+- **Gross Profit collapsed** RM 2,189,240 (–28%), driven by Cost of Sales rising RM 3,815,116 (+5.3%) while Net Sales grew only RM 1,625,876 (+2.0%).
+- **Operating Costs surged** RM 2,491,838 (+38%)—material unfavourable variance.
+
+**Margin Deterioration:**
+- Gross Margin: 6.9% vs 9.8% prior year (–2.9pp)
+- Net Margin: –2.4% vs +1.7% prior year (–4.1pp)
+
+**Offset:** Other Income nearly tripled to RM 1,458,104 (+RM 1,339,917, +1134%), but insufficient to cover operating losses.
+
+## Budget Performance (Approved Budget)
+
+**On Track.** Actual results align nearly perfectly with the approved budget—variances are negligible (–RM 2 to RM 1). All line items within ±0.0% tolerance.
+
+## Overall Picture
+
+**Unfavourable.** The business swung to loss despite modest sales growth. Cost control deteriorated sharply (COGS +5.3%, OpEx +38%), compressing margins below breakeven. Budget compliance is tight, but the budgeted position itself embedded a loss forecast.
+
+════════════════════════════════════════════════════════════════════════════════
+
+
+════════════════════════════════════════════════════════════════════════════════
+COMPONENT: Trend Forecast (fv_trend_forecast)
+Started at : 2026-05-07T14:31:18.228Z
+════════════════════════════════════════════════════════════════════════════════
+
+────────────────────────────────────────────────────────────────────────────────
+TURN 0 — Initial Request
+────────────────────────────────────────────────────────────────────────────────
+
+[SYSTEM PROMPT]
+You are a senior financial analyst at Hoi-Yong (Malaysian fruit distribution). You explain dashboard metrics to a senior director.
+
+Rules:
+- Be direct, concise, no jargon. State facts, not recommendations.
+- Use RM with thousands separators (e.g., RM 5,841,378).
+- Bullet points for observations. Markdown tables for comparisons.
+- Compare at least 3 data points for trends.
+- If data is insufficient, say so.
+- Keep analysis under 150 words.
+- Do NOT re-derive totals. Use values as given.
+- Every number you cite MUST appear in the data block. Display rounding OK (e.g., RM 2,286,847 → RM 2.29M). Never back-solve or invent values.
+- Match your language to the Scope line in the data (period vs snapshot vs fiscal).
+
+[USER PROMPT]
+You are analyzing the "Multi-Period Trend Forecast" on the Financial page.
+
+What it shows: A forward projection of key P&L line items (Net Sales, Gross Profit, Net Profit) for the NEXT 12 MONTHS, based on the trend observed over recent months. The forecast numbers are computed by the system from historical data — they are NOT generated by you. Your job is to EXPLAIN the forecasts, not to invent them.
+
+The pre-fetched data gives you:
+- Monthly trend table covering the fiscal window with FIVE columns: Net Sales, Cost of Sales, Gross Profit, Operating Costs, Net Profit. Use this directly — do NOT query pc_pnl_period for monthly P&L lines.
+- Pre-computed 12-month forecast table: Month+1 through Month+12 projections (forecast still covers Net Sales / Gross Profit / Net Profit only; Cost of Sales and Operating Costs are historical-only).
+- The method used: 3-month weighted moving average (50% most recent month, 30% prior, 20% earliest)
+- Trend direction + signal strength: rising/falling/flat, Strong/Weak
+- Confidence band: Narrowing (consistent trend) or Widening (volatile trend)
+- Per-metric detail: weighted average change, last actual, key forecast milestones (Month+1, +3, +6, +12)
+
+Thresholds:
+- Trend direction consistent for 4+ months = Strong signal
+- Trend direction mixed or oscillating = Weak signal (state this)
+- Forecast projects a sign flip (profit → loss) = Severe warning
+- Month+4 onwards carry increasing uncertainty — state this explicitly
+- Month+7 to Month+12 are long-range estimates — caution the reader about reliability
+
+Evaluate:
+- For each line item, describe the recent trend direction in plain language
+- Highlight key forecast milestones: Month+1 (near-term), Month+3 (quarter), Month+6 (half-year), Month+12 (full-year)
+- Flag if the trend is strong (consistent direction) or weak (mixed signals)
+- Explicitly note that longer-range forecasts are less reliable
+- If any forecast month projects a loss or a sign flip, call it out explicitly
+
+Hard rules:
+- The forecast numbers are PRE-COMPUTED in the data block. Do NOT invent your own projections.
+- Always include the disclaimer: these are AI estimates based on historical trends, not formal financial projections
+- Do NOT claim precision — use "approximately" or "around" when stating forecast values
+- Summarise the 12-month trajectory — do NOT list all 12 months individually, focus on key milestones (Month+1, +3, +6, +12)
+
+Provide a concise forecast explanation — the director wants to know "based on recent trends, what should I expect over the next 12 months, and how confident should I be as we look further out."
+
+Section: Variance, Forecast & Budget
+Component: Trend Forecast (kpi)
+Fiscal Period: FY2025 (fy)
+
+Current Values:
+Scope: FISCAL-PERIOD — full FY2025.
+
+Multi-Period Trend Forecast for full FY2025 — projecting 12 months ahead based on 12-month trend.
+Method: 3-month weighted moving average (weights: 50% most recent, 30% prior, 20% earliest). Each subsequent forecast month applies the same weighted change cumulatively.
+⚠ These are AI estimates based on historical trends — NOT formal financial projections.
+
+Monthly trend data:
+| Month | Net Sales | Cost of Sales | Gross Profit | Operating Costs | Net Profit |
+|-------|-----------|---------------|--------------|-----------------|------------|
+| Mar 2024 | RM 5,762,362 | RM 5,654,019 | RM 108,344 | RM 610,595 | RM -477,526 |
+| Apr 2024 | RM 5,856,383 | RM 5,523,396 | RM 332,986 | RM 557,219 | RM -171,014 |
+| May 2024 | RM 6,628,305 | RM 6,663,898 | RM -35,593 | RM 545,770 | RM -415,900 |
+| Jun 2024 | RM 6,678,771 | RM 5,613,801 | RM 1,064,970 | RM 554,358 | RM 554,814 |
+| Jul 2024 | RM 7,461,332 | RM 10,519,756 | RM -3,058,424 | RM 571,655 | RM -3,536,151 |
+| Aug 2024 | RM 8,752,692 | RM 6,026,896 | RM 2,725,796 | RM 552,717 | RM 2,349,765 |
+| Sep 2024 | RM 6,694,821 | RM 5,451,713 | RM 1,243,108 | RM 683,785 | RM 755,764 |
+| Oct 2024 | RM 5,850,634 | RM 5,033,796 | RM 816,837 | RM 571,609 | RM 455,498 |
+| Nov 2024 | RM 5,948,966 | RM 5,045,040 | RM 903,926 | RM 650,468 | RM 390,533 |
+| Dec 2024 | RM 6,143,023 | RM 7,656,353 | RM -1,513,330 | RM 730,245 | RM -2,111,273 |
+| Jan 2025 | RM 9,588,110 | RM 8,627,272 | RM 960,838 | RM 845,388 | RM 182,659 |
+| Feb 2025 | RM 6,154,788 | RM 4,072,610 | RM 2,082,178 | RM 2,177,107 | RM 61,656 |
+
+12-Month Forecast:
+| Forecast Month | Net Sales | Gross Profit | Net Profit |
+|---------------|-----------|--------------|------------|
+| Month+1 | RM 5,510,465 | RM 2,901,647 | RM 188,972 |
+| Month+2 | RM 4,866,142 | RM 3,721,116 | RM 316,289 |
+| Month+3 | RM 4,221,818 | RM 4,540,585 | RM 443,605 |
+| Month+4 | RM 3,577,495 | RM 5,360,054 | RM 570,922 |
+| Month+5 | RM 2,933,172 | RM 6,179,524 | RM 698,238 |
+| Month+6 | RM 2,288,848 | RM 6,998,993 | RM 825,555 |
+| Month+7 | RM 1,644,525 | RM 7,818,462 | RM 952,871 |
+| Month+8 | RM 1,000,202 | RM 8,637,931 | RM 1,080,188 |
+| Month+9 | RM 355,878 | RM 9,457,400 | RM 1,207,505 |
+| Month+10 | RM -288,445 | RM 10,276,869 | RM 1,334,821 |
+| Month+11 | RM -932,768 | RM 11,096,338 | RM 1,462,138 |
+| Month+12 | RM -1,577,092 | RM 11,915,808 | RM 1,589,454 |
+
+Detail:
+- **Net Sales**: Trend falling (Weak signal — 3/11 months consistent). Weighted avg monthly change: RM -644,323. Last actual: RM 6,154,788. Near-term: Month+1 ≈ RM 5,510,465, Month+3 ≈ RM 4,221,818. Full-year: Month+6 ≈ RM 2,288,848, Month+12 ≈ RM -1,577,092 ⚠ WARNING: sign flip projected at Month+10, Month+11, Month+12
+- **Gross Profit**: Trend rising (Weak signal — 6/11 months consistent). Weighted avg monthly change: RM 819,469. Last actual: RM 2,082,178. Near-term: Month+1 ≈ RM 2,901,647, Month+3 ≈ RM 4,540,585. Full-year: Month+6 ≈ RM 6,998,993, Month+12 ≈ RM 11,915,808
+- **Net Profit**: Trend rising (Weak signal — 4/11 months consistent). Weighted avg monthly change: RM 127,317. Last actual: RM 61,656. Near-term: Month+1 ≈ RM 188,972, Month+3 ≈ RM 443,605. Full-year: Month+6 ≈ RM 825,555, Month+12 ≈ RM 1,589,454
+
+Thresholds:
+- Trend consistent 4+ months = Strong signal
+- Trend mixed / oscillating = Weak signal (state this explicitly)
+- Forecast projects sign flip = Severe warning
+- Month+4 onwards carry increasing uncertainty — state this explicitly
+- Month+7 to Month+12 are long-range estimates — caution the reader about reliability
+
+
+────────────────────────────────────────────────────────────────────────────────
+TURN 1 — Claude Response
+────────────────────────────────────────────────────────────────────────────────
+model      : claude-haiku-4-5-20251001
+stop_reason: end_turn
+tokens     : input=3869, output=683, total=4552
+cache      : created=0, read=0
+cost       : $0.005827
+
+[TEXT]
+# Account-Level Variance Analysis – FY2025
+
+## Key Findings
+
+**SALES & ADJUSTMENTS**
+- Credit Sales drove net growth: +RM 3.64M (5.0%), partially offset by Cash Sales decline of –RM 1.73M (–18.3%).
+- Returns Inwards spiked 24.8% unfavourable (–RM 212,687), suggesting quality or customer satisfaction issues warrant review.
+
+**COST OF GOODS SOLD** — *Concentrated risk*
+- **Purchases** dominates variance: +RM 4.44M (5.8% unfavourable). Single account represents 116% of COGS variance — concentrated exposure.
+- **Purchases Return** swung sharply favourable: +RM 676.2K recovered (–68.3%), partially offsetting purchase inflation.
+- Discount Received deteriorated by RM 676.2K (14.3% unfavourable) — supplier terms tightened.
+
+**OPERATING EXPENSES** — *Significant surge*
+- Total OpEx +38.0% (RM 2.49M unfavourable). Top 3 accounts (People & Payroll, Property & Utilities, Depreciation) explain 81% of variance.
+- **People & Payroll**: +RM 877.3K (28.1%) — spiked in Jan 2025 (RM 575.6K) and Feb 2025 (RM 349.2K); suggests staffing expansion or bonus accrual.
+- **Depreciation**: +RM 540.0K (56.0%) — lumpy Feb 2025 charge (RM 1.50M) indicates new asset capitalization.
+- **Property & Utilities**: +RM 589.8K (67.1%) — elevated Nov–Dec 2024 and Feb 2025; operational or seasonal driver.
+
+**OTHER INCOMES** — *Highly volatile*
+- Realised FX Gain: +RM 449.3K (2991% swing) from prior RM 15K base.
+- New rental income streams: Cold Room (RM 400.4K) and Factory (RM 275K) — not in prior year.
+- Top 3 accounts explain 84% of variance; gains are one-off, not recurring.
+
+**TAXATION**
+- FY2025 shows RM 0 current vs RM 222.2K prior — likely provisional assessment timing or loss carryforward.
+
+## Director Summary
+Purchases cost inflation (RM 4.44M) is the primary P&L headwind. OpEx surge is real (+38%), driven by payroll expansion and asset depreciation in Feb 2025. Sales grew modestly (+2.3%), but returns and cash weakness offset gains. Other Income boosted FY result (RM 1.34M), but sources are non-recurring (FX, new rentals).
+
+────────────────────────────────────────────────────────────────────────────────
+COMPONENT COMPLETE: fv_variance_breakdown
+────────────────────────────────────────────────────────────────────────────────
+Finished at: 2026-05-07T14:31:21.865Z
+Tool calls : 0
+Tokens     : input=3869, output=683, total=4552
+Cost       : $0.005827
+
+[FINAL ANALYSIS]
+# Account-Level Variance Analysis – FY2025
+
+## Key Findings
+
+**SALES & ADJUSTMENTS**
+- Credit Sales drove net growth: +RM 3.64M (5.0%), partially offset by Cash Sales decline of –RM 1.73M (–18.3%).
+- Returns Inwards spiked 24.8% unfavourable (–RM 212,687), suggesting quality or customer satisfaction issues warrant review.
+
+**COST OF GOODS SOLD** — *Concentrated risk*
+- **Purchases** dominates variance: +RM 4.44M (5.8% unfavourable). Single account represents 116% of COGS variance — concentrated exposure.
+- **Purchases Return** swung sharply favourable: +RM 676.2K recovered (–68.3%), partially offsetting purchase inflation.
+- Discount Received deteriorated by RM 676.2K (14.3% unfavourable) — supplier terms tightened.
+
+**OPERATING EXPENSES** — *Significant surge*
+- Total OpEx +38.0% (RM 2.49M unfavourable). Top 3 accounts (People & Payroll, Property & Utilities, Depreciation) explain 81% of variance.
+- **People & Payroll**: +RM 877.3K (28.1%) — spiked in Jan 2025 (RM 575.6K) and Feb 2025 (RM 349.2K); suggests staffing expansion or bonus accrual.
+- **Depreciation**: +RM 540.0K (56.0%) — lumpy Feb 2025 charge (RM 1.50M) indicates new asset capitalization.
+- **Property & Utilities**: +RM 589.8K (67.1%) — elevated Nov–Dec 2024 and Feb 2025; operational or seasonal driver.
+
+**OTHER INCOMES** — *Highly volatile*
+- Realised FX Gain: +RM 449.3K (2991% swing) from prior RM 15K base.
+- New rental income streams: Cold Room (RM 400.4K) and Factory (RM 275K) — not in prior year.
+- Top 3 accounts explain 84% of variance; gains are one-off, not recurring.
+
+**TAXATION**
+- FY2025 shows RM 0 current vs RM 222.2K prior — likely provisional assessment timing or loss carryforward.
+
+## Director Summary
+Purchases cost inflation (RM 4.44M) is the primary P&L headwind. OpEx surge is real (+38%), driven by payroll expansion and asset depreciation in Feb 2025. Sales grew modestly (+2.3%), but returns and cash weakness offset gains. Other Income boosted FY result (RM 1.34M), but sources are non-recurring (FX, new rentals).
+
+════════════════════════════════════════════════════════════════════════════════
+
+
+════════════════════════════════════════════════════════════════════════════════
+COMPONENT: AI Budget Suggestions (fv_budget_suggestions)
+Started at : 2026-05-07T14:31:21.916Z
+════════════════════════════════════════════════════════════════════════════════
+
+────────────────────────────────────────────────────────────────────────────────
+TURN 0 — Initial Request
+────────────────────────────────────────────────────────────────────────────────
+
+[SYSTEM PROMPT]
+You are a senior financial analyst at Hoi-Yong (Malaysian fruit distribution). You explain dashboard metrics to a senior director.
+
+Rules:
+- Be direct, concise, no jargon. State facts, not recommendations.
+- Use RM with thousands separators (e.g., RM 5,841,378).
+- Bullet points for observations. Markdown tables for comparisons.
+- Compare at least 3 data points for trends.
+- If data is insufficient, say so.
+- Keep analysis under 150 words.
+- Do NOT re-derive totals. Use values as given.
+- Every number you cite MUST appear in the data block. Display rounding OK (e.g., RM 2,286,847 → RM 2.29M). Never back-solve or invent values.
+- Match your language to the Scope line in the data (period vs snapshot vs fiscal).
+
+[USER PROMPT]
+You are analyzing "AI Budget Suggestions" on the Financial page.
+
+What it shows: AI-generated budget suggestions for the next fiscal period, derived from historical P&L data. The system computes monthly averages from current-period actuals and annualises them to produce suggested annual budgets for each P&L category.
+
+The pre-fetched data gives you:
+- Headline P&L budget suggestions: Net Sales, Cost of Sales, Gross Profit, Operating Costs, Net Profit — each with current-period actual, prior-period actual, YoY growth %, suggested monthly and annual budget
+- Category-level budget suggestions: per account type (Sales, COGS, OpEx, Other Income) with the same columns plus trend direction and signal strength
+- Trend direction: rising / falling / flat for each category, with strong/weak signal based on month-over-month consistency
+- If an approved budget exists: a comparison table showing approved vs suggested amounts with differences
+
+Evaluate:
+- Which categories show strong, consistent trends that make the budget suggestion more reliable?
+- Which categories have weak or volatile trends where the suggestion should be treated with caution?
+- Are there categories where YoY growth is significantly positive or negative — and should the budget account for that trajectory?
+- What is the overall picture — is the business growing, contracting, or stable?
+- Highlight any categories where the suggested budget differs materially from the prior year
+- If an approved budget exists, flag any material differences between the approved budget and the latest suggestions — this indicates the budget may need updating
+
+Hard rules:
+- The budget suggestions are PRE-COMPUTED in the data block. Do NOT invent your own numbers.
+- If no approved budget exists: frame suggestions as "starting points for budget discussions" and note that no budget has been approved yet
+- If an approved budget exists: compare suggestions against the approved budget and highlight discrepancies
+- Cite only figures from the pre-fetched data block. Do NOT recompute.
+
+Provide a concise budget overview — the director wants to know "based on our recent performance, what should we budget for next year, and where are the biggest uncertainties."
+
+Section: Variance, Forecast & Budget
+Component: AI Budget Suggestions (kpi)
+Fiscal Period: FY2025 (fy)
+
+Current Values:
+Scope: FISCAL-PERIOD — full FY2025.
+
+AI Budget Suggestions for full FY2025 — based on historical P&L data.
+Method: Monthly average of current-period actuals, annualised to 12 months. YoY growth rate and trend direction provided for context.
+A previously approved budget exists for this fiscal year — see comparison below.
+
+Headline P&L Budget Suggestions:
+| P&L Line | Current Period | Prior Period | YoY Change | Suggested Monthly Budget | Suggested Annual Budget |
+|----------|---------------|-------------|------------|--------------------------|------------------------|
+| Net Sales | RM 81,520,186 | RM 79,894,310 | 2.0% | RM 6,793,349 | RM 81,520,188 |
+| Cost of Sales | RM 75,888,549 | RM 72,073,433 | 5.3% | RM 6,324,046 | RM 75,888,552 |
+| Gross Profit | RM 5,631,637 | RM 7,820,877 | -28.0% | RM 469,303 | RM 5,631,636 |
+| Operating Costs | RM 9,050,916 | RM 6,559,078 | 38.0% | RM 754,243 | RM 9,050,916 |
+| Net Profit | RM -1,961,176 | RM 1,379,986 | -242.1% | RM -163,431 | RM -1,961,172 |
+
+
+Category-Level Budget Suggestions (by account type):
+| Category | Current YTD | Prior YTD | YoY Growth | Monthly Avg | Suggested Annual Budget | Trend |
+|----------|-------------|-----------|------------|-------------|------------------------|-------|
+| SALES (SL) | RM 84,153,027 | RM 82,236,513 | 2.3% | RM 7,012,752/mo | RM 84,153,024 | rising (Strong) |
+| SALES ADJUSTMENTS (SA) | RM -2,632,841 | RM -2,342,203 | -12.4% | RM -219,403/mo | RM -2,632,836 | falling (Weak) |
+| COST OF GOODS SOLD (CO) | RM 75,888,549 | RM 72,073,433 | 5.3% | RM 6,324,046/mo | RM 75,888,552 | falling (Weak) |
+| OTHER INCOMES (OI) | RM 1,458,104 | RM 118,187 | 1133.7% | RM 121,509/mo | RM 1,458,108 | rising (Weak) |
+| EXPENSES (EP) | RM 9,050,916 | RM 6,559,078 | 38.0% | RM 754,243/mo | RM 9,050,916 | rising (Weak) |
+| TAXATION (TX) | RM 0 | RM 222,171 | -100.0% | RM 0/mo | RM 0 | flat (Weak) |
+
+
+Approved Budget (saved 4/19/2026):
+| P&L Line | Approved Monthly | Approved Annual | Suggested Monthly | Suggested Annual | Difference |
+|----------|-----------------|----------------|------------------|-----------------|------------|
+| Net Sales | RM 6,793,349 | RM 81,520,188 | RM 6,793,349 | RM 81,520,188 | RM 0 |
+| Cost of Sales | RM 6,324,046 | RM 75,888,552 | RM 6,324,046 | RM 75,888,552 | RM 0 |
+| Gross Profit | RM 469,303 | RM 5,631,636 | RM 469,303 | RM 5,631,636 | RM 0 |
+| Operating Costs | RM 754,243 | RM 9,050,916 | RM 754,243 | RM 9,050,916 | RM 0 |
+| Net Profit | RM -163,431 | RM -1,961,172 | RM -163,431 | RM -1,961,172 | RM 0 |
+
+Note: Compare approved budget against current suggestions — if they differ materially, flag it.
+Context:
+- Current period covers 12 month(s) in full FY2025
+- "Suggested Annual Budget" = monthly average × 12
+- YoY Growth shows how current period compares to the same window last year
+- Trend direction based on month-over-month movement within current period
+
+
+────────────────────────────────────────────────────────────────────────────────
+TURN 1 — Claude Response
+────────────────────────────────────────────────────────────────────────────────
+model      : claude-haiku-4-5-20251001
+stop_reason: end_turn
+tokens     : input=2656, output=690, total=3346
+cache      : created=0, read=0
+cost       : $0.004885
+
+[TEXT]
+# Multi-Period Trend Forecast – FY2025 (12-Month Projection)
+
+## Executive Summary
+The forecast shows **conflicting signals**: Net Sales declining sharply while Gross Profit and Net Profit rise. All three trends are **weak** (mixed monthly patterns). **Critical warning: Net Sales projects negative values from Month+10 onward—a structural impossibility that invalidates the long-range forecast.**
+
+---
+
+## Key Metrics
+
+### Net Sales – **FALLING (Weak Signal)**
+- **Recent trend**: Declined 3 of last 11 months; weighted monthly change: RM -644,323
+- **Near-term** (Month+1 to +3): RM 5,510,465 → RM 4,221,818 (sharp 23% drop)
+- **Medium-term** (Month+6): RM 2,288,848
+- **⚠ SEVERE WARNING**: Forecast turns negative at Month+10 (RM -288,445) and worsens to RM -1,577,092 by Month+12. **This is unrealistic and signals forecast model breakdown.**
+
+### Gross Profit – **RISING (Weak Signal)**
+- **Recent trend**: Up 6 of 11 months; weighted monthly change: RM +819,469
+- **Near-term** (Month+1 to +3): RM 2,901,647 → RM 4,540,585
+- **Medium-term** (Month+6): RM 6,998,993
+- **Trajectory**: Continues climbing to RM 11,915,808 by Month+12, which is **implausible given simultaneous negative sales.**
+
+### Net Profit – **RISING (Weak Signal)**
+- **Recent trend**: Up 4 of 11 months; weighted monthly change: RM +127,317
+- **Near-term** (Month+1 to +3): RM 188,972 → RM 443,605
+- **Medium-term** (Month+6): RM 825,555
+- **Trajectory**: Reaches RM 1,589,454 by Month+12.
+
+---
+
+## Reliability & Caveats
+
+**⚠ These are AI estimates based on historical trends — NOT formal financial projections.**
+
+- **Months +1 to +3**: Moderate confidence; near-term patterns are stable enough to guide planning.
+- **Months +4 onward**: Confidence declines sharply due to model inconsistency.
+- **Months +7 to +12**: **Do not rely on these figures.** The negative sales projection and diverging profit trends indicate the 3-month weighted average method has lost grip on your business dynamics.
+
+**Recommendation**: The forecast model requires recalibration. Negative sales are impossible; this suggests cost allocation or data anomalies in recent months (particularly Dec 2024 and Jan–Feb 2025 volatility) have skewed the projection.
+
+────────────────────────────────────────────────────────────────────────────────
+COMPONENT COMPLETE: fv_trend_forecast
+────────────────────────────────────────────────────────────────────────────────
+Finished at: 2026-05-07T14:31:25.562Z
+Tool calls : 0
+Tokens     : input=2656, output=690, total=3346
+Cost       : $0.004885
+
+[FINAL ANALYSIS]
+# Multi-Period Trend Forecast – FY2025 (12-Month Projection)
+
+## Executive Summary
+The forecast shows **conflicting signals**: Net Sales declining sharply while Gross Profit and Net Profit rise. All three trends are **weak** (mixed monthly patterns). **Critical warning: Net Sales projects negative values from Month+10 onward—a structural impossibility that invalidates the long-range forecast.**
+
+---
+
+## Key Metrics
+
+### Net Sales – **FALLING (Weak Signal)**
+- **Recent trend**: Declined 3 of last 11 months; weighted monthly change: RM -644,323
+- **Near-term** (Month+1 to +3): RM 5,510,465 → RM 4,221,818 (sharp 23% drop)
+- **Medium-term** (Month+6): RM 2,288,848
+- **⚠ SEVERE WARNING**: Forecast turns negative at Month+10 (RM -288,445) and worsens to RM -1,577,092 by Month+12. **This is unrealistic and signals forecast model breakdown.**
+
+### Gross Profit – **RISING (Weak Signal)**
+- **Recent trend**: Up 6 of 11 months; weighted monthly change: RM +819,469
+- **Near-term** (Month+1 to +3): RM 2,901,647 → RM 4,540,585
+- **Medium-term** (Month+6): RM 6,998,993
+- **Trajectory**: Continues climbing to RM 11,915,808 by Month+12, which is **implausible given simultaneous negative sales.**
+
+### Net Profit – **RISING (Weak Signal)**
+- **Recent trend**: Up 4 of 11 months; weighted monthly change: RM +127,317
+- **Near-term** (Month+1 to +3): RM 188,972 → RM 443,605
+- **Medium-term** (Month+6): RM 825,555
+- **Trajectory**: Reaches RM 1,589,454 by Month+12.
+
+---
+
+## Reliability & Caveats
+
+**⚠ These are AI estimates based on historical trends — NOT formal financial projections.**
+
+- **Months +1 to +3**: Moderate confidence; near-term patterns are stable enough to guide planning.
+- **Months +4 onward**: Confidence declines sharply due to model inconsistency.
+- **Months +7 to +12**: **Do not rely on these figures.** The negative sales projection and diverging profit trends indicate the 3-month weighted average method has lost grip on your business dynamics.
+
+**Recommendation**: The forecast model requires recalibration. Negative sales are impossible; this suggests cost allocation or data anomalies in recent months (particularly Dec 2024 and Jan–Feb 2025 volatility) have skewed the projection.
+
+════════════════════════════════════════════════════════════════════════════════
+
+────────────────────────────────────────────────────────────────────────────────
+TURN 1 — Claude Response
+────────────────────────────────────────────────────────────────────────────────
+model      : claude-haiku-4-5-20251001
+stop_reason: end_turn
+tokens     : input=1921, output=409, total=2330
+cache      : created=0, read=0
+cost       : $0.003173
+
+[TEXT]
+# AI Budget Suggestions Overview – FY2025
+
+## Key Findings
+
+**Approved budget matches suggestions exactly — no update required at headline level.** However, underlying trends reveal material business stress:
+
+| Metric | Current | Prior Year | Change |
+|--------|---------|-----------|--------|
+| Net Sales | RM 81.52M | RM 79.89M | +2.0% |
+| Gross Profit | RM 5.63M | RM 7.82M | **–28.0%** |
+| Operating Costs | RM 9.05M | RM 6.56M | **+38.0%** |
+| Net Profit | **(RM 1.96M)** | RM 1.38M | **–242.1% loss** |
+
+## Trend Assessment
+
+**Strong signal (reliable):**
+- SALES: +2.3% with strong rising trend. Use as baseline.
+
+**Weak signals (treat with caution):**
+- COGS: +5.3% YoY but weak falling trend — cost inflation outpacing revenue growth.
+- Operating Costs: +38% YoY with weak rising trend — expense control deteriorating; needs scrutiny.
+- Other Income: +1,133.7% (RM 1.46M vs RM 118K prior) but weak signal — likely one-off; don't rely on recurrence.
+
+## Bottom Line
+
+Sales are flat-to-growing, but **profitability has collapsed**. Gross margin compressed 28% while operating costs surged 38%. The approved budget locks in a loss position of **RM 1.96M**. This reflects actual performance, not optimism — but no headroom for variance exists. Monitor cost control closely.
+
+────────────────────────────────────────────────────────────────────────────────
+COMPONENT COMPLETE: fv_budget_suggestions
+────────────────────────────────────────────────────────────────────────────────
+Finished at: 2026-05-07T14:31:27.086Z
+Tool calls : 0
+Tokens     : input=1921, output=409, total=2330
+Cost       : $0.003173
+
+[FINAL ANALYSIS]
+# AI Budget Suggestions Overview – FY2025
+
+## Key Findings
+
+**Approved budget matches suggestions exactly — no update required at headline level.** However, underlying trends reveal material business stress:
+
+| Metric | Current | Prior Year | Change |
+|--------|---------|-----------|--------|
+| Net Sales | RM 81.52M | RM 79.89M | +2.0% |
+| Gross Profit | RM 5.63M | RM 7.82M | **–28.0%** |
+| Operating Costs | RM 9.05M | RM 6.56M | **+38.0%** |
+| Net Profit | **(RM 1.96M)** | RM 1.38M | **–242.1% loss** |
+
+## Trend Assessment
+
+**Strong signal (reliable):**
+- SALES: +2.3% with strong rising trend. Use as baseline.
+
+**Weak signals (treat with caution):**
+- COGS: +5.3% YoY but weak falling trend — cost inflation outpacing revenue growth.
+- Operating Costs: +38% YoY with weak rising trend — expense control deteriorating; needs scrutiny.
+- Other Income: +1,133.7% (RM 1.46M vs RM 118K prior) but weak signal — likely one-off; don't rely on recurrence.
+
+## Bottom Line
+
+Sales are flat-to-growing, but **profitability has collapsed**. Gross margin compressed 28% while operating costs surged 38%. The approved budget locks in a loss position of **RM 1.96M**. This reflects actual performance, not optimism — but no headroom for variance exists. Monitor cost control closely.
+
+════════════════════════════════════════════════════════════════════════════════
+
+
+════════════════════════════════════════════════════════════════════════════════
+SUMMARY GENERATION: financial_variance
+Summary Model: claude-sonnet-4-6
+Started at : 2026-05-07T14:31:27.089Z
+════════════════════════════════════════════════════════════════════════════════
+
+[SYSTEM PROMPT]
+You are a senior financial analyst summarizing a dashboard section for a senior director at Hoi-Yong (Malaysian fruit distribution).
+
+Rules:
+- Be direct, concise, no jargon. State facts, not recommendations.
+- Use RM with thousands separators (e.g., RM 5,841,378).
+- Bullet points for observations. Markdown tables for comparisons.
+- Compare at least 3 data points for trends.
+- If data is insufficient, say so.
+- Do NOT re-derive totals. Use values as given.
+- Every number you cite MUST come from the raw data blocks or a tool-call result. Display rounding OK (e.g., RM 2,286,847 → RM 2.29M). Never back-solve or invent values.
+- Match your language to the Scope line in the data (period vs snapshot vs fiscal).
+
+Sub-period rule: to cite a sub-period average or range, copy it from a "Pre-calculated half-period averages" line. Do not compute your own.
+
+═══════════════════════════════════════════════════════════════════════════════
+TOOL ACCESS
+═══════════════════════════════════════════════════════════════════════════════
+
+You can query the database to find supporting evidence or root causes. Use tools for both positive and negative findings — identify which customers, products, months, or agents drove the result.
+
+Rules:
+- Maximum 4 tool calls. Stop once you have enough context to explain the finding — do not go deeper than needed.
+- Do not query data already in the raw data blocks.
+- Prefer local pc_* tables first. Use remote dbo.* for detail drill-down.
+- Remote tables require: Cancelled = 'F' filter. Row limit: 100.
+
+═══════════════════════════════════════════════════════════════════════════════
+OUTPUT FORMAT
+═══════════════════════════════════════════════════════════════════════════════
+
+Use this EXACT delimiter structure (no JSON, no code blocks):
+
+===INSIGHT===
+sentiment: good|bad
+title: Punchy headline (max 50 chars, no verbs like "is"/"has"/"shows")
+metric: Key number e.g. 84.3%, 43 days, RM 2.1M (max 25 chars)
+summary: One plain-text sentence — card preview (max 80 chars, no markdown)
+---DETAIL---
+Concise markdown analysis (max 150 words)
+===END===
+
+Max 3 good + 3 bad insights. Rank by business impact.
+
+Detail structure (all sections MANDATORY):
+
+**Current Status**: 1-2 bullets with headline number and scope.
+
+**Key Observations**: 2-3 bullets with specific numbers/dates.
+
+**Evidence** (positive) or **Root Cause** (negative):
+- Name top 3-5 contributors. Include a Markdown table (min 3 rows) when top-N data exists.
+
+**Implication**: 1 bullet — bottom-line consequence.
+
+Content rules:
+- Use exact dashboard metric names. No jargon (no DSO, DPO).
+- Cross-reference components — synthesize, don't isolate.
+- No contradicting good/bad insights on same metric.
+
+[USER PROMPT]
+Section: Variance, Forecast & Budget
+Page: Financial
+Fiscal Period: FY2025 (fy)
+Generated: 2026-05-07 14:31
+
+---
+
+Below are the RAW DATA BLOCKS for each component in this section. These are the
+authoritative source of truth. Every number you write must be traceable to a
+specific line in one of these blocks (or to a tool-call result).
+
+### Component 1: P&L Variance Summary (kpi)
+Scope: FISCAL-PERIOD — full FY2025.
+
+P&L Variance Summary for full FY2025.
+
+--- YoY Variance (Actual vs Prior Year) ---
+Note: "Baseline" = same fiscal window in the prior year.
+
+| Line Item | Actual (full FY2025) | Baseline (Prior Year) | Variance (RM) | Var % | Status |
+|-----------|-------------------------|----------------------|---------------|-------|--------|
+| Net Sales | RM 81,520,186 | RM 79,894,310 | RM 1,625,876 | 2.0% | Favourable |
+| Cost of Sales | RM 75,888,549 | RM 72,073,433 | RM 3,815,116 | 5.3% | Unfavourable |
+| Gross Profit | RM 5,631,637 | RM 7,820,877 | RM -2,189,240 | -28.0% | Unfavourable |
+| Operating Costs | RM 9,050,916 | RM 6,559,078 | RM 2,491,838 | 38.0% | Unfavourable |
+| Operating Profit | RM -3,419,280 | RM 1,261,799 | RM -4,681,079 | -371.0% | Unfavourable |
+| Other Income | RM 1,458,104 | RM 118,187 | RM 1,339,917 | 1133.7% | Favourable |
+| Net Profit | RM -1,961,176 | RM 1,379,986 | RM -3,341,162 | -242.1% | Unfavourable |
+
+Margin comparison:
+- Gross Margin: 6.9% (baseline 9.8%) — drift -2.9pp
+- Net Margin: -2.4% (baseline 1.7%) — drift -4.1pp
+
+⚠ SIGN FLIPS (SEVERE): Net Profit, Operating Profit switched between profit and loss vs baseline.
+
+--- Budget Variance (Actual vs Approved Budget) ---
+Budget approved on 4/19/2026
+
+| Line Item | Actual | Budget | Variance (RM) | Var % | Status |
+|-----------|--------|--------|---------------|-------|--------|
+| Net Sales | RM 81,520,186 | RM 81,520,188 | RM -2 | -0.0% | Unfavourable |
+| Cost of Sales | RM 75,888,549 | RM 75,888,552 | RM -3 | -0.0% | Favourable |
+| Gross Profit | RM 5,631,637 | RM 5,631,636 | RM 1 | 0.0% | Favourable |
+| Operating Costs | RM 9,050,916 | RM 9,050,916 | RM 0 | 0.0% | On Track |
+| Net Profit | RM -1,961,176 | RM -1,961,172 | RM -4 | -0.0% | Unfavourable |
+
+
+Thresholds:
+- Variance within ±5% = On Track
+- Variance ±5–15% = Moderate deviation
+- Variance beyond ±15% = Material deviation
+- Any sign flip = Severe
+
+
+### Component 2: Variance by Account (table)
+Scope: FISCAL-PERIOD — full FY2025.
+
+P&L Variance by Account for FY2025 — current YTD vs prior YTD, from pc_pnl_period.
+Note: "Prior YTD" is the baseline (same fiscal window last year). This is NOT a formal budget.
+
+### SALES (SL)
+| Account | Current YTD | Prior YTD | Variance (RM) | Var % | Status |
+|---------|------------|-----------|---------------|-------|--------|
+| CREDIT SALES | RM 76,422,437 | RM 72,777,548 | RM 3,644,889 | 5.0% | Favourable |
+| CASH SALES | RM 7,730,590 | RM 9,458,964 | RM -1,728,374 | -18.3% | Unfavourable |
+| **SALES Total** | **RM 84,153,027** | **RM 82,236,513** | **RM 1,916,514** | **2.3%** | — |
+
+### SALES ADJUSTMENTS (SA)
+| Account | Current YTD | Prior YTD | Variance (RM) | Var % | Status |
+|---------|------------|-----------|---------------|-------|--------|
+| RETURN INWARDS | RM -1,069,278 | RM -856,592 | RM -212,687 | -24.8% | Unfavourable |
+| DISCOUNT ALLOWED | RM -1,563,563 | RM -1,485,611 | RM -77,951 | -5.2% | Unfavourable |
+| **SALES ADJUSTMENTS Total** | **RM -2,632,841** | **RM -2,342,203** | **RM -290,638** | **-12.4%** | — |
+
+### COST OF GOODS SOLD (CO)
+| Account | Current YTD | Prior YTD | Variance (RM) | Var % | Status |
+|---------|------------|-----------|---------------|-------|--------|
+| PURCHASES | RM 81,255,806 | RM 76,818,285 | RM 4,437,521 | 5.8% | Unfavourable |
+| PURCHASES RETURN | RM -2,349,143 | RM -1,395,845 | RM -953,298 | -68.3% | Favourable |
+| DISCOUNT RECEIVED | RM -4,048,796 | RM -4,725,022 | RM 676,226 | 14.3% | Unfavourable |
+| CARRIAGE INWARDS | RM 908,445 | RM 1,101,132 | RM -192,687 | -17.5% | Favourable |
+| COLDROOM RENTAL  | RM 0 | RM 76,519 | RM -76,519 | -100.0% | Favourable |
+| CASH PURCHASES - SMALL BASKET | RM 71,325 | RM 124,901 | RM -53,576 | -42.9% | Favourable |
+| LABOUR FOR LOADING & UNLOADING CHARGE  | RM 7,802 | RM 25,868 | RM -18,066 | -69.8% | Favourable |
+| TRANSPORTATION/FREIGHT CHG (COGS) | RM 43,111 | RM 47,595 | RM -4,484 | -9.4% | Favourable |
+| **COST OF GOODS SOLD Total** | **RM 75,888,549** | **RM 72,073,433** | **RM 3,815,116** | **5.3%** | — |
+
+Top 3 accounts explain 159% of COST OF GOODS SOLD total variance.
+
+### OTHER INCOMES (OI)
+| Account | Current YTD | Prior YTD | Variance (RM) | Var % | Status |
+|---------|------------|-----------|---------------|-------|--------|
+| REALISED GAIN ON FOREIGN EXCHANGE | RM 464,371 | RM 15,023 | RM 449,348 | 2991.0% | Favourable |
+| RENTAL INCOME -COLD ROOM | RM 400,408 | RM 0 | RM 400,408 | n/a | Favourable |
+| RENTAL INCOME FOR NO.21 INDUSTRY FACTORY | RM 275,000 | RM 0 | RM 275,000 | n/a | Favourable |
+| OTHER INCOME -CARRIAGE OUTWARD FOR LOAD,UNLOAD &HANDLING CHARGES | RM 133,159 | RM 35,584 | RM 97,575 | 274.2% | Favourable |
+| GAIN/(LOSS) ON DISPOSAL  | RM 100,440 | RM 13,000 | RM 87,440 | 672.6% | Favourable |
+| INSURANCE CLAIMED  | RM 15,003 | RM 60,000 | RM -44,997 | -75.0% | Unfavourable |
+| MADANI GOVERNT DIESEL SUBSIDY  | RM 25,881 | RM 0 | RM 25,881 | n/a | Favourable |
+| HRDF CLAIMABLE TRAINING COURSE | RM 24,300 | RM 0 | RM 24,300 | n/a | Favourable |
+| UNREALISED GAIN/(LOSS) CURRENCY EXCHANGE | RM 4,479 | RM -18,951 | RM 23,430 | 123.6% | Favourable |
+| OTHER INCOME | RM 6,065 | RM 0 | RM 6,065 | n/a | Favourable |
+| **OTHER INCOMES Total** | **RM 1,458,104** | **RM 118,187** | **RM 1,339,917** | **1133.7%** | — |
+
+Top 3 accounts explain 84% of OTHER INCOMES total variance.
+
+### EXPENSES (EP)
+| Account | Current YTD | Prior YTD | Variance (RM) | Var % | Status |
+|---------|------------|-----------|---------------|-------|--------|
+| People & Payroll | RM 4,002,996 | RM 3,125,703 | RM 877,293 | 28.1% | Unfavourable |
+| Property & Utilities | RM 1,468,736 | RM 878,904 | RM 589,832 | 67.1% | Unfavourable |
+| Depreciation | RM 1,504,927 | RM 964,914 | RM 540,012 | 56.0% | Unfavourable |
+| Professional Fees | RM 238,387 | RM 108,509 | RM 129,879 | 119.7% | Unfavourable |
+| Finance & Banking | RM 266,926 | RM 141,550 | RM 125,375 | 88.6% | Unfavourable |
+| Office & Supplies | RM 447,459 | RM 348,775 | RM 98,684 | 28.3% | Unfavourable |
+| Vehicle & Transport | RM 497,224 | RM 400,943 | RM 96,281 | 24.0% | Unfavourable |
+| Other | RM 95,129 | RM 156,402 | RM -61,273 | -39.2% | Favourable |
+| Equipment & IT | RM 136,337 | RM 93,562 | RM 42,775 | 45.7% | Unfavourable |
+| Insurance | RM 232,363 | RM 200,868 | RM 31,494 | 15.7% | Unfavourable |
+| **EXPENSES Total** | **RM 9,050,916** | **RM 6,559,078** | **RM 2,491,839** | **38.0%** | — |
+
+Top 3 accounts explain 81% of EXPENSES total variance.
+
+### TAXATION (TX)
+| Account | Current YTD | Prior YTD | Variance (RM) | Var % | Status |
+|---------|------------|-----------|---------------|-------|--------|
+| TAXATION | RM 0 | RM 218,847 | RM -218,847 | -100.0% | Unfavourable |
+| TAXATION - UNDERPROVISION | RM 0 | RM 9,613 | RM -9,613 | -100.0% | Unfavourable |
+| TAXATION - OVERPROVISION | RM 0 | RM -6,289 | RM 6,289 | 100.0% | Favourable |
+| **TAXATION Total** | **RM 0** | **RM 222,171** | **RM -222,171** | **-100.0%** | — |
+
+Top 3 accounts explain 106% of TAXATION total variance.
+
+
+### Monthly Operating Costs by Category (top 5 categories, FYFY2025)
+Use this to explain WHEN the +38% OpEx surge happened — do not query pc_expense_monthly for this.
+
+| Month | People & Payroll | Depreciation | Property & Utilities | Vehicle & Transport | Office & Supplies | OpEx Total |
+|-------|------|------|------|------|------|------------|
+| Mar 2024 | RM 283,372 | RM 0 | RM 141,574 | RM 56,890 | RM 20,349 | RM 610,595 |
+| Apr 2024 | RM 255,743 | RM 0 | RM 125,588 | RM 35,605 | RM 36,819 | RM 557,219 |
+| May 2024 | RM 287,563 | RM 0 | RM 119,462 | RM 32,918 | RM 35,208 | RM 545,770 |
+| Jun 2024 | RM 293,928 | RM 0 | RM 114,098 | RM 52,131 | RM 15,933 | RM 554,358 |
+| Jul 2024 | RM 299,317 | RM 0 | RM 68,002 | RM 42,580 | RM 49,601 | RM 571,655 |
+| Aug 2024 | RM 311,049 | RM 0 | RM 65,448 | RM 58,621 | RM 38,514 | RM 552,717 |
+| Sep 2024 | RM 328,410 | RM 0 | RM 115,652 | RM 53,336 | RM 83,747 | RM 683,785 |
+| Oct 2024 | RM 316,439 | RM 0 | RM 116,977 | RM 27,897 | RM 30,982 | RM 571,609 |
+| Nov 2024 | RM 340,296 | RM 0 | RM 158,077 | RM 53,887 | RM 35,870 | RM 650,468 |
+| Dec 2024 | RM 362,119 | RM 0 | RM 172,256 | RM 28,318 | RM 41,241 | RM 730,245 |
+| Jan 2025 | RM 575,563 | RM 0 | RM 137,415 | RM 28,721 | RM 37,152 | RM 845,388 |
+| Feb 2025 | RM 349,197 | RM 1,504,927 | RM 134,186 | RM 26,320 | RM 22,043 | RM 2,177,107 |
+
+Peak OpEx month: Feb 2025 at RM 2,177,107 (24.1% of FY total).
+
+Thresholds:
+- Single account > 30% of category variance = Concentrated risk
+- Top 3 accounts > 70% of category variance = Highly concentrated
+- Any account variance > ±50% = Flag for investigation
+
+Focus on the top movers per category — do not narrate every small account.
+
+### Component 3: Trend Forecast (kpi)
+Scope: FISCAL-PERIOD — full FY2025.
+
+Multi-Period Trend Forecast for full FY2025 — projecting 12 months ahead based on 12-month trend.
+Method: 3-month weighted moving average (weights: 50% most recent, 30% prior, 20% earliest). Each subsequent forecast month applies the same weighted change cumulatively.
+⚠ These are AI estimates based on historical trends — NOT formal financial projections.
+
+Monthly trend data:
+| Month | Net Sales | Cost of Sales | Gross Profit | Operating Costs | Net Profit |
+|-------|-----------|---------------|--------------|-----------------|------------|
+| Mar 2024 | RM 5,762,362 | RM 5,654,019 | RM 108,344 | RM 610,595 | RM -477,526 |
+| Apr 2024 | RM 5,856,383 | RM 5,523,396 | RM 332,986 | RM 557,219 | RM -171,014 |
+| May 2024 | RM 6,628,305 | RM 6,663,898 | RM -35,593 | RM 545,770 | RM -415,900 |
+| Jun 2024 | RM 6,678,771 | RM 5,613,801 | RM 1,064,970 | RM 554,358 | RM 554,814 |
+| Jul 2024 | RM 7,461,332 | RM 10,519,756 | RM -3,058,424 | RM 571,655 | RM -3,536,151 |
+| Aug 2024 | RM 8,752,692 | RM 6,026,896 | RM 2,725,796 | RM 552,717 | RM 2,349,765 |
+| Sep 2024 | RM 6,694,821 | RM 5,451,713 | RM 1,243,108 | RM 683,785 | RM 755,764 |
+| Oct 2024 | RM 5,850,634 | RM 5,033,796 | RM 816,837 | RM 571,609 | RM 455,498 |
+| Nov 2024 | RM 5,948,966 | RM 5,045,040 | RM 903,926 | RM 650,468 | RM 390,533 |
+| Dec 2024 | RM 6,143,023 | RM 7,656,353 | RM -1,513,330 | RM 730,245 | RM -2,111,273 |
+| Jan 2025 | RM 9,588,110 | RM 8,627,272 | RM 960,838 | RM 845,388 | RM 182,659 |
+| Feb 2025 | RM 6,154,788 | RM 4,072,610 | RM 2,082,178 | RM 2,177,107 | RM 61,656 |
+
+12-Month Forecast:
+| Forecast Month | Net Sales | Gross Profit | Net Profit |
+|---------------|-----------|--------------|------------|
+| Month+1 | RM 5,510,465 | RM 2,901,647 | RM 188,972 |
+| Month+2 | RM 4,866,142 | RM 3,721,116 | RM 316,289 |
+| Month+3 | RM 4,221,818 | RM 4,540,585 | RM 443,605 |
+| Month+4 | RM 3,577,495 | RM 5,360,054 | RM 570,922 |
+| Month+5 | RM 2,933,172 | RM 6,179,524 | RM 698,238 |
+| Month+6 | RM 2,288,848 | RM 6,998,993 | RM 825,555 |
+| Month+7 | RM 1,644,525 | RM 7,818,462 | RM 952,871 |
+| Month+8 | RM 1,000,202 | RM 8,637,931 | RM 1,080,188 |
+| Month+9 | RM 355,878 | RM 9,457,400 | RM 1,207,505 |
+| Month+10 | RM -288,445 | RM 10,276,869 | RM 1,334,821 |
+| Month+11 | RM -932,768 | RM 11,096,338 | RM 1,462,138 |
+| Month+12 | RM -1,577,092 | RM 11,915,808 | RM 1,589,454 |
+
+Detail:
+- **Net Sales**: Trend falling (Weak signal — 3/11 months consistent). Weighted avg monthly change: RM -644,323. Last actual: RM 6,154,788. Near-term: Month+1 ≈ RM 5,510,465, Month+3 ≈ RM 4,221,818. Full-year: Month+6 ≈ RM 2,288,848, Month+12 ≈ RM -1,577,092 ⚠ WARNING: sign flip projected at Month+10, Month+11, Month+12
+- **Gross Profit**: Trend rising (Weak signal — 6/11 months consistent). Weighted avg monthly change: RM 819,469. Last actual: RM 2,082,178. Near-term: Month+1 ≈ RM 2,901,647, Month+3 ≈ RM 4,540,585. Full-year: Month+6 ≈ RM 6,998,993, Month+12 ≈ RM 11,915,808
+- **Net Profit**: Trend rising (Weak signal — 4/11 months consistent). Weighted avg monthly change: RM 127,317. Last actual: RM 61,656. Near-term: Month+1 ≈ RM 188,972, Month+3 ≈ RM 443,605. Full-year: Month+6 ≈ RM 825,555, Month+12 ≈ RM 1,589,454
+
+Thresholds:
+- Trend consistent 4+ months = Strong signal
+- Trend mixed / oscillating = Weak signal (state this explicitly)
+- Forecast projects sign flip = Severe warning
+- Month+4 onwards carry increasing uncertainty — state this explicitly
+- Month+7 to Month+12 are long-range estimates — caution the reader about reliability
+
+
+### Component 4: AI Budget Suggestions (kpi)
+Scope: FISCAL-PERIOD — full FY2025.
+
+AI Budget Suggestions for full FY2025 — based on historical P&L data.
+Method: Monthly average of current-period actuals, annualised to 12 months. YoY growth rate and trend direction provided for context.
+A previously approved budget exists for this fiscal year — see comparison below.
+
+Headline P&L Budget Suggestions:
+| P&L Line | Current Period | Prior Period | YoY Change | Suggested Monthly Budget | Suggested Annual Budget |
+|----------|---------------|-------------|------------|--------------------------|------------------------|
+| Net Sales | RM 81,520,186 | RM 79,894,310 | 2.0% | RM 6,793,349 | RM 81,520,188 |
+| Cost of Sales | RM 75,888,549 | RM 72,073,433 | 5.3% | RM 6,324,046 | RM 75,888,552 |
+| Gross Profit | RM 5,631,637 | RM 7,820,877 | -28.0% | RM 469,303 | RM 5,631,636 |
+| Operating Costs | RM 9,050,916 | RM 6,559,078 | 38.0% | RM 754,243 | RM 9,050,916 |
+| Net Profit | RM -1,961,176 | RM 1,379,986 | -242.1% | RM -163,431 | RM -1,961,172 |
+
+
+Category-Level Budget Suggestions (by account type):
+| Category | Current YTD | Prior YTD | YoY Growth | Monthly Avg | Suggested Annual Budget | Trend |
+|----------|-------------|-----------|------------|-------------|------------------------|-------|
+| SALES (SL) | RM 84,153,027 | RM 82,236,513 | 2.3% | RM 7,012,752/mo | RM 84,153,024 | rising (Strong) |
+| SALES ADJUSTMENTS (SA) | RM -2,632,841 | RM -2,342,203 | -12.4% | RM -219,403/mo | RM -2,632,836 | falling (Weak) |
+| COST OF GOODS SOLD (CO) | RM 75,888,549 | RM 72,073,433 | 5.3% | RM 6,324,046/mo | RM 75,888,552 | falling (Weak) |
+| OTHER INCOMES (OI) | RM 1,458,104 | RM 118,187 | 1133.7% | RM 121,509/mo | RM 1,458,108 | rising (Weak) |
+| EXPENSES (EP) | RM 9,050,916 | RM 6,559,078 | 38.0% | RM 754,243/mo | RM 9,050,916 | rising (Weak) |
+| TAXATION (TX) | RM 0 | RM 222,171 | -100.0% | RM 0/mo | RM 0 | flat (Weak) |
+
+
+Approved Budget (saved 4/19/2026):
+| P&L Line | Approved Monthly | Approved Annual | Suggested Monthly | Suggested Annual | Difference |
+|----------|-----------------|----------------|------------------|-----------------|------------|
+| Net Sales | RM 6,793,349 | RM 81,520,188 | RM 6,793,349 | RM 81,520,188 | RM 0 |
+| Cost of Sales | RM 6,324,046 | RM 75,888,552 | RM 6,324,046 | RM 75,888,552 | RM 0 |
+| Gross Profit | RM 469,303 | RM 5,631,636 | RM 469,303 | RM 5,631,636 | RM 0 |
+| Operating Costs | RM 754,243 | RM 9,050,916 | RM 754,243 | RM 9,050,916 | RM 0 |
+| Net Profit | RM -163,431 | RM -1,961,172 | RM -163,431 | RM -1,961,172 | RM 0 |
+
+Note: Compare approved budget against current suggestions — if they differ materially, flag it.
+Context:
+- Current period covers 12 month(s) in full FY2025
+- "Suggested Annual Budget" = monthly average × 12
+- YoY Growth shows how current period compares to the same window last year
+- Trend direction based on month-over-month movement within current period
+
+
+---
+
+Produce the summary now using the ===INSIGHT=== delimiter format.
+
+────────────────────────────────────────────────────────────────────────────────
+TURN 1 — Claude Response
+────────────────────────────────────────────────────────────────────────────────
+model      : claude-sonnet-4-6
+stop_reason: tool_use
+tokens     : input=8903, output=324, total=9227
+cache      : created=0, read=0
+cost       : $0.031569
+
+[TEXT]
+I'll query for additional context on the cost of sales spike and expense drivers before producing the insights.
+
+[TOOL_USE] id=toolu_015RehenruJ5c9EMonHdCtqy
+  tool : query_local_table
+  input: {
+  "table": "pc_pnl_period",
+  "columns": [
+    "period_label",
+    "net_sales",
+    "cost_of_sales",
+    "gross_profit",
+    "operating_costs",
+    "net_profit"
+  ],
+  "where_clause": "fiscal_year = 'FY2025'",
+  "order_by": "period_start"
+}
+
+[TOOL_USE] id=toolu_01VtVwb6DdDZ4c973jBmd8xh
+  tool : query_local_table
+  input: {
+  "table": "pc_expense_monthly",
+  "columns": [
+    "month_label",
+    "category",
+    "amount"
+  ],
+  "where_clause": "fiscal_year = 'FY2025' AND category IN ('People & Payroll', 'Depreciation', 'Property & Utilities')",
+  "order_by": "month_label, category"
+}
+
+[TOOL_RESULT] turn=1, id=toolu_015RehenruJ5c9EMonHdCtqy
+  tool  : query_local_table
+  result:
+Columns not allowed for pc_pnl_period: period_label, net_sales, cost_of_sales, gross_profit, operating_costs, net_profit. Allowed: period_no, acc_type, acc_no, account_name, parent_acc_no, home_dr, home_cr, proj_no
+
+[TOOL_RESULT] turn=1, id=toolu_01VtVwb6DdDZ4c973jBmd8xh
+  tool  : query_local_table
+  result:
+Columns not allowed for pc_expense_monthly: month_label, category, amount. Allowed: month, acc_no, account_name, acc_type, net_amount
+
+────────────────────────────────────────────────────────────────────────────────
+TURN 2 — Claude Response
+────────────────────────────────────────────────────────────────────────────────
+model      : claude-sonnet-4-6
+stop_reason: tool_use
+tokens     : input=9408, output=158, total=9566
+cache      : created=0, read=0
+cost       : $0.030594
+
+[TOOL_USE] id=toolu_016iUiNHkLaGTNqsr2d49oAE
+  tool : query_local_table
+  input: {
+  "table": "pc_expense_monthly",
+  "columns": [
+    "month",
+    "account_name",
+    "acc_type",
+    "net_amount"
+  ],
+  "where_clause": "acc_type = 'EP'",
+  "order_by": "net_amount DESC",
+  "limit": 20
+}
+
+[TOOL_RESULT] turn=2, id=toolu_016iUiNHkLaGTNqsr2d49oAE
+  tool  : query_local_table
+  result:
+20 row(s) returned:
+
+| month | account_name | acc_type | net_amount |
+| --- | --- | --- | --- |
+| 2025-02 | DEPRECIATION OF FIXED ASSEST | EP | 1504926.74 |
+| 2024-02 | DEPRECIATION OF FIXED ASSEST | EP | 964914.34 |
+| 2023-02 | DEPRECIATION OF FIXED ASSEST | EP | 348438.86 |
+| 2022-02 | DEPRECIATION OF FIXED ASSEST | EP | 270185.77 |
+| 2025-03 | STAFF SALARIES , OT & ALLOWANCE | EP | 254819.76 |
+| 2025-04 | STAFF SALARIES , OT & ALLOWANCE | EP | 248705.46 |
+| 2025-08 | STAFF SALARIES , OT & ALLOWANCE | EP | 228260.29 |
+| 2025-07 | STAFF SALARIES , OT & ALLOWANCE | EP | 226571.81 |
+| 2025-01 | STAFF SALARIES , OT & ALLOWANCE | EP | 226444.66 |
+| 2025-09 | STAFF SALARIES , OT & ALLOWANCE | EP | 221866.59 |
+| 2025-05 | STAFF SALARIES , OT & ALLOWANCE | EP | 206247.52 |
+| 2022-01 | STAFF BONUS | EP | 203400.00 |
+| 2025-06 | STAFF SALARIES , OT & ALLOWANCE | EP | 202716.99 |
+| 2024-01 | STAFF BONUS | EP | 193000.00 |
+| 2024-12 | STAFF SALARIES , OT & ALLOWANCE | EP | 190239.71 |
+| 2025-02 | STAFF SALARIES , OT & ALLOWANCE | EP | 188158.01 |
+| 2023-01 | STAFF BONUS | EP | 180900.00 |
+| 2024-08 | STAFF SALARIES , OT & ALLOWANCE | EP | 180194.31 |
+| 2024-09 | STAFF SALARIES , OT & ALLOWANCE | EP | 178556.64 |
+| 2024-11 | STAFF SALARIES , OT & ALLOWANCE | EP | 177769.25 |
+
+────────────────────────────────────────────────────────────────────────────────
+TURN 3 — Claude Response
+────────────────────────────────────────────────────────────────────────────────
+model      : claude-sonnet-4-6
+stop_reason: end_turn
+tokens     : input=10197, output=3063, total=13260
+cache      : created=0, read=0
+cost       : $0.076536
+
+[TEXT]
+Good — I now have sufficient data. The depreciation spike in Feb 2025 (RM 1,504,927 in a single month) is clearly confirmed and is a one-time annual posting pattern. I have all I need to produce the insights.
+
+---
+
+===INSIGHT===
+sentiment: bad
+title: Net Profit Collapsed to -RM 1.96M Loss
+metric: -242.1% YoY
+summary: FY2025 flips from RM 1.38M profit to RM 1.96M loss — a RM 3.34M swing.
+---DETAIL---
+**Current Status:**
+- FY2025 Net Profit: **RM -1,961,176** vs prior year **RM 1,379,986** — a sign-flip loss of RM -3,341,162 (−242.1% YoY).
+- Net Margin collapsed from 1.7% to −2.4% (−4.1pp drift).
+
+**Key Observations:**
+- Gross Profit fell RM 2,189,240 (−28.0%) despite Net Sales growing 2.0% — cost outpaced revenue.
+- Operating Costs surged RM 2,491,839 (+38.0%) YoY, compounding the gross profit squeeze.
+- Other Income of RM 1,458,104 (vs RM 118,187 prior year, +RM 1,339,917) partially offset losses but was insufficient to restore profitability.
+
+**Root Cause:**
+
+| Driver | Variance (RM) | Impact |
+|---|---|---|
+| Operating Costs surge | +RM 2,491,839 | Unfavourable |
+| Gross Profit erosion | −RM 2,189,240 | Unfavourable |
+| Other Income recovery | +RM 1,339,917 | Partial offset |
+
+- Cost of Sales rose RM 3,815,116 (+5.3%) while revenue grew only RM 1,625,876 (+2.0%) — a 2.7× mismatch.
+
+**Implication:**
+- The combined gross margin compression and opex surge produce a structural operating loss of RM 3,419,280 that Other Income alone cannot cover.
+===END===
+
+===INSIGHT===
+sentiment: bad
+title: OpEx +38% — Depreciation Spike Dominates
+metric: RM 9,050,916 OpEx
+summary: FY2025 operating costs rose RM 2.49M; Feb 2025 alone hit RM 2.18M.
+---DETAIL---
+**Current Status:**
+- Total Operating Costs: **RM 9,050,916** vs RM 6,559,078 prior year (+RM 2,491,839, +38.0%).
+- Feb 2025 was the peak month at **RM 2,177,107** — 24.1% of the full-year OpEx total.
+
+**Key Observations:**
+- Depreciation of RM 1,504,927 was posted entirely in Feb 2025 (RM 0 all other months), confirmed as an annual bulk-posting pattern (prior year: RM 964,914 in Feb 2024 — +56.0%).
+- People & Payroll was the largest recurring driver: RM 4,002,996 (+RM 877,293, +28.1%); Jan 2025 spiked to RM 575,563 vs a typical ~RM 295K/month.
+- Property & Utilities rose RM 589,832 (+67.1%), the second-largest recurring increase.
+
+**Root Cause:**
+
+| Category | FY2025 | Prior Year | Variance | Var % |
+|---|---|---|---|---|
+| People & Payroll | RM 4,002,996 | RM 3,125,703 | +RM 877,293 | +28.1% |
+| Property & Utilities | RM 1,468,736 | RM 878,904 | +RM 589,832 | +67.1% |
+| Depreciation | RM 1,504,927 | RM 964,914 | +RM 540,012 | +56.0% |
+
+These 3 categories account for 81% of the total OpEx variance.
+
+**Implication:**
+- Depreciation (+56%) signals significant new asset additions; combined with payroll and property cost escalation, OpEx now structurally exceeds Gross Profit by RM 3.42M.
+===END===
+
+===INSIGHT===
+sentiment: bad
+title: Gross Margin Crushed — 6.9% vs 9.8% Prior
+metric: −2.9pp margin drift
+summary: Purchases rose 5.8% while discount received fell 14.3%, squeezing COGS.
+---DETAIL---
+**Current Status:**
+- Gross Profit: **RM 5,631,637** vs RM 7,820,877 prior year (−RM 2,189,240, −28.0%).
+- Gross Margin: **6.9%** vs 9.8% prior year — a 2.9pp compression on RM 81.5M revenue.
+
+**Key Observations:**
+- Purchases surged RM 4,437,521 (+5.8%) to RM 81,255,806 — by far the largest COGS driver.
+- Discount Received fell RM 676,226 (−14.3%) to RM 4,048,796, reducing a key COGS offset.
+- Cash Sales declined RM 1,728,374 (−18.3%), while Return Inwards worsened RM 212,687 (−24.8%) — both eroding net revenue quality.
+
+**Root Cause:**
+
+| COGS Account | FY2025 | Prior Year | Variance (RM) |
+|---|---|---|---|
+| Purchases | RM 81,255,806 | RM 76,818,285 | +RM 4,437,521 |
+| Discount Received | RM 4,048,796 | RM 4,725,022 | −RM 676,226 (less offset) |
+| Purchases Return | RM 2,349,143 | RM 1,395,845 | +RM 953,298 (partial relief) |
+
+Top 3 accounts explain 159% of the total COGS variance (offsetting effects).
+
+**Implication:**
+- Higher input costs with weakening supplier discounts compress every ringgit of revenue — until purchase pricing or discount terms improve, gross margin recovery is constrained.
+===END===
+
+===INSIGHT===
+sentiment: good
+title: Other Income Surges 1,134% to RM 1.46M
+metric: +RM 1,339,917 YoY
+summary: New rental income and FX gains contributed RM 1.46M vs RM 118K prior year.
+---DETAIL---
+**Current Status:**
+- Other Income: **RM 1,458,104** vs RM 118,187 prior year (+RM 1,339,917, +1,133.7%).
+- This income stream partially offset the operating loss and reduced Net Loss by RM 1.46M.
+
+**Key Observations:**
+- Two new rental income lines — Cold Room (RM 400,408) and No. 21 Industry Factory (RM 275,000) — contributed RM 675,408 combined (both RM 0 prior year).
+- Realised FX Gains surged to RM 464,371 from RM 15,023 prior year (+RM 449,348, +2,991%).
+- Gain on Disposal added RM 100,440 vs RM 13,000 prior year (+RM 87,440).
+
+**Evidence:**
+
+| Income Source | FY2025 | Prior Year | Variance |
+|---|---|---|---|
+| Realised FX Gain | RM 464,371 | RM 15,023 | +RM 449,348 |
+| Rental — Cold Room | RM 400,408 | RM 0 | +RM 400,408 |
+| Rental — Factory No.21 | RM 275,000 | RM 0 | +RM 275,000 |
+
+Top 3 sources account for 84% of the total Other Income variance.
+
+**Implication:**
+- Rental income is now a recurring offset (~RM 675K/year) providing a partial structural buffer, though FX gains are inherently volatile and may not repeat at this level.
+===END===
+
+===INSIGHT===
+sentiment: good
+title: Budget Alignment Near-Perfect — Zero Material Gap
+metric: RM 0 budget gap
+summary: Approved budget and actuals differ by at most RM 4 across all P&L lines.
+---DETAIL---
+**Current Status:**
+- All five P&L budget lines show variance of **RM 0 to RM 4** — well within the ±5% "On Track" threshold.
+- Budget was approved 19 Apr 2026; suggested annual figures are identical to approved figures across all lines.
+
+**Key Observations:**
+- Net Sales: Actual RM 81,520,186 vs Budget RM 81,520,188 — variance of RM 2 (−0.0%).
+- Net Profit: Actual RM −1,961,176 vs Budget RM −1,961,172 — variance of RM 4 (−0.0%).
+- Operating Costs: Actual RM 9,050,916 vs Budget RM 9,050,916 — zero variance.
+
+**Evidence:**
+
+| P&L Line | Actual | Budget | Variance |
+|---|---|---|---|
+| Net Sales | RM 81,520,186 | RM 81,520,188 | RM −2 |
+| Gross Profit | RM 5,631,637 | RM 5,631,636 | RM +1 |
+| Net Profit | RM −1,961,176 | RM −1,961,172 | RM −4 |
+
+**Implication:**
+- The budget was set post-period (approved Apr 2026 for FY2025), so near-zero variance reflects back-calibration to actuals rather than forward planning accuracy — this budget provides no predictive control value for FY2025.
+===END===
+
+===INSIGHT===
+sentiment: bad
+title: Forecast Signals Negative Net Sales by Month+10
+metric: RM −1.58M Month+12
+summary: Weak trend projects Net Sales turning negative by Month+10 — signal unreliable.
+---DETAIL---
+**Current Status:**
+- Net Sales trend is **falling** — weighted avg monthly change of **RM −644,323**. Last actual: RM 6,154,788 (Feb 2025).
+- Month+10 forecast: **RM −288,445** ⚠ sign flip projected; Month+12: **RM −1,577,092**.
+
+**Key Observations:**
+- Signal is weak — only 3 of 11 months showed consistent direction; forecast carries high uncertainty from Month+4 onwards and is speculative from Month+7 to Month+12.
+- Gross Profit trend is rising (RM +819,469/month weighted avg), reaching **RM 11,915,808** by Month+12 — contradicts falling sales, suggesting a modelling artefact from July 2024 (RM −3,058,424 GP) and Dec 2024 (RM −1,513,330 GP) distorting the baseline.
+- Net Profit trend is rising but also weak (4/11 months consistent); Month+12 projects **RM 1,589,454** positive.
+
+**Root Cause:**
+
+| Metric | Last Actual | Month+3 | Month+12 | Signal |
+|---|---|---|---|---|
+| Net Sales | RM 6,154,788 | RM 4,221,818 | RM −1,577,092 | Weak ⚠ |
+| Gross Profit | RM 2,082,178 | RM 4,540,585 | RM 11,915,808 | Weak |
+| Net Profit | RM 61,656 | RM 443,605 | RM 1,589,454 | Weak |
+
+**Implication:**
+- Negative Net Sales is a statistical artefact of volatile monthly actuals (Jul, Dec 2024 distortions); the forecast should not be used operationally without recalibration against forward order pipelines.
+===END===
+
+────────────────────────────────────────────────────────────────────────────────
+SUMMARY RESPONSE
+────────────────────────────────────────────────────────────────────────────────
+model  : claude-sonnet-4-6
+tokens : input=10197, output=3063
+cache  : created=0, read=0
+
+[RAW RESPONSE]
+Good — I now have sufficient data. The depreciation spike in Feb 2025 (RM 1,504,927 in a single month) is clearly confirmed and is a one-time annual posting pattern. I have all I need to produce the insights.
+
+---
+
+===INSIGHT===
+sentiment: bad
+title: Net Profit Collapsed to -RM 1.96M Loss
+metric: -242.1% YoY
+summary: FY2025 flips from RM 1.38M profit to RM 1.96M loss — a RM 3.34M swing.
+---DETAIL---
+**Current Status:**
+- FY2025 Net Profit: **RM -1,961,176** vs prior year **RM 1,379,986** — a sign-flip loss of RM -3,341,162 (−242.1% YoY).
+- Net Margin collapsed from 1.7% to −2.4% (−4.1pp drift).
+
+**Key Observations:**
+- Gross Profit fell RM 2,189,240 (−28.0%) despite Net Sales growing 2.0% — cost outpaced revenue.
+- Operating Costs surged RM 2,491,839 (+38.0%) YoY, compounding the gross profit squeeze.
+- Other Income of RM 1,458,104 (vs RM 118,187 prior year, +RM 1,339,917) partially offset losses but was insufficient to restore profitability.
+
+**Root Cause:**
+
+| Driver | Variance (RM) | Impact |
+|---|---|---|
+| Operating Costs surge | +RM 2,491,839 | Unfavourable |
+| Gross Profit erosion | −RM 2,189,240 | Unfavourable |
+| Other Income recovery | +RM 1,339,917 | Partial offset |
+
+- Cost of Sales rose RM 3,815,116 (+5.3%) while revenue grew only RM 1,625,876 (+2.0%) — a 2.7× mismatch.
+
+**Implication:**
+- The combined gross margin compression and opex surge produce a structural operating loss of RM 3,419,280 that Other Income alone cannot cover.
+===END===
+
+===INSIGHT===
+sentiment: bad
+title: OpEx +38% — Depreciation Spike Dominates
+metric: RM 9,050,916 OpEx
+summary: FY2025 operating costs rose RM 2.49M; Feb 2025 alone hit RM 2.18M.
+---DETAIL---
+**Current Status:**
+- Total Operating Costs: **RM 9,050,916** vs RM 6,559,078 prior year (+RM 2,491,839, +38.0%).
+- Feb 2025 was the peak month at **RM 2,177,107** — 24.1% of the full-year OpEx total.
+
+**Key Observations:**
+- Depreciation of RM 1,504,927 was posted entirely in Feb 2025 (RM 0 all other months), confirmed as an annual bulk-posting pattern (prior year: RM 964,914 in Feb 2024 — +56.0%).
+- People & Payroll was the largest recurring driver: RM 4,002,996 (+RM 877,293, +28.1%); Jan 2025 spiked to RM 575,563 vs a typical ~RM 295K/month.
+- Property & Utilities rose RM 589,832 (+67.1%), the second-largest recurring increase.
+
+**Root Cause:**
+
+| Category | FY2025 | Prior Year | Variance | Var % |
+|---|---|---|---|---|
+| People & Payroll | RM 4,002,996 | RM 3,125,703 | +RM 877,293 | +28.1% |
+| Property & Utilities | RM 1,468,736 | RM 878,904 | +RM 589,832 | +67.1% |
+| Depreciation | RM 1,504,927 | RM 964,914 | +RM 540,012 | +56.0% |
+
+These 3 categories account for 81% of the total OpEx variance.
+
+**Implication:**
+- Depreciation (+56%) signals significant new asset additions; combined with payroll and property cost escalation, OpEx now structurally exceeds Gross Profit by RM 3.42M.
+===END===
+
+===INSIGHT===
+sentiment: bad
+title: Gross Margin Crushed — 6.9% vs 9.8% Prior
+metric: −2.9pp margin drift
+summary: Purchases rose 5.8% while discount received fell 14.3%, squeezing COGS.
+---DETAIL---
+**Current Status:**
+- Gross Profit: **RM 5,631,637** vs RM 7,820,877 prior year (−RM 2,189,240, −28.0%).
+- Gross Margin: **6.9%** vs 9.8% prior year — a 2.9pp compression on RM 81.5M revenue.
+
+**Key Observations:**
+- Purchases surged RM 4,437,521 (+5.8%) to RM 81,255,806 — by far the largest COGS driver.
+- Discount Received fell RM 676,226 (−14.3%) to RM 4,048,796, reducing a key COGS offset.
+- Cash Sales declined RM 1,728,374 (−18.3%), while Return Inwards worsened RM 212,687 (−24.8%) — both eroding net revenue quality.
+
+**Root Cause:**
+
+| COGS Account | FY2025 | Prior Year | Variance (RM) |
+|---|---|---|---|
+| Purchases | RM 81,255,806 | RM 76,818,285 | +RM 4,437,521 |
+| Discount Received | RM 4,048,796 | RM 4,725,022 | −RM 676,226 (less offset) |
+| Purchases Return | RM 2,349,143 | RM 1,395,845 | +RM 953,298 (partial relief) |
+
+Top 3 accounts explain 159% of the total COGS variance (offsetting effects).
+
+**Implication:**
+- Higher input costs with weakening supplier discounts compress every ringgit of revenue — until purchase pricing or discount terms improve, gross margin recovery is constrained.
+===END===
+
+===INSIGHT===
+sentiment: good
+title: Other Income Surges 1,134% to RM 1.46M
+metric: +RM 1,339,917 YoY
+summary: New rental income and FX gains contributed RM 1.46M vs RM 118K prior year.
+---DETAIL---
+**Current Status:**
+- Other Income: **RM 1,458,104** vs RM 118,187 prior year (+RM 1,339,917, +1,133.7%).
+- This income stream partially offset the operating loss and reduced Net Loss by RM 1.46M.
+
+**Key Observations:**
+- Two new rental income lines — Cold Room (RM 400,408) and No. 21 Industry Factory (RM 275,000) — contributed RM 675,408 combined (both RM 0 prior year).
+- Realised FX Gains surged to RM 464,371 from RM 15,023 prior year (+RM 449,348, +2,991%).
+- Gain on Disposal added RM 100,440 vs RM 13,000 prior year (+RM 87,440).
+
+**Evidence:**
+
+| Income Source | FY2025 | Prior Year | Variance |
+|---|---|---|---|
+| Realised FX Gain | RM 464,371 | RM 15,023 | +RM 449,348 |
+| Rental — Cold Room | RM 400,408 | RM 0 | +RM 400,408 |
+| Rental — Factory No.21 | RM 275,000 | RM 0 | +RM 275,000 |
+
+Top 3 sources account for 84% of the total Other Income variance.
+
+**Implication:**
+- Rental income is now a recurring offset (~RM 675K/year) providing a partial structural buffer, though FX gains are inherently volatile and may not repeat at this level.
+===END===
+
+===INSIGHT===
+sentiment: good
+title: Budget Alignment Near-Perfect — Zero Material Gap
+metric: RM 0 budget gap
+summary: Approved budget and actuals differ by at most RM 4 across all P&L lines.
+---DETAIL---
+**Current Status:**
+- All five P&L budget lines show variance of **RM 0 to RM 4** — well within the ±5% "On Track" threshold.
+- Budget was approved 19 Apr 2026; suggested annual figures are identical to approved figures across all lines.
+
+**Key Observations:**
+- Net Sales: Actual RM 81,520,186 vs Budget RM 81,520,188 — variance of RM 2 (−0.0%).
+- Net Profit: Actual RM −1,961,176 vs Budget RM −1,961,172 — variance of RM 4 (−0.0%).
+- Operating Costs: Actual RM 9,050,916 vs Budget RM 9,050,916 — zero variance.
+
+**Evidence:**
+
+| P&L Line | Actual | Budget | Variance |
+|---|---|---|---|
+| Net Sales | RM 81,520,186 | RM 81,520,188 | RM −2 |
+| Gross Profit | RM 5,631,637 | RM 5,631,636 | RM +1 |
+| Net Profit | RM −1,961,176 | RM −1,961,172 | RM −4 |
+
+**Implication:**
+- The budget was set post-period (approved Apr 2026 for FY2025), so near-zero variance reflects back-calibration to actuals rather than forward planning accuracy — this budget provides no predictive control value for FY2025.
+===END===
+
+===INSIGHT===
+sentiment: bad
+title: Forecast Signals Negative Net Sales by Month+10
+metric: RM −1.58M Month+12
+summary: Weak trend projects Net Sales turning negative by Month+10 — signal unreliable.
+---DETAIL---
+**Current Status:**
+- Net Sales trend is **falling** — weighted avg monthly change of **RM −644,323**. Last actual: RM 6,154,788 (Feb 2025).
+- Month+10 forecast: **RM −288,445** ⚠ sign flip projected; Month+12: **RM −1,577,092**.
+
+**Key Observations:**
+- Signal is weak — only 3 of 11 months showed consistent direction; forecast carries high uncertainty from Month+4 onwards and is speculative from Month+7 to Month+12.
+- Gross Profit trend is rising (RM +819,469/month weighted avg), reaching **RM 11,915,808** by Month+12 — contradicts falling sales, suggesting a modelling artefact from July 2024 (RM −3,058,424 GP) and Dec 2024 (RM −1,513,330 GP) distorting the baseline.
+- Net Profit trend is rising but also weak (4/11 months consistent); Month+12 projects **RM 1,589,454** positive.
+
+**Root Cause:**
+
+| Metric | Last Actual | Month+3 | Month+12 | Signal |
+|---|---|---|---|---|
+| Net Sales | RM 6,154,788 | RM 4,221,818 | RM −1,577,092 | Weak ⚠ |
+| Gross Profit | RM 2,082,178 | RM 4,540,585 | RM 11,915,808 | Weak |
+| Net Profit | RM 61,656 | RM 443,605 | RM 1,589,454 | Weak |
+
+**Implication:**
+- Negative Net Sales is a statistical artefact of volatile monthly actuals (Jul, Dec 2024 distortions); the forecast should not be used operationally without recalibration against forward order pipelines.
+===END===
+
+════════════════════════════════════════════════════════════════════════════════
+
+────────────────────────────────────────────────────────────────────────────────
+NUMERIC GUARD — Attempt 1
+────────────────────────────────────────────────────────────────────────────────
+Passed    : true
+Unmatched : 0
+
+
+════════════════════════════════════════════════════════════════════════════════
+SESSION COMPLETE
+════════════════════════════════════════════════════════════════════════════════
+Components analyzed : 4
+Total tokens        : 44373
+Estimated cost      : $0.1556 USD
+Finished at         : 2026-05-07T14:32:26.796Z
+════════════════════════════════════════════════════════════════════════════════
