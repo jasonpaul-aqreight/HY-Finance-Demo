@@ -1,0 +1,77 @@
+{
+  "section_key": "sales_trend",
+  "page": "/sales",
+  "components": ["sales_summary", "net_sales_trend"],
+  "tool_policy": "aggregate_only",
+  "date_range": {
+    "start": "2024-11-01",
+    "end": "2025-10-31",
+    "source": "Page default — trailing 12 months ending at endOfMonth(MAX(pc_sales_daily.doc_date))",
+    "max_doc_date_at_capture": "2025-10-31"
+  },
+  "sales_summary": {
+    "raw_query": "SELECT SUM(invoice_total), SUM(cash_total), SUM(cn_total), SUM(net_revenue) FROM pc_sales_daily WHERE doc_date BETWEEN '2024-11-01' AND '2025-10-31'",
+    "totals_RM": {
+      "invoice_sales": 83771290.40,
+      "cash_sales": 5534326.38,
+      "credit_notes_abs": 1013268.22,
+      "net_sales": 88292348.56,
+      "gross_sales": 89305616.78
+    },
+    "shares_pct": {
+      "invoice_share_of_net": 94.88,
+      "cash_share_of_net": 6.27,
+      "cn_share_of_gross": 1.13
+    },
+    "expected_llm_facing_strings": [
+      "RM 88,292,348.56",
+      "RM 83,771,290.40",
+      "RM 5,534,326.38",
+      "-RM 1,013,268.22",
+      "94.9%",
+      "6.3%",
+      "1.13%"
+    ],
+    "thresholds_per_prompt": {
+      "credit_notes_pct_of_gross": "<=1% Good, 1-3% Monitor, >3% Concern",
+      "invoice_share_norm": "invoice >=90% of net is normal for credit-customer distribution business"
+    },
+    "verdict_against_thresholds": {
+      "cn_share_of_gross_1_13_pct": "Monitor (1-3% band)",
+      "invoice_share_94_9_pct": "Normal (>=90%)"
+    }
+  },
+  "net_sales_trend": {
+    "raw_query": "SELECT to_char(doc_date,'YYYY-MM'), SUM(invoice_total), SUM(cash_total), SUM(cn_total), SUM(net_revenue) FROM pc_sales_daily WHERE doc_date BETWEEN '2024-11-01' AND '2025-10-31' GROUP BY 1 ORDER BY 1",
+    "row_count": 12,
+    "monthly_RM": [
+      { "month": "2024-11", "invoice_sales": 5733161.66, "cash_sales": 429911.78, "credit_notes_abs": 55792.02,  "net_sales": 6107281.42 },
+      { "month": "2024-12", "invoice_sales": 5851598.92, "cash_sales": 441856.87, "credit_notes_abs": 78107.18,  "net_sales": 6215348.61 },
+      { "month": "2025-01", "invoice_sales": 8158101.22, "cash_sales": 1596887.28, "credit_notes_abs": 65223.16, "net_sales": 9689765.34 },
+      { "month": "2025-02", "invoice_sales": 5790578.29, "cash_sales": 392851.66,  "credit_notes_abs": 135662.48,"net_sales": 6047767.47 },
+      { "month": "2025-03", "invoice_sales": 7090165.38, "cash_sales": 341210.64,  "credit_notes_abs": 55953.40, "net_sales": 7375422.62 },
+      { "month": "2025-04", "invoice_sales": 6679913.95, "cash_sales": 331548.37,  "credit_notes_abs": 44878.30, "net_sales": 6966584.02 },
+      { "month": "2025-05", "invoice_sales": 8328273.92, "cash_sales": 369648.58,  "credit_notes_abs": 81429.88, "net_sales": 8616492.62 },
+      { "month": "2025-06", "invoice_sales": 7253540.51, "cash_sales": 369295.56,  "credit_notes_abs": 100979.70,"net_sales": 7521856.37 },
+      { "month": "2025-07", "invoice_sales": 7287495.72, "cash_sales": 349472.22,  "credit_notes_abs": 101874.96,"net_sales": 7535092.98 },
+      { "month": "2025-08", "invoice_sales": 7216878.50, "cash_sales": 327360.38,  "credit_notes_abs": 91344.90, "net_sales": 7452893.98 },
+      { "month": "2025-09", "invoice_sales": 6953711.41, "cash_sales": 285467.75,  "credit_notes_abs": 75715.17, "net_sales": 7163463.99 },
+      { "month": "2025-10", "invoice_sales": 7427870.92, "cash_sales": 298815.29,  "credit_notes_abs": 126307.07,"net_sales": 7600379.14 }
+    ],
+    "trend_observations_for_quality_scoring": {
+      "peak_month": "2025-01 (RM 9,689,765.34) — Chinese New Year season",
+      "trough_month": "2025-02 (RM 6,047,767.47) — post-CNY dip",
+      "highest_cn_month": "2025-02 (RM 135,662.48) — also lowest net month",
+      "second_high_month": "2025-05 (RM 8,616,492.62)",
+      "consecutive_growth_runs": "no 3+ consecutive month growth streak; mixed/oscillating",
+      "consecutive_decline_runs": "Jul→Sep: 7,535,092 → 7,452,893 → 7,163,463 = 3 consecutive months declining (modest, ~5%)",
+      "anomalies_pct_threshold_20pct": [
+        "2025-01 vs 12-mo avg (RM 7,357,696): +31.7% — anomaly UP",
+        "2025-02 vs 12-mo avg: -17.8% — borderline, just under 20%",
+        "no other months exceed +/-20%"
+      ]
+    }
+  },
+  "captured_at": "2026-05-08T07:33:00+08:00",
+  "captured_by": "Validation Study session"
+}

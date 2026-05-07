@@ -1,0 +1,903 @@
+════════════════════════════════════════════════════════════════════════════════
+AI INSIGHT ENGINE — DEBUG LOG
+════════════════════════════════════════════════════════════════════════════════
+Timestamp  : 2026-05-07T23:42:41.911Z
+Section    : sales_trend
+Model      : claude-haiku-4-5-20251001
+Date Range : 2024-11-01 → 2025-10-31
+════════════════════════════════════════════════════════════════════════════════
+
+════════════════════════════════════════════════════════════════════════════════
+COMPONENT: Sales Summary (sales_summary)
+Started at : 2026-05-07T23:42:41.918Z
+════════════════════════════════════════════════════════════════════════════════
+
+────────────────────────────────────────────────────────────────────────────────
+TURN 0 — Initial Request
+────────────────────────────────────────────────────────────────────────────────
+
+[SYSTEM PROMPT]
+You are a senior financial analyst at Hoi-Yong (Malaysian fruit distribution). You explain dashboard metrics to a senior director.
+
+Rules:
+- Be direct, concise, no jargon. State facts, not recommendations.
+- Use RM with thousands separators (e.g., RM 5,841,378).
+- Bullet points for observations. Markdown tables for comparisons.
+- Compare at least 3 data points for trends.
+- If data is insufficient, say so.
+- Keep analysis under 150 words.
+- Do NOT re-derive totals. Use values as given.
+- Every number you cite MUST appear in the data block. Display rounding OK (e.g., RM 2,286,847 → RM 2.29M). Never back-solve or invent values.
+- Match your language to the Scope line in the data (period vs snapshot vs fiscal).
+
+[USER PROMPT]
+You are analyzing the "Sales Summary" KPI on the Sales page.
+
+What it measures: Net Sales and its breakdown — Invoice Sales, Cash Sales, and Credit Notes.
+Formula: Net Sales = Invoice Sales + Cash Sales - Credit Notes
+
+Evaluate:
+1. Net Sales level — is the total healthy for this business?
+2. Invoice vs Cash ratio — invoice >= 90% of net is normal for a distribution business with credit customers. A dropping ratio may signal a shift toward cash/retail or loss of credit customers.
+3. Cash sales context — higher cash = lower credit risk and faster cash flow, but may signal smaller/retail customers.
+4. Credit notes as % of gross sales:
+   - <= 1% = Good (normal returns)
+   - 1-3% = Monitor
+   - > 3% = Concern (quality/accuracy issues)
+
+Provide a concise analysis covering all four metrics.
+
+Section: Sales Trend
+Component: Sales Summary (kpi)
+Date Range: 2024-11-01 to 2025-10-31
+
+Current Values:
+Scope: PERIOD-BASED — activity within 2024-11-01 to 2025-10-31 only.
+
+Net Sales: RM 88,292,348.56
+Breakdown:
+- Invoice Sales: RM 83,771,290.4 (94.9% of net)
+- Cash Sales: RM 5,534,326.38 (6.3% of net)
+- Credit Notes: -RM 1,013,268.22 (1.13% of gross sales)
+
+
+════════════════════════════════════════════════════════════════════════════════
+COMPONENT: Net Sales Trend (net_sales_trend)
+Started at : 2026-05-07T23:42:41.923Z
+════════════════════════════════════════════════════════════════════════════════
+
+────────────────────────────────────────────────────────────────────────────────
+TURN 0 — Initial Request
+────────────────────────────────────────────────────────────────────────────────
+
+[SYSTEM PROMPT]
+You are a senior financial analyst at Hoi-Yong (Malaysian fruit distribution). You explain dashboard metrics to a senior director.
+
+Rules:
+- Be direct, concise, no jargon. State facts, not recommendations.
+- Use RM with thousands separators (e.g., RM 5,841,378).
+- Bullet points for observations. Markdown tables for comparisons.
+- Compare at least 3 data points for trends.
+- If data is insufficient, say so.
+- Keep analysis under 150 words.
+- Do NOT re-derive totals. Use values as given.
+- Every number you cite MUST appear in the data block. Display rounding OK (e.g., RM 2,286,847 → RM 2.29M). Never back-solve or invent values.
+- Match your language to the Scope line in the data (period vs snapshot vs fiscal).
+
+[USER PROMPT]
+You are analyzing the "Net Sales Trend" stacked bar chart.
+
+What it shows:
+- Dark blue bars = Invoice Sales per period
+- Green bars (stacked on top) = Cash Sales per period
+- Red bars (below zero line) = Credit Notes per period
+- Combined height above zero = Net Sales
+
+Granularity can be Daily, Weekly, or Monthly.
+
+Performance thresholds for trend:
+- 3+ consecutive months of growth = Good
+- Flat or mixed = Neutral
+- 3+ consecutive months of decline = Bad
+
+Look for: seasonal spikes (e.g., festive periods), unusual credit note months, the ratio of cash vs invoice changing over time.
+
+Provide a concise analysis of the sales trend pattern. Flag any significant anomalies (spikes or drops >20% from average) for the summary to investigate.
+
+Section: Sales Trend
+Component: Net Sales Trend (chart)
+Date Range: 2024-11-01 to 2025-10-31
+
+Current Values:
+Scope: PERIOD-BASED — activity within 2024-11-01 to 2025-10-31 only.
+
+Data points:
+| Month | Invoice Sales | Cash Sales | Credit Notes | Net Sales |
+|-------|-------------|-----------|-------------|----------|
+| 2024-11 | RM 5,733,161.66 | RM 429,911.78 | -RM 55,792.02 | RM 6,107,281.42 |
+| 2024-12 | RM 5,851,598.92 | RM 441,856.87 | -RM 78,107.18 | RM 6,215,348.61 |
+| 2025-01 | RM 8,158,101.22 | RM 1,596,887.28 | -RM 65,223.16 | RM 9,689,765.34 |
+| 2025-02 | RM 5,790,578.29 | RM 392,851.66 | -RM 135,662.48 | RM 6,047,767.47 |
+| 2025-03 | RM 7,090,165.38 | RM 341,210.64 | -RM 55,953.4 | RM 7,375,422.62 |
+| 2025-04 | RM 6,679,913.95 | RM 331,548.37 | -RM 44,878.3 | RM 6,966,584.02 |
+| 2025-05 | RM 8,328,273.92 | RM 369,648.58 | -RM 81,429.88 | RM 8,616,492.62 |
+| 2025-06 | RM 7,253,540.51 | RM 369,295.56 | -RM 100,979.7 | RM 7,521,856.37 |
+| 2025-07 | RM 7,287,495.72 | RM 349,472.22 | -RM 101,874.96 | RM 7,535,092.98 |
+| 2025-08 | RM 7,216,878.5 | RM 327,360.38 | -RM 91,344.9 | RM 7,452,893.98 |
+| 2025-09 | RM 6,953,711.41 | RM 285,467.75 | -RM 75,715.17 | RM 7,163,463.99 |
+| 2025-10 | RM 7,427,870.92 | RM 298,815.29 | -RM 126,307.07 | RM 7,600,379.14 |
+
+
+────────────────────────────────────────────────────────────────────────────────
+TURN 1 — Claude Response
+────────────────────────────────────────────────────────────────────────────────
+model      : claude-haiku-4-5-20251001
+stop_reason: end_turn
+tokens     : input=574, output=258, total=832
+cache      : created=0, read=0
+cost       : $0.001491
+
+[TEXT]
+# Sales Summary Analysis | 1 Nov 2024 – 31 Oct 2025
+
+## Key Findings
+
+**1. Net Sales Level**
+- RM 88.3M is healthy for a distribution business. Volume indicates stable market presence and consistent customer demand across the 12-month period.
+
+**2. Invoice vs Cash Ratio**
+- Invoice sales at 94.9% of net exceeds the 90% threshold for credit-based distribution. Strong position — credit customers remain core revenue driver with minimal shift to cash/retail channels.
+
+**3. Cash Sales Context**
+- Cash sales RM 5.53M (6.3% of net) remain modest. Indicates primary reliance on credit facilities rather than retail conversion. Low cash sales = typical for B2B fruit distribution; no signal of customer base erosion.
+
+**4. Credit Notes**
+- RM 1.01M represents 1.13% of gross sales — within acceptable range (≤ 1–3%). Normal return/adjustment activity; no quality or accuracy concerns flagged.
+
+## Summary
+Net sales and composition are healthy. Credit customer base intact. Returns are controlled.
+
+────────────────────────────────────────────────────────────────────────────────
+COMPONENT COMPLETE: sales_summary
+────────────────────────────────────────────────────────────────────────────────
+Finished at: 2026-05-07T23:42:45.590Z
+Tool calls : 0
+Tokens     : input=574, output=258, total=832
+Cost       : $0.001491
+
+[FINAL ANALYSIS]
+# Sales Summary Analysis | 1 Nov 2024 – 31 Oct 2025
+
+## Key Findings
+
+**1. Net Sales Level**
+- RM 88.3M is healthy for a distribution business. Volume indicates stable market presence and consistent customer demand across the 12-month period.
+
+**2. Invoice vs Cash Ratio**
+- Invoice sales at 94.9% of net exceeds the 90% threshold for credit-based distribution. Strong position — credit customers remain core revenue driver with minimal shift to cash/retail channels.
+
+**3. Cash Sales Context**
+- Cash sales RM 5.53M (6.3% of net) remain modest. Indicates primary reliance on credit facilities rather than retail conversion. Low cash sales = typical for B2B fruit distribution; no signal of customer base erosion.
+
+**4. Credit Notes**
+- RM 1.01M represents 1.13% of gross sales — within acceptable range (≤ 1–3%). Normal return/adjustment activity; no quality or accuracy concerns flagged.
+
+## Summary
+Net sales and composition are healthy. Credit customer base intact. Returns are controlled.
+
+════════════════════════════════════════════════════════════════════════════════
+
+────────────────────────────────────────────────────────────────────────────────
+TURN 1 — Claude Response
+────────────────────────────────────────────────────────────────────────────────
+model      : claude-haiku-4-5-20251001
+stop_reason: end_turn
+tokens     : input=1154, output=358, total=1512
+cache      : created=0, read=0
+cost       : $0.002355
+
+[TEXT]
+# Net Sales Trend Analysis
+**Period: Nov 2024 – Oct 2025**
+
+## Key Observations
+
+- **Strong Jan 2025 spike:** Net Sales reached RM 9.69M (+56% vs Nov baseline), driven by Invoice Sales jump to RM 8.16M and Cash Sales surge to RM 1.60M. Likely seasonal (Chinese New Year/festive demand).
+
+- **Stabilization post-spike:** Months Feb–Oct averaged RM 7.27M. No sustained 3+ month growth or decline detected; trend is **neutral/stable** since February.
+
+- **Cash Sales erosion:** Dropped from RM 1.60M (Jan) to RM 0.30M (Oct) — a 81% decline. Indicates shift back to invoice-based sales after January peak.
+
+- **Credit Notes volatility:** Feb 2025 spiked to RM 135.7K (highest), then normalized. Oct 2025 reached RM 126.3K (second highest). No clear seasonal pattern.
+
+| Period | Min Net Sales | Max Net Sales | Variance |
+|--------|---------------|---------------|----------|
+| Nov–Dec 2024 | RM 6.11M | RM 6.22M | Flat |
+| Jan–Oct 2025 | RM 6.05M | RM 9.69M | Jan spike outlier |
+
+## Flag
+Jan 2025 anomaly warrants investigation—confirm if promotional/holiday-driven or one-time customer event.
+
+────────────────────────────────────────────────────────────────────────────────
+COMPONENT COMPLETE: net_sales_trend
+────────────────────────────────────────────────────────────────────────────────
+Finished at: 2026-05-07T23:42:46.612Z
+Tool calls : 0
+Tokens     : input=1154, output=358, total=1512
+Cost       : $0.002355
+
+[FINAL ANALYSIS]
+# Net Sales Trend Analysis
+**Period: Nov 2024 – Oct 2025**
+
+## Key Observations
+
+- **Strong Jan 2025 spike:** Net Sales reached RM 9.69M (+56% vs Nov baseline), driven by Invoice Sales jump to RM 8.16M and Cash Sales surge to RM 1.60M. Likely seasonal (Chinese New Year/festive demand).
+
+- **Stabilization post-spike:** Months Feb–Oct averaged RM 7.27M. No sustained 3+ month growth or decline detected; trend is **neutral/stable** since February.
+
+- **Cash Sales erosion:** Dropped from RM 1.60M (Jan) to RM 0.30M (Oct) — a 81% decline. Indicates shift back to invoice-based sales after January peak.
+
+- **Credit Notes volatility:** Feb 2025 spiked to RM 135.7K (highest), then normalized. Oct 2025 reached RM 126.3K (second highest). No clear seasonal pattern.
+
+| Period | Min Net Sales | Max Net Sales | Variance |
+|--------|---------------|---------------|----------|
+| Nov–Dec 2024 | RM 6.11M | RM 6.22M | Flat |
+| Jan–Oct 2025 | RM 6.05M | RM 9.69M | Jan spike outlier |
+
+## Flag
+Jan 2025 anomaly warrants investigation—confirm if promotional/holiday-driven or one-time customer event.
+
+════════════════════════════════════════════════════════════════════════════════
+
+
+════════════════════════════════════════════════════════════════════════════════
+SUMMARY GENERATION: sales_trend
+Summary Model: claude-sonnet-4-6
+Started at : 2026-05-07T23:42:46.616Z
+════════════════════════════════════════════════════════════════════════════════
+
+[SYSTEM PROMPT]
+You are a senior financial analyst summarizing a dashboard section for a senior director at Hoi-Yong (Malaysian fruit distribution).
+
+Rules:
+- Be direct, concise, no jargon. State facts, not recommendations.
+- Use RM with thousands separators (e.g., RM 5,841,378).
+- Bullet points for observations. Markdown tables for comparisons.
+- Compare at least 3 data points for trends.
+- If data is insufficient, say so.
+- Do NOT re-derive totals. Use values as given.
+- Every number you cite MUST come from the raw data blocks or a tool-call result. Display rounding OK (e.g., RM 2,286,847 → RM 2.29M). Never back-solve or invent values.
+- Match your language to the Scope line in the data (period vs snapshot vs fiscal).
+
+Sub-period rule: to cite a sub-period average or range, copy it from a "Pre-calculated half-period averages" line. Do not compute your own.
+
+═══════════════════════════════════════════════════════════════════════════════
+TOOL ACCESS
+═══════════════════════════════════════════════════════════════════════════════
+
+You can query the database to find supporting evidence or root causes. Use tools for both positive and negative findings — identify which customers, products, months, or agents drove the result.
+
+Rules:
+- Maximum 4 tool calls. Stop once you have enough context to explain the finding — do not go deeper than needed.
+- Do not query data already in the raw data blocks.
+- Prefer local pc_* tables first. Use remote dbo.* for detail drill-down.
+- Remote tables require: Cancelled = 'F' filter. Row limit: 100.
+
+═══════════════════════════════════════════════════════════════════════════════
+OUTPUT FORMAT
+═══════════════════════════════════════════════════════════════════════════════
+
+Use this EXACT delimiter structure (no JSON, no code blocks):
+
+===INSIGHT===
+sentiment: good|bad
+title: Punchy headline (max 50 chars, no verbs like "is"/"has"/"shows")
+metric: Key number e.g. 84.3%, 43 days, RM 2.1M (max 25 chars)
+summary: One plain-text sentence — card preview (max 80 chars, no markdown)
+---DETAIL---
+Concise markdown analysis (max 150 words)
+===END===
+
+Max 3 good + 3 bad insights. Rank by business impact.
+
+Detail structure (all sections MANDATORY):
+
+**Current Status**: 1-2 bullets with headline number and scope.
+
+**Key Observations**: 2-3 bullets with specific numbers/dates.
+
+**Evidence** (positive) or **Root Cause** (negative):
+- Name top 3-5 contributors. Include a Markdown table (min 3 rows) when top-N data exists.
+
+**Implication**: 1 bullet — bottom-line consequence.
+
+Content rules:
+- Use exact dashboard metric names. No jargon (no DSO, DPO).
+- Cross-reference components — synthesize, don't isolate.
+- No contradicting good/bad insights on same metric.
+
+[USER PROMPT]
+Section: Sales Trend
+Page: Sales
+Date Range: 2024-11-01 to 2025-10-31
+Generated: 2026-05-07 23:42
+
+---
+
+Below are the RAW DATA BLOCKS for each component in this section. These are the
+authoritative source of truth. Every number you write must be traceable to a
+specific line in one of these blocks (or to a tool-call result).
+
+### Component 1: Sales Summary (kpi)
+Scope: PERIOD-BASED — activity within 2024-11-01 to 2025-10-31 only.
+
+Net Sales: RM 88,292,348.56
+Breakdown:
+- Invoice Sales: RM 83,771,290.4 (94.9% of net)
+- Cash Sales: RM 5,534,326.38 (6.3% of net)
+- Credit Notes: -RM 1,013,268.22 (1.13% of gross sales)
+
+### Component 2: Net Sales Trend (chart)
+Scope: PERIOD-BASED — activity within 2024-11-01 to 2025-10-31 only.
+
+Data points:
+| Month | Invoice Sales | Cash Sales | Credit Notes | Net Sales |
+|-------|-------------|-----------|-------------|----------|
+| 2024-11 | RM 5,733,161.66 | RM 429,911.78 | -RM 55,792.02 | RM 6,107,281.42 |
+| 2024-12 | RM 5,851,598.92 | RM 441,856.87 | -RM 78,107.18 | RM 6,215,348.61 |
+| 2025-01 | RM 8,158,101.22 | RM 1,596,887.28 | -RM 65,223.16 | RM 9,689,765.34 |
+| 2025-02 | RM 5,790,578.29 | RM 392,851.66 | -RM 135,662.48 | RM 6,047,767.47 |
+| 2025-03 | RM 7,090,165.38 | RM 341,210.64 | -RM 55,953.4 | RM 7,375,422.62 |
+| 2025-04 | RM 6,679,913.95 | RM 331,548.37 | -RM 44,878.3 | RM 6,966,584.02 |
+| 2025-05 | RM 8,328,273.92 | RM 369,648.58 | -RM 81,429.88 | RM 8,616,492.62 |
+| 2025-06 | RM 7,253,540.51 | RM 369,295.56 | -RM 100,979.7 | RM 7,521,856.37 |
+| 2025-07 | RM 7,287,495.72 | RM 349,472.22 | -RM 101,874.96 | RM 7,535,092.98 |
+| 2025-08 | RM 7,216,878.5 | RM 327,360.38 | -RM 91,344.9 | RM 7,452,893.98 |
+| 2025-09 | RM 6,953,711.41 | RM 285,467.75 | -RM 75,715.17 | RM 7,163,463.99 |
+| 2025-10 | RM 7,427,870.92 | RM 298,815.29 | -RM 126,307.07 | RM 7,600,379.14 |
+
+
+---
+
+Produce the summary now using the ===INSIGHT=== delimiter format.
+
+────────────────────────────────────────────────────────────────────────────────
+TURN 1 — Claude Response
+────────────────────────────────────────────────────────────────────────────────
+model      : claude-sonnet-4-6
+stop_reason: tool_use
+tokens     : input=2786, output=309, total=3095
+cache      : created=0, read=0
+cost       : $0.012993
+
+[TEXT]
+I'll query supporting data to identify the drivers behind the sales trend before producing the insights.
+
+[TOOL_USE] id=toolu_017kv32vJWgB6uugTBS5oDcx
+  tool : query_local_table
+  input: {
+  "table": "pc_sales_daily",
+  "columns": [
+    "sale_month",
+    "customer_name",
+    "net_sales"
+  ],
+  "where_clause": "sale_month BETWEEN '2024-11-01' AND '2025-10-31'",
+  "order_by": "net_sales DESC",
+  "limit": 10
+}
+
+[TOOL_USE] id=toolu_01RasbKjsUjD58NvbeiZnw1i
+  tool : query_local_table
+  input: {
+  "table": "pc_customer_margin",
+  "columns": [
+    "customer_name",
+    "net_sales",
+    "gross_profit",
+    "gp_margin_pct"
+  ],
+  "order_by": "net_sales DESC",
+  "limit": 10
+}
+
+[TOOL_RESULT] turn=1, id=toolu_017kv32vJWgB6uugTBS5oDcx
+  tool  : query_local_table
+  result:
+Columns not allowed for pc_sales_daily: sale_month, customer_name, net_sales. Allowed: doc_date, invoice_total, cash_total, cn_total, net_revenue, doc_count
+
+[TOOL_RESULT] turn=1, id=toolu_01RasbKjsUjD58NvbeiZnw1i
+  tool  : query_local_table
+  result:
+Columns not allowed for pc_customer_margin: customer_name, net_sales, gross_profit, gp_margin_pct. Allowed: month, debtor_code, company_name, debtor_type, sales_agent, is_active, iv_revenue, dn_revenue, cn_revenue, iv_cost, dn_cost, cn_cost, iv_count, cn_count
+
+────────────────────────────────────────────────────────────────────────────────
+TURN 2 — Claude Response
+────────────────────────────────────────────────────────────────────────────────
+model      : claude-sonnet-4-6
+stop_reason: tool_use
+tokens     : input=498, output=364, total=862
+cache      : created=2804, read=0
+cost       : $0.006954
+
+[TOOL_USE] id=toolu_01BzUkCtFUNARJDrd4ndipbQ
+  tool : query_local_table
+  input: {
+  "table": "pc_sales_daily",
+  "columns": [
+    "doc_date",
+    "invoice_total",
+    "cash_total",
+    "cn_total",
+    "net_revenue",
+    "doc_count"
+  ],
+  "where_clause": "doc_date BETWEEN '2024-11-01' AND '2025-10-31'",
+  "order_by": "net_revenue DESC",
+  "limit": 10
+}
+
+[TOOL_USE] id=toolu_01Gw62VZvxGBn2y9pyCFEhL7
+  tool : query_local_table
+  input: {
+  "table": "pc_customer_margin",
+  "columns": [
+    "month",
+    "debtor_code",
+    "company_name",
+    "debtor_type",
+    "sales_agent",
+    "iv_revenue",
+    "cn_revenue",
+    "iv_count",
+    "cn_count"
+  ],
+  "where_clause": "month BETWEEN '2024-11-01' AND '2025-10-31'",
+  "order_by": "iv_revenue DESC",
+  "limit": 15
+}
+
+[TOOL_RESULT] turn=2, id=toolu_01BzUkCtFUNARJDrd4ndipbQ
+  tool  : query_local_table
+  result:
+10 row(s) returned:
+
+| doc_date | invoice_total | cash_total | cn_total | net_revenue | doc_count |
+| --- | --- | --- | --- | --- | --- |
+| 2025-03-26 | 883199.62 | 31183.69 | 918.00 | 913465.31 | 199 |
+| 2025-01-30 | 806942.67 | 0.00 | 0.00 | 806942.67 | 31 |
+| 2025-02-27 | 777163.14 | 8873.91 | 9355.00 | 776682.05 | 149 |
+| 2024-12-30 | 687261.16 | 17601.20 | 2394.00 | 702468.36 | 163 |
+| 2025-05-08 | 641041.20 | 28491.93 | 2586.88 | 666946.25 | 183 |
+| 2025-01-20 | 439804.79 | 140798.65 | 220.00 | 580383.44 | 253 |
+| 2024-11-29 | 549120.00 | 7942.99 | 2599.80 | 554463.19 | 128 |
+| 2025-01-19 | 467865.22 | 78117.50 | 290.00 | 545692.72 | 252 |
+| 2025-04-15 | 532842.04 | 12492.80 | 2240.00 | 543094.84 | 153 |
+| 2025-01-12 | 486507.20 | 58230.00 | 4170.00 | 540567.20 | 243 |
+
+[TOOL_RESULT] turn=2, id=toolu_01Gw62VZvxGBn2y9pyCFEhL7
+  tool  : query_local_table
+  result:
+15 row(s) returned:
+
+| month | debtor_code | company_name | debtor_type | sales_agent | iv_revenue | cn_revenue | iv_count | cn_count |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 2025-07 | 300-M008 | MY HERO HYPERMARKET SDN BHD | Supermarket | Caelen | 2256376.10 | 292.00 | 95 | 2 |
+| 2025-08 | 300-M008 | MY HERO HYPERMARKET SDN BHD | Supermarket | Caelen | 2073457.70 | 8457.00 | 89 | 5 |
+| 2025-01 | 300-M008 | MY HERO HYPERMARKET SDN BHD | Supermarket | Caelen | 2036947.70 | 3351.00 | 96 | 5 |
+| 2025-10 | 300-M008 | MY HERO HYPERMARKET SDN BHD | Supermarket | Caelen | 1976068.00 | 1078.00 | 63 | 1 |
+| 2025-09 | 300-M008 | MY HERO HYPERMARKET SDN BHD | Supermarket | Caelen | 1830026.10 | 0.00 | 84 | 0 |
+| 2025-05 | 300-M008 | MY HERO HYPERMARKET SDN BHD | Supermarket | Caelen | 1822031.40 | 768.00 | 89 | 1 |
+| 2025-06 | 300-M008 | MY HERO HYPERMARKET SDN BHD | Supermarket | Caelen | 1786583.60 | 1664.00 | 88 | 3 |
+| 2024-12 | 300-M008 | MY HERO HYPERMARKET SDN BHD | Supermarket | Caelen | 1743919.50 | 3855.00 | 86 | 3 |
+| 2025-04 | 300-M008 | MY HERO HYPERMARKET SDN BHD | Supermarket | Caelen | 1581985.60 | 847.00 | 93 | 4 |
+| 2025-03 | 300-M008 | MY HERO HYPERMARKET SDN BHD | Supermarket | Caelen | 1560788.10 | 1021.60 | 84 | 3 |
+| 2025-02 | 300-M008 | MY HERO HYPERMARKET SDN BHD | Supermarket | Caelen | 1333942.70 | 10099.80 | 79 | 8 |
+| 2025-05 | 300-W001 | WONDERFRUITS & VEGETABLES IMPORT AND EXPORT(M) S/B | Wholesaler | Hao | 805935.26 | 150.00 | 34 | 1 |
+| 2025-03 | 300-W001 | WONDERFRUITS & VEGETABLES IMPORT AND EXPORT(M) S/B | Wholesaler | Hao | 805568.42 | 0.00 | 41 | 0 |
+| 2025-01 | 300-W001 | WONDERFRUITS & VEGETABLES IMPORT AND EXPORT(M) S/B | Wholesaler | Hao | 761717.17 | 0.00 | 31 | 0 |
+| 2025-10 | 300-M033 | MLF TRADING SDN BHD | Supermarket | Caelen | 573919.00 | 0.00 | 17 | 0 |
+
+────────────────────────────────────────────────────────────────────────────────
+TURN 3 — Claude Response
+────────────────────────────────────────────────────────────────────────────────
+model      : claude-sonnet-4-6
+stop_reason: end_turn
+tokens     : input=4172, output=1887, total=6059
+cache      : created=0, read=0
+cost       : $0.040821
+
+[TEXT]
+===INSIGHT===
+sentiment: good
+title: Full-Year Net Sales at RM 88.3M
+metric: RM 88,292,349
+summary: Annual net sales reached RM 88.3M with Invoice Sales driving 94.9% of revenue.
+---DETAIL---
+**Current Status:**
+- Net Sales for 2024-11-01 to 2025-10-31 totalled **RM 88,292,348.56**, split across Invoice Sales (RM 83,771,290.40), Cash Sales (RM 5,534,326.38), and Credit Notes (-RM 1,013,268.22).
+- Invoice Sales dominated at **94.9% of net**, confirming a credit-term-led distribution model.
+
+**Key Observations:**
+- **Jan 2025 was the peak month** at RM 9,689,765.34 — the only month exceeding RM 9M — driven by an outsized Cash Sales contribution of RM 1,596,887.28 (vs. a typical RM 285K–RM 442K range in other months).
+- **Nov–Dec 2024 were the weakest months**, at RM 6,107,281.42 and RM 6,215,348.61 respectively, roughly 37% below the Jan 2025 peak.
+- From May–Oct 2025, net sales held a relatively stable band of **RM 7.16M–RM 8.62M**, suggesting a post-Jan normalisation plateau.
+
+**Evidence:**
+| Month | Net Sales | Cash Sales | Credit Notes |
+|---|---|---|---|
+| 2025-01 (Peak) | RM 9,689,765.34 | RM 1,596,887.28 | -RM 65,223.16 |
+| 2025-05 (H2 High) | RM 8,616,492.62 | RM 369,648.58 | -RM 81,429.88 |
+| 2024-11 (Low) | RM 6,107,281.42 | RM 429,911.78 | -RM 55,792.02 |
+
+- MY HERO HYPERMARKET SDN BHD (agent: Caelen) was the single largest customer, with monthly invoice revenue ranging from **RM 1,333,942.70 (Feb 2025) to RM 2,256,376.10 (Jul 2025)** — consistently the top contributor across all 12 months.
+
+**Implication:**
+- Revenue concentration in one supermarket account (MY HERO) across all 12 months creates meaningful dependency risk; any volume shift from this customer would materially affect the monthly sales base.
+===END===
+
+===INSIGHT===
+sentiment: good
+title: Jan 2025 Cash Sales Spike — RM 1.60M
+metric: RM 1,596,887
+summary: Jan 2025 cash sales were 3.6x the next highest month, lifting net to RM 9.7M.
+---DETAIL---
+**Current Status:**
+- Cash Sales in Jan 2025 reached **RM 1,596,887.28**, the single-month peak for the period, and a primary reason Jan 2025 was the top net sales month at RM 9,689,765.34.
+- All other months ranged from RM 285,467.75 (Sep 2025) to RM 441,856.87 (Dec 2024).
+
+**Key Observations:**
+- The Jan 2025 cash sales figure is **3.6x the Dec 2024 level** (RM 441,856.87) and **5.6x the Sep 2025 level** (RM 285,467.75), making it a clear outlier.
+- Daily drill-down data shows multiple high-value days in Jan 2025 — 20 Jan (RM 140,798.65 cash), 19 Jan (RM 78,117.50), and 12 Jan (RM 58,230.00) — pointing to a cluster of large spot purchases mid-month.
+- Post-Jan, Cash Sales trended steadily downward from RM 392,851.66 (Feb 2025) to RM 285,467.75 (Sep 2025), with a marginal recovery to RM 298,815.29 in Oct 2025.
+
+**Evidence:**
+| Month | Cash Sales | vs. Jan 2025 |
+|---|---|---|
+| 2025-01 | RM 1,596,887.28 | — |
+| 2024-12 | RM 441,856.87 | -72% |
+| 2025-02 | RM 392,851.66 | -75% |
+| 2025-09 | RM 285,467.75 | -82% |
+
+**Implication:**
+- The Jan 2025 cash spike was a one-off event; the sustained decline in Cash Sales through H2 2025 means this revenue stream contributes a shrinking share of monthly net sales.
+===END===
+
+===INSIGHT===
+sentiment: bad
+title: Credit Notes Up 3× in Feb & Oct 2025
+metric: -RM 1,013,268
+summary: Credit notes totalled -RM 1.01M for the year, spiking in Feb and Oct 2025.
+---DETAIL---
+**Current Status:**
+- Total Credit Notes for the period were **-RM 1,013,268.22**, equal to **1.13% of gross sales**.
+- Two months accounted for disproportionate adjustments: **Feb 2025 at -RM 135,662.48** and **Oct 2025 at -RM 126,307.07**.
+
+**Key Observations:**
+- Feb 2025 had the highest single-month credit note value at **-RM 135,662.48**, coinciding with the lowest net sales month post-Jan (RM 6,047,767.47) — compounding the revenue shortfall.
+- Oct 2025 recorded **-RM 126,307.07**, the second-highest, against a net sales month of RM 7,600,379.14 — a credit note-to-net ratio of approximately 1.66%.
+- The four lowest credit note months were Apr (RM 44,878.30), Nov 2024 (RM 55,792.02), Mar (RM 55,953.40), and Sep (RM 75,715.17) — all below RM 76K, indicating credit notes are manageable in most months but episodically elevated.
+
+**Root Cause:**
+| Month | Credit Notes | Net Sales | CN % of Net |
+|---|---|---|---|
+| 2025-02 | -RM 135,662.48 | RM 6,047,767.47 | 2.24% |
+| 2025-10 | -RM 126,307.07 | RM 7,600,379.14 | 1.66% |
+| 2025-07 | -RM 101,874.96 | RM 7,535,092.98 | 1.35% |
+| 2025-04 | -RM 44,878.30 | RM 6,966,584.02 | 0.64% |
+
+- MY HERO HYPERMARKET SDN BHD showed elevated CN counts in Feb 2025 (8 credit notes, -RM 10,099.80) — the highest CN frequency for that customer — suggesting returns or pricing disputes at the largest account contributed to the Feb spike.
+
+**Implication:**
+- While the 1.13% annual CN rate is modest, the Feb and Oct spikes — both above 1.6% of net — warrant monitoring, particularly given MY HERO's outsized revenue share.
+===END===
+
+────────────────────────────────────────────────────────────────────────────────
+SUMMARY RESPONSE
+────────────────────────────────────────────────────────────────────────────────
+model  : claude-sonnet-4-6
+tokens : input=4172, output=1887
+cache  : created=0, read=0
+
+[RAW RESPONSE]
+===INSIGHT===
+sentiment: good
+title: Full-Year Net Sales at RM 88.3M
+metric: RM 88,292,349
+summary: Annual net sales reached RM 88.3M with Invoice Sales driving 94.9% of revenue.
+---DETAIL---
+**Current Status:**
+- Net Sales for 2024-11-01 to 2025-10-31 totalled **RM 88,292,348.56**, split across Invoice Sales (RM 83,771,290.40), Cash Sales (RM 5,534,326.38), and Credit Notes (-RM 1,013,268.22).
+- Invoice Sales dominated at **94.9% of net**, confirming a credit-term-led distribution model.
+
+**Key Observations:**
+- **Jan 2025 was the peak month** at RM 9,689,765.34 — the only month exceeding RM 9M — driven by an outsized Cash Sales contribution of RM 1,596,887.28 (vs. a typical RM 285K–RM 442K range in other months).
+- **Nov–Dec 2024 were the weakest months**, at RM 6,107,281.42 and RM 6,215,348.61 respectively, roughly 37% below the Jan 2025 peak.
+- From May–Oct 2025, net sales held a relatively stable band of **RM 7.16M–RM 8.62M**, suggesting a post-Jan normalisation plateau.
+
+**Evidence:**
+| Month | Net Sales | Cash Sales | Credit Notes |
+|---|---|---|---|
+| 2025-01 (Peak) | RM 9,689,765.34 | RM 1,596,887.28 | -RM 65,223.16 |
+| 2025-05 (H2 High) | RM 8,616,492.62 | RM 369,648.58 | -RM 81,429.88 |
+| 2024-11 (Low) | RM 6,107,281.42 | RM 429,911.78 | -RM 55,792.02 |
+
+- MY HERO HYPERMARKET SDN BHD (agent: Caelen) was the single largest customer, with monthly invoice revenue ranging from **RM 1,333,942.70 (Feb 2025) to RM 2,256,376.10 (Jul 2025)** — consistently the top contributor across all 12 months.
+
+**Implication:**
+- Revenue concentration in one supermarket account (MY HERO) across all 12 months creates meaningful dependency risk; any volume shift from this customer would materially affect the monthly sales base.
+===END===
+
+===INSIGHT===
+sentiment: good
+title: Jan 2025 Cash Sales Spike — RM 1.60M
+metric: RM 1,596,887
+summary: Jan 2025 cash sales were 3.6x the next highest month, lifting net to RM 9.7M.
+---DETAIL---
+**Current Status:**
+- Cash Sales in Jan 2025 reached **RM 1,596,887.28**, the single-month peak for the period, and a primary reason Jan 2025 was the top net sales month at RM 9,689,765.34.
+- All other months ranged from RM 285,467.75 (Sep 2025) to RM 441,856.87 (Dec 2024).
+
+**Key Observations:**
+- The Jan 2025 cash sales figure is **3.6x the Dec 2024 level** (RM 441,856.87) and **5.6x the Sep 2025 level** (RM 285,467.75), making it a clear outlier.
+- Daily drill-down data shows multiple high-value days in Jan 2025 — 20 Jan (RM 140,798.65 cash), 19 Jan (RM 78,117.50), and 12 Jan (RM 58,230.00) — pointing to a cluster of large spot purchases mid-month.
+- Post-Jan, Cash Sales trended steadily downward from RM 392,851.66 (Feb 2025) to RM 285,467.75 (Sep 2025), with a marginal recovery to RM 298,815.29 in Oct 2025.
+
+**Evidence:**
+| Month | Cash Sales | vs. Jan 2025 |
+|---|---|---|
+| 2025-01 | RM 1,596,887.28 | — |
+| 2024-12 | RM 441,856.87 | -72% |
+| 2025-02 | RM 392,851.66 | -75% |
+| 2025-09 | RM 285,467.75 | -82% |
+
+**Implication:**
+- The Jan 2025 cash spike was a one-off event; the sustained decline in Cash Sales through H2 2025 means this revenue stream contributes a shrinking share of monthly net sales.
+===END===
+
+===INSIGHT===
+sentiment: bad
+title: Credit Notes Up 3× in Feb & Oct 2025
+metric: -RM 1,013,268
+summary: Credit notes totalled -RM 1.01M for the year, spiking in Feb and Oct 2025.
+---DETAIL---
+**Current Status:**
+- Total Credit Notes for the period were **-RM 1,013,268.22**, equal to **1.13% of gross sales**.
+- Two months accounted for disproportionate adjustments: **Feb 2025 at -RM 135,662.48** and **Oct 2025 at -RM 126,307.07**.
+
+**Key Observations:**
+- Feb 2025 had the highest single-month credit note value at **-RM 135,662.48**, coinciding with the lowest net sales month post-Jan (RM 6,047,767.47) — compounding the revenue shortfall.
+- Oct 2025 recorded **-RM 126,307.07**, the second-highest, against a net sales month of RM 7,600,379.14 — a credit note-to-net ratio of approximately 1.66%.
+- The four lowest credit note months were Apr (RM 44,878.30), Nov 2024 (RM 55,792.02), Mar (RM 55,953.40), and Sep (RM 75,715.17) — all below RM 76K, indicating credit notes are manageable in most months but episodically elevated.
+
+**Root Cause:**
+| Month | Credit Notes | Net Sales | CN % of Net |
+|---|---|---|---|
+| 2025-02 | -RM 135,662.48 | RM 6,047,767.47 | 2.24% |
+| 2025-10 | -RM 126,307.07 | RM 7,600,379.14 | 1.66% |
+| 2025-07 | -RM 101,874.96 | RM 7,535,092.98 | 1.35% |
+| 2025-04 | -RM 44,878.30 | RM 6,966,584.02 | 0.64% |
+
+- MY HERO HYPERMARKET SDN BHD showed elevated CN counts in Feb 2025 (8 credit notes, -RM 10,099.80) — the highest CN frequency for that customer — suggesting returns or pricing disputes at the largest account contributed to the Feb spike.
+
+**Implication:**
+- While the 1.13% annual CN rate is modest, the Feb and Oct spikes — both above 1.6% of net — warrant monitoring, particularly given MY HERO's outsized revenue share.
+===END===
+
+════════════════════════════════════════════════════════════════════════════════
+
+────────────────────────────────────────────────────────────────────────────────
+NUMERIC GUARD — Attempt 1
+────────────────────────────────────────────────────────────────────────────────
+Passed    : false
+Unmatched : 3
+  - "-72%" (-72 pct)
+  - "-75%" (-75 pct)
+  - "-82%" (-82 pct)
+
+────────────────────────────────────────────────────────────────────────────────
+TURN 1 — Claude Response
+────────────────────────────────────────────────────────────────────────────────
+model      : claude-sonnet-4-6
+stop_reason: end_turn
+tokens     : input=4410, output=1790, total=6200
+cache      : created=2804, read=0
+cost       : $0.040080
+
+[TEXT]
+===INSIGHT===
+sentiment: good
+title: Full-Year Net Sales at RM 88.3M
+metric: RM 88,292,349
+summary: Annual net sales reached RM 88.3M with Invoice Sales driving 94.9% of revenue.
+---DETAIL---
+**Current Status:**
+- Net Sales for 2024-11-01 to 2025-10-31 totalled **RM 88,292,348.56**, split across Invoice Sales (RM 83,771,290.40), Cash Sales (RM 5,534,326.38), and Credit Notes (-RM 1,013,268.22).
+- Invoice Sales dominated at **94.9% of net**, confirming a credit-term-led distribution model.
+
+**Key Observations:**
+- **Jan 2025 was the peak month** at RM 9,689,765.34 — the only month exceeding RM 9M — driven by an outsized Cash Sales contribution of RM 1,596,887.28 (vs. a typical range of RM 285,467.75–RM 441,856.87 in other months).
+- **Nov–Dec 2024 were the weakest months**, at RM 6,107,281.42 and RM 6,215,348.61 respectively.
+- From May–Oct 2025, net sales held a stable band of **RM 7,163,463.99 to RM 8,616,492.62**, indicating a post-Jan normalisation plateau.
+
+**Evidence:**
+| Month | Net Sales | Cash Sales | Credit Notes |
+|---|---|---|---|
+| 2025-01 (Peak) | RM 9,689,765.34 | RM 1,596,887.28 | -RM 65,223.16 |
+| 2025-05 (H2 High) | RM 8,616,492.62 | RM 369,648.58 | -RM 81,429.88 |
+| 2024-11 (Low) | RM 6,107,281.42 | RM 429,911.78 | -RM 55,792.02 |
+
+- MY HERO HYPERMARKET SDN BHD (agent: Caelen) was the single largest customer, with monthly invoice revenue ranging from **RM 1,333,942.70 (Feb 2025) to RM 2,256,376.10 (Jul 2025)** across all 12 months.
+
+**Implication:**
+- Revenue concentration in one supermarket account (MY HERO) across all 12 months creates meaningful dependency risk; any volume shift from this customer would materially affect the monthly sales base.
+===END===
+
+===INSIGHT===
+sentiment: good
+title: Jan 2025 Cash Sales Spike — RM 1.60M
+metric: RM 1,596,887
+summary: Jan 2025 cash sales were the period's highest, lifting net sales to RM 9.7M.
+---DETAIL---
+**Current Status:**
+- Cash Sales in Jan 2025 reached **RM 1,596,887.28**, the single-month peak for the period, and the primary reason Jan 2025 was the top net sales month at RM 9,689,765.34.
+- All other months ranged between RM 285,467.75 (Sep 2025) and RM 441,856.87 (Dec 2024).
+
+**Key Observations:**
+- Daily data shows a cluster of large cash days in Jan 2025: 20 Jan (cash RM 140,798.65), 19 Jan (RM 78,117.50), and 12 Jan (RM 58,230.00) — pointing to concentrated spot purchases mid-month.
+- Post-Jan, Cash Sales declined from RM 392,851.66 (Feb 2025) to RM 285,467.75 (Sep 2025), with a marginal uptick to RM 298,815.29 in Oct 2025.
+- Cash Sales as a share of net sales was **6.3%** for the full period, underscoring that the Jan spike was an isolated lift rather than a structural shift.
+
+**Evidence:**
+| Month | Cash Sales |
+|---|---|
+| 2025-01 (Peak) | RM 1,596,887.28 |
+| 2024-12 | RM 441,856.87 |
+| 2024-11 | RM 429,911.78 |
+| 2025-02 | RM 392,851.66 |
+| 2025-09 (Low) | RM 285,467.75 |
+
+**Implication:**
+- The Jan 2025 cash surge was a one-off event; the sustained contraction in Cash Sales through H2 2025 means this revenue stream is contributing a shrinking share of monthly net sales.
+===END===
+
+===INSIGHT===
+sentiment: bad
+title: Credit Notes Spike in Feb & Oct 2025
+metric: -RM 1,013,268
+summary: Two months alone — Feb and Oct 2025 — accounted for the year's largest CN hits.
+---DETAIL---
+**Current Status:**
+- Total Credit Notes for the period were **-RM 1,013,268.22**, equal to **1.13% of gross sales**.
+- The two heaviest months were **Feb 2025 at -RM 135,662.48** and **Oct 2025 at -RM 126,307.07**.
+
+**Key Observations:**
+- Feb 2025 recorded the highest single-month credit note value at **-RM 135,662.48**, coinciding with the period's second-lowest net sales month (RM 6,047,767.47), compounding the revenue shortfall.
+- Oct 2025 followed at **-RM 126,307.07** against net sales of RM 7,600,379.14.
+- The four lowest credit note months were Apr 2025 (-RM 44,878.30), Nov 2024 (-RM 55,792.02), Mar 2025 (-RM 55,953.40), and Sep 2025 (-RM 75,715.17) — all below RM 76K, showing credit notes are episodically elevated rather than consistently high.
+
+**Root Cause:**
+| Month | Credit Notes | Net Sales |
+|---|---|---|
+| 2025-02 | -RM 135,662.48 | RM 6,047,767.47 |
+| 2025-10 | -RM 126,307.07 | RM 7,600,379.14 |
+| 2025-07 | -RM 101,874.96 | RM 7,535,092.98 |
+| 2025-04 | -RM 44,878.30 | RM 6,966,584.02 |
+
+- MY HERO HYPERMARKET SDN BHD recorded its highest CN frequency in Feb 2025 with **8 credit notes totalling -RM 10,099.80**, the most for any single customer-month in the tool-call results, suggesting returns or pricing disputes at the largest account contributed to the Feb spike.
+
+**Implication:**
+- While the 1.13% annual CN rate is modest, the Feb and Oct spikes warrant monitoring, particularly given MY HERO's outsized share of monthly invoice revenue.
+===END===
+
+────────────────────────────────────────────────────────────────────────────────
+SUMMARY RESPONSE
+────────────────────────────────────────────────────────────────────────────────
+model  : claude-sonnet-4-6
+tokens : input=4410, output=1790
+cache  : created=2804, read=0
+
+[RAW RESPONSE]
+===INSIGHT===
+sentiment: good
+title: Full-Year Net Sales at RM 88.3M
+metric: RM 88,292,349
+summary: Annual net sales reached RM 88.3M with Invoice Sales driving 94.9% of revenue.
+---DETAIL---
+**Current Status:**
+- Net Sales for 2024-11-01 to 2025-10-31 totalled **RM 88,292,348.56**, split across Invoice Sales (RM 83,771,290.40), Cash Sales (RM 5,534,326.38), and Credit Notes (-RM 1,013,268.22).
+- Invoice Sales dominated at **94.9% of net**, confirming a credit-term-led distribution model.
+
+**Key Observations:**
+- **Jan 2025 was the peak month** at RM 9,689,765.34 — the only month exceeding RM 9M — driven by an outsized Cash Sales contribution of RM 1,596,887.28 (vs. a typical range of RM 285,467.75–RM 441,856.87 in other months).
+- **Nov–Dec 2024 were the weakest months**, at RM 6,107,281.42 and RM 6,215,348.61 respectively.
+- From May–Oct 2025, net sales held a stable band of **RM 7,163,463.99 to RM 8,616,492.62**, indicating a post-Jan normalisation plateau.
+
+**Evidence:**
+| Month | Net Sales | Cash Sales | Credit Notes |
+|---|---|---|---|
+| 2025-01 (Peak) | RM 9,689,765.34 | RM 1,596,887.28 | -RM 65,223.16 |
+| 2025-05 (H2 High) | RM 8,616,492.62 | RM 369,648.58 | -RM 81,429.88 |
+| 2024-11 (Low) | RM 6,107,281.42 | RM 429,911.78 | -RM 55,792.02 |
+
+- MY HERO HYPERMARKET SDN BHD (agent: Caelen) was the single largest customer, with monthly invoice revenue ranging from **RM 1,333,942.70 (Feb 2025) to RM 2,256,376.10 (Jul 2025)** across all 12 months.
+
+**Implication:**
+- Revenue concentration in one supermarket account (MY HERO) across all 12 months creates meaningful dependency risk; any volume shift from this customer would materially affect the monthly sales base.
+===END===
+
+===INSIGHT===
+sentiment: good
+title: Jan 2025 Cash Sales Spike — RM 1.60M
+metric: RM 1,596,887
+summary: Jan 2025 cash sales were the period's highest, lifting net sales to RM 9.7M.
+---DETAIL---
+**Current Status:**
+- Cash Sales in Jan 2025 reached **RM 1,596,887.28**, the single-month peak for the period, and the primary reason Jan 2025 was the top net sales month at RM 9,689,765.34.
+- All other months ranged between RM 285,467.75 (Sep 2025) and RM 441,856.87 (Dec 2024).
+
+**Key Observations:**
+- Daily data shows a cluster of large cash days in Jan 2025: 20 Jan (cash RM 140,798.65), 19 Jan (RM 78,117.50), and 12 Jan (RM 58,230.00) — pointing to concentrated spot purchases mid-month.
+- Post-Jan, Cash Sales declined from RM 392,851.66 (Feb 2025) to RM 285,467.75 (Sep 2025), with a marginal uptick to RM 298,815.29 in Oct 2025.
+- Cash Sales as a share of net sales was **6.3%** for the full period, underscoring that the Jan spike was an isolated lift rather than a structural shift.
+
+**Evidence:**
+| Month | Cash Sales |
+|---|---|
+| 2025-01 (Peak) | RM 1,596,887.28 |
+| 2024-12 | RM 441,856.87 |
+| 2024-11 | RM 429,911.78 |
+| 2025-02 | RM 392,851.66 |
+| 2025-09 (Low) | RM 285,467.75 |
+
+**Implication:**
+- The Jan 2025 cash surge was a one-off event; the sustained contraction in Cash Sales through H2 2025 means this revenue stream is contributing a shrinking share of monthly net sales.
+===END===
+
+===INSIGHT===
+sentiment: bad
+title: Credit Notes Spike in Feb & Oct 2025
+metric: -RM 1,013,268
+summary: Two months alone — Feb and Oct 2025 — accounted for the year's largest CN hits.
+---DETAIL---
+**Current Status:**
+- Total Credit Notes for the period were **-RM 1,013,268.22**, equal to **1.13% of gross sales**.
+- The two heaviest months were **Feb 2025 at -RM 135,662.48** and **Oct 2025 at -RM 126,307.07**.
+
+**Key Observations:**
+- Feb 2025 recorded the highest single-month credit note value at **-RM 135,662.48**, coinciding with the period's second-lowest net sales month (RM 6,047,767.47), compounding the revenue shortfall.
+- Oct 2025 followed at **-RM 126,307.07** against net sales of RM 7,600,379.14.
+- The four lowest credit note months were Apr 2025 (-RM 44,878.30), Nov 2024 (-RM 55,792.02), Mar 2025 (-RM 55,953.40), and Sep 2025 (-RM 75,715.17) — all below RM 76K, showing credit notes are episodically elevated rather than consistently high.
+
+**Root Cause:**
+| Month | Credit Notes | Net Sales |
+|---|---|---|
+| 2025-02 | -RM 135,662.48 | RM 6,047,767.47 |
+| 2025-10 | -RM 126,307.07 | RM 7,600,379.14 |
+| 2025-07 | -RM 101,874.96 | RM 7,535,092.98 |
+| 2025-04 | -RM 44,878.30 | RM 6,966,584.02 |
+
+- MY HERO HYPERMARKET SDN BHD recorded its highest CN frequency in Feb 2025 with **8 credit notes totalling -RM 10,099.80**, the most for any single customer-month in the tool-call results, suggesting returns or pricing disputes at the largest account contributed to the Feb spike.
+
+**Implication:**
+- While the 1.13% annual CN rate is modest, the Feb and Oct spikes warrant monitoring, particularly given MY HERO's outsized share of monthly invoice revenue.
+===END===
+
+════════════════════════════════════════════════════════════════════════════════
+
+────────────────────────────────────────────────────────────────────────────────
+NUMERIC GUARD — Attempt 2
+────────────────────────────────────────────────────────────────────────────────
+Passed    : true
+Unmatched : 0
+
+
+════════════════════════════════════════════════════════════════════════════════
+SESSION COMPLETE
+════════════════════════════════════════════════════════════════════════════════
+Components analyzed : 2
+Total tokens        : 18560
+Estimated cost      : $0.1047 USD
+Finished at         : 2026-05-07T23:43:55.730Z
+════════════════════════════════════════════════════════════════════════════════
