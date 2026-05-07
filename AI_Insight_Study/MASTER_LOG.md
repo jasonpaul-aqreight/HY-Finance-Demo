@@ -27,7 +27,7 @@
 | 0   | Baseline (post-RDS migration, post-prompt-trim) | ✅ done | $0.141 | — | 9/10 | 2 | 2026-04-28 | See `01_baseline.md` |
 | 1   | Fix numeric guard whitelist | ✅ done | $0.134 | −$0.007 (−5%) | 10/10 | 0 | 2026-04-28 | See `03_iteration_01_fix_guard.md`. Guard now passes (was always failing). Real hallucinations still caught. |
 | 2   | Add column-schema hint to tool description (re-scoped from system prompt per user) | ❌ reverted | $0.169 | +$0.035 (+26%) | 10/10 | 0 | 2026-05-07 | See `03_iteration_02_schema_hint.md`. Eliminated `Columns not allowed` errors (0/run vs 2/run baseline) but +700-token tool description bloat triggered cost regression. Quality unchanged. |
-| 3   | Drop MAX_TOOL_CALLS_PER_SUMMARY from 4 → 2 | ⏳ pending | — | — | — | — | — | Spec: 02_analysis.md §Iter 3 |
+| 3   | Drop MAX_TOOL_CALLS_PER_SUMMARY from 4 → 2 | ⏸ skipped | — | — | — | — | 2026-05-07 | Subsumed by Iter 9 (set tool policy to 'none' — tools off makes the cap moot). Per user decision 2026-05-07. |
 | 4   | Pre-compute subtotals + strengthen no-arithmetic rule | ⏳ pending | — | — | — | — | — | Spec: 02_analysis.md §Iter 4 |
 | 5   | Enable prompt caching | ⏳ pending | — | — | — | — | — | Spec: 02_analysis.md §Iter 5 |
 | 6   | Combine 6 Haiku component calls → 1 (tech lead tip #5) | ⏳ pending | — | — | — | — | — | Spec: 02_analysis.md §Iter 6 |
@@ -42,11 +42,11 @@
 ## Cumulative Trajectory (Update after each iteration)
 
 ```
-Iter:    0       1       2       3       4       5       6       7       8       9
-Cost:  $0.141  $0.134  $0.169✗ $___    $___    $___    $___    $___    $___    $___
-Qual:   9/10   10/10   10/10   __/10   __/10   __/10   __/10   __/10   __/10   __/10
+Iter:    0       1       2       3⏸     4       5       6       7       8       9
+Cost:  $0.141  $0.134  $0.169✗ skip   $___    $___    $___    $___    $___    $___
+Qual:   9/10   10/10   10/10   skip   __/10   __/10   __/10   __/10   __/10   __/10
 ```
-(Iter 2 reverted — cost regressed +26%; baseline remains $0.134.)
+(Iter 2 reverted — cost regressed +26%; baseline remains $0.134. Iter 3 skipped — subsumed by Iter 9.)
 
 **Final target:** $0.010/click, quality ≥8/10
 
@@ -69,6 +69,7 @@ Qual:   9/10   10/10   10/10   __/10   __/10   __/10   __/10   __/10   __/10   _
 - **2026-04-28** Re-ordered: tool reduction moved to LAST iteration (was originally Iter 1) — build confidence with low-risk fixes first. Per user request.
 - **2026-05-07** Iter 2 re-scoped before implementation: original spec placed column hint in `SUMMARY_SYSTEM` (global summary prompt). User redirected to tool description in `tools.ts` since that's where column constraints belong. Tested → reverted (cost regression). Active baseline remains Iter 1 ($0.134, 10/10).
 - **2026-05-07** Pre-existing bug exposed by Iter 2: `pc_ar_aging_history.dimension_key` is in `LOCAL_WHITELIST` but the actual table column doesn't exist. Caused 1 SQL execution error per run in both Iter 2 runs. Action: drop from whitelist OR add column to table. **Not fixed in this study** (out of scope); track separately.
+- **2026-05-07** Iter 3 SKIPPED — subsumed by Iter 9. Iter 3 (cap tool calls at 2) is meaningless once Iter 9 (tools off entirely) ships. Doing both is redundant. New sequence: 4 → 5 → 6 → 7 → 8 → 9. Per user decision.
 
 ---
 
