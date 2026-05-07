@@ -3,7 +3,7 @@
 > **This file is the single source of truth.** Read this first in every session.
 > Updated after each iteration completes. Never delete rows — keep failed/reverted attempts as history.
 
-**Pilot section:** `financial_variance` (switched 2026-05-07 from `payment_outstanding`)
+**Pilot section:** `financial_variance` (active for Iter 6+); `payment_outstanding` was used for Iter 5 only as a pure-cost A/B test. Caching change retained codebase-wide.
 **Runs per iteration:** 2 (baseline AND iteration runs)
 **Eval set (current pilot):** `eval_set/financial_variance/snapshot_state.md` + `expected_values.json`
 **Eval set (former pilot, retained):** `eval_set/snapshot_state.md` + `expected_values.json` (payment_outstanding)
@@ -14,9 +14,9 @@
 
 ## Current State
 
-**Active pilot:** `financial_variance` (Financial page)
-**Baseline (financial_variance, fresh 2026-05-07):** $0.1494 / 9/10 quality / ~2 mild hallucinations per run (computed ratios). Details: `01_baseline_financial_variance.md`.
-**Former pilot (`payment_outstanding`) end-state:** $0.134 / 10/10 / 0 hallucinations after Iter 1. Frozen — no further iterations planned on this section since it hit a quality ceiling.
+**Active pilot:** `financial_variance` (Financial page) — caching test on payment_outstanding complete; returning to financial_variance for Iter 6+.
+**`payment_outstanding` end-state (post-Iter-5):** $0.11525 / 10/10 / 0 hallucinations. Caching change kept; ready to apply to financial_variance baseline going forward.
+**`financial_variance` baseline (Iter 0, pre-cache):** $0.1494 / 9/10 / ~2 mild hallucinations per run. Details: `01_baseline_financial_variance.md`. **Iter 5 caching is now live in the codebase** → next click on `financial_variance` will benefit from it; expect new effective baseline ~$0.134 (−10% from $0.149) before Iter 6.
 
 ---
 
@@ -29,6 +29,7 @@
 | 0   | Baseline (post-RDS migration, post-prompt-trim) | ✅ done | $0.141 | — | 9/10 | 2 | 2026-04-28 | See `01_baseline.md` |
 | 1   | Fix numeric guard whitelist | ✅ done | $0.134 | −$0.007 (−5%) | 10/10 | 0 | 2026-04-28 | See `03_iteration_01_fix_guard.md`. Guard now passes (was always failing). Real hallucinations still caught. |
 | 2   | Add column-schema hint to tool description (re-scoped from system prompt per user) | ❌ reverted | $0.169 | +$0.035 (+26%) | 10/10 | 0 | 2026-05-07 | See `03_iteration_02_schema_hint.md`. Eliminated `Columns not allowed` errors but +700-token bloat caused cost regression. Quality unchanged. |
+| 5   | Enable prompt caching (system prompts; tools cached implicitly via prefix) | ✅ done | $0.11525 | −$0.01875 (−14.0%) | 10/10 | 0 | 2026-05-07 | See `03_iteration_05_caching.md`. Median of $0.1188 + $0.1117. Beat spec target (~−5%) by ~3× because tools array (multi-thousand tokens) is cached implicitly with the system marker. Haiku component calls did NOT cache (~200-token system prompt below Haiku's minimum cacheable size) — all savings on Sonnet. |
 | 9   | ~~Tool reduction (set policy to 'none')~~ | ❌ removed | — | — | — | — | 2026-05-07 | Removed — tools essential for drill-down evidence. |
 
 ### `financial_variance` (current pilot — baseline captured 2026-05-07)
@@ -37,7 +38,7 @@
 |-----|-----------|--------|----------------|--------|---------|----------------|------|-------|
 | 0   | Baseline (financial_variance, post-Iter-1 codebase) | ✅ done | $0.1494 | — | 9/10 | ~2 (mild ratios) | 2026-05-07 | See `01_baseline_financial_variance.md`. Guard passes 0 unmatched, but 3 of 4 tool calls fail with "Columns not allowed" — wasted ~$0.057/run on retries. |
 | 4   | Pre-compute subtotals + strengthen no-arithmetic rule | ⏸ deferred | — | — | — | — | 2026-05-07 | Spec: 02_analysis.md §Iter 4. Component prompts already include the no-arith rule; only mild ratio infractions slip through. Saving < $0.005, quality 9→10 ceiling — low ROI on this section. |
-| 5   | Enable prompt caching | ⏳ pending | — | — | — | — | — | Spec: 02_analysis.md §Iter 5 |
+| 5   | Enable prompt caching | ⏸ tested on payment_outstanding | — | — | — | — | 2026-05-07 | Iteration moved to payment_outstanding section above for pure cost test. See that row + `03_iteration_05_caching.md`. |
 | 6   | Combine 4 Haiku component calls → 1 | ⏳ pending | — | — | — | — | — | Spec: 02_analysis.md §Iter 6 (rescoped 6→4 components for this section) |
 | 7   | Pre-fetch monthly P&L by category | ❌ reverted | $0.1546 | +$0.0052 (+3.5%) | 10/10 | 0 | 2026-05-07 | See `03_iteration_07_pre_fetch.md`. Spec assumption ("pre-fetch → fewer tool calls") was wrong: Sonnet still queries even when data is in block. Quality genuinely improved (9→10) with timing insights, but cost increased. User chose strict cost discipline — reverted. **Lesson:** pre-fetching is a quality lever, not a cost lever, until paired with explicit no-query instruction or `MAX_TOOL_CALLS` cap (Iter 3). |
 | 8   | Switch summary model Sonnet → Haiku | ⏳ pending | — | — | — | — | — | Spec: 02_analysis.md §Iter 8 |
@@ -49,23 +50,25 @@
 
 ## Cumulative Trajectory
 
-### `payment_outstanding` (former pilot — frozen)
+### `payment_outstanding` (former pilot — re-used briefly for Iter 5 caching A/B)
 
 ```
-Iter:    0       1       2 (reverted)
-Cost:  $0.141  $0.134  $0.169✗
-Qual:   9/10   10/10   10/10
+Iter:    0       1       2 (reverted)   5
+Cost:  $0.141  $0.134  $0.169✗         $0.115
+Qual:   9/10   10/10   10/10           10/10
 ```
 
 ### `financial_variance` (current pilot)
 
 ```
-Iter:    0           7 (reverted)   5           6           4           8           3 (last)
-Cost:  $0.1494     $0.1546✗        $___        $___        $___        $___        $___
-Qual:   9/10       10/10           __/10       __/10       __/10       __/10       __/10
+Iter:    0           7 (reverted)   5 (codebase)*  6           4           8           3 (last)
+Cost:  $0.1494     $0.1546✗        ~$0.135 est    $___        $___        $___        $___
+Qual:   9/10       10/10           9/10 expected  __/10       __/10       __/10       __/10
 ```
 
-(Iter 7 reverted — cost +3.5% even though quality went 9→10. Pre-fetching alone doesn't reduce Sonnet's tool-call appetite; needs to be paired with explicit no-query instruction or `MAX_TOOL_CALLS` cap (Iter 3). Active baseline remains $0.1494, 9/10. Order for next iteration tentative — Iter 5 (caching) is the safest small win; Iter 6 (combine 4→1 Haiku) and Iter 8 (Sonnet→Haiku) are bigger but riskier.)
+\* Iter 5 (caching) was tested on `payment_outstanding`, not measured directly here, but the codebase change is live for `financial_variance` too. Expected effective baseline ≈ $0.135 (−10% from $0.149) when next click on financial_variance fires. Will be confirmed by the first Iter 6 run.
+
+(Iter 7 reverted — cost +3.5% even though quality went 9→10. Iter 5 (caching) kept — −14% on payment_outstanding A/B. Order for next iteration: Iter 6 (combine 4→1 Haiku) is the next big lever; Iter 8 (Sonnet→Haiku) is the bigger but riskier final cost play.)
 
 **Final target (revised 2026-05-07 for new pilot):** ~$0.05–$0.06/click on `financial_variance` (60% reduction from $0.149 baseline), quality ≥9/10. Ambition is more conservative than payment_outstanding's old target because (a) the section starts cleaner — guard already passing, hallucinations only mild — and (b) Sonnet → Haiku swap (Iter 8, biggest lever) carries higher quality risk on a financial-variance analysis than on AR analysis.
 
@@ -82,6 +85,8 @@ Qual:   9/10       10/10           __/10       __/10       __/10       __/10    
 - (Pilot switch / 2026-05-07) **Switched pilot from `payment_outstanding` → `financial_variance`.** Reason: payment_outstanding hit a 10/10 quality ceiling after Iter 1, leaving no measurable headroom. financial_variance baseline ($0.1494, 9/10) shows real headroom — the dominant cost driver is **3-of-4 wasted tool calls per run** ("Columns not allowed" failures + 1 successful call returning 2021 data instead of FY2025). That's ~$0.057/run wasted overhead. The same failure mode payment_outstanding had at baseline, only worse here because financial_variance uses `aggregate_only` policy (more restrictive). Iter 7 (pre-fetch what tools want) is now the highest-leverage next iteration — eliminates the failure at root.
 
 - (Iter 7 / REVERTED) **Spec assumption broken: pre-fetching does NOT cause Sonnet to skip tool calls.** Pre-fetched the monthly P&L lines + monthly OpEx by category. Sonnet *did* use the new data productively (now writes timing-specific insights: "Feb 2025 was the peak month at RM 2,177,107 — 24.1% of FY total", "depreciation booked entirely in Feb 2025 as bulk annual posting", "payroll consistent monthly escalation from RM 283K to RM 575K"). Quality 9→10. **But Sonnet still made the same 4 tool calls per run** — it doesn't treat "data is in the block" as "don't query for the same thing". Result: cost +3.5% (input bloat from new data, no offsetting tool-call reduction). User chose strict cost discipline — reverted. **Architectural takeaway:** pre-fetching is a *quality* lever, not a *cost* lever, until paired with explicit no-query instruction in summary prompt OR `MAX_TOOL_CALLS_PER_SUMMARY` cap (Iter 3). Reattempt as a pair, not in isolation.
+
+- (Iter 5 / KEPT) **Anthropic prompt caching delivered −14.0% cost (−$0.0188/click) on `payment_outstanding` — ~3× the spec's projected −5%.** Quality unchanged (10/10, 0 hallucinations) — confirmed caching is purely a billing-layer optimization. **Two surprises:** (1) The bigger-than-expected savings came from the tools array, not the system prompt. Tools sit before system in Anthropic's prompt prefix, so a single `cache_control` marker on the system block implicitly caches tools too — and the tools blob (multi-thousand tokens of whitelist + schemas) is much fatter than the system prompt. Spec underestimated this. (2) Haiku component calls did NOT cache — `created=0, read=0` on every Haiku turn — because the ~200-token Haiku system prompt is below Haiku 4.5's minimum cacheable prefix size. All Iter 5 savings came from Sonnet caching alone. **Architectural lesson:** position-based caching means the cheapest cache win is on the largest static prefix block — for tool-using flows, that's the tools array (cached implicitly via system marker). When evaluating future caching opportunities, count tokens by prompt-prefix layer, not by which named field the marker lives on. Also: Haiku's higher minimum cache size means small system prompts won't cache there — pre-validate prompt size before adding markers.
 
 ---
 
@@ -100,6 +105,8 @@ Qual:   9/10       10/10           __/10       __/10       __/10       __/10    
 - **2026-05-07** **Pilot section switch: `payment_outstanding` → `financial_variance`.** Driver: payment_outstanding at 10/10 quality ceiling, no headroom for the remaining iterations to demonstrate impact. New pilot baseline captured (`01_baseline_financial_variance.md`): $0.1494, 9/10, ~2 mild ratio hallucinations/run, 3-of-4 tool calls failing. Eval set built at `eval_set/financial_variance/`. Old eval set retained for reference at `eval_set/`.
 
 - **2026-05-07** **Iteration order revised for new pilot.** Recommended next: **Iter 7 (pre-fetch monthly P&L by category)** — the failed-tool-call signature is the dominant cost driver on financial_variance ($0.057/run wasted), and pre-fetching is a low-risk surgical fix. Iter 4 deferred (no-arithmetic rule already in component prompts; mild infractions don't move cost needle).
+
+- **2026-05-07** **Iter 5 pilot revert (one-iteration only): `financial_variance` → `payment_outstanding`.** Driver: caching is a cost-only feature — same input bytes go to the model, so quality cannot regress from this change. Running on `payment_outstanding` (already at 10/10 ceiling) gives us a cleaner pure-cost signal: any cost delta is purely the cache effect, no quality scoring noise. Bonus: `payment_outstanding` has 6 components vs `financial_variance`'s 4 → more Haiku calls within one click → more cache hits to measure. Will return to `financial_variance` for Iter 6+ where quality risk re-enters (combine components, model swap).
 
 ---
 

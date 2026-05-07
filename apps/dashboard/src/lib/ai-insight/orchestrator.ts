@@ -207,11 +207,15 @@ async function analyzeComponent(
   if (abortSignal.aborted) throw new Error('Analysis aborted');
 
   // Single LLM call — no tools. Components narrate/interpret the pre-fetched data.
+  // System prompt cached (ephemeral, 5min TTL) — same prompt reused across all
+  // component calls within one click, so calls 2..N hit cache.
   const response = await callWithRetry(
     () => client.messages.create({
       model: AI_MODEL,
       max_tokens: MAX_TOKENS,
-      system: systemPrompt,
+      system: [
+        { type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } },
+      ],
       messages: [{ role: 'user', content: userPrompt }],
     }),
     abortSignal,
@@ -405,11 +409,17 @@ async function runSummaryAgentLoop(p: AgentLoopParams): Promise<AgentLoopResult>
     const isLastTurn = toolCallCount >= MAX_TOOL_CALLS_PER_SUMMARY;
     const includeTools = p.toolsAllowed && !isLastTurn;
 
+    // System prompt cached (ephemeral, 5min TTL). Because tools sit BEFORE
+    // system in the prompt prefix, this single cache_control marker also
+    // captures the tools array — so multi-turn agent loops within one click
+    // pay full price only on the first turn, then read cache on turns 2..N.
     const response = await callWithRetry(
       () => p.client.messages.create({
         model: SUMMARY_MODEL,
         max_tokens: SUMMARY_MAX_TOKENS,
-        system: p.systemPrompt,
+        system: [
+          { type: 'text', text: p.systemPrompt, cache_control: { type: 'ephemeral' } },
+        ],
         ...(includeTools ? { tools: p.sectionTools } : {}),
         messages: p.messages,
       }),
