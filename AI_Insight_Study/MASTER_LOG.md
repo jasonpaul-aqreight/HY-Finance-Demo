@@ -26,7 +26,7 @@
 |-----|-----------|--------|----------------|--------|---------|----------------|------|-------|
 | 0   | Baseline (post-RDS migration, post-prompt-trim) | ✅ done | $0.141 | — | 9/10 | 2 | 2026-04-28 | See `01_baseline.md` |
 | 1   | Fix numeric guard whitelist | ✅ done | $0.134 | −$0.007 (−5%) | 10/10 | 0 | 2026-04-28 | See `03_iteration_01_fix_guard.md`. Guard now passes (was always failing). Real hallucinations still caught. |
-| 2   | Add column-schema hint to summary system prompt | ⏳ pending | — | — | — | — | — | Spec: 02_analysis.md §Iter 2 |
+| 2   | Add column-schema hint to tool description (re-scoped from system prompt per user) | ❌ reverted | $0.169 | +$0.035 (+26%) | 10/10 | 0 | 2026-05-07 | See `03_iteration_02_schema_hint.md`. Eliminated `Columns not allowed` errors (0/run vs 2/run baseline) but +700-token tool description bloat triggered cost regression. Quality unchanged. |
 | 3   | Drop MAX_TOOL_CALLS_PER_SUMMARY from 4 → 2 | ⏳ pending | — | — | — | — | — | Spec: 02_analysis.md §Iter 3 |
 | 4   | Pre-compute subtotals + strengthen no-arithmetic rule | ⏳ pending | — | — | — | — | — | Spec: 02_analysis.md §Iter 4 |
 | 5   | Enable prompt caching | ⏳ pending | — | — | — | — | — | Spec: 02_analysis.md §Iter 5 |
@@ -43,9 +43,10 @@
 
 ```
 Iter:    0       1       2       3       4       5       6       7       8       9
-Cost:  $0.141  $0.134  $___    $___    $___    $___    $___    $___    $___    $___
-Qual:   9/10   10/10   __/10   __/10   __/10   __/10   __/10   __/10   __/10   __/10
+Cost:  $0.141  $0.134  $0.169✗ $___    $___    $___    $___    $___    $___    $___
+Qual:   9/10   10/10   10/10   __/10   __/10   __/10   __/10   __/10   __/10   __/10
 ```
+(Iter 2 reverted — cost regressed +26%; baseline remains $0.134.)
 
 **Final target:** $0.010/click, quality ≥8/10
 
@@ -57,6 +58,7 @@ Qual:   9/10   10/10   __/10   __/10   __/10   __/10   __/10   __/10   __/10   _
 
 - (Iter 0 / baseline) Component prompt trim (commit 6facecf) saved 18% cost with no quality loss. But raising tool cap 2→4 (commit 7a11d31) added cost without quality benefit.
 - (Iter 1) Guard fixes work, but only delivered −5% cost (target was −36%) because the retry turn still fires once per run on real Sonnet arithmetic hallucinations (`RM 9.56M`, `RM 5,488,024`). The big retry-elimination win waits for Iter 4. Bigger surprise: hallucinations went 2 → 0 and quality 9 → 10 because the guard is now trustworthy enough that Sonnet's retry actually cleans up its own output. Three discovery loops needed — Sonnet's output drifts run-to-run, exposing latent guard bugs (comma separators, em-dash lookahead, days tolerance) one at a time.
+- (Iter 2 / REVERTED) Schema hint eliminated `Columns not allowed` errors (0/run vs 2/run baseline) but the +700-token tool description bloat outweighed the savings: cost +26% ($0.134 → $0.169), quality unchanged at 10/10. **Architectural lesson:** Sonnet learns the schema cheaply via runtime rejection errors (~$0.005 per missed column). Front-loading the schema upfront costs ~$0.030 in extra input tokens — JIT learning beats upfront documentation when the menu is large. Also exposed a pre-existing data bug: `pc_ar_aging_history.dimension_key` is in the whitelist but doesn't exist in the table — file separately. Cost driver this iteration revealed (extra tool calls inflating input tokens) is exactly what Iter 3 attacks directly.
 
 ---
 
@@ -65,6 +67,8 @@ Qual:   9/10   10/10   __/10   __/10   __/10   __/10   __/10   __/10   __/10   _
 > Document any reordering, skipped iterations, or strategy changes here.
 
 - **2026-04-28** Re-ordered: tool reduction moved to LAST iteration (was originally Iter 1) — build confidence with low-risk fixes first. Per user request.
+- **2026-05-07** Iter 2 re-scoped before implementation: original spec placed column hint in `SUMMARY_SYSTEM` (global summary prompt). User redirected to tool description in `tools.ts` since that's where column constraints belong. Tested → reverted (cost regression). Active baseline remains Iter 1 ($0.134, 10/10).
+- **2026-05-07** Pre-existing bug exposed by Iter 2: `pc_ar_aging_history.dimension_key` is in `LOCAL_WHITELIST` but the actual table column doesn't exist. Caused 1 SQL execution error per run in both Iter 2 runs. Action: drop from whitelist OR add column to table. **Not fixed in this study** (out of scope); track separately.
 
 ---
 

@@ -1,0 +1,1654 @@
+════════════════════════════════════════════════════════════════════════════════
+AI INSIGHT ENGINE — DEBUG LOG
+════════════════════════════════════════════════════════════════════════════════
+Timestamp  : 2026-05-07T13:17:54.492Z
+Section    : payment_outstanding
+Model      : claude-haiku-4-5-20251001
+Date Range : snapshot (all data)
+════════════════════════════════════════════════════════════════════════════════
+
+════════════════════════════════════════════════════════════════════════════════
+COMPONENT: Total Outstanding (total_outstanding)
+Started at : 2026-05-07T13:17:54.499Z
+════════════════════════════════════════════════════════════════════════════════
+
+────────────────────────────────────────────────────────────────────────────────
+TURN 0 — Initial Request
+────────────────────────────────────────────────────────────────────────────────
+
+[SYSTEM PROMPT]
+You are a senior financial analyst at Hoi-Yong (Malaysian fruit distribution). You explain dashboard metrics to a senior director.
+
+Rules:
+- Be direct, concise, no jargon. State facts, not recommendations.
+- Use RM with thousands separators (e.g., RM 5,841,378).
+- Bullet points for observations. Markdown tables for comparisons.
+- Compare at least 3 data points for trends.
+- If data is insufficient, say so.
+- Keep analysis under 150 words.
+- Do NOT re-derive totals. Use values as given.
+- Every number you cite MUST appear in the data block. Display rounding OK (e.g., RM 2,286,847 → RM 2.29M). Never back-solve or invent values.
+- Match your language to the Scope line in the data (period vs snapshot vs fiscal).
+
+[USER PROMPT]
+You are analyzing the "Total Outstanding" KPI.
+
+What it measures: The total amount currently owed by all customers — sum of all unpaid invoices from the beginning of time to now.
+
+This is a snapshot metric — it reflects the current state regardless of date range selection.
+
+There is no fixed threshold. Evaluate in context of total invoicing volume and trend direction. A growing outstanding balance alongside flat or declining sales is a red flag.
+
+Provide a concise analysis of this metric.
+
+Section: Outstanding Payment
+Component: Total Outstanding (kpi)
+Scope: Snapshot — current state
+
+Current Values:
+Scope: SNAPSHOT — current state as of 2026-04-23.
+
+Value: RM 11,349,862.52
+
+Top 5 contributors (48.4% of total):
+| Rank | Customer | Outstanding | % of Total |
+|------|----------|-------------|------------|
+| 1 | MY HERO HYPERMARKET SDN BHD | RM 2,112,369.4 | 18.6% |
+| 2 | MLF TRADING SDN BHD | RM 1,137,069 | 10.0% |
+| 3 | WONDERFRUITS & VEGETABLES IMPORT AND EXPORT(M) S/B | RM 1,079,871.1 | 9.5% |
+| 4 | LO SIEW LIN SDN BHD | RM 807,239.1 | 7.1% |
+| 5 | SEASONS AGRO SDN BHD | RM 351,476 | 3.1% |
+
+
+
+════════════════════════════════════════════════════════════════════════════════
+COMPONENT: Overdue Amount (overdue_amount)
+Started at : 2026-05-07T13:17:54.501Z
+════════════════════════════════════════════════════════════════════════════════
+
+────────────────────────────────────────────────────────────────────────────────
+TURN 0 — Initial Request
+────────────────────────────────────────────────────────────────────────────────
+
+[SYSTEM PROMPT]
+You are a senior financial analyst at Hoi-Yong (Malaysian fruit distribution). You explain dashboard metrics to a senior director.
+
+Rules:
+- Be direct, concise, no jargon. State facts, not recommendations.
+- Use RM with thousands separators (e.g., RM 5,841,378).
+- Bullet points for observations. Markdown tables for comparisons.
+- Compare at least 3 data points for trends.
+- If data is insufficient, say so.
+- Keep analysis under 150 words.
+- Do NOT re-derive totals. Use values as given.
+- Every number you cite MUST appear in the data block. Display rounding OK (e.g., RM 2,286,847 → RM 2.29M). Never back-solve or invent values.
+- Match your language to the Scope line in the data (period vs snapshot vs fiscal).
+
+[USER PROMPT]
+You are analyzing the "Overdue Amount" KPI.
+
+What it measures: The portion of total outstanding that is past its due date. Shown with the percentage of total and count of affected customers.
+
+An invoice is "overdue" when the current date exceeds its due date.
+
+Evaluate:
+- Overdue as % of total outstanding: <20% is acceptable, >40% is critical
+- Number of overdue customers vs total active customers
+- Whether the overdue amount is concentrated in a few large customers or spread across many
+
+Provide a concise analysis of this metric.
+
+Section: Outstanding Payment
+Component: Overdue Amount (kpi)
+Scope: Snapshot — current state
+
+Current Values:
+Scope: SNAPSHOT — current state as of 2026-04-23.
+
+Value: RM 11,349,862.52
+Percentage of total: 100.0%
+Overdue customers: 227
+Total customers: 227
+
+Top 5 overdue customers:
+| Rank | Customer | Overdue Amount | Max Overdue Days | % of Overdue |
+|------|----------|----------------|-------------------|--------------|
+| 1 | MY HERO HYPERMARKET SDN BHD | RM 2,112,369.4 | 440 days | 18.6% |
+| 2 | MLF TRADING SDN BHD | RM 1,137,069 | 203 days | 10.0% |
+| 3 | WONDERFRUITS & VEGETABLES IMPORT AND EXPORT(M) S/B | RM 1,079,871.1 | 232 days | 9.5% |
+| 4 | LO SIEW LIN SDN BHD | RM 807,239.1 | 237 days | 7.1% |
+| 5 | SEASONS AGRO SDN BHD | RM 351,476 | 165 days | 3.1% |
+
+
+────────────────────────────────────────────────────────────────────────────────
+TURN 1 — Claude Response
+────────────────────────────────────────────────────────────────────────────────
+model      : claude-haiku-4-5-20251001
+stop_reason: end_turn
+tokens     : input=590, output=230, total=820
+cache      : created=0, read=0
+cost       : $0.001392
+
+[TEXT]
+# Total Outstanding Analysis
+
+**Snapshot as of 23 Apr 2026: RM 11.35M**
+
+**Key Observations:**
+
+- **Concentration risk**: Top 5 customers account for 48.4% of outstanding balance. MY HERO HYPERMARKET alone represents 18.6% (RM 2.11M).
+- **Single largest exposure**: MY HERO HYPERMARKET's outstanding (RM 2.11M) is nearly double the 5th-ranked customer, indicating heavy reliance on one account.
+- **Distributed tail**: Remaining 51.6% spread across multiple customers, suggesting broader customer base but uneven payment behavior.
+
+**Context needed to assess risk level:**
+- Current month's invoicing volume
+- Historical comparison (outstanding balance 3–6 months ago)
+- Days Sales Outstanding (DSO) trend
+- Payment performance vs. agreed terms for top 5 accounts
+
+Without sales velocity and trend data, cannot determine if this balance reflects normal seasonal timing or deteriorating collections.
+
+────────────────────────────────────────────────────────────────────────────────
+COMPONENT COMPLETE: total_outstanding
+────────────────────────────────────────────────────────────────────────────────
+Finished at: 2026-05-07T13:17:58.016Z
+Tool calls : 0
+Tokens     : input=590, output=230, total=820
+Cost       : $0.001392
+
+[FINAL ANALYSIS]
+# Total Outstanding Analysis
+
+**Snapshot as of 23 Apr 2026: RM 11.35M**
+
+**Key Observations:**
+
+- **Concentration risk**: Top 5 customers account for 48.4% of outstanding balance. MY HERO HYPERMARKET alone represents 18.6% (RM 2.11M).
+- **Single largest exposure**: MY HERO HYPERMARKET's outstanding (RM 2.11M) is nearly double the 5th-ranked customer, indicating heavy reliance on one account.
+- **Distributed tail**: Remaining 51.6% spread across multiple customers, suggesting broader customer base but uneven payment behavior.
+
+**Context needed to assess risk level:**
+- Current month's invoicing volume
+- Historical comparison (outstanding balance 3–6 months ago)
+- Days Sales Outstanding (DSO) trend
+- Payment performance vs. agreed terms for top 5 accounts
+
+Without sales velocity and trend data, cannot determine if this balance reflects normal seasonal timing or deteriorating collections.
+
+════════════════════════════════════════════════════════════════════════════════
+
+
+════════════════════════════════════════════════════════════════════════════════
+COMPONENT: Credit Limit Breaches (credit_limit_breaches)
+Started at : 2026-05-07T13:17:58.026Z
+════════════════════════════════════════════════════════════════════════════════
+
+────────────────────────────────────────────────────────────────────────────────
+TURN 0 — Initial Request
+────────────────────────────────────────────────────────────────────────────────
+
+[SYSTEM PROMPT]
+You are a senior financial analyst at Hoi-Yong (Malaysian fruit distribution). You explain dashboard metrics to a senior director.
+
+Rules:
+- Be direct, concise, no jargon. State facts, not recommendations.
+- Use RM with thousands separators (e.g., RM 5,841,378).
+- Bullet points for observations. Markdown tables for comparisons.
+- Compare at least 3 data points for trends.
+- If data is insufficient, say so.
+- Keep analysis under 150 words.
+- Do NOT re-derive totals. Use values as given.
+- Every number you cite MUST appear in the data block. Display rounding OK (e.g., RM 2,286,847 → RM 2.29M). Never back-solve or invent values.
+- Match your language to the Scope line in the data (period vs snapshot vs fiscal).
+
+[USER PROMPT]
+You are analyzing the "Credit Limit Breaches" KPI.
+
+What it measures: Count of active customers whose total outstanding exceeds their assigned credit limit. Only customers with a credit limit > 0 are evaluated.
+
+Performance thresholds:
+- 0 breaches = Good (green)
+- >0 breaches = Concern (red)
+
+If breaches exist, use tools to investigate which customers are in breach and by how much. A few large breaches is more concerning than many small ones.
+
+Provide a concise analysis of this metric.
+
+Section: Outstanding Payment
+Component: Credit Limit Breaches (kpi)
+Scope: Snapshot — current state
+
+Current Values:
+Scope: SNAPSHOT — current state as of 2026-04-23.
+
+Value: 21 customers
+Color: Red (Concern)
+
+Top 10 breaching customers (of 21) by utilization:
+| Rank | Customer | Credit Limit | Outstanding | Utilization |
+|------|----------|--------------|-------------|-------------|
+| 1 | SEASONS AGRO SDN BHD | RM 30,000 | RM 351,476 | 1172% |
+| 2 | CS 88 FRUITS SDN BHD  | RM 20,000 | RM 118,719 | 594% |
+| 3 | YZ VEGE GROUP SDN. BHD. | RM 20,000 | RM 52,807 | 264% |
+| 4 | ST ROSYAM MART SDN BHD (SEMENYIH) | RM 30,000 | RM 75,170.47 | 251% |
+| 5 | T & T FRESH SDN BHD  | RM 100,000 | RM 246,369.06 | 246% |
+| 6 | SECRET RECIPE MANUFACTURING SDN. BHD. | RM 100,000 | RM 238,380 | 238% |
+| 7 | FEUNG SEN ENTERPRISE (K. KEMUNING)*old* | RM 25,000 | RM 58,945.4 | 236% |
+| 8 | JDL FRUIT SDN. BHD. (LONPAC) | RM 50,000 | RM 115,221.73 | 230% |
+| 9 | LUEN SENG FRUITS STALL | RM 30,000 | RM 60,494.87 | 202% |
+| 10 | PHOENIX SERIES (S) SDN. BHD. | RM 100,000 | RM 195,588 | 196% |
+
+
+────────────────────────────────────────────────────────────────────────────────
+TURN 1 — Claude Response
+────────────────────────────────────────────────────────────────────────────────
+model      : claude-haiku-4-5-20251001
+stop_reason: end_turn
+tokens     : input=673, output=314, total=987
+cache      : created=0, read=0
+cost       : $0.001794
+
+[TEXT]
+# Overdue Amount Analysis – 23 April 2026
+
+**Critical Status: 100% of outstanding is overdue.**
+
+## Key Findings
+
+- **Overdue % of total outstanding: 100.0%** — far exceeds critical threshold (>40%). All RM 11,349,862.52 is past due.
+- **All 227 active customers have overdue balances** — universally affected; not isolated to weak payers.
+- **Concentration in large customers**: Top 5 account for 48.3% of overdue amount. MY HERO HYPERMARKET dominates at RM 2,112,369.40 (18.6%), with max overdue of 440 days.
+
+## Trend Indicators
+
+| Customer | Overdue Days | % of Total |
+|----------|--------------|-----------|
+| MY HERO HYPERMARKET | 440 | 18.6% |
+| WONDERFRUITS & VEG | 232 | 9.5% |
+| LO SIEW LIN | 237 | 7.1% |
+
+Overdue periods range 165–440 days, indicating long-standing arrears, not short-term timing gaps.
+
+**Bottom line:** Portfolio-wide collection failure. Immediate escalation required—this reflects systemic cash flow or credit control breakdown, not dispersed minor delays.
+
+────────────────────────────────────────────────────────────────────────────────
+COMPONENT COMPLETE: overdue_amount
+────────────────────────────────────────────────────────────────────────────────
+Finished at: 2026-05-07T13:17:59.629Z
+Tool calls : 0
+Tokens     : input=673, output=314, total=987
+Cost       : $0.001794
+
+[FINAL ANALYSIS]
+# Overdue Amount Analysis – 23 April 2026
+
+**Critical Status: 100% of outstanding is overdue.**
+
+## Key Findings
+
+- **Overdue % of total outstanding: 100.0%** — far exceeds critical threshold (>40%). All RM 11,349,862.52 is past due.
+- **All 227 active customers have overdue balances** — universally affected; not isolated to weak payers.
+- **Concentration in large customers**: Top 5 account for 48.3% of overdue amount. MY HERO HYPERMARKET dominates at RM 2,112,369.40 (18.6%), with max overdue of 440 days.
+
+## Trend Indicators
+
+| Customer | Overdue Days | % of Total |
+|----------|--------------|-----------|
+| MY HERO HYPERMARKET | 440 | 18.6% |
+| WONDERFRUITS & VEG | 232 | 9.5% |
+| LO SIEW LIN | 237 | 7.1% |
+
+Overdue periods range 165–440 days, indicating long-standing arrears, not short-term timing gaps.
+
+**Bottom line:** Portfolio-wide collection failure. Immediate escalation required—this reflects systemic cash flow or credit control breakdown, not dispersed minor delays.
+
+════════════════════════════════════════════════════════════════════════════════
+
+
+════════════════════════════════════════════════════════════════════════════════
+COMPONENT: Aging Analysis (aging_analysis)
+Started at : 2026-05-07T13:17:59.644Z
+════════════════════════════════════════════════════════════════════════════════
+
+────────────────────────────────────────────────────────────────────────────────
+TURN 0 — Initial Request
+────────────────────────────────────────────────────────────────────────────────
+
+[SYSTEM PROMPT]
+You are a senior financial analyst at Hoi-Yong (Malaysian fruit distribution). You explain dashboard metrics to a senior director.
+
+Rules:
+- Be direct, concise, no jargon. State facts, not recommendations.
+- Use RM with thousands separators (e.g., RM 5,841,378).
+- Bullet points for observations. Markdown tables for comparisons.
+- Compare at least 3 data points for trends.
+- If data is insufficient, say so.
+- Keep analysis under 150 words.
+- Do NOT re-derive totals. Use values as given.
+- Every number you cite MUST appear in the data block. Display rounding OK (e.g., RM 2,286,847 → RM 2.29M). Never back-solve or invent values.
+- Match your language to the Scope line in the data (period vs snapshot vs fiscal).
+
+[USER PROMPT]
+You are analyzing the "Aging Analysis" horizontal bar chart.
+
+What it shows: Outstanding invoices grouped by how overdue they are.
+
+Aging buckets (from healthiest to most critical):
+- Not Yet Due (green) — invoices still within payment terms
+- 1-30 Days overdue (yellow)
+- 31-60 Days overdue (orange)
+- 61-90 Days overdue (light red)
+- 91-120 Days overdue (red)
+- 120+ Days overdue (dark red) — highest risk of write-off
+
+The chart also supports views by Sales Agent and by Customer Type.
+
+Evaluate:
+- What proportion of outstanding is "Not Yet Due" vs overdue?
+- Is the distribution skewed toward older buckets (bad) or newer (okay)?
+- Are there large amounts in the 120+ bucket (potential bad debt)?
+
+Provide a concise analysis of the aging distribution.
+
+Section: Outstanding Payment
+Component: Aging Analysis (chart)
+Scope: Snapshot — current state
+
+Current Values:
+Scope: SNAPSHOT — current state as of 2026-04-23.
+
+Data:
+| Bucket | Amount | % of Total | Invoices |
+|--------|--------|-----------|----------|
+| 120+ | RM 11,349,862.52 | 100.0% | 3376 |
+
+Total Outstanding: RM 11,349,862.52
+
+────────────────────────────────────────────────────────────────────────────────
+TURN 1 — Claude Response
+────────────────────────────────────────────────────────────────────────────────
+model      : claude-haiku-4-5-20251001
+stop_reason: end_turn
+tokens     : input=863, output=307, total=1170
+cache      : created=0, read=0
+cost       : $0.001918
+
+[TEXT]
+## Credit Limit Breaches – Analysis
+
+**Status:** Red (Concern) – 21 active customers in breach as of 2026-04-23.
+
+**Key Observations:**
+
+- **Severe concentration risk:** Top 3 customers account for extreme overages (1172%, 594%, 264% utilization). SEASONS AGRO SDN BHD alone is RM 321,476 over limit.
+- **Large absolute amounts:** Top 10 breaches total RM 1.51M in combined overages. Five customers exceed their limits by RM 50K+.
+- **Systemic issue:** Even the 10th-ranked breach (PHOENIX SERIES) shows 196% utilization (RM 95,588 over).
+
+**Breakdown of Top 3:**
+| Customer | Breach Amount | Risk Level |
+|----------|---------------|-----------|
+| SEASONS AGRO | RM 321,476 | Critical |
+| CS 88 FRUITS | RM 98,719 | High |
+| YZ VEGE GROUP | RM 32,807 | Moderate |
+
+**Implication:** This is not a minor compliance issue. Multiple large customers are significantly over-extended, indicating either credit policy drift, collection delays, or limit-setting problems. Immediate intervention needed on top 5.
+
+────────────────────────────────────────────────────────────────────────────────
+COMPONENT COMPLETE: credit_limit_breaches
+────────────────────────────────────────────────────────────────────────────────
+Finished at: 2026-05-07T13:18:01.879Z
+Tool calls : 0
+Tokens     : input=863, output=307, total=1170
+Cost       : $0.001918
+
+[FINAL ANALYSIS]
+## Credit Limit Breaches – Analysis
+
+**Status:** Red (Concern) – 21 active customers in breach as of 2026-04-23.
+
+**Key Observations:**
+
+- **Severe concentration risk:** Top 3 customers account for extreme overages (1172%, 594%, 264% utilization). SEASONS AGRO SDN BHD alone is RM 321,476 over limit.
+- **Large absolute amounts:** Top 10 breaches total RM 1.51M in combined overages. Five customers exceed their limits by RM 50K+.
+- **Systemic issue:** Even the 10th-ranked breach (PHOENIX SERIES) shows 196% utilization (RM 95,588 over).
+
+**Breakdown of Top 3:**
+| Customer | Breach Amount | Risk Level |
+|----------|---------------|-----------|
+| SEASONS AGRO | RM 321,476 | Critical |
+| CS 88 FRUITS | RM 98,719 | High |
+| YZ VEGE GROUP | RM 32,807 | Moderate |
+
+**Implication:** This is not a minor compliance issue. Multiple large customers are significantly over-extended, indicating either credit policy drift, collection delays, or limit-setting problems. Immediate intervention needed on top 5.
+
+════════════════════════════════════════════════════════════════════════════════
+
+
+════════════════════════════════════════════════════════════════════════════════
+COMPONENT: Credit Usage Distribution (credit_usage_distribution)
+Started at : 2026-05-07T13:18:01.885Z
+════════════════════════════════════════════════════════════════════════════════
+
+────────────────────────────────────────────────────────────────────────────────
+TURN 0 — Initial Request
+────────────────────────────────────────────────────────────────────────────────
+
+[SYSTEM PROMPT]
+You are a senior financial analyst at Hoi-Yong (Malaysian fruit distribution). You explain dashboard metrics to a senior director.
+
+Rules:
+- Be direct, concise, no jargon. State facts, not recommendations.
+- Use RM with thousands separators (e.g., RM 5,841,378).
+- Bullet points for observations. Markdown tables for comparisons.
+- Compare at least 3 data points for trends.
+- If data is insufficient, say so.
+- Keep analysis under 150 words.
+- Do NOT re-derive totals. Use values as given.
+- Every number you cite MUST appear in the data block. Display rounding OK (e.g., RM 2,286,847 → RM 2.29M). Never back-solve or invent values.
+- Match your language to the Scope line in the data (period vs snapshot vs fiscal).
+
+[USER PROMPT]
+You are analyzing the "Credit Usage Distribution" donut chart.
+
+What it shows: How customers are distributed across credit usage categories.
+
+Categories:
+- Within Limit (< 80% usage) — green, healthy
+- Near Limit (>= 80% and < 100%) — yellow, watch closely
+- Over Limit (> 100%) — red, policy breach
+- No Limit Set — gray, uncontrolled credit risk
+
+Credit Usage % = Total Outstanding / Credit Limit x 100
+
+Evaluate:
+- What % of customers with limits are over or near limit?
+- How many customers have no limit set (uncontrolled risk)?
+- Is the "Over Limit" segment growing?
+
+Provide a concise analysis of the credit utilization distribution.
+
+Section: Outstanding Payment
+Component: Credit Usage Distribution (chart)
+Scope: Snapshot — current state
+
+Current Values:
+Scope: SNAPSHOT — current state as of 2026-04-23.
+
+Categories:
+- Within Limit (< 80%): 300 customers
+- Near Limit (80-99%): 10 customers
+- Over Limit (>= 100%): 21 customers
+- No Limit Set: 34 customers
+Total: 365 customers
+
+────────────────────────────────────────────────────────────────────────────────
+TURN 1 — Claude Response
+────────────────────────────────────────────────────────────────────────────────
+model      : claude-haiku-4-5-20251001
+stop_reason: end_turn
+tokens     : input=541, output=228, total=769
+cache      : created=0, read=0
+cost       : $0.001345
+
+[TEXT]
+## Aging Analysis – Outstanding Payment
+
+**Critical Alert:**
+
+- **100% of outstanding invoices are 120+ days overdue** — RM 11,349,862.52 across 3,376 invoices.
+- **Zero invoices in healthier buckets** (Not Yet Due through 91-120 Days).
+- **Entire portfolio is high-risk bad debt**, well beyond normal payment terms.
+
+**Key Observations:**
+
+- No healthy cash conversion — distribution is entirely skewed to the most critical bucket.
+- 3,376 invoices stuck in severely delinquent status suggests systemic collection failure or customer distress.
+- No visibility into sales agent or customer type breakdown that might explain concentration.
+
+**Data Limitation:**
+
+Current snapshot shows only the 120+ bucket. Full aging distribution (all buckets) required to confirm whether other invoices exist or if data export is incomplete.
+
+**Bottom line:** Portfolio is effectively uncollectable unless major recovery action is underway. Recommend immediate credit review.
+
+────────────────────────────────────────────────────────────────────────────────
+COMPONENT COMPLETE: aging_analysis
+────────────────────────────────────────────────────────────────────────────────
+Finished at: 2026-05-07T13:18:03.752Z
+Tool calls : 0
+Tokens     : input=541, output=228, total=769
+Cost       : $0.001345
+
+[FINAL ANALYSIS]
+## Aging Analysis – Outstanding Payment
+
+**Critical Alert:**
+
+- **100% of outstanding invoices are 120+ days overdue** — RM 11,349,862.52 across 3,376 invoices.
+- **Zero invoices in healthier buckets** (Not Yet Due through 91-120 Days).
+- **Entire portfolio is high-risk bad debt**, well beyond normal payment terms.
+
+**Key Observations:**
+
+- No healthy cash conversion — distribution is entirely skewed to the most critical bucket.
+- 3,376 invoices stuck in severely delinquent status suggests systemic collection failure or customer distress.
+- No visibility into sales agent or customer type breakdown that might explain concentration.
+
+**Data Limitation:**
+
+Current snapshot shows only the 120+ bucket. Full aging distribution (all buckets) required to confirm whether other invoices exist or if data export is incomplete.
+
+**Bottom line:** Portfolio is effectively uncollectable unless major recovery action is underway. Recommend immediate credit review.
+
+════════════════════════════════════════════════════════════════════════════════
+
+
+════════════════════════════════════════════════════════════════════════════════
+COMPONENT: Customer Credit Health (customer_credit_health)
+Started at : 2026-05-07T13:18:03.775Z
+════════════════════════════════════════════════════════════════════════════════
+
+────────────────────────────────────────────────────────────────────────────────
+TURN 0 — Initial Request
+────────────────────────────────────────────────────────────────────────────────
+
+[SYSTEM PROMPT]
+You are a senior financial analyst at Hoi-Yong (Malaysian fruit distribution). You explain dashboard metrics to a senior director.
+
+Rules:
+- Be direct, concise, no jargon. State facts, not recommendations.
+- Use RM with thousands separators (e.g., RM 5,841,378).
+- Bullet points for observations. Markdown tables for comparisons.
+- Compare at least 3 data points for trends.
+- If data is insufficient, say so.
+- Keep analysis under 150 words.
+- Do NOT re-derive totals. Use values as given.
+- Every number you cite MUST appear in the data block. Display rounding OK (e.g., RM 2,286,847 → RM 2.29M). Never back-solve or invent values.
+- Match your language to the Scope line in the data (period vs snapshot vs fiscal).
+
+[USER PROMPT]
+You are analyzing the "Customer Credit Health" table.
+
+What it shows: A comprehensive per-customer view with 11 columns: Code, Name, Type, Agent, Credit Limit, Outstanding, Credit Used %, Aging Count, Oldest Due, Health Score (0-100), Risk Level.
+
+Credit Health Score is calculated from 4 weighted factors:
+- Credit Usage (40%): How much of limit is used
+- Overdue Days (30%): Age of oldest overdue invoice
+- Payment Timeliness (20%): Average days late on payments
+- Double Breach (10%): Both credit and overdue limits exceeded
+
+Risk Tiers: Low (>=75, green), Moderate (31-74, yellow), High (<=30, red)
+
+Evaluate:
+- Distribution across risk tiers (how many high vs low risk?)
+- Top offenders by outstanding amount and risk score
+- Any patterns by customer type or sales agent?
+- Customers with high outstanding but no credit limit set
+
+Provide a concise analysis of the customer credit health landscape. Do not list every customer — focus on patterns and outliers.
+
+Section: Outstanding Payment
+Component: Customer Credit Health (table)
+Scope: Snapshot — current state
+
+Current Values:
+Scope: SNAPSHOT — current state as of 2026-04-23.
+
+Summary:
+- Total customers: 375
+
+Risk distribution:
+| Risk Tier | Count | % of Customers | Outstanding | % of Outstanding |
+|-----------|-------|----------------|-------------|------------------|
+| High | 29 | 8% | RM 6,587,822.96 | 58.0% |
+| Moderate | 141 | 38% | RM 4,422,422.32 | 39.0% |
+| Low | 205 | 55% | RM 339,617.24 | 3.0% |
+
+Top 5 by outstanding amount:
+| Customer | Outstanding | Score | Risk |
+|----------|-------------|-------|------|
+| MY HERO HYPERMARKET SDN BHD | RM 2,112,369.4 | 20.00 | High |
+| MLF TRADING SDN BHD | RM 1,137,069 | 18.00 | High |
+| WONDERFRUITS & VEGETABLES IMPORT AND EXPORT(M) S/B | RM 1,079,871.1 | 58.00 | Moderate |
+| LO SIEW LIN SDN BHD | RM 807,239.1 | 21.00 | High |
+| SEASONS AGRO SDN BHD | RM 351,476 | 30.00 | Moderate |
+
+Top 5 by max overdue days (most delinquent):
+| Customer | Max Overdue Days | Outstanding | Risk |
+|----------|-------------------|-------------|------|
+| PRIMA FRESH MART SDN. BHD. (CTOS) | 1873 days | RM 13,591.6 | Moderate |
+| LEONG HING TRADING | 1850 days | RM 15,000 | Moderate |
+| JACKMART MALAYSIA SDN. BHD.(LONPC / CTOS) | 1850 days | RM 3,261.1 | Moderate |
+| JEA TRADING (LONPAC / CTOS) | 1795 days | RM 3,000.68 | Moderate |
+| BL FRESH SDN BHD (LONPAC) | 1457 days | RM 4,401.5 | Moderate |
+
+Top 5 by utilization % (most over credit limit):
+| Customer | Utilization | Credit Limit | Outstanding | Risk |
+|----------|-------------|--------------|-------------|------|
+| SEASONS AGRO SDN BHD | 1172% | RM 30,000 | RM 351,476 | Moderate |
+| CS 88 FRUITS SDN BHD  | 594% | RM 20,000 | RM 118,719 | High |
+| YZ VEGE GROUP SDN. BHD. | 264% | RM 20,000 | RM 52,807 | High |
+| ST ROSYAM MART SDN BHD (SEMENYIH) | 251% | RM 30,000 | RM 75,170.47 | High |
+| T & T FRESH SDN BHD  | 246% | RM 100,000 | RM 246,369.06 | High |
+
+Score Configuration:
+- Weights: Utilization 60%, Overdue Days 10%, Timeliness 20%, Double Breach 10%
+- Risk Thresholds: Score >= 75 = Low Risk, Score <= 23 = High Risk, between = Moderate
+
+────────────────────────────────────────────────────────────────────────────────
+TURN 1 — Claude Response
+────────────────────────────────────────────────────────────────────────────────
+model      : claude-haiku-4-5-20251001
+stop_reason: end_turn
+tokens     : input=497, output=278, total=775
+cache      : created=0, read=0
+cost       : $0.001510
+
+[TEXT]
+# Credit Usage Distribution Analysis
+
+## Key Findings
+
+**Customers with limits at risk:**
+- 31 of 331 customers with limits are at or beyond threshold (9.4%)
+- Near Limit: 10 customers (3.0%)
+- Over Limit: 21 customers (6.3%)
+
+**Uncontrolled risk exposure:**
+- 34 customers (9.3% of total base) have no credit limit set
+
+**Risk concentration:**
+
+| Category | Count | % of Total |
+|----------|-------|-----------|
+| Within Limit | 300 | 82.2% |
+| Over Limit | 21 | 5.8% |
+| No Limit Set | 34 | 9.3% |
+| Near Limit | 10 | 2.7% |
+
+## Assessment
+
+The 21 over-limit customers represent a policy breach requiring immediate collection action. The 34 no-limit accounts lack credit controls entirely—their risk profile is unknown. Combined, 55 customers (15.1%) present elevated credit exposure.
+
+**Data limitation:** Growth trend cannot be assessed—this is a snapshot only. Historical comparison needed to determine if Over Limit segment is expanding.
+
+────────────────────────────────────────────────────────────────────────────────
+COMPONENT COMPLETE: credit_usage_distribution
+────────────────────────────────────────────────────────────────────────────────
+Finished at: 2026-05-07T13:18:05.594Z
+Tool calls : 0
+Tokens     : input=497, output=278, total=775
+Cost       : $0.001510
+
+[FINAL ANALYSIS]
+# Credit Usage Distribution Analysis
+
+## Key Findings
+
+**Customers with limits at risk:**
+- 31 of 331 customers with limits are at or beyond threshold (9.4%)
+- Near Limit: 10 customers (3.0%)
+- Over Limit: 21 customers (6.3%)
+
+**Uncontrolled risk exposure:**
+- 34 customers (9.3% of total base) have no credit limit set
+
+**Risk concentration:**
+
+| Category | Count | % of Total |
+|----------|-------|-----------|
+| Within Limit | 300 | 82.2% |
+| Over Limit | 21 | 5.8% |
+| No Limit Set | 34 | 9.3% |
+| Near Limit | 10 | 2.7% |
+
+## Assessment
+
+The 21 over-limit customers represent a policy breach requiring immediate collection action. The 34 no-limit accounts lack credit controls entirely—their risk profile is unknown. Combined, 55 customers (15.1%) present elevated credit exposure.
+
+**Data limitation:** Growth trend cannot be assessed—this is a snapshot only. Historical comparison needed to determine if Over Limit segment is expanding.
+
+════════════════════════════════════════════════════════════════════════════════
+
+────────────────────────────────────────────────────────────────────────────────
+TURN 1 — Claude Response
+────────────────────────────────────────────────────────────────────────────────
+model      : claude-haiku-4-5-20251001
+stop_reason: end_turn
+tokens     : input=1367, output=458, total=1825
+cache      : created=0, read=0
+cost       : $0.002926
+
+[TEXT]
+# Customer Credit Health Analysis
+**Snapshot as of 2026-04-23 | 375 customers**
+
+---
+
+## Risk Distribution
+55% of customers are **Low Risk** (RM 339,617), yet **8% (29 customers) are High Risk** and account for **58% of total outstanding** (RM 6.59M). Moderate-risk customers (38%) hold RM 4.42M.
+
+**Key concern:** High-risk segment is concentrated—29 customers drive RM 6.59M exposure.
+
+---
+
+## Top Offenders
+| Issue | Customer | Amount/Score |
+|-------|----------|-------------|
+| **Highest outstanding** | MY HERO HYPERMARKET SDN BHD | RM 2.11M (Score: 20 - High Risk) |
+| **2nd highest** | MLF TRADING SDN BHD | RM 1.14M (Score: 18 - High Risk) |
+| **Most delinquent** | PRIMA FRESH MART SDN. BHD. | 1,873 days overdue (RM 13.6K) |
+
+**Pattern:** Top 2 outstanding debtors have scores ≤20 (severely stressed). Longest delinquencies (1,800+ days) involve smaller amounts—possible dormant accounts.
+
+---
+
+## Credit Limit Breaches
+Five customers exceed limits by **246%–1,172%**:
+- **SEASONS AGRO SDN BHD:** RM 351K outstanding vs. RM 30K limit (1,172% utilization)
+- **CS 88 FRUITS SDN BHD:** RM 118.7K vs. RM 20K limit (594% utilization)
+
+All five are flagged **High or Moderate Risk**. No pattern by agent visible in data provided.
+
+---
+
+## Recommendation Data Gap
+Type/agent patterns cannot be fully assessed—insufficient detail in provided summary.
+
+────────────────────────────────────────────────────────────────────────────────
+COMPONENT COMPLETE: customer_credit_health
+────────────────────────────────────────────────────────────────────────────────
+Finished at: 2026-05-07T13:18:09.177Z
+Tool calls : 0
+Tokens     : input=1367, output=458, total=1825
+Cost       : $0.002926
+
+[FINAL ANALYSIS]
+# Customer Credit Health Analysis
+**Snapshot as of 2026-04-23 | 375 customers**
+
+---
+
+## Risk Distribution
+55% of customers are **Low Risk** (RM 339,617), yet **8% (29 customers) are High Risk** and account for **58% of total outstanding** (RM 6.59M). Moderate-risk customers (38%) hold RM 4.42M.
+
+**Key concern:** High-risk segment is concentrated—29 customers drive RM 6.59M exposure.
+
+---
+
+## Top Offenders
+| Issue | Customer | Amount/Score |
+|-------|----------|-------------|
+| **Highest outstanding** | MY HERO HYPERMARKET SDN BHD | RM 2.11M (Score: 20 - High Risk) |
+| **2nd highest** | MLF TRADING SDN BHD | RM 1.14M (Score: 18 - High Risk) |
+| **Most delinquent** | PRIMA FRESH MART SDN. BHD. | 1,873 days overdue (RM 13.6K) |
+
+**Pattern:** Top 2 outstanding debtors have scores ≤20 (severely stressed). Longest delinquencies (1,800+ days) involve smaller amounts—possible dormant accounts.
+
+---
+
+## Credit Limit Breaches
+Five customers exceed limits by **246%–1,172%**:
+- **SEASONS AGRO SDN BHD:** RM 351K outstanding vs. RM 30K limit (1,172% utilization)
+- **CS 88 FRUITS SDN BHD:** RM 118.7K vs. RM 20K limit (594% utilization)
+
+All five are flagged **High or Moderate Risk**. No pattern by agent visible in data provided.
+
+---
+
+## Recommendation Data Gap
+Type/agent patterns cannot be fully assessed—insufficient detail in provided summary.
+
+════════════════════════════════════════════════════════════════════════════════
+
+
+════════════════════════════════════════════════════════════════════════════════
+SUMMARY GENERATION: payment_outstanding
+Summary Model: claude-sonnet-4-6
+Started at : 2026-05-07T13:18:09.178Z
+════════════════════════════════════════════════════════════════════════════════
+
+[SYSTEM PROMPT]
+You are a senior financial analyst summarizing a dashboard section for a senior director at Hoi-Yong (Malaysian fruit distribution).
+
+Rules:
+- Be direct, concise, no jargon. State facts, not recommendations.
+- Use RM with thousands separators (e.g., RM 5,841,378).
+- Bullet points for observations. Markdown tables for comparisons.
+- Compare at least 3 data points for trends.
+- If data is insufficient, say so.
+- Do NOT re-derive totals. Use values as given.
+- Every number you cite MUST come from the raw data blocks or a tool-call result. Display rounding OK (e.g., RM 2,286,847 → RM 2.29M). Never back-solve or invent values.
+- Match your language to the Scope line in the data (period vs snapshot vs fiscal).
+
+Sub-period rule: to cite a sub-period average or range, copy it from a "Pre-calculated half-period averages" line. Do not compute your own.
+
+═══════════════════════════════════════════════════════════════════════════════
+TOOL ACCESS
+═══════════════════════════════════════════════════════════════════════════════
+
+You can query the database to find supporting evidence or root causes. Use tools for both positive and negative findings — identify which customers, products, months, or agents drove the result.
+
+Rules:
+- Maximum 4 tool calls. Stop once you have enough context to explain the finding — do not go deeper than needed.
+- Do not query data already in the raw data blocks.
+- Prefer local pc_* tables first. Use remote dbo.* for detail drill-down.
+- Remote tables require: Cancelled = 'F' filter. Row limit: 100.
+
+═══════════════════════════════════════════════════════════════════════════════
+OUTPUT FORMAT
+═══════════════════════════════════════════════════════════════════════════════
+
+Use this EXACT delimiter structure (no JSON, no code blocks):
+
+===INSIGHT===
+sentiment: good|bad
+title: Punchy headline (max 50 chars, no verbs like "is"/"has"/"shows")
+metric: Key number e.g. 84.3%, 43 days, RM 2.1M (max 25 chars)
+summary: One plain-text sentence — card preview (max 80 chars, no markdown)
+---DETAIL---
+Concise markdown analysis (max 150 words)
+===END===
+
+Max 3 good + 3 bad insights. Rank by business impact.
+
+Detail structure (all sections MANDATORY):
+
+**Current Status**: 1-2 bullets with headline number and scope.
+
+**Key Observations**: 2-3 bullets with specific numbers/dates.
+
+**Evidence** (positive) or **Root Cause** (negative):
+- Name top 3-5 contributors. Include a Markdown table (min 3 rows) when top-N data exists.
+
+**Implication**: 1 bullet — bottom-line consequence.
+
+Content rules:
+- Use exact dashboard metric names. No jargon (no DSO, DPO).
+- Cross-reference components — synthesize, don't isolate.
+- No contradicting good/bad insights on same metric.
+
+[USER PROMPT]
+Section: Outstanding Payment
+Page: Payment
+Scope: Snapshot — current state
+Generated: 2026-05-07 13:18
+
+---
+
+Below are the RAW DATA BLOCKS for each component in this section. These are the
+authoritative source of truth. Every number you write must be traceable to a
+specific line in one of these blocks (or to a tool-call result).
+
+### Component 1: Total Outstanding (kpi)
+Scope: SNAPSHOT — current state as of 2026-04-23.
+
+Value: RM 11,349,862.52
+
+Top 5 contributors (48.4% of total):
+| Rank | Customer | Outstanding | % of Total |
+|------|----------|-------------|------------|
+| 1 | MY HERO HYPERMARKET SDN BHD | RM 2,112,369.4 | 18.6% |
+| 2 | MLF TRADING SDN BHD | RM 1,137,069 | 10.0% |
+| 3 | WONDERFRUITS & VEGETABLES IMPORT AND EXPORT(M) S/B | RM 1,079,871.1 | 9.5% |
+| 4 | LO SIEW LIN SDN BHD | RM 807,239.1 | 7.1% |
+| 5 | SEASONS AGRO SDN BHD | RM 351,476 | 3.1% |
+
+
+### Component 2: Overdue Amount (kpi)
+Scope: SNAPSHOT — current state as of 2026-04-23.
+
+Value: RM 11,349,862.52
+Percentage of total: 100.0%
+Overdue customers: 227
+Total customers: 227
+
+Top 5 overdue customers:
+| Rank | Customer | Overdue Amount | Max Overdue Days | % of Overdue |
+|------|----------|----------------|-------------------|--------------|
+| 1 | MY HERO HYPERMARKET SDN BHD | RM 2,112,369.4 | 440 days | 18.6% |
+| 2 | MLF TRADING SDN BHD | RM 1,137,069 | 203 days | 10.0% |
+| 3 | WONDERFRUITS & VEGETABLES IMPORT AND EXPORT(M) S/B | RM 1,079,871.1 | 232 days | 9.5% |
+| 4 | LO SIEW LIN SDN BHD | RM 807,239.1 | 237 days | 7.1% |
+| 5 | SEASONS AGRO SDN BHD | RM 351,476 | 165 days | 3.1% |
+
+
+### Component 3: Credit Limit Breaches (kpi)
+Scope: SNAPSHOT — current state as of 2026-04-23.
+
+Value: 21 customers
+Color: Red (Concern)
+
+Top 10 breaching customers (of 21) by utilization:
+| Rank | Customer | Credit Limit | Outstanding | Utilization |
+|------|----------|--------------|-------------|-------------|
+| 1 | SEASONS AGRO SDN BHD | RM 30,000 | RM 351,476 | 1172% |
+| 2 | CS 88 FRUITS SDN BHD  | RM 20,000 | RM 118,719 | 594% |
+| 3 | YZ VEGE GROUP SDN. BHD. | RM 20,000 | RM 52,807 | 264% |
+| 4 | ST ROSYAM MART SDN BHD (SEMENYIH) | RM 30,000 | RM 75,170.47 | 251% |
+| 5 | T & T FRESH SDN BHD  | RM 100,000 | RM 246,369.06 | 246% |
+| 6 | SECRET RECIPE MANUFACTURING SDN. BHD. | RM 100,000 | RM 238,380 | 238% |
+| 7 | FEUNG SEN ENTERPRISE (K. KEMUNING)*old* | RM 25,000 | RM 58,945.4 | 236% |
+| 8 | JDL FRUIT SDN. BHD. (LONPAC) | RM 50,000 | RM 115,221.73 | 230% |
+| 9 | LUEN SENG FRUITS STALL | RM 30,000 | RM 60,494.87 | 202% |
+| 10 | PHOENIX SERIES (S) SDN. BHD. | RM 100,000 | RM 195,588 | 196% |
+
+
+### Component 4: Aging Analysis (chart)
+Scope: SNAPSHOT — current state as of 2026-04-23.
+
+Data:
+| Bucket | Amount | % of Total | Invoices |
+|--------|--------|-----------|----------|
+| 120+ | RM 11,349,862.52 | 100.0% | 3376 |
+
+Total Outstanding: RM 11,349,862.52
+
+### Component 5: Credit Usage Distribution (chart)
+Scope: SNAPSHOT — current state as of 2026-04-23.
+
+Categories:
+- Within Limit (< 80%): 300 customers
+- Near Limit (80-99%): 10 customers
+- Over Limit (>= 100%): 21 customers
+- No Limit Set: 34 customers
+Total: 365 customers
+
+### Component 6: Customer Credit Health (table)
+Scope: SNAPSHOT — current state as of 2026-04-23.
+
+Summary:
+- Total customers: 375
+
+Risk distribution:
+| Risk Tier | Count | % of Customers | Outstanding | % of Outstanding |
+|-----------|-------|----------------|-------------|------------------|
+| High | 29 | 8% | RM 6,587,822.96 | 58.0% |
+| Moderate | 141 | 38% | RM 4,422,422.32 | 39.0% |
+| Low | 205 | 55% | RM 339,617.24 | 3.0% |
+
+Top 5 by outstanding amount:
+| Customer | Outstanding | Score | Risk |
+|----------|-------------|-------|------|
+| MY HERO HYPERMARKET SDN BHD | RM 2,112,369.4 | 20.00 | High |
+| MLF TRADING SDN BHD | RM 1,137,069 | 18.00 | High |
+| WONDERFRUITS & VEGETABLES IMPORT AND EXPORT(M) S/B | RM 1,079,871.1 | 58.00 | Moderate |
+| LO SIEW LIN SDN BHD | RM 807,239.1 | 21.00 | High |
+| SEASONS AGRO SDN BHD | RM 351,476 | 30.00 | Moderate |
+
+Top 5 by max overdue days (most delinquent):
+| Customer | Max Overdue Days | Outstanding | Risk |
+|----------|-------------------|-------------|------|
+| PRIMA FRESH MART SDN. BHD. (CTOS) | 1873 days | RM 13,591.6 | Moderate |
+| LEONG HING TRADING | 1850 days | RM 15,000 | Moderate |
+| JACKMART MALAYSIA SDN. BHD.(LONPC / CTOS) | 1850 days | RM 3,261.1 | Moderate |
+| JEA TRADING (LONPAC / CTOS) | 1795 days | RM 3,000.68 | Moderate |
+| BL FRESH SDN BHD (LONPAC) | 1457 days | RM 4,401.5 | Moderate |
+
+Top 5 by utilization % (most over credit limit):
+| Customer | Utilization | Credit Limit | Outstanding | Risk |
+|----------|-------------|--------------|-------------|------|
+| SEASONS AGRO SDN BHD | 1172% | RM 30,000 | RM 351,476 | Moderate |
+| CS 88 FRUITS SDN BHD  | 594% | RM 20,000 | RM 118,719 | High |
+| YZ VEGE GROUP SDN. BHD. | 264% | RM 20,000 | RM 52,807 | High |
+| ST ROSYAM MART SDN BHD (SEMENYIH) | 251% | RM 30,000 | RM 75,170.47 | High |
+| T & T FRESH SDN BHD  | 246% | RM 100,000 | RM 246,369.06 | High |
+
+Score Configuration:
+- Weights: Utilization 60%, Overdue Days 10%, Timeliness 20%, Double Breach 10%
+- Risk Thresholds: Score >= 75 = Low Risk, Score <= 23 = High Risk, between = Moderate
+
+---
+
+Produce the summary now using the ===INSIGHT=== delimiter format.
+
+────────────────────────────────────────────────────────────────────────────────
+TURN 1 — Claude Response
+────────────────────────────────────────────────────────────────────────────────
+model      : claude-sonnet-4-6
+stop_reason: tool_use
+tokens     : input=5250, output=367, total=5617
+cache      : created=0, read=0
+cost       : $0.021255
+
+[TEXT]
+I'll query for additional context on the most critical findings before producing the insights.
+
+[TOOL_USE] id=toolu_01Y7J66owjsYH8W82CpYFwAr
+  tool : query_local_table
+  input: {
+  "table": "pc_ar_customer_snapshot",
+  "columns": [
+    "debtor_code",
+    "company_name",
+    "risk_tier",
+    "total_outstanding",
+    "overdue_amount",
+    "max_overdue_days",
+    "avg_payment_days",
+    "credit_limit",
+    "utilization_pct",
+    "credit_score"
+  ],
+  "where_clause": "risk_tier = 'High'",
+  "order_by": "total_outstanding DESC",
+  "limit": 10
+}
+
+[TOOL_USE] id=toolu_01M3rZpUNA5YHq29AKZ3yB8s
+  tool : query_local_table
+  input: {
+  "table": "pc_ar_aging_history",
+  "columns": [
+    "snapshot_date",
+    "bucket",
+    "dimension",
+    "dimension_key",
+    "invoice_count",
+    "total_outstanding"
+  ],
+  "where_clause": "dimension = 'overall'",
+  "order_by": "snapshot_date DESC",
+  "limit": 20
+}
+
+[TOOL_RESULT] turn=1, id=toolu_01Y7J66owjsYH8W82CpYFwAr
+  tool  : query_local_table
+  result:
+10 row(s) returned:
+
+| debtor_code | company_name | risk_tier | total_outstanding | overdue_amount | max_overdue_days | avg_payment_days | credit_limit | utilization_pct | credit_score |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 300-M008 | MY HERO HYPERMARKET SDN BHD | High | 2112369.40 | 2112369.40 | 440 | 20.66 | 1300000.00 | 162.49 | 20.00 |
+| 300-M033 | MLF TRADING SDN BHD | High | 1137069.00 | 1137069.00 | 203 | 54.13 | 600000.00 | 189.51 | 18.00 |
+| 300-L018 | LO SIEW LIN SDN BHD | High | 807239.10 | 807239.10 | 237 | 85.86 | 1000000.00 | 80.72 | 21.00 |
+| 300-T001 | T & T FRESH SDN BHD  | High | 246369.06 | 246369.06 | 193 | 46.13 | 100000.00 | 246.37 | 4.00 |
+| 300-S003 | SECRET RECIPE MANUFACTURING SDN. BHD. | High | 238380.00 | 238380.00 | 202 | 53.08 | 100000.00 | 238.38 | 8.00 |
+| 300-P024 | PHOENIX SERIES (S) SDN. BHD. | High | 195588.00 | 195588.00 | 208 | 81.25 | 100000.00 | 195.59 | 14.00 |
+| 300-S004 | ST ROSYAM MART (SHAH ALAM) SDN BHD | High | 187559.00 | 187559.00 | 234 | 78.38 | 200000.00 | 93.78 | 22.00 |
+| 300-N027 | NSK GROCER (KL) SDN BHD (3 DAMANSARA) | High | 153278.00 | 153278.00 | 326 | 48.84 | 100000.00 | 153.28 | 8.00 |
+| 300-W005 | WORLD TASTY FRUITS TRADING | High | 145698.11 | 145698.11 | 213 | 51.28 | 100000.00 | 145.70 | 4.00 |
+| 300-K034 | K & T TRADING (KUANTAN) SDN. BHD. | High | 145541.00 | 145541.00 | 234 | 76.08 | 100000.00 | 145.54 | 14.00 |
+
+[TOOL_RESULT] turn=1, id=toolu_01M3rZpUNA5YHq29AKZ3yB8s
+  tool  : query_local_table
+  result:
+Error executing query: column "dimension_key" does not exist
+
+────────────────────────────────────────────────────────────────────────────────
+TURN 2 — Claude Response
+────────────────────────────────────────────────────────────────────────────────
+model      : claude-sonnet-4-6
+stop_reason: tool_use
+tokens     : input=6471, output=141, total=6612
+cache      : created=0, read=0
+cost       : $0.021528
+
+[TOOL_USE] id=toolu_01WeGjoo8Rbww5tFLjnS4F2r
+  tool : query_local_table
+  input: {
+  "table": "pc_ar_aging_history",
+  "columns": [
+    "snapshot_date",
+    "bucket",
+    "dimension",
+    "invoice_count",
+    "total_outstanding"
+  ],
+  "order_by": "snapshot_date DESC, bucket ASC",
+  "limit": 30
+}
+
+[TOOL_RESULT] turn=2, id=toolu_01WeGjoo8Rbww5tFLjnS4F2r
+  tool  : query_local_table
+  result:
+30 row(s) returned:
+
+| snapshot_date | bucket | dimension | invoice_count | total_outstanding |
+| --- | --- | --- | --- | --- |
+| 2026-04-23 | 120+ | agent:Yuki | 969 | 2774067.69 |
+| 2026-04-23 | 120+ | agent:Chyi | 28 | 27251.70 |
+| 2026-04-23 | 120+ | agent:Max | 1 | 650.80 |
+| 2026-04-23 | 120+ | agent:Aireen | 15 | 2898.50 |
+| 2026-04-23 | 120+ | agent:Huat | 549 | 454259.96 |
+| 2026-04-23 | 120+ | agent:Unknown | 1 | 400.00 |
+| 2026-04-23 | 120+ | agent:Joy | 8 | 15454.00 |
+| 2026-04-23 | 120+ | agent:Hao | 88 | 1122915.54 |
+| 2026-04-23 | 120+ | agent:Judy | 3 | 1200.00 |
+| 2026-04-23 | 120+ | agent:Vincent | 945 | 3059752.80 |
+| 2026-04-23 | 120+ | agent:Caelen | 378 | 3721296.25 |
+| 2026-04-23 | 120+ | agent:Helen | 323 | 132893.28 |
+| 2026-04-23 | 120+ | agent:Lee | 48 | 20837.50 |
+| 2026-04-23 | 120+ | agent:NM | 20 | 15984.50 |
+| 2026-04-23 | 120+ | type:Supermarket | 1,138 | 5201897.62 |
+| 2026-04-23 | 120+ | type:Wet Market | 339 | 364298.86 |
+| 2026-04-23 | 120+ | type:Fruit Shop | 697 | 902616.89 |
+| 2026-04-23 | 120+ | type:Unknown | 9 | 15796.60 |
+| 2026-04-23 | 120+ | type:Consumer | 363 | 540717.53 |
+| 2026-04-23 | 120+ | type:Wholesaler | 791 | 4269135.02 |
+| 2026-04-23 | 120+ | type:Hospitality Business | 39 | 55400.00 |
+| 2026-04-23 | 120+ | all | 3,376 | 11349862.52 |
+| 2026-04-22 | 120+ | agent:Yuki | 969 | 2774067.69 |
+| 2026-04-22 | 120+ | agent:Chyi | 28 | 27251.70 |
+| 2026-04-22 | 120+ | agent:Max | 1 | 650.80 |
+| 2026-04-22 | 120+ | agent:Aireen | 15 | 2898.50 |
+| 2026-04-22 | 120+ | agent:Huat | 549 | 454259.96 |
+| 2026-04-22 | 120+ | agent:Unknown | 1 | 400.00 |
+| 2026-04-22 | 120+ | agent:Joy | 8 | 15454.00 |
+| 2026-04-22 | 120+ | agent:Hao | 88 | 1122915.54 |
+
+────────────────────────────────────────────────────────────────────────────────
+TURN 3 — Claude Response
+────────────────────────────────────────────────────────────────────────────────
+model      : claude-sonnet-4-6
+stop_reason: end_turn
+tokens     : input=7604, output=2062, total=9666
+cache      : created=0, read=0
+cost       : $0.053742
+
+[TEXT]
+Good — I now have sufficient data to produce all insights. Here is the full analysis:
+
+===INSIGHT===
+sentiment: bad
+title: 100% of Receivables Sitting 120+ Days Overdue
+metric: RM 11,349,862
+summary: Every single outstanding invoice — 3,376 in total — is past the 120-day mark.
+---DETAIL---
+**Current Status:**
+- Total outstanding as of 2026-04-23: **RM 11,349,862** across 3,376 invoices and 227 active customers.
+- The entire receivables balance sits in the **120+ day overdue bucket** — 100% of total. There is no current or near-current portion.
+
+**Key Observations:**
+- All 227 customers with outstanding balances are classified as overdue — zero exceptions.
+- The top 2 customers alone — MY HERO HYPERMARKET (440 overdue days) and MLF TRADING (203 overdue days) — account for **RM 3,249,438**, or 28.6% of the total.
+- Agent Caelen's portfolio carries the highest single-agent exposure at **RM 3,721,296** (969+ invoices); agent Yuki follows at **RM 2,774,068**.
+
+| Agent | 120+ Outstanding | Invoice Count |
+|---------|-----------------|---------------|
+| Caelen | RM 3,721,296 | 378 |
+| Yuki | RM 2,774,068 | 969 |
+| Vincent | RM 3,059,753 | 945 |
+| Hao | RM 1,122,916 | 88 |
+| Huat | RM 454,260 | 549 |
+
+**Root Cause:** The 120+ day cliff is uniform across all agents and customer types, indicating a systemic collection failure rather than isolated account issues. No sub-120-day invoices remain open, suggesting either very slow billing cycles or payment terms are being consistently breached.
+
+**Implication:** The entire AR book is impaired — cash conversion is structurally broken and write-off risk is elevated across all 227 accounts.
+===END===
+
+===INSIGHT===
+sentiment: bad
+title: High-Risk Tier Owns 58% of All Outstanding
+metric: RM 6,587,823
+summary: Just 29 High-risk customers hold RM 6.59M — over half of total receivables.
+---DETAIL---
+**Current Status:**
+- 29 High-risk customers (8% of 375 total) hold **RM 6,587,823** — 58% of total outstanding as of 2026-04-23.
+- Every High-risk customer also carries 100% overdue exposure (scores ≤ 23).
+
+**Key Observations:**
+- MY HERO HYPERMARKET (score 20) alone holds **RM 2,112,369** at 440 overdue days — the single largest concentration in the portfolio.
+- MLF TRADING (score 18) and LO SIEW LIN (score 21) together add another **RM 1,944,308**, all overdue.
+- Average payment days for High-risk top accounts range from 20.7 (MY HERO) to 85.9 days (LO SIEW LIN), confirming deeply inconsistent collections.
+
+| Customer | Outstanding | Credit Score | Max Overdue Days |
+|---|---|---|---|
+| MY HERO HYPERMARKET | RM 2,112,369 | 20 | 440 |
+| MLF TRADING | RM 1,137,069 | 18 | 203 |
+| LO SIEW LIN | RM 807,239 | 21 | 237 |
+| T & T FRESH | RM 246,369 | 4 | 193 |
+| SECRET RECIPE MFG | RM 238,380 | 8 | 202 |
+
+**Root Cause:** Credit scores are weighted 60% on utilization and 20% on timeliness — these five accounts fail on both dimensions, having breached their limits and consistently paying late.
+
+**Implication:** Recovery of RM 6.59M is at material risk; a partial write-down of High-risk balances would significantly reduce reported net receivables.
+===END===
+
+===INSIGHT===
+sentiment: bad
+title: 21 Customers in Severe Credit Limit Breach
+metric: 21 customers
+summary: 21 customers exceed their credit limits, some by over 10x the approved ceiling.
+---DETAIL---
+**Current Status:**
+- 21 customers are Over Limit (≥100% utilization) as of 2026-04-23, with an additional 10 Near Limit (80–99%).
+- Credit limits for breach accounts are predominantly low (RM 20,000–RM 100,000), yet balances have been allowed to balloon far above them.
+
+**Key Observations:**
+- SEASONS AGRO holds **RM 351,476** against a **RM 30,000** limit — **1,172% utilization**, the worst in the portfolio.
+- CS 88 FRUITS (594%) and YZ VEGE GROUP (264%) carry limits of only RM 20,000, suggesting outdated limit-setting rather than intentional extended credit.
+- Combined outstanding for the top 5 breach accounts is **RM 844,542**, all 120+ days overdue.
+
+| Customer | Credit Limit | Outstanding | Utilization |
+|---|---|---|---|
+| SEASONS AGRO | RM 30,000 | RM 351,476 | 1,172% |
+| CS 88 FRUITS | RM 20,000 | RM 118,719 | 594% |
+| YZ VEGE GROUP | RM 20,000 | RM 52,807 | 264% |
+| ST ROSYAM MART (SEMENYIH) | RM 30,000 | RM 75,170 | 251% |
+| T & T FRESH | RM 100,000 | RM 246,369 | 246% |
+
+**Root Cause:** Credit limits appear to have never been revised upward to reflect actual trading volumes, while deliveries continued uninterrupted — creating a silent but compounding exposure gap.
+
+**Implication:** Without enforcement of credit holds, further exposure growth is unchecked; the 10 Near-Limit customers are the next breach cohort if collections don't accelerate.
+===END===
+
+===INSIGHT===
+sentiment: bad
+title: Ghost Debts: Active Balances 5+ Years Overdue
+metric: 1,873 days
+summary: Five accounts show max overdue days above 1,457 — some unpaid since 2021.
+---DETAIL---
+**Current Status:**
+- Five customers recorded overdue periods of **1,457 to 1,873 days** (roughly 4–5 years), yet still carry active outstanding balances as of 2026-04-23.
+- All five are classified **Moderate** risk — indicating scores do not fully penalise extreme ageing.
+
+**Key Observations:**
+- PRIMA FRESH MART (CTOS-flagged) is the oldest at **1,873 days** overdue with **RM 13,592** outstanding.
+- LEONG HING TRADING at **1,850 days** holds the largest balance in this cohort at **RM 15,000**.
+- All five accounts are CTOS- or LONPAC-flagged, suggesting known credit events on record.
+
+| Customer | Max Overdue Days | Outstanding |
+|---|---|---|
+| PRIMA FRESH MART (CTOS) | 1,873 days | RM 13,592 |
+| LEONG HING TRADING | 1,850 days | RM 15,000 |
+| JACKMART MALAYSIA (LONPAC/CTOS) | 1,850 days | RM 3,261 |
+| JEA TRADING (LONPAC/CTOS) | 1,795 days | RM 3,001 |
+| BL FRESH (LONPAC) | 1,457 days | RM 4,402 |
+
+**Root Cause:** Balances have not been written off despite multi-year delinquency and known insolvency flags (CTOS/LONPAC), overstating gross receivables and masking true collection quality.
+
+**Implication:** These balances are virtually unrecoverable; retaining them inflates the AR book and may misrepresent the quality of the receivables portfolio in credit reviews.
+===END===
+
+────────────────────────────────────────────────────────────────────────────────
+SUMMARY RESPONSE
+────────────────────────────────────────────────────────────────────────────────
+model  : claude-sonnet-4-6
+tokens : input=7604, output=2062
+cache  : created=0, read=0
+
+[RAW RESPONSE]
+Good — I now have sufficient data to produce all insights. Here is the full analysis:
+
+===INSIGHT===
+sentiment: bad
+title: 100% of Receivables Sitting 120+ Days Overdue
+metric: RM 11,349,862
+summary: Every single outstanding invoice — 3,376 in total — is past the 120-day mark.
+---DETAIL---
+**Current Status:**
+- Total outstanding as of 2026-04-23: **RM 11,349,862** across 3,376 invoices and 227 active customers.
+- The entire receivables balance sits in the **120+ day overdue bucket** — 100% of total. There is no current or near-current portion.
+
+**Key Observations:**
+- All 227 customers with outstanding balances are classified as overdue — zero exceptions.
+- The top 2 customers alone — MY HERO HYPERMARKET (440 overdue days) and MLF TRADING (203 overdue days) — account for **RM 3,249,438**, or 28.6% of the total.
+- Agent Caelen's portfolio carries the highest single-agent exposure at **RM 3,721,296** (969+ invoices); agent Yuki follows at **RM 2,774,068**.
+
+| Agent | 120+ Outstanding | Invoice Count |
+|---------|-----------------|---------------|
+| Caelen | RM 3,721,296 | 378 |
+| Yuki | RM 2,774,068 | 969 |
+| Vincent | RM 3,059,753 | 945 |
+| Hao | RM 1,122,916 | 88 |
+| Huat | RM 454,260 | 549 |
+
+**Root Cause:** The 120+ day cliff is uniform across all agents and customer types, indicating a systemic collection failure rather than isolated account issues. No sub-120-day invoices remain open, suggesting either very slow billing cycles or payment terms are being consistently breached.
+
+**Implication:** The entire AR book is impaired — cash conversion is structurally broken and write-off risk is elevated across all 227 accounts.
+===END===
+
+===INSIGHT===
+sentiment: bad
+title: High-Risk Tier Owns 58% of All Outstanding
+metric: RM 6,587,823
+summary: Just 29 High-risk customers hold RM 6.59M — over half of total receivables.
+---DETAIL---
+**Current Status:**
+- 29 High-risk customers (8% of 375 total) hold **RM 6,587,823** — 58% of total outstanding as of 2026-04-23.
+- Every High-risk customer also carries 100% overdue exposure (scores ≤ 23).
+
+**Key Observations:**
+- MY HERO HYPERMARKET (score 20) alone holds **RM 2,112,369** at 440 overdue days — the single largest concentration in the portfolio.
+- MLF TRADING (score 18) and LO SIEW LIN (score 21) together add another **RM 1,944,308**, all overdue.
+- Average payment days for High-risk top accounts range from 20.7 (MY HERO) to 85.9 days (LO SIEW LIN), confirming deeply inconsistent collections.
+
+| Customer | Outstanding | Credit Score | Max Overdue Days |
+|---|---|---|---|
+| MY HERO HYPERMARKET | RM 2,112,369 | 20 | 440 |
+| MLF TRADING | RM 1,137,069 | 18 | 203 |
+| LO SIEW LIN | RM 807,239 | 21 | 237 |
+| T & T FRESH | RM 246,369 | 4 | 193 |
+| SECRET RECIPE MFG | RM 238,380 | 8 | 202 |
+
+**Root Cause:** Credit scores are weighted 60% on utilization and 20% on timeliness — these five accounts fail on both dimensions, having breached their limits and consistently paying late.
+
+**Implication:** Recovery of RM 6.59M is at material risk; a partial write-down of High-risk balances would significantly reduce reported net receivables.
+===END===
+
+===INSIGHT===
+sentiment: bad
+title: 21 Customers in Severe Credit Limit Breach
+metric: 21 customers
+summary: 21 customers exceed their credit limits, some by over 10x the approved ceiling.
+---DETAIL---
+**Current Status:**
+- 21 customers are Over Limit (≥100% utilization) as of 2026-04-23, with an additional 10 Near Limit (80–99%).
+- Credit limits for breach accounts are predominantly low (RM 20,000–RM 100,000), yet balances have been allowed to balloon far above them.
+
+**Key Observations:**
+- SEASONS AGRO holds **RM 351,476** against a **RM 30,000** limit — **1,172% utilization**, the worst in the portfolio.
+- CS 88 FRUITS (594%) and YZ VEGE GROUP (264%) carry limits of only RM 20,000, suggesting outdated limit-setting rather than intentional extended credit.
+- Combined outstanding for the top 5 breach accounts is **RM 844,542**, all 120+ days overdue.
+
+| Customer | Credit Limit | Outstanding | Utilization |
+|---|---|---|---|
+| SEASONS AGRO | RM 30,000 | RM 351,476 | 1,172% |
+| CS 88 FRUITS | RM 20,000 | RM 118,719 | 594% |
+| YZ VEGE GROUP | RM 20,000 | RM 52,807 | 264% |
+| ST ROSYAM MART (SEMENYIH) | RM 30,000 | RM 75,170 | 251% |
+| T & T FRESH | RM 100,000 | RM 246,369 | 246% |
+
+**Root Cause:** Credit limits appear to have never been revised upward to reflect actual trading volumes, while deliveries continued uninterrupted — creating a silent but compounding exposure gap.
+
+**Implication:** Without enforcement of credit holds, further exposure growth is unchecked; the 10 Near-Limit customers are the next breach cohort if collections don't accelerate.
+===END===
+
+===INSIGHT===
+sentiment: bad
+title: Ghost Debts: Active Balances 5+ Years Overdue
+metric: 1,873 days
+summary: Five accounts show max overdue days above 1,457 — some unpaid since 2021.
+---DETAIL---
+**Current Status:**
+- Five customers recorded overdue periods of **1,457 to 1,873 days** (roughly 4–5 years), yet still carry active outstanding balances as of 2026-04-23.
+- All five are classified **Moderate** risk — indicating scores do not fully penalise extreme ageing.
+
+**Key Observations:**
+- PRIMA FRESH MART (CTOS-flagged) is the oldest at **1,873 days** overdue with **RM 13,592** outstanding.
+- LEONG HING TRADING at **1,850 days** holds the largest balance in this cohort at **RM 15,000**.
+- All five accounts are CTOS- or LONPAC-flagged, suggesting known credit events on record.
+
+| Customer | Max Overdue Days | Outstanding |
+|---|---|---|
+| PRIMA FRESH MART (CTOS) | 1,873 days | RM 13,592 |
+| LEONG HING TRADING | 1,850 days | RM 15,000 |
+| JACKMART MALAYSIA (LONPAC/CTOS) | 1,850 days | RM 3,261 |
+| JEA TRADING (LONPAC/CTOS) | 1,795 days | RM 3,001 |
+| BL FRESH (LONPAC) | 1,457 days | RM 4,402 |
+
+**Root Cause:** Balances have not been written off despite multi-year delinquency and known insolvency flags (CTOS/LONPAC), overstating gross receivables and masking true collection quality.
+
+**Implication:** These balances are virtually unrecoverable; retaining them inflates the AR book and may misrepresent the quality of the receivables portfolio in credit reviews.
+===END===
+
+════════════════════════════════════════════════════════════════════════════════
+
+────────────────────────────────────────────────────────────────────────────────
+NUMERIC GUARD — Attempt 1
+────────────────────────────────────────────────────────────────────────────────
+Passed    : false
+Unmatched : 2
+  - "RM 3,249,438" (3249438 RM)
+  - "RM 1,944,308" (1944308 RM)
+
+────────────────────────────────────────────────────────────────────────────────
+TURN 1 — Claude Response
+────────────────────────────────────────────────────────────────────────────────
+model      : claude-sonnet-4-6
+stop_reason: end_turn
+tokens     : input=9791, output=2065, total=11856
+cache      : created=0, read=0
+cost       : $0.060348
+
+[TEXT]
+===INSIGHT===
+sentiment: bad
+title: 100% of Receivables Sitting 120+ Days Overdue
+metric: RM 11,349,862
+summary: Every single outstanding invoice — 3,376 in total — is past the 120-day mark.
+---DETAIL---
+**Current Status:**
+- Total outstanding as of 2026-04-23: **RM 11,349,862** across 3,376 invoices and 227 active customers.
+- The entire receivables balance sits in the **120+ day overdue bucket** — 100% of total. There is no current or near-current portion.
+
+**Key Observations:**
+- All 227 customers with outstanding balances are classified as overdue — zero exceptions.
+- MY HERO HYPERMARKET carries the single largest balance at **RM 2,112,369** with 440 overdue days; MLF TRADING follows at **RM 1,137,069** with 203 overdue days.
+- Agent Caelen's portfolio carries the highest single-agent exposure at **RM 3,721,296** (378 invoices); agent Vincent follows at **RM 3,059,753** (945 invoices).
+
+| Agent | 120+ Outstanding | Invoice Count |
+|---------|-----------------|---------------|
+| Caelen | RM 3,721,296 | 378 |
+| Vincent | RM 3,059,753 | 945 |
+| Yuki | RM 2,774,068 | 969 |
+| Hao | RM 1,122,916 | 88 |
+| Huat | RM 454,260 | 549 |
+
+**Root Cause:** The 120+ day concentration is uniform across all agents and customer types, indicating a systemic collection failure rather than isolated account issues. No sub-120-day invoices remain open.
+
+**Implication:** The entire AR book is impaired — cash conversion is structurally broken and write-off risk is elevated across all 227 accounts.
+===END===
+
+===INSIGHT===
+sentiment: bad
+title: High-Risk Tier Owns 58% of All Outstanding
+metric: RM 6,587,823
+summary: Just 29 High-risk customers hold RM 6.59M — over half of total receivables.
+---DETAIL---
+**Current Status:**
+- 29 High-risk customers (8% of 375 total) hold **RM 6,587,822.96** — 58% of total outstanding as of 2026-04-23.
+- Every High-risk customer carries 100% overdue exposure (scores ≤ 23 per the score configuration).
+
+**Key Observations:**
+- MY HERO HYPERMARKET (score 20) alone holds **RM 2,112,369** at 440 overdue days — the single largest concentration in the portfolio.
+- MLF TRADING (score 18) holds **RM 1,137,069** at 203 overdue days; LO SIEW LIN (score 21) holds **RM 807,239** at 237 overdue days.
+- The remaining 141 Moderate-risk customers hold **RM 4,422,422** (39%), meaning High and Moderate tiers together account for 97% of all outstanding.
+
+| Customer | Outstanding | Credit Score | Max Overdue Days |
+|---|---|---|---|
+| MY HERO HYPERMARKET | RM 2,112,369 | 20 | 440 |
+| MLF TRADING | RM 1,137,069 | 18 | 203 |
+| LO SIEW LIN | RM 807,239 | 21 | 237 |
+| T & T FRESH | RM 246,369 | 4 | 193 |
+| SECRET RECIPE MFG | RM 238,380 | 8 | 202 |
+
+**Root Cause:** Credit scores are weighted 60% on utilization and 20% on timeliness — these accounts fail on both dimensions, having breached their limits and consistently paying late.
+
+**Implication:** Recovery of RM 6,587,822.96 is at material risk; a partial write-down of High-risk balances would significantly reduce reported net receivables.
+===END===
+
+===INSIGHT===
+sentiment: bad
+title: 21 Customers in Severe Credit Limit Breach
+metric: 21 customers
+summary: 21 customers exceed their credit limits, some by over 10x the approved ceiling.
+---DETAIL---
+**Current Status:**
+- 21 customers are Over Limit (≥100% utilization) as of 2026-04-23, with an additional 10 Near Limit (80–99%).
+- Credit limits for breach accounts are predominantly low (RM 20,000–RM 100,000), yet balances have been allowed to grow far beyond them.
+
+**Key Observations:**
+- SEASONS AGRO holds **RM 351,476** against a **RM 30,000** limit — **1,172% utilization**, the worst in the portfolio.
+- CS 88 FRUITS (594%) and YZ VEGE GROUP (264%) both carry limits of only RM 20,000, suggesting severely outdated limit-setting.
+- T & T FRESH and SECRET RECIPE MFG each hold limits of RM 100,000 yet carry outstandings of **RM 246,369** and **RM 238,380** respectively.
+
+| Customer | Credit Limit | Outstanding | Utilization |
+|---|---|---|---|
+| SEASONS AGRO | RM 30,000 | RM 351,476 | 1,172% |
+| CS 88 FRUITS | RM 20,000 | RM 118,719 | 594% |
+| YZ VEGE GROUP | RM 20,000 | RM 52,807 | 264% |
+| ST ROSYAM MART (SEMENYIH) | RM 30,000 | RM 75,170.47 | 251% |
+| T & T FRESH | RM 100,000 | RM 246,369.06 | 246% |
+
+**Root Cause:** Credit limits appear to have never been revised to reflect actual trading volumes, while deliveries continued uninterrupted — creating a compounding exposure gap.
+
+**Implication:** Without enforcement of credit holds, the 10 Near-Limit customers are the next breach cohort if collections do not accelerate.
+===END===
+
+===INSIGHT===
+sentiment: bad
+title: Ghost Debts: Active Balances 5+ Years Overdue
+metric: 1,873 days
+summary: Five accounts show max overdue days above 1,457 — some unpaid since 2021.
+---DETAIL---
+**Current Status:**
+- Five customers recorded overdue periods of **1,457 to 1,873 days** (roughly 4–5 years), yet still carry active outstanding balances as of 2026-04-23.
+- All five are classified **Moderate** risk — indicating the scoring model does not fully penalise extreme ageing on low-balance accounts.
+
+**Key Observations:**
+- PRIMA FRESH MART (CTOS-flagged) is the oldest at **1,873 days** overdue with **RM 13,591.60** outstanding.
+- LEONG HING TRADING at **1,850 days** holds the largest balance in this cohort at **RM 15,000**.
+- All five accounts carry CTOS or LONPAC flags, indicating known prior credit events on record.
+
+| Customer | Max Overdue Days | Outstanding |
+|---|---|---|
+| PRIMA FRESH MART (CTOS) | 1,873 days | RM 13,591.60 |
+| LEONG HING TRADING | 1,850 days | RM 15,000 |
+| JACKMART MALAYSIA (LONPAC/CTOS) | 1,850 days | RM 3,261.10 |
+| JEA TRADING (LONPAC/CTOS) | 1,795 days | RM 3,000.68 |
+| BL FRESH (LONPAC) | 1,457 days | RM 4,401.50 |
+
+**Root Cause:** Balances have not been written off despite multi-year delinquency and known insolvency flags, overstating gross receivables and masking true collection quality.
+
+**Implication:** These balances are virtually unrecoverable; retaining them inflates the AR book and may misrepresent portfolio quality in credit reviews.
+===END===
+
+────────────────────────────────────────────────────────────────────────────────
+SUMMARY RESPONSE
+────────────────────────────────────────────────────────────────────────────────
+model  : claude-sonnet-4-6
+tokens : input=9791, output=2065
+cache  : created=0, read=0
+
+[RAW RESPONSE]
+===INSIGHT===
+sentiment: bad
+title: 100% of Receivables Sitting 120+ Days Overdue
+metric: RM 11,349,862
+summary: Every single outstanding invoice — 3,376 in total — is past the 120-day mark.
+---DETAIL---
+**Current Status:**
+- Total outstanding as of 2026-04-23: **RM 11,349,862** across 3,376 invoices and 227 active customers.
+- The entire receivables balance sits in the **120+ day overdue bucket** — 100% of total. There is no current or near-current portion.
+
+**Key Observations:**
+- All 227 customers with outstanding balances are classified as overdue — zero exceptions.
+- MY HERO HYPERMARKET carries the single largest balance at **RM 2,112,369** with 440 overdue days; MLF TRADING follows at **RM 1,137,069** with 203 overdue days.
+- Agent Caelen's portfolio carries the highest single-agent exposure at **RM 3,721,296** (378 invoices); agent Vincent follows at **RM 3,059,753** (945 invoices).
+
+| Agent | 120+ Outstanding | Invoice Count |
+|---------|-----------------|---------------|
+| Caelen | RM 3,721,296 | 378 |
+| Vincent | RM 3,059,753 | 945 |
+| Yuki | RM 2,774,068 | 969 |
+| Hao | RM 1,122,916 | 88 |
+| Huat | RM 454,260 | 549 |
+
+**Root Cause:** The 120+ day concentration is uniform across all agents and customer types, indicating a systemic collection failure rather than isolated account issues. No sub-120-day invoices remain open.
+
+**Implication:** The entire AR book is impaired — cash conversion is structurally broken and write-off risk is elevated across all 227 accounts.
+===END===
+
+===INSIGHT===
+sentiment: bad
+title: High-Risk Tier Owns 58% of All Outstanding
+metric: RM 6,587,823
+summary: Just 29 High-risk customers hold RM 6.59M — over half of total receivables.
+---DETAIL---
+**Current Status:**
+- 29 High-risk customers (8% of 375 total) hold **RM 6,587,822.96** — 58% of total outstanding as of 2026-04-23.
+- Every High-risk customer carries 100% overdue exposure (scores ≤ 23 per the score configuration).
+
+**Key Observations:**
+- MY HERO HYPERMARKET (score 20) alone holds **RM 2,112,369** at 440 overdue days — the single largest concentration in the portfolio.
+- MLF TRADING (score 18) holds **RM 1,137,069** at 203 overdue days; LO SIEW LIN (score 21) holds **RM 807,239** at 237 overdue days.
+- The remaining 141 Moderate-risk customers hold **RM 4,422,422** (39%), meaning High and Moderate tiers together account for 97% of all outstanding.
+
+| Customer | Outstanding | Credit Score | Max Overdue Days |
+|---|---|---|---|
+| MY HERO HYPERMARKET | RM 2,112,369 | 20 | 440 |
+| MLF TRADING | RM 1,137,069 | 18 | 203 |
+| LO SIEW LIN | RM 807,239 | 21 | 237 |
+| T & T FRESH | RM 246,369 | 4 | 193 |
+| SECRET RECIPE MFG | RM 238,380 | 8 | 202 |
+
+**Root Cause:** Credit scores are weighted 60% on utilization and 20% on timeliness — these accounts fail on both dimensions, having breached their limits and consistently paying late.
+
+**Implication:** Recovery of RM 6,587,822.96 is at material risk; a partial write-down of High-risk balances would significantly reduce reported net receivables.
+===END===
+
+===INSIGHT===
+sentiment: bad
+title: 21 Customers in Severe Credit Limit Breach
+metric: 21 customers
+summary: 21 customers exceed their credit limits, some by over 10x the approved ceiling.
+---DETAIL---
+**Current Status:**
+- 21 customers are Over Limit (≥100% utilization) as of 2026-04-23, with an additional 10 Near Limit (80–99%).
+- Credit limits for breach accounts are predominantly low (RM 20,000–RM 100,000), yet balances have been allowed to grow far beyond them.
+
+**Key Observations:**
+- SEASONS AGRO holds **RM 351,476** against a **RM 30,000** limit — **1,172% utilization**, the worst in the portfolio.
+- CS 88 FRUITS (594%) and YZ VEGE GROUP (264%) both carry limits of only RM 20,000, suggesting severely outdated limit-setting.
+- T & T FRESH and SECRET RECIPE MFG each hold limits of RM 100,000 yet carry outstandings of **RM 246,369** and **RM 238,380** respectively.
+
+| Customer | Credit Limit | Outstanding | Utilization |
+|---|---|---|---|
+| SEASONS AGRO | RM 30,000 | RM 351,476 | 1,172% |
+| CS 88 FRUITS | RM 20,000 | RM 118,719 | 594% |
+| YZ VEGE GROUP | RM 20,000 | RM 52,807 | 264% |
+| ST ROSYAM MART (SEMENYIH) | RM 30,000 | RM 75,170.47 | 251% |
+| T & T FRESH | RM 100,000 | RM 246,369.06 | 246% |
+
+**Root Cause:** Credit limits appear to have never been revised to reflect actual trading volumes, while deliveries continued uninterrupted — creating a compounding exposure gap.
+
+**Implication:** Without enforcement of credit holds, the 10 Near-Limit customers are the next breach cohort if collections do not accelerate.
+===END===
+
+===INSIGHT===
+sentiment: bad
+title: Ghost Debts: Active Balances 5+ Years Overdue
+metric: 1,873 days
+summary: Five accounts show max overdue days above 1,457 — some unpaid since 2021.
+---DETAIL---
+**Current Status:**
+- Five customers recorded overdue periods of **1,457 to 1,873 days** (roughly 4–5 years), yet still carry active outstanding balances as of 2026-04-23.
+- All five are classified **Moderate** risk — indicating the scoring model does not fully penalise extreme ageing on low-balance accounts.
+
+**Key Observations:**
+- PRIMA FRESH MART (CTOS-flagged) is the oldest at **1,873 days** overdue with **RM 13,591.60** outstanding.
+- LEONG HING TRADING at **1,850 days** holds the largest balance in this cohort at **RM 15,000**.
+- All five accounts carry CTOS or LONPAC flags, indicating known prior credit events on record.
+
+| Customer | Max Overdue Days | Outstanding |
+|---|---|---|
+| PRIMA FRESH MART (CTOS) | 1,873 days | RM 13,591.60 |
+| LEONG HING TRADING | 1,850 days | RM 15,000 |
+| JACKMART MALAYSIA (LONPAC/CTOS) | 1,850 days | RM 3,261.10 |
+| JEA TRADING (LONPAC/CTOS) | 1,795 days | RM 3,000.68 |
+| BL FRESH (LONPAC) | 1,457 days | RM 4,401.50 |
+
+**Root Cause:** Balances have not been written off despite multi-year delinquency and known insolvency flags, overstating gross receivables and masking true collection quality.
+
+**Implication:** These balances are virtually unrecoverable; retaining them inflates the AR book and may misrepresent portfolio quality in credit reviews.
+===END===
+
+════════════════════════════════════════════════════════════════════════════════
+
+────────────────────────────────────────────────────────────────────────────────
+NUMERIC GUARD — Attempt 2
+────────────────────────────────────────────────────────────────────────────────
+Passed    : true
+Unmatched : 0
+
+
+════════════════════════════════════════════════════════════════════════════════
+SESSION COMPLETE
+════════════════════════════════════════════════════════════════════════════════
+Components analyzed : 6
+Total tokens        : 40097
+Estimated cost      : $0.1678 USD
+Finished at         : 2026-05-07T13:19:15.686Z
+════════════════════════════════════════════════════════════════════════════════
