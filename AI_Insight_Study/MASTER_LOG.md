@@ -27,13 +27,13 @@
 | 0   | Baseline (post-RDS migration, post-prompt-trim) | ✅ done | $0.141 | — | 9/10 | 2 | 2026-04-28 | See `01_baseline.md` |
 | 1   | Fix numeric guard whitelist | ✅ done | $0.134 | −$0.007 (−5%) | 10/10 | 0 | 2026-04-28 | See `03_iteration_01_fix_guard.md`. Guard now passes (was always failing). Real hallucinations still caught. |
 | 2   | Add column-schema hint to tool description (re-scoped from system prompt per user) | ❌ reverted | $0.169 | +$0.035 (+26%) | 10/10 | 0 | 2026-05-07 | See `03_iteration_02_schema_hint.md`. Eliminated `Columns not allowed` errors (0/run vs 2/run baseline) but +700-token tool description bloat triggered cost regression. Quality unchanged. |
-| 3   | Drop MAX_TOOL_CALLS_PER_SUMMARY from 4 → 2 | ⏸ skipped | — | — | — | — | 2026-05-07 | Subsumed by Iter 9 (set tool policy to 'none' — tools off makes the cap moot). Per user decision 2026-05-07. |
 | 4   | Pre-compute subtotals + strengthen no-arithmetic rule | ⏳ pending | — | — | — | — | — | Spec: 02_analysis.md §Iter 4 |
 | 5   | Enable prompt caching | ⏳ pending | — | — | — | — | — | Spec: 02_analysis.md §Iter 5 |
 | 6   | Combine 6 Haiku component calls → 1 (tech lead tip #5) | ⏳ pending | — | — | — | — | — | Spec: 02_analysis.md §Iter 6 |
 | 7   | Pre-fetch agent/type breakdown + avg_payment_days | ⏳ pending | — | — | — | — | — | Spec: 02_analysis.md §Iter 7 |
 | 8   | Switch summary model Sonnet → Haiku | ⏳ pending | — | — | — | — | — | Spec: 02_analysis.md §Iter 8 |
-| 9   | Tool reduction (set policy to 'none') ⭐ LAST | ⏳ pending | — | — | — | — | — | Spec: 02_analysis.md §Iter 9 |
+| 3   | Drop MAX_TOOL_CALLS_PER_SUMMARY from 4 → 2 ⭐ LAST | ⏳ pending | — | — | — | — | — | Spec: 02_analysis.md §Iter 3. Re-ordered to LAST 2026-05-07 (replaces removed Iter 9). |
+| 9   | ~~Tool reduction (set policy to 'none')~~ | ❌ removed | — | — | — | — | 2026-05-07 | Removed — tools are essential for drill-down evidence (per-customer overdue days, agent breakdowns). Saving (~$0.002) doesn't justify insight degradation. |
 
 **Status legend:** ✅ done · ❌ reverted · ⏸ skipped · ⏳ pending · 🔄 in progress
 
@@ -42,13 +42,13 @@
 ## Cumulative Trajectory (Update after each iteration)
 
 ```
-Iter:    0       1       2       3⏸     4       5       6       7       8       9
-Cost:  $0.141  $0.134  $0.169✗ skip   $___    $___    $___    $___    $___    $___
-Qual:   9/10   10/10   10/10   skip   __/10   __/10   __/10   __/10   __/10   __/10
+Iter:    0       1       2       4       5       6       7       8       3 (last)    9
+Cost:  $0.141  $0.134  $0.169✗ $___    $___    $___    $___    $___    $___        removed
+Qual:   9/10   10/10   10/10   __/10   __/10   __/10   __/10   __/10   __/10       —
 ```
-(Iter 2 reverted — cost regressed +26%; baseline remains $0.134. Iter 3 skipped — subsumed by Iter 9.)
+(Iter 2 reverted — cost regressed +26%; baseline remains $0.134. Iter 9 removed — tools needed for drill-down. Iter 3 moved to LAST as the safe tool-reduction fallback.)
 
-**Final target:** $0.010/click, quality ≥8/10
+**Final target:** ~$0.012/click, quality ≥10/10 (revised 2026-05-07; was $0.010 with Iter 9 tool-off, but Iter 9 removed since tools are essential for drill-down evidence)
 
 ---
 
@@ -69,7 +69,10 @@ Qual:   9/10   10/10   10/10   skip   __/10   __/10   __/10   __/10   __/10   __
 - **2026-04-28** Re-ordered: tool reduction moved to LAST iteration (was originally Iter 1) — build confidence with low-risk fixes first. Per user request.
 - **2026-05-07** Iter 2 re-scoped before implementation: original spec placed column hint in `SUMMARY_SYSTEM` (global summary prompt). User redirected to tool description in `tools.ts` since that's where column constraints belong. Tested → reverted (cost regression). Active baseline remains Iter 1 ($0.134, 10/10).
 - **2026-05-07** Pre-existing bug exposed by Iter 2: `pc_ar_aging_history.dimension_key` is in `LOCAL_WHITELIST` but the actual table column doesn't exist. Caused 1 SQL execution error per run in both Iter 2 runs. Action: drop from whitelist OR add column to table. **Not fixed in this study** (out of scope); track separately.
-- **2026-05-07** Iter 3 SKIPPED — subsumed by Iter 9. Iter 3 (cap tool calls at 2) is meaningless once Iter 9 (tools off entirely) ships. Doing both is redundant. New sequence: 4 → 5 → 6 → 7 → 8 → 9. Per user decision.
+- **2026-05-07** Iter 9 REMOVED. Original plan was to disable tools entirely; user pushed back: tools are essential for the LLM to drill into specific customers/agents/months and surface concrete evidence in insights. Iter 2 logs proved this — Sonnet's tool calls produced the agent breakdown (Caelen RM 3.7M, Vincent RM 3.0M) and "Ghost Debts" insight (PRIMA FRESH MART 1,873 days overdue). Removing tools would regress insight quality for ~$0.002 savings — not worth it.
+- **2026-05-07** Iter 3 RE-ORDERED to LAST. With Iter 9 removed, capping tool calls at 2 (instead of 4) becomes the safe tool-reduction step — keeps drill-down capability, removes wasted exploratory calls. Final sequence: 4 → 5 → 6 → 7 → 8 → 3.
+- **2026-05-07** Final target revised: ~$0.012/click (was $0.010 with Iter 9). Trade $0.002 for keeping tools enabled.
+- **2026-05-07** Bug fix (separate from study): removed `dimension_key` from `pc_ar_aging_history` whitelist in `tools.ts`. The actual table has no `dimension_key` column (verified via `\d pc_ar_aging_history`). The whitelist falsely advertised it, causing 1 SQL error per run when Sonnet used it. Fix: drop from whitelist (cleaner than altering the table since the dimension structure here is just `dimension` text alone, no key/value split).
 
 ---
 
