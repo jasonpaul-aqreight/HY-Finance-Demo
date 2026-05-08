@@ -32,6 +32,11 @@ const SUMMARY_MAX_TOKENS = 4096; // Summary needs more tokens for tool reasoning
 const RATE_LIMIT_RETRIES = 3;
 const RATE_LIMIT_BASE_DELAY_MS = 15_000; // 15s base backoff for rate limits
 
+// Validation Study toggle: when "1", strip cache_control markers so baseline runs
+// produce a true pre-Iter-5 measurement. Default (unset/0) keeps caching ON.
+const VALIDATION_BASELINE = process.env.AI_INSIGHT_VALIDATION_BASELINE === '1';
+const CACHE_MARKER = VALIDATION_BASELINE ? {} : { cache_control: { type: 'ephemeral' as const } };
+
 export interface ProgressCallback {
   (component: string, status: 'analyzing' | 'complete' | 'error', message?: string): void;
 }
@@ -181,8 +186,8 @@ async function analyzeComponent(
   // Fetch dashboard data for this component
   const { prompt: formattedValues, allowed } = await fetchComponentData(componentKey, sectionKey, dateRange, fiscalPeriod);
 
-  const systemPrompt = getGlobalSystemPrompt();
-  const userPrompt = buildComponentUserPrompt({
+  const systemPrompt = await getGlobalSystemPrompt();
+  const userPrompt = await buildComponentUserPrompt({
     componentKey,
     sectionKey,
     componentName,
@@ -214,7 +219,7 @@ async function analyzeComponent(
       model: AI_MODEL,
       max_tokens: MAX_TOKENS,
       system: [
-        { type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } },
+        { type: 'text', text: systemPrompt, ...CACHE_MARKER },
       ],
       messages: [{ role: 'user', content: userPrompt }],
     }),
@@ -259,7 +264,7 @@ async function runSummaryAnalysis(
   const client = getAnthropicClient();
   const components = SECTION_COMPONENTS[sectionKey];
 
-  const systemPrompt = getSummarySystemPrompt();
+  const systemPrompt = await getSummarySystemPrompt();
   const userPrompt = buildSummaryUserPrompt({
     sectionKey,
     dateRange,
@@ -418,7 +423,7 @@ async function runSummaryAgentLoop(p: AgentLoopParams): Promise<AgentLoopResult>
         model: SUMMARY_MODEL,
         max_tokens: SUMMARY_MAX_TOKENS,
         system: [
-          { type: 'text', text: p.systemPrompt, cache_control: { type: 'ephemeral' } },
+          { type: 'text', text: p.systemPrompt, ...CACHE_MARKER },
         ],
         ...(includeTools ? { tools: p.sectionTools } : {}),
         messages: p.messages,
