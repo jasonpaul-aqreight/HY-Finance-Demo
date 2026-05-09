@@ -192,6 +192,108 @@ export default function AiInsightPage() {
         If no analysis has been run yet, it will say &ldquo;No analysis available.&rdquo;
       </Callout>
 
+      {/* ─── Behind the Scenes ─── */}
+
+      <h2 className="text-xl font-semibold text-foreground">Behind the Scenes</h2>
+
+      <p className="text-base text-foreground">
+        Curious what happens after you click <strong>Analyze</strong>? Each click triggers a{' '}
+        <strong>two-stage pipeline</strong> that talks to Claude (Anthropic&apos;s LLM) using two
+        different models for speed and quality.
+      </p>
+
+      <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 overflow-x-auto">
+        <pre className="font-mono text-xs leading-relaxed text-slate-800 whitespace-pre">
+{`┌─────────────────────────────────────────────────────┐
+│              Click "Get Insight"                    │
+└──────────────────────┬──────────────────────────────┘
+                       ▼
+┌─────────────────────────────────────────────────────┐
+│  Stage 1 — Components  (Haiku 4.5)                  │
+│  N parallel API calls, one per component            │
+│  Output: short "Key Observations" bullets           │
+└──────────────────────┬──────────────────────────────┘
+                       │  outputs feed into
+                       ▼
+┌─────────────────────────────────────────────────────┐
+│  Stage 2 — Summary  (Sonnet 4.6)                    │
+│  1 API call + database tool access                  │
+│  Output: section insights with evidence             │
+└──────────────────────┬──────────────────────────────┘
+                       ▼
+                Insight Panel UI`}
+        </pre>
+      </div>
+
+      {/* ─── Stage 1 ─── */}
+
+      <h3 className="text-lg font-semibold text-foreground mt-4">Stage 1 — Component calls</h3>
+
+      <p className="text-base text-foreground">
+        Every KPI, chart, and table on the section gets its own request. They run{' '}
+        <strong>in parallel</strong> for speed. Each request carries the same{' '}
+        <strong>Dashboard Component Prompt</strong> (the system prompt) and a per-component user
+        message containing the live numbers from the page.
+      </p>
+
+      <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 overflow-x-auto">
+        <pre className="font-mono text-xs leading-relaxed text-slate-800 whitespace-pre">
+{`┌─────────── Anthropic API Request ──────────┐
+│ system:  ┌─ Dashboard Component Prompt ─┐  │
+│          │ "You are a senior…"          │  │  cached
+│          │ Output: Key Observations…    │  │
+│          └──────────────────────────────┘  │
+│                                            │
+│ messages: ┌─ user ──────────────────────┐  │
+│           │ <Component Prompt>          │  │  per-component
+│           │ <Live data block>           │  │  per-component
+│           └─────────────────────────────┘  │
+└────────────────────────────────────────────┘`}
+        </pre>
+      </div>
+
+      {/* ─── Stage 2 ─── */}
+
+      <h3 className="text-lg font-semibold text-foreground mt-4">Stage 2 — Summary call</h3>
+
+      <p className="text-base text-foreground">
+        Once all component analyses come back, the engine builds <strong>one</strong> summary
+        request. The user message is <em>auto-built</em>: it stitches every component&apos;s output
+        together so the summary model can synthesize across the whole section. The{' '}
+        <strong>Summary Insight Prompt</strong> enforces a strict output format
+        (<code>===INSIGHT===…===END===</code>) so the panel can parse it reliably. The model also
+        has access to two database tools to drill down for evidence (e.g. top customers, monthly
+        breakdowns).
+      </p>
+
+      <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 overflow-x-auto">
+        <pre className="font-mono text-xs leading-relaxed text-slate-800 whitespace-pre">
+{`┌─────────── Anthropic API Request ──────────┐
+│ system:  ┌─ Summary Insight Prompt ─────┐  │
+│          │ "You are a senior…"          │  │
+│          │ Output: ===INSIGHT===…       │  │
+│          │         …===END===           │  │
+│          └──────────────────────────────┘  │
+│                                            │
+│ messages: ┌─ user (auto-built) ─────────┐  │
+│           │ Section: <name>             │  │
+│           │ === Component A ===         │  │
+│           │ <Haiku analysis A>          │  │
+│           │ === Component B ===         │  │
+│           │ <Haiku analysis B>          │  │
+│           └─────────────────────────────┘  │
+│                                            │
+│ tools: [query_local, query_rds]            │
+└────────────────────────────────────────────┘`}
+        </pre>
+      </div>
+
+      <Callout type="info" title="Why two models?">
+        <strong>Haiku 4.5</strong> is fast and cheap — perfect for analyzing each component in
+        parallel. <strong>Sonnet 4.6</strong> is stronger at synthesis and reasoning across
+        multiple inputs — ideal for the section-level summary that powers the insight cards.
+      </Callout>
+
       {/* ─── Important Notes ─── */}
 
       <h2 className="text-xl font-semibold text-foreground">Important Notes</h2>

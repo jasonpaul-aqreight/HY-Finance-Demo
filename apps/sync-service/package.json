@@ -10,6 +10,7 @@
     "sync": "tsx src/run-sync.ts"
   },
   "dependencies": {
+    "dotenv": "^17.4.2",
     "express": "^4.21.0",
     "node-cron": "^3.0.3",
     "pg": "^8.13.0"

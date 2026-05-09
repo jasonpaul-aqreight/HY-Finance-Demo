@@ -9,7 +9,7 @@
 The AI Insight Engine lets senior directors get analyst-grade summaries of any dashboard section with a single click, without leaving the dashboard. It answers:
 
 - What are the most important positive and negative findings in this section?
-- What is the root cause behind each finding?
+- What is the root cause & supporting evidence behind each finding?
 - What does each individual chart, KPI, or table tell us?
 
 The engine is domain-agnostic — it provides the analysis machinery, while domain-specific configuration (prompts, data sources, thresholds) is supplied separately.
@@ -459,19 +459,95 @@ Each domain PRD (docs 11 and 12) lists the specific summary questions per sectio
 
 ---
 
-## 17. RBAC (Role-Based Access Control)
+## 17. Summary System Prompt Template
 
-Each domain defines its own RBAC rules. The base engine provides the hooks:
+Each domain must define a **summary system prompt** used during Phase 2 (summary synthesis). The prompt follows this shared structure:
 
-- **Server-side:** Data-scoping service injects role-based filters into every fetcher query.
-- **Client-side:** UI hides/shows the "Analyze" button based on user role.
-- **Cache scoping:** When different users see different data, storage must include `user_id` in the unique constraint.
+### Required Sections in Summary Prompt
+
+1. **Persona** — domain-specific analyst role (e.g., "You are a senior financial analyst..." or "You are an HR analyst...")
+2. **Output format** — reference to the `===INSIGHT===` delimiter format (see §12)
+3. **Insight limits** — max 3 good + 3 bad insights, ranked by business impact
+4. **Ground truth rule** — every number must trace to the raw data blocks or tool results. No fabrication.
+5. **Sub-period citation rule** — can only cite pre-computed averages, not manually average monthly values
+6. **Scope-appropriate language** — must match the section's scope type (period, snapshot, fiscal_period)
+7. **Deterministic questions** — the section's fixed questions (see §16)
+8. **Detail structure** — mandatory sections for the `---DETAIL---` block:
+   - **Current Status** — headline number + business meaning
+   - **Key Observations** — 2–4 bullets with non-obvious patterns
+   - **Supporting Evidence / Root Cause** — markdown table (3+ rows) or 3–5 specific bullets
+   - **Implication** — 1–2 bullets on business consequence
+9. **Tool guidance** — what tools are available, what NOT to re-query (data already in raw blocks), and the early-stop rule: skip tools entirely if raw data already supports a well-evidenced answer
+
+### Domain-Specific Rules
+
+Each domain adds rules specific to its data:
+
+- **Finance:** Currency format (RM with thousands separators), verbatim-copy rule, component word limit (150), summary word limit (220–320)
+- **HR:** PII ban (never reference employee names/IDs), department-level language only, threshold awareness (pre-flagged data, don't re-evaluate)
+
+Each domain PRD (docs 11 and 12) includes the full domain-specific summary prompt text.
+
+---
+
+## 18. RBAC (Role-Based Access Control)
+
+Each domain defines its own RBAC rules. The base engine provides the implementation pattern:
+
+### 18.1 Three Enforcement Layers
+
+| Layer | What It Does | Who Defines It |
+|-------|-------------|----------------|
+| **Server-side route guard** | Reject unauthorized roles with 403 on `/analyze` and `/cancel` | Domain PRD |
+| **Client-side UI guard** | Hide/show "Analyze" button via role context hook | Domain PRD |
+
+### 18.2 Cache Strategy
+
+All domains use the same shared-cache pattern: `UNIQUE(page, section_key)` — one stored result per section. Analysis always runs against the full dataset (not scoped per user). All authorized viewers see the same insight.
+
+### 18.3 What Each Domain PRD Must Define
+
+1. **Role table** — which roles can trigger analysis, which can view insights, which are denied
+2. **Trigger restriction** — which roles can trigger (typically admin/HR only), all other authorized roles view the shared result
 
 See each domain PRD for specific role definitions and access rules.
 
 ---
 
-## 18. Extensibility Contract
+## 19. Threshold Strategy
+
+Each domain defines performance thresholds that determine whether a metric is "good," "warning," or "critical." The base engine supports two approaches:
+
+### 19.1 Hardcoded Thresholds (Finance Pattern)
+
+Thresholds are embedded directly in the component prompt text and the PRD component tables.
+
+- Simple, no database dependency
+- Changed by editing prompts and redeploying
+- Example: "Collection Rate ≥80% Good, ≥50% Warning, <50% Critical"
+
+### 19.2 Configurable Thresholds (HR Pattern)
+
+Thresholds are stored in a settings table and loaded at analysis time. Fetchers pre-flag data against these thresholds before sending to the AI.
+
+- Admin-configurable via Settings UI without code changes
+- AI sees "flagged / not-flagged" — does not re-evaluate raw numbers against thresholds
+- Example: `alert_chronic_lateness.threshold = 3` → fetcher flags employees with ≥3 late days
+
+### 19.3 Pre-Flagging Pattern
+
+When using configurable thresholds, the fetcher (not the AI) evaluates data against thresholds:
+
+1. **Settings loader** batch-fetches all threshold categories from the settings table
+2. **Fetcher** applies thresholds to compute flags (e.g., "flagged_chronic_lateness: true")
+3. **AI prompt** receives flagged results — instructed not to re-evaluate
+4. **Frontend** also displays flags in the dashboard UI (dual use)
+
+Each domain PRD lists its specific thresholds and whether they are hardcoded or configurable.
+
+---
+
+## 20. Extensibility Contract
 
 The base engine is domain-agnostic. To add a new domain, provide:
 
@@ -489,17 +565,17 @@ The base engine is domain-agnostic. To add a new domain, provide:
 
 ---
 
-## 19. Implementation Guardrails
+## 21. Implementation Guardrails
 
 These patterns were discovered during implementation and validated through accuracy testing. They prevent specific classes of bugs — removing any of them reintroduces known failures.
 
-### 19.1 Pre-Calculated Totals in Fetchers
+### 21.1 Pre-Calculated Totals in Fetchers
 
 Data fetchers that pass monthly breakdowns must also include pre-calculated totals, ratios, and percentages in the prompt output. The component-analysis model (Haiku) cannot do arithmetic reliably — it summed 12 monthly values incorrectly (RM 87M vs actual RM 82M) and hallucinated percentages (claimed 95% when actual was 58%).
 
 All fetchers include a `"Pre-calculated roll-ups (use these values directly — do not recompute)"` block above their data tables.
 
-### 19.2 Tool Call Exhaustion Nudge
+### 21.2 Tool Call Exhaustion Nudge
 
 When the summary uses all allowed tool calls, the orchestrator injects a user message:
 
@@ -507,27 +583,27 @@ When the summary uses all allowed tool calls, the orchestrator injects a user me
 
 Without this nudge, the model outputs reasoning text instead of the required delimiter format, causing the parser to fall back to a generic output.
 
-### 19.3 Snapshot Table Deduplication
+### 21.3 Snapshot Table Deduplication
 
 The `pc_ar_customer_snapshot` table contains multiple rows per customer (one per snapshot date). Tool queries against this table are automatically deduplicated by the tool executor: filter to latest `snapshot_date` and apply `DISTINCT ON (debtor_code)`.
 
 Without deduplication, a "top 10 customers" query returns duplicate rows of the same customers, making root-cause analysis useless.
 
-### 19.4 Summary Tool Call Guidance
+### 21.4 Summary Tool Call Guidance
 
-The summary system prompt explicitly instructs the LLM not to re-query data already available in the raw data blocks. Without this guidance, the summary wastes both tool calls re-querying monthly data already available, leaving none for actual root-cause investigation.
+The summary system prompt explicitly instructs the LLM not to re-query data already available in the raw data blocks, and to skip tools entirely if the raw data already supports a well-evidenced answer. Without the no-requery rule, the summary wastes both tool calls re-querying monthly data already available, leaving none for actual root-cause investigation. Without the early-stop rule, the model burns tool calls on sections where Phase 1 data is already sufficient.
 
-### 19.5 Summary Reads Raw Fetcher Data, Not Narrations
+### 21.5 Summary Reads Raw Fetcher Data, Not Narrations
 
 The summary stage receives the raw fetcher markdown blocks (the same formatted string each component originally saw) — NOT the Haiku component narrations. The `ComponentResult` type carries a `raw_data_md` field populated from the fetcher output. The summary system prompt enforces a GROUND TRUTH RULE: every number must be traceable to a specific line in the raw blocks or to a tool-call result.
 
 Without this, the summary model invents numbers to fill tables because narrations (~150 words) don't contain source values. This single fix eliminated all hard fabrications across ~115 numeric claims.
 
-### 19.6 Population Labels
+### 21.6 Population Labels
 
 Each data fetcher includes a population label in its output header describing which records are included (e.g., "Population: active customers only (is_active = 'T')"). This prevents the LLM from cross-referencing numbers between components that use different populations and getting confused by the mismatch.
 
-### 19.7 Active Customer Filtering
+### 21.7 Active Customer Filtering
 
 Fetchers that query `pc_ar_customer_snapshot` apply different `is_active` filters depending on the query purpose:
 
@@ -540,9 +616,9 @@ Fetchers that query `pc_ar_customer_snapshot` apply different `is_active` filter
 
 ---
 
-## 20. Known Limitations & Gaps
+## 22. Known Limitations & Gaps
 
-### 20.1 Implemented Behaviors
+### 22.1 Implemented Behaviors
 
 | Item | Detail | Impact |
 |---|---|---|
@@ -551,7 +627,7 @@ Fetchers that query `pc_ar_customer_snapshot` apply different `is_active` filter
 | Data-fetcher date format | `toMonth()` helper converts `YYYY-MM-DD` to `YYYY-MM` for `pc_ar_monthly` queries. Without this, string comparison silently excludes the first month. | Low |
 | Blocked PII columns | `attention, phone1, mobile, email_address` are not in column whitelists — implicitly blocked from AI access. | Medium |
 
-### 20.2 Required — Not Yet Implemented
+### 22.2 Required — Not Yet Implemented
 
 These safety rules must be enforced in code before HR goes live:
 

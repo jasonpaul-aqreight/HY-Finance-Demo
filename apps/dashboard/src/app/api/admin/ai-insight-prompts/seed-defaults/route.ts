@@ -8,6 +8,8 @@ import {
   DEFAULT_GLOBAL_SYSTEM,
   DEFAULT_SUMMARY_SYSTEM,
   DEFAULT_COMPONENT_PROMPTS,
+  DEFAULT_FEEDBACK_ROUTER_SYSTEM,
+  DEFAULT_SURGICAL_EDITOR_SYSTEM,
 } from '@/lib/ai-insight/prompts-defaults';
 import {
   SECTION_COMPONENTS,
@@ -53,6 +55,28 @@ function buildSeedRows(): SeedRow[] {
       component_type: null,
       display_name: 'Summary System Prompt',
       sort_order: 1,
+    },
+    {
+      prompt_key: 'feedback_router_system',
+      prompt_text: DEFAULT_FEEDBACK_ROUTER_SYSTEM,
+      category: 'system',
+      page: null,
+      section_key: null,
+      section_name: null,
+      component_type: null,
+      display_name: 'Feedback Router Prompt',
+      sort_order: 2,
+    },
+    {
+      prompt_key: 'surgical_editor_system',
+      prompt_text: DEFAULT_SURGICAL_EDITOR_SYSTEM,
+      category: 'system',
+      page: null,
+      section_key: null,
+      section_name: null,
+      component_type: null,
+      display_name: 'Surgical Editor Prompt',
+      sort_order: 3,
     },
   ];
 

@@ -4,6 +4,7 @@
  * - node-cron scheduler for automated syncs
  */
 
+import 'dotenv/config';
 import express from 'express';
 import cron from 'node-cron';
 import { Pool } from 'pg';

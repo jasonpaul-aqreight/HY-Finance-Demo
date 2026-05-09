@@ -14,9 +14,10 @@
 
 ## Current State
 
-**Active pilot:** `financial_variance` (Financial page) — caching test on payment_outstanding complete; returning to financial_variance for Iter 6+.
-**`payment_outstanding` end-state (post-Iter-5):** $0.11525 / 10/10 / 0 hallucinations. Caching change kept; ready to apply to financial_variance baseline going forward.
-**`financial_variance` baseline (Iter 0, pre-cache):** $0.1494 / 9/10 / ~2 mild hallucinations per run. Details: `01_baseline_financial_variance.md`. **Iter 5 caching is now live in the codebase** → next click on `financial_variance` will benefit from it; expect new effective baseline ~$0.134 (−10% from $0.149) before Iter 6.
+**Active pilot:** `financial_variance` (Financial page).
+**Open decision:** Iter 8 (Sonnet→Haiku for summary) **deferred** pending Iter 8.1 (OpenRouter primary + Claude SDK fallback). Iter 8 code change has been **reverted** in `client.ts:17` (working tree clean, Sonnet is the active default again) per user direction — 8.1 will start from a clean pre-Iter-8 baseline. **Next session must run Iter 8.1.** If 8.1 succeeds, Claude Haiku will be re-applied as the SDK fallback model; if 8.1 fails, no further revert is needed.
+**`payment_outstanding` end-state (post-Iter-5):** $0.11525 / 10/10 / 0 hallucinations. Caching change kept. Iter 8 tested here for arithmetic stress test → regressed to 7.5/10 (Haiku fabricates derived sums).
+**`financial_variance` end-state (post-Iter-5 codebase, post-Iter-8 measured):** Iter 8 measured cost = $0.0410, quality 9/10, 0 hallucinations on Haiku — held strict bar. Pre-Iter-8 baseline (post-cache) ≈ $0.135. Original Iter 0 baseline (pre-cache): $0.1494 / 9/10. Details: `01_baseline_financial_variance.md`, `03_iteration_08_haiku_summary.md`.
 
 ---
 
@@ -39,9 +40,10 @@
 | 0   | Baseline (financial_variance, post-Iter-1 codebase) | ✅ done | $0.1494 | — | 9/10 | ~2 (mild ratios) | 2026-05-07 | See `01_baseline_financial_variance.md`. Guard passes 0 unmatched, but 3 of 4 tool calls fail with "Columns not allowed" — wasted ~$0.057/run on retries. |
 | 4   | Pre-compute subtotals + strengthen no-arithmetic rule | ⏸ deferred | — | — | — | — | 2026-05-07 | Spec: 02_analysis.md §Iter 4. Component prompts already include the no-arith rule; only mild ratio infractions slip through. Saving < $0.005, quality 9→10 ceiling — low ROI on this section. |
 | 5   | Enable prompt caching | ⏸ tested on payment_outstanding | — | — | — | — | 2026-05-07 | Iteration moved to payment_outstanding section above for pure cost test. See that row + `03_iteration_05_caching.md`. |
-| 6   | Combine 4 Haiku component calls → 1 | ⏳ pending | — | — | — | — | — | Spec: 02_analysis.md §Iter 6 (rescoped 6→4 components for this section) |
+| 6   | Combine 4 Haiku component calls → 1 | ⏸ skipped | — | — | — | — | 2026-05-07 | Spec: 02_analysis.md §Iter 6. Skipped — Haiku component cost is ~$0.015/run (10% slice); est. saving ~$0.008 (~5%) too small to confidently distinguish from run-to-run noise. Iter 8 (Sonnet→Haiku for summary) attacks the 90% slice with 10× more headroom. Revisit only if Iter 8 lands and we still need cost cuts. |
 | 7   | Pre-fetch monthly P&L by category | ❌ reverted | $0.1546 | +$0.0052 (+3.5%) | 10/10 | 0 | 2026-05-07 | See `03_iteration_07_pre_fetch.md`. Spec assumption ("pre-fetch → fewer tool calls") was wrong: Sonnet still queries even when data is in block. Quality genuinely improved (9→10) with timing insights, but cost increased. User chose strict cost discipline — reverted. **Lesson:** pre-fetching is a quality lever, not a cost lever, until paired with explicit no-query instruction or `MAX_TOOL_CALLS` cap (Iter 3). |
-| 8   | Switch summary model Sonnet → Haiku | ⏳ pending | — | — | — | — | — | Spec: 02_analysis.md §Iter 8 |
+| 8   | Switch summary model Sonnet → Haiku | ⏸ deferred (decision pending Iter 8.1; code reverted in working tree) | $0.0410 | −$0.094 (−69.6%) | 9/10 | 0 | 2026-05-07 | See `03_iteration_08_haiku_summary.md`. Cost target hit cleanly on financial_variance. Tested on **both** pilots: payment_outstanding regressed 10/10→7.5/10 (Haiku fabricates derived sums; guard misses arithmetic hallucinations); financial_variance held 9/10→9/10 with 0 hallucinations (pre-computed variance data plays to Haiku's strengths). User chose to defer keep/revert until Iter 8.1 (OpenRouter study) outcome. **Code change in `client.ts:17` has been reverted** to Sonnet default; working tree clean. If 8.1 succeeds, Haiku will be re-applied as the SDK fallback. |
+| 8.1 | OpenRouter primary + Claude SDK fallback (`z-ai/glm-5.1` @ Z.ai provider, $1.40/$4.40/$0.26 cache per M, 202k ctx, reasoning model; user policy: reasoning OFF for components, ON for summary) | ⏳ pending (next session) | — | — | — | — | — | Spec: 02_analysis.md §Iter 8.1. **Cost projection ~$0.13/click — near Sonnet baseline ($0.135), ~3× Iter-8 Haiku ($0.041).** Iter 8.1 is a quality + diversification play, not a cost play. Decision rule: adopt only if (a) tools work, (b) quality ≥ baseline on BOTH pilots, (c) payment_outstanding hallucinations = 0, (d) cost ≤ Sonnet baseline. **Hard prerequisite: pre-flight tool-calling probe before any orchestrator code is written.** Credential: `OPEN_ROUTER_API` in project-root `.env` (verify Next.js dashboard loads it). |
 | 3   | Drop MAX_TOOL_CALLS_PER_SUMMARY from 4 → 2 ⭐ LAST | ⏳ pending | — | — | — | — | — | Spec: 02_analysis.md §Iter 3 |
 
 **Status legend:** ✅ done · ❌ reverted · ⏸ skipped · ⏳ pending · 🔄 in progress
@@ -61,14 +63,14 @@ Qual:   9/10   10/10   10/10           10/10
 ### `financial_variance` (current pilot)
 
 ```
-Iter:    0           7 (reverted)   5 (codebase)*  6           4           8           3 (last)
-Cost:  $0.1494     $0.1546✗        ~$0.135 est    $___        $___        $___        $___
-Qual:   9/10       10/10           9/10 expected  __/10       __/10       __/10       __/10
+Iter:    0           7 (reverted)   5 (codebase)*  6 (skipped)   8 (deferred)  8.1          4           3 (last)
+Cost:  $0.1494     $0.1546✗        ~$0.135 est    —             $0.0410⏸     $___          $___        $___
+Qual:   9/10       10/10           9/10 expected  —             9/10⏸        __/10         __/10       __/10
 ```
 
-\* Iter 5 (caching) was tested on `payment_outstanding`, not measured directly here, but the codebase change is live for `financial_variance` too. Expected effective baseline ≈ $0.135 (−10% from $0.149) when next click on financial_variance fires. Will be confirmed by the first Iter 6 run.
+\* Iter 5 (caching) was tested on `payment_outstanding`, not measured directly here, but the codebase change is live for `financial_variance` too. Expected effective baseline ≈ $0.135 (−10% from $0.149) when next click on financial_variance fires. Confirmed by Iter 8 baseline measurement.
 
-(Iter 7 reverted — cost +3.5% even though quality went 9→10. Iter 5 (caching) kept — −14% on payment_outstanding A/B. Order for next iteration: Iter 6 (combine 4→1 Haiku) is the next big lever; Iter 8 (Sonnet→Haiku) is the bigger but riskier final cost play.)
+(Iter 7 reverted — cost +3.5% even though quality went 9→10. Iter 5 (caching) kept — −14% on payment_outstanding A/B. Iter 6 SKIPPED 2026-05-07 (Haiku slice too small to give clean signal). Iter 8 (Sonnet→Haiku) tested on both pilots 2026-05-07: financial_variance held quality at -70% cost; payment_outstanding regressed (Haiku can't synthesize derived sums). Decision deferred pending **Iter 8.1 — OpenRouter primary + Claude SDK fallback** as alternative path to Haiku-class cost without arithmetic regression.)
 
 **Final target (revised 2026-05-07 for new pilot):** ~$0.05–$0.06/click on `financial_variance` (60% reduction from $0.149 baseline), quality ≥9/10. Ambition is more conservative than payment_outstanding's old target because (a) the section starts cleaner — guard already passing, hallucinations only mild — and (b) Sonnet → Haiku swap (Iter 8, biggest lever) carries higher quality risk on a financial-variance analysis than on AR analysis.
 
@@ -87,6 +89,8 @@ Qual:   9/10       10/10           9/10 expected  __/10       __/10       __/10 
 - (Iter 7 / REVERTED) **Spec assumption broken: pre-fetching does NOT cause Sonnet to skip tool calls.** Pre-fetched the monthly P&L lines + monthly OpEx by category. Sonnet *did* use the new data productively (now writes timing-specific insights: "Feb 2025 was the peak month at RM 2,177,107 — 24.1% of FY total", "depreciation booked entirely in Feb 2025 as bulk annual posting", "payroll consistent monthly escalation from RM 283K to RM 575K"). Quality 9→10. **But Sonnet still made the same 4 tool calls per run** — it doesn't treat "data is in the block" as "don't query for the same thing". Result: cost +3.5% (input bloat from new data, no offsetting tool-call reduction). User chose strict cost discipline — reverted. **Architectural takeaway:** pre-fetching is a *quality* lever, not a *cost* lever, until paired with explicit no-query instruction in summary prompt OR `MAX_TOOL_CALLS_PER_SUMMARY` cap (Iter 3). Reattempt as a pair, not in isolation.
 
 - (Iter 5 / KEPT) **Anthropic prompt caching delivered −14.0% cost (−$0.0188/click) on `payment_outstanding` — ~3× the spec's projected −5%.** Quality unchanged (10/10, 0 hallucinations) — confirmed caching is purely a billing-layer optimization. **Two surprises:** (1) The bigger-than-expected savings came from the tools array, not the system prompt. Tools sit before system in Anthropic's prompt prefix, so a single `cache_control` marker on the system block implicitly caches tools too — and the tools blob (multi-thousand tokens of whitelist + schemas) is much fatter than the system prompt. Spec underestimated this. (2) Haiku component calls did NOT cache — `created=0, read=0` on every Haiku turn — because the ~200-token Haiku system prompt is below Haiku 4.5's minimum cacheable prefix size. All Iter 5 savings came from Sonnet caching alone. **Architectural lesson:** position-based caching means the cheapest cache win is on the largest static prefix block — for tool-using flows, that's the tools array (cached implicitly via system marker). When evaluating future caching opportunities, count tokens by prompt-prefix layer, not by which named field the marker lives on. Also: Haiku's higher minimum cache size means small system prompts won't cache there — pre-validate prompt size before adding markers.
+
+- (Iter 8 / DEFERRED) **Sonnet → Haiku for summary delivered the projected ~70% cost cut on both pilots (−74.9% on payment_outstanding, −69.6% on financial_variance) — but quality split sharply by data shape.** financial_variance held 9/10 with 0 hallucinations (improvement over baseline's ~2 mild ratios) — Haiku is excellent at *synthesizing commentary* over pre-computed variance numbers. payment_outstanding regressed to 7.5/10 with 1.5 hallucinations median — Haiku fabricated derived sums (e.g., wrote `RM 1,413,171.53` for a top-10 total whose actual sum is `RM 1,513,171.53`; wrote `RM 4,375,655.2 / 38.6%` for a 2nd-to-5th subtotal whose actual is `RM 3,375,655.2 / 29.7%`). **Three architectural takeaways:** (1) The numeric guard's "must appear in raw data" check is **defeated by approximate-arithmetic hallucinations** — a wrong sum that looks plausible passes. The guard catches missing-from-data, not wrong-arithmetic. (2) **Model-quality-per-dollar depends on whether the prompt requires *synthesis* (Haiku ✓) or *computation* (Haiku ✗).** Sonnet's premium pays for chained quantitative reasoning; if the data fetcher pre-computes those values, Sonnet's premium is wasted. If it doesn't, Haiku is unsafe. (3) Haiku's higher minimum cacheable prefix size **also affects the summary call**, not just components — `cache_read=0` on every summary turn even though Iter 5's marker is in place. The Iter 5 caching savings on the summary path are partly lost when the model swaps to Haiku, so the realised cost reduction is below the headline 3.75× pricing differential. **Decision deferred to Iter 8.1 (OpenRouter study)** rather than ship a per-section model selector — user opted to first see whether a Sonnet-arithmetic alternative (candidate: `z-ai/glm-5.1` via OpenRouter; ~7% more expensive than Haiku per token but ~3× cheaper than Sonnet, reasoning-capable) collapses the dilemma. Iter 8.1 is therefore framed as a *quality + diversification* play, not a cost play.
 
 ---
 
@@ -108,6 +112,10 @@ Qual:   9/10       10/10           9/10 expected  __/10       __/10       __/10 
 
 - **2026-05-07** **Iter 5 pilot revert (one-iteration only): `financial_variance` → `payment_outstanding`.** Driver: caching is a cost-only feature — same input bytes go to the model, so quality cannot regress from this change. Running on `payment_outstanding` (already at 10/10 ceiling) gives us a cleaner pure-cost signal: any cost delta is purely the cache effect, no quality scoring noise. Bonus: `payment_outstanding` has 6 components vs `financial_variance`'s 4 → more Haiku calls within one click → more cache hits to measure. Will return to `financial_variance` for Iter 6+ where quality risk re-enters (combine components, model swap).
 
+- **2026-05-07** **Iter 6 SKIPPED.** Cost analysis: Haiku component slice is ~$0.015/run (10% of total). Combining 4→1 Haiku calls saves at most ~$0.008/run (~5% of baseline) — too close to run-to-run noise to confidently call keep/revert (cf. Iter 7's borderline +3.5% revert). Iter 8 (Sonnet→Haiku for summary) attacks the 90% slice with 10× more headroom and gives a cleaner signal. **New iteration order: 8 → 4 → 3.** Revisit Iter 6 only if Iter 8 lands and we still need cost cuts; at that point the Haiku slice will be even smaller, making it even less worth doing. Architectural note: Iter 6 would still simplify the codebase (fewer calls, less rate-limit pressure) — that's a refactor, not a study iteration.
+
+- **2026-05-07** **Iter 8 DEFERRED — Iter 8.1 inserted before keep/revert decision.** Iter 8 was tested on both pilots with strict (no-regression) quality bars per user direction. Result split: financial_variance passed strict (9→9, 0 hallucinations, −69.6% cost); payment_outstanding failed strict (10→7.5, 1.5 hallucinations median, −74.9% cost). Three resolution paths were on the table — (1) revert globally, (2) keep globally accepting the regression on the closed pilot, (3) per-section model selector. User chose a fourth option: **defer the keep/revert call and run Iter 8.1 first — replace the Anthropic SDK as the primary model layer with OpenRouter (candidate model `z-ai/glm-5.1`, confirmed by user via https://openrouter.ai/z-ai/glm-5.1) and keep Anthropic SDK as a fallback only.** Rationale: a Sonnet-arithmetic alternative at ~30% of Sonnet's price could collapse the synthesis-vs-computation dilemma exposed by Iter 8 and obviate the need for a per-section selector. Note: pricing investigation revealed GLM 5.1 is *not* cheaper than Haiku (~7% more on FV-shaped workloads), so 8.1 is now framed as a quality + diversification play rather than a cost play. **Iter 8 code change in `client.ts:17` has been reverted** to Sonnet baseline (working tree clean) per user direction so 8.1 starts from the pre-Iter-8 codebase; if 8.1 succeeds, Haiku will be re-applied as the SDK fallback model. New iteration order: **8.1 → 8 (decided by 8.1) → 4 → 3.** Iter 8.1 to be run in a fresh worker session; spec at `02_analysis.md §Iter 8.1`.
+
 ---
 
 ## How to Resume
@@ -125,4 +133,71 @@ Qual:   9/10       10/10           9/10 expected  __/10       __/10       __/10 
 > 5. Confirm with me before committing
 > 
 > Do not skip ahead. Steps 1-3 happen before any code edit.
+> ```
+
+### Specific resume prompt for the next session — Iter 8.1 (OpenRouter)
+
+> ```
+> Resume AI Insight optimization. Read AI_Insight_Study/MASTER_LOG.md, HOW_TO_RUN_ITERATION.md,
+> and AI_Insight_Study/02_analysis.md §Iteration 8.1.
+> 
+> Next iteration: Iter 8.1 — OpenRouter primary + Claude SDK fallback.
+> 
+> LOCKED CONFIG (do not re-discuss; act on these):
+>   Model:        z-ai/glm-5.1
+>   Provider:     Z.ai (pinned — not OpenRouter aggregate)
+>                 https://openrouter.ai/z-ai/glm-5.1/providers
+>   Pricing:      $1.40 input / $4.40 output / $0.26 cache-read per M tokens (Z.ai)
+>   Context:      202,752 tokens, max output 131,072
+>   Reasoning:    OFF for component-insight calls, ON for AI-Panel summary call
+>   Slot policy:  GLM 5.1 for BOTH component and summary
+>   Credential:   process.env.OPEN_ROUTER_API
+>                 (currently in project-root /Users/aqreight/.../Hoi-Yong_Finance/.env)
+> 
+> Cost projection: ~$0.13/click with reasoning ON for summary — near Sonnet baseline ($0.135),
+> ~3x Iter-8 Haiku ($0.041). Iter 8.1 is a QUALITY + DIVERSIFICATION play, not a cost play.
+> 
+> HARD PREREQUISITE — pre-flight gate before any orchestrator integration:
+>   Send a one-off OpenRouter request to z-ai/glm-5.1 (Z.ai-pinned) with a tools array and a
+>   prompt that should trigger a tool call. Confirm the response contains a tool_calls block.
+>   If unsupported -> abort Iter 8.1, do not edit orchestrator code.
+> 
+> Required Step-1 items before any code edit:
+>   1. Pre-flight tool-calling probe outcome (PASS/FAIL). HARD GATE.
+>   2. Verify Next.js dashboard process actually sees process.env.OPEN_ROUTER_API. If not,
+>      copy/symlink the var to apps/dashboard/.env.local.
+>   3. Confirm OpenRouter's current `provider:` routing field syntax (the API has had a few
+>      iterations — wrong field silently falls through to the cheapest provider, invalidating
+>      the cost numbers).
+>   4. Confirm cost ceiling: ~$0.13/click is acceptable as a quality+diversification trade.
+>   5. Reasoning-tokens billing path: confirm OpenRouter sums reasoning tokens into
+>      usage.completion_tokens; if separate, update client.ts pricing math.
+>   6. Fallback trigger granularity (recommend: 5xx + rate-limit + timeout only).
+> 
+> Decision rule (post-runs):
+>   - Tools unsupported at probe          -> ABORT 8.1, no code edits.
+>   - Quality >= baseline on BOTH pilots
+>     AND payment_outstanding hallucinations = 0
+>     AND cost <= ~$0.135/click           -> ADOPT OpenRouter primary; re-apply Iter 8 (Haiku)
+>                                           in client.ts:17 as the SDK fallback default.
+>   - Quality >= baseline only on FV      -> 8.1 fails. Decide Iter 8 separately.
+>   - Quality < baseline on either pilot
+>     OR cost > ~$0.135/click             -> 8.1 fails. Revert Iter 8 (component=Haiku,
+>                                           summary=Sonnet via Claude SDK).
+> 
+> Iter 8 (Sonnet->Haiku) has been reverted in apps/dashboard/src/lib/ai-insight/client.ts:17 —
+> working tree is clean. The 8.1 study starts from the pre-Iter-8 baseline (Sonnet for summary,
+> Haiku for components).
+> 
+> Process: same 14-step procedure in HOW_TO_RUN_ITERATION.md. Steps 1-3 (discuss, plan, get
+> approval) happen before any code edit. Pilots: payment_outstanding (2 runs) +
+> financial_variance (2 runs).
+> 
+> Decision rule (after running both pilots):
+>   - Quality ≥ baseline on both pilots AND cost ≤ Iter-8 Haiku cost
+>     → Adopt OpenRouter primary; keep Iter 8 (Haiku is the fallback).
+>   - Otherwise → revert Iter 8 (component=Haiku, summary=Sonnet via Anthropic SDK).
+> 
+> Process: same 14-step procedure in HOW_TO_RUN_ITERATION.md. Steps 1-3 (discuss, plan, get approval)
+> happen before any code edit. Pilots to run: payment_outstanding (2 runs) + financial_variance (2 runs).
 > ```

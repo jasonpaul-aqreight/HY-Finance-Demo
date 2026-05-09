@@ -2,10 +2,12 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Loader2, Ban } from 'lucide-react';
+import { Loader2, Ban, MessageSquarePlus } from 'lucide-react';
 import type { InsightStatus, ProgressLine, SectionInsightData } from '@/hooks/ai-insight/useInsightAnalysis';
-import type { SummaryInsight } from '@/lib/ai-insight/types';
+import type { SectionKey, SummaryInsight } from '@/lib/ai-insight/types';
 import { InsightDetailDialog } from './InsightDetailDialog';
+import { FeedbackModal } from './FeedbackModal';
+import { Toast } from './Toast';
 
 interface AiInsightPanelProps {
   status: InsightStatus;
@@ -16,6 +18,10 @@ interface AiInsightPanelProps {
   onAnalyze: () => void;
   onCancel: () => void;
   isAdmin?: boolean;
+  sectionKey: SectionKey;
+  sectionName: string;
+  page: string;
+  userName: string;
 }
 
 function InsightCard({
@@ -98,8 +104,14 @@ export function AiInsightPanel({
   onAnalyze,
   onCancel,
   isAdmin = true,
+  sectionKey,
+  sectionName,
+  page,
+  userName,
 }: AiInsightPanelProps) {
   const [selectedInsight, setSelectedInsight] = useState<{ insight: SummaryInsight; sentiment: 'good' | 'bad' } | null>(null);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const isAnalyzing = status === 'analyzing';
   const isBlocked = status === 'blocked';
@@ -251,7 +263,16 @@ export function AiInsightPanel({
             </>
           )}
         </div>
-        <div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setFeedbackOpen(true)}
+            disabled={isAnalyzing}
+          >
+            <MessageSquarePlus className="mr-1.5 h-3.5 w-3.5" />
+            Feedback
+          </Button>
           {isAnalyzing ? (
             <Button variant="destructive" size="sm" onClick={onCancel}>
               Cancel
@@ -280,6 +301,20 @@ export function AiInsightPanel({
           sentiment={selectedInsight.sentiment}
         />
       )}
+
+      {/* Feedback modal */}
+      <FeedbackModal
+        open={feedbackOpen}
+        onOpenChange={setFeedbackOpen}
+        sectionKey={sectionKey}
+        sectionName={sectionName}
+        page={page}
+        submittedBy={userName}
+        onSubmitted={(msg) => setToastMessage(msg)}
+      />
+
+      {/* Toast */}
+      <Toast message={toastMessage} onClose={() => setToastMessage(null)} />
     </div>
   );
 }
