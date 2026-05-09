@@ -265,13 +265,14 @@ async function runSummaryAnalysis(
   const components = SECTION_COMPONENTS[sectionKey];
 
   const systemPrompt = await getSummarySystemPrompt();
-  const userPrompt = buildSummaryUserPrompt({
+  const userPrompt = await buildSummaryUserPrompt({
     sectionKey,
     dateRange,
     fiscalPeriod,
     componentResults: componentResults.map(cr => {
       const compDef = components.find(c => c.key === cr.component_key);
       return {
+        key: cr.component_key,
         name: compDef?.name ?? cr.component_key,
         type: compDef?.type ?? cr.component_type,
         rawData: cr.raw_data_md,

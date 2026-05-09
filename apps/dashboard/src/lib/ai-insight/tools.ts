@@ -32,6 +32,61 @@ const RDS_WHITELIST: Record<string, string[]> = {
 
 const ROW_LIMIT = 100;
 
+// RDS tables that require Cancelled='F' to exclude voided documents. The
+// LLM is instructed to include this filter, but we ALSO inject it server-side
+// (see executeRdsQuery) so prompt drift can never let a cancelled document
+// leak into the analysis.
+const RDS_CANCELLED_FILTER_TABLES = new Set([
+  'dbo.IV',
+  'dbo.CS',
+  'dbo.CN',
+  'dbo.ARInvoice',
+  'dbo.ARPayment',
+]);
+
+// Words/sequences that should never appear inside an LLM-supplied WHERE clause.
+// Statement separators, comment markers, and any keyword that would let the
+// model exfiltrate or mutate data outside the intended SELECT.
+const WHERE_CLAUSE_BLOCKLIST: Array<{ pattern: RegExp; label: string }> = [
+  { pattern: /;/, label: 'statement terminator (;)' },
+  { pattern: /--/, label: 'line comment (--)' },
+  { pattern: /\/\*/, label: 'block comment start (/*)' },
+  { pattern: /\*\//, label: 'block comment end (*/)' },
+  { pattern: /\bUNION\b/i, label: 'UNION' },
+  { pattern: /\bSELECT\b/i, label: 'nested SELECT' },
+  { pattern: /\bINSERT\b/i, label: 'INSERT' },
+  { pattern: /\bUPDATE\b/i, label: 'UPDATE' },
+  { pattern: /\bDELETE\b/i, label: 'DELETE' },
+  { pattern: /\bDROP\b/i, label: 'DROP' },
+  { pattern: /\bTRUNCATE\b/i, label: 'TRUNCATE' },
+  { pattern: /\bALTER\b/i, label: 'ALTER' },
+  { pattern: /\bEXEC\b/i, label: 'EXEC' },
+  { pattern: /\bEXECUTE\b/i, label: 'EXECUTE' },
+  { pattern: /\bGRANT\b/i, label: 'GRANT' },
+  { pattern: /\bREVOKE\b/i, label: 'REVOKE' },
+  { pattern: /\bxp_\w+/i, label: 'extended stored procedure (xp_*)' },
+  { pattern: /\bsp_\w+/i, label: 'system stored procedure (sp_*)' },
+];
+
+function validateWhereClauseSafety(where: string | undefined | null): string | null {
+  if (!where) return null;
+  for (const { pattern, label } of WHERE_CLAUSE_BLOCKLIST) {
+    if (pattern.test(where)) {
+      return `WHERE clause rejected: contains disallowed token (${label}). Use only column comparisons with $1/$2 parameter placeholders.`;
+    }
+  }
+  return null;
+}
+
+function ensureRdsCancelledFilter(table: string, where: string | undefined): string | undefined {
+  if (!RDS_CANCELLED_FILTER_TABLES.has(table)) return where;
+  // Already present (any case)? Leave it untouched.
+  if (where && /Cancelled\s*=\s*'F'/i.test(where)) return where;
+  const filter = `Cancelled = 'F'`;
+  if (!where || !where.trim()) return filter;
+  return `(${where}) AND ${filter}`;
+}
+
 // ─── Tool definitions for Claude ─────────────────────────────────────────────
 
 export const AI_TOOLS: Anthropic.Tool[] = [
@@ -149,8 +204,13 @@ export async function executeToolCall(
 }
 
 async function executeLocalQuery(input: QueryInput): Promise<string> {
-  const error = validateColumns(input.table, input.columns, LOCAL_WHITELIST);
-  if (error) return error;
+  const colError = validateColumns(input.table, input.columns, LOCAL_WHITELIST);
+  if (colError) return colError;
+
+  const whereError = validateWhereClauseSafety(input.where_clause);
+  if (whereError) return whereError;
+  const orderByError = validateWhereClauseSafety(input.order_by);
+  if (orderByError) return orderByError.replace('WHERE clause', 'ORDER BY clause');
 
   const limit = Math.min(input.limit ?? ROW_LIMIT, ROW_LIMIT);
 
@@ -190,12 +250,21 @@ async function executeLocalQuery(input: QueryInput): Promise<string> {
 }
 
 async function executeRdsQuery(input: QueryInput): Promise<string> {
-  const error = validateColumns(input.table, input.columns, RDS_WHITELIST);
-  if (error) return error;
+  const colError = validateColumns(input.table, input.columns, RDS_WHITELIST);
+  if (colError) return colError;
+
+  const whereError = validateWhereClauseSafety(input.where_clause);
+  if (whereError) return whereError;
+  const orderByError = validateWhereClauseSafety(input.order_by);
+  if (orderByError) return orderByError.replace('WHERE clause', 'ORDER BY clause');
+
+  // Server-side enforcement: dbo.IV/CS/CN/ARInvoice/ARPayment must be filtered
+  // to non-cancelled documents. Belt-and-braces with the prompt-level rule.
+  const whereWithCancelled = ensureRdsCancelledFilter(input.table, input.where_clause);
 
   const limit = Math.min(input.limit ?? ROW_LIMIT, ROW_LIMIT);
   let sql = `SELECT TOP ${limit} ${input.columns.map(c => `[${c}]`).join(', ')} FROM ${input.table}`;
-  if (input.where_clause) sql += ` WHERE ${input.where_clause}`;
+  if (whereWithCancelled) sql += ` WHERE ${whereWithCancelled}`;
   if (input.order_by) sql += ` ORDER BY ${input.order_by}`;
 
   const rows = await queryRds<Record<string, unknown>>(sql, input.params ?? []);

@@ -12,7 +12,7 @@ export interface PromptRowView {
   promptText: string;
   previousText: string | null;
   previousText2: string | null;
-  category: 'system' | 'component';
+  category: 'system' | 'component' | 'section_guidance';
   page: string | null;
   sectionKey: string | null;
   sectionName: string | null;

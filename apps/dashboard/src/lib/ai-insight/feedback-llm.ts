@@ -1,21 +1,22 @@
 // Feedback Router LLM (Phase 1 of feedback loop).
 //
 // Given a piece of raw user feedback + the section it was submitted from,
-// asks Haiku to:
-//   1. Pick the single component prompt within that section most likely to
-//      be responsible for the feedback.
-//   2. Compact the feedback into 2–4 imperative bullets.
+// asks Haiku to pick the single prompt key within that section most likely
+// to be responsible for the feedback. Tries components first, falls back to
+// the section's General prompt only when no component fits. Raw feedback is
+// stored as-is — no rewriting/compaction.
 //
 // Tool use is forced via tool_choice so the model must return structured
-// output. The router cannot pick keys outside the section's component list —
-// the tool's enum scopes it.
+// output. The router cannot pick keys outside the section — the tool's enum
+// scopes it.
 
 import { getAnthropicClient } from './client';
 import {
   getFeedbackRouterSystemPrompt,
   getSurgicalEditorSystemPrompt,
+  sectionGuidanceKey,
 } from './prompt-loader';
-import { SECTION_COMPONENTS } from './prompts';
+import { SECTION_COMPONENTS, SECTION_NAMES } from './prompts';
 import type { SectionKey } from './types';
 
 const ROUTER_MODEL =
@@ -24,49 +25,54 @@ const ROUTER_MODEL =
 const SURGICAL_EDITOR_MODEL =
   process.env.AI_INSIGHT_SURGICAL_EDITOR_MODEL || 'claude-sonnet-4-6';
 
-const ROUTER_MAX_TOKENS = 512;
+const ROUTER_MAX_TOKENS = 256;
 // Most component prompts are 200–600 tokens; allow plenty of headroom for the
 // edited version + the change_summary tool output.
 const SURGICAL_EDITOR_MAX_TOKENS = 4096;
 
-export interface RouteAndCompactInput {
+export interface RouteFeedbackInput {
   section_key: SectionKey;
   page: string;
   raw_feedback: string;
 }
 
-export interface RouteAndCompactResult {
+export interface RouteFeedbackResult {
   target_prompt_key: string;
-  compact_feedback: string;
 }
 
-export async function routeAndCompact(
-  input: RouteAndCompactInput,
-): Promise<RouteAndCompactResult> {
+export async function routeFeedback(
+  input: RouteFeedbackInput,
+): Promise<RouteFeedbackResult> {
   const components = SECTION_COMPONENTS[input.section_key];
   if (!components || components.length === 0) {
     throw new Error(`Unknown or empty section: ${input.section_key}`);
   }
 
-  const componentKeys = components.map((c) => c.key);
-  const componentList = components
-    .map((c) => `- ${c.key} (${c.type}): ${c.name}`)
-    .join('\n');
+  const guidanceKey = sectionGuidanceKey(input.section_key);
+  const sectionName = SECTION_NAMES[input.section_key] ?? input.section_key;
+
+  // Components listed first so the router considers card-specific targets up
+  // top; General appears last to reinforce its fallback role.
+  const targetKeys = [...components.map((c) => c.key), guidanceKey];
+  const targetList = [
+    ...components.map((c) => `- ${c.key} (${c.type}): ${c.name}`),
+    `- ${guidanceKey} (general): ${sectionName} — General prompt`,
+  ].join('\n');
 
   const systemPrompt = await getFeedbackRouterSystemPrompt();
 
   const userMessage = `Page: ${input.page}
 Section: ${input.section_key}
 
-Components in this section:
-${componentList}
+Available prompts in this section (pick exactly one):
+${targetList}
 
 User feedback:
 """
 ${input.raw_feedback}
 """
 
-Pick the single component prompt this feedback should edit, and compact the feedback to 2–4 bullets. Always call select_target.`;
+Pick the single prompt key this feedback should edit. Always call select_target.`;
 
   const client = getAnthropicClient();
   const response = await client.messages.create({
@@ -77,22 +83,18 @@ Pick the single component prompt this feedback should edit, and compact the feed
       {
         name: 'select_target',
         description:
-          'Select the component prompt this feedback should edit and return a compacted bullet form of the feedback.',
+          'Select the prompt this feedback should edit — a component key when feedback targets one card, or the General key when feedback is about how the whole summary reads.',
         input_schema: {
           type: 'object',
           properties: {
             target_prompt_key: {
               type: 'string',
-              enum: componentKeys,
-              description: 'Component prompt key from the provided list.',
-            },
-            compact_feedback: {
-              type: 'string',
+              enum: targetKeys,
               description:
-                '2–4 imperative bullets, each on its own line starting with "- ".',
+                'Prompt key from the provided list. Component keys for card-specific feedback; the General key only when no component fits.',
             },
           },
-          required: ['target_prompt_key', 'compact_feedback'],
+          required: ['target_prompt_key'],
         },
       },
     ],
@@ -109,21 +111,14 @@ Pick the single component prompt this feedback should edit, and compact the feed
     throw new Error('Router LLM did not return a select_target tool call');
   }
 
-  const args = toolUse.input as Partial<RouteAndCompactResult>;
+  const args = toolUse.input as Partial<RouteFeedbackResult>;
   const targetKey = args.target_prompt_key;
-  const compact = args.compact_feedback;
 
-  if (!targetKey || !componentKeys.includes(targetKey)) {
+  if (!targetKey || !targetKeys.includes(targetKey)) {
     throw new Error(`Router returned invalid target key: ${String(targetKey)}`);
   }
-  if (!compact || !compact.trim()) {
-    throw new Error('Router returned empty compact_feedback');
-  }
 
-  return {
-    target_prompt_key: targetKey,
-    compact_feedback: compact.trim(),
-  };
+  return { target_prompt_key: targetKey };
 }
 
 // ─── Surgical Editor (Phase 2) ──────────────────────────────────────────────
@@ -158,12 +153,12 @@ export async function proposeSurgicalEdit(
     ? `Component: ${input.prompt_display_name}\n`
     : '';
 
-  const userMessage = `${heading}CURRENT PROMPT:
+  const userMessage = `${heading}CURRENT:
 """
 ${input.current_prompt_text}
 """
 
-COMPACT FEEDBACK:
+FEEDBACK:
 """
 ${input.compact_feedback}
 """

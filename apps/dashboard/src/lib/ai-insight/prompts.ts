@@ -3,6 +3,7 @@ import {
   getGlobalSystemPrompt as loaderGlobalSystemPrompt,
   getSummarySystemPrompt as loaderSummarySystemPrompt,
   getComponentPrompt,
+  getSectionGuidance,
 } from './prompt-loader';
 
 
@@ -157,12 +158,12 @@ export async function getSummarySystemPrompt(): Promise<string> {
   return loaderSummarySystemPrompt();
 }
 
-export function buildSummaryUserPrompt(params: {
+export async function buildSummaryUserPrompt(params: {
   sectionKey: SectionKey;
   dateRange: { start: string; end: string } | null;
   fiscalPeriod?: { fiscalYear: string; range: 'fy' | 'last12' | 'ytd' } | null;
-  componentResults: { name: string; type: string; rawData: string }[];
-}): string {
+  componentResults: { key: string; name: string; type: string; rawData: string }[];
+}): Promise<string> {
   const sectionName = SECTION_NAMES[params.sectionKey];
   const pageName = SECTION_PAGE[params.sectionKey];
 
@@ -174,20 +175,52 @@ export function buildSummaryUserPrompt(params: {
 
   const now = new Date().toISOString().slice(0, 16).replace('T', ' ');
 
-  const components = params.componentResults
-    .map((c, i) => `### Component ${i + 1}: ${c.name} (${c.type})\n${c.rawData}`)
-    .join('\n\n');
+  // Per-component blocks: About (the component prompt — describes the card and
+  // is authoritative on good/neutral/bad thresholds for this metric) + Raw
+  // Data (live values). About is loaded from the DB-backed prompt store; the
+  // same source Haiku sees during component analysis, so Sonnet gets identical
+  // guidance.
+  const componentBlocks = await Promise.all(
+    params.componentResults.map(async (c, i) => {
+      const about = await getComponentPrompt(c.key);
+      return `### Component ${i + 1}: ${c.name} (${c.type})
+
+About:
+"""
+${about}
+"""
+
+Raw Data:
+${c.rawData}`;
+    }),
+  );
+  const components = componentBlocks.join('\n\n');
+
+  // General — section-scoped tone, expected output, and any deterministic
+  // questions or output overrides. Null when no guidance exists, in which
+  // case the block is omitted entirely.
+  const guidance = await getSectionGuidance(params.sectionKey);
+  const guidanceBlock = guidance
+    ? `General:
+"""
+${guidance}
+"""
+
+`
+    : '';
 
   return `Section: ${sectionName}
 Page: ${pageName}
 ${dateInfo}
 Generated: ${now}
 
----
+${guidanceBlock}---
 
-Below are the RAW DATA BLOCKS for each component in this section. These are the
-authoritative source of truth. Every number you write must be traceable to a
-specific line in one of these blocks (or to a tool-call result).
+Below is the ABOUT and RAW DATA for each component in this section. ABOUT
+describes the component's role in the dashboard and is the authority on good /
+neutral / bad. RAW DATA is what the dashboard shows the user. Every number you
+cite must be traceable to a specific line in a Raw Data block or a tool-call
+result.
 
 ${components}
 

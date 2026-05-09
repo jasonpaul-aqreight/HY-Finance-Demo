@@ -11,8 +11,9 @@ import {
   DEFAULT_COMPONENT_PROMPTS,
   DEFAULT_FEEDBACK_ROUTER_SYSTEM,
   DEFAULT_SURGICAL_EDITOR_SYSTEM,
+  DEFAULT_SECTION_GUIDANCE,
 } from './prompts-defaults';
-import { invalidateCache, type PromptRow } from './prompt-loader';
+import { invalidateCache, type PromptCategory, type PromptRow } from './prompt-loader';
 
 const SUMMARY_DELIMITER_MARKERS = ['===INSIGHT===', '---DETAIL---', '===END==='] as const;
 
@@ -27,6 +28,12 @@ export function getDefaultPromptText(promptKey: string): string | null {
   if (promptKey === 'summary_system') return DEFAULT_SUMMARY_SYSTEM;
   if (promptKey === 'feedback_router_system') return DEFAULT_FEEDBACK_ROUTER_SYSTEM;
   if (promptKey === 'surgical_editor_system') return DEFAULT_SURGICAL_EDITOR_SYSTEM;
+  // Section Guidance keys end in `_guidance`; strip the suffix to get the
+  // section_key used as the DEFAULT_SECTION_GUIDANCE map key.
+  if (promptKey.endsWith('_guidance')) {
+    const sectionKey = promptKey.slice(0, -'_guidance'.length);
+    return DEFAULT_SECTION_GUIDANCE[sectionKey] ?? null;
+  }
   return DEFAULT_COMPONENT_PROMPTS[promptKey] ?? null;
 }
 
@@ -60,7 +67,7 @@ interface RotatedRow {
   prompt_text: string;
   previous_text: string | null;
   previous_text_2: string | null;
-  category: 'system' | 'component';
+  category: PromptCategory;
   page: string | null;
   section_key: string | null;
   section_name: string | null;

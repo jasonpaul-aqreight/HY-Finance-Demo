@@ -15,16 +15,19 @@ import {
   DEFAULT_COMPONENT_PROMPTS,
   DEFAULT_FEEDBACK_ROUTER_SYSTEM,
   DEFAULT_SURGICAL_EDITOR_SYSTEM,
+  DEFAULT_SECTION_GUIDANCE,
 } from './prompts-defaults';
 
 const CACHE_TTL_MS = 30_000;
+
+export type PromptCategory = 'system' | 'component' | 'section_guidance';
 
 export interface PromptRow {
   promptKey: string;
   promptText: string;
   previousText: string | null;
   previousText2: string | null;
-  category: 'system' | 'component';
+  category: PromptCategory;
   page: string | null;
   sectionKey: string | null;
   sectionName: string | null;
@@ -51,7 +54,7 @@ async function loadSnapshot(): Promise<Snapshot> {
     prompt_text: string;
     previous_text: string | null;
     previous_text_2: string | null;
-    category: 'system' | 'component';
+    category: PromptCategory;
     page: string | null;
     section_key: string | null;
     section_name: string | null;
@@ -159,6 +162,26 @@ export async function getComponentPrompt(componentKey: string): Promise<string> 
     return fallback;
   }
   throw new Error(`No prompt defined for component: ${componentKey}`);
+}
+
+// Section Guidance prompt key convention: `<section_key>_guidance`.
+// Returns null if no guidance is defined and no default exists — callers
+// (buildSummaryUserPrompt) should skip injection in that case.
+export function sectionGuidanceKey(sectionKey: string): string {
+  return `${sectionKey}_guidance`;
+}
+
+export async function getSectionGuidance(sectionKey: string): Promise<string | null> {
+  const s = await getSnapshot();
+  const key = sectionGuidanceKey(sectionKey);
+  const text = s.byKey.get(key);
+  if (text && text.trim()) return text;
+  const fallback = DEFAULT_SECTION_GUIDANCE[sectionKey];
+  if (fallback && fallback.trim()) {
+    console.warn(`[prompt-loader] DB miss for section guidance ${key}, using default`);
+    return fallback;
+  }
+  return null;
 }
 
 export async function getAllPrompts(): Promise<PromptRow[]> {

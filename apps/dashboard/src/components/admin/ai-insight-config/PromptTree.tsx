@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { ChevronRight, ChevronDown, Cog } from 'lucide-react';
+import { ChevronRight, ChevronDown, Cog, Compass } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import type { PromptRowView } from './PromptConfigDashboard';
@@ -15,6 +15,7 @@ interface Props {
 interface Section {
   sectionKey: string;
   sectionName: string;
+  guidance: PromptRowView | null;
   components: PromptRowView[];
 }
 
@@ -26,17 +27,24 @@ interface Page {
 function groupByPage(rows: PromptRowView[]): Page[] {
   const byPage = new Map<string, Map<string, Section>>();
   for (const r of rows) {
-    if (r.category !== 'component' || !r.page || !r.sectionKey) continue;
+    if (!r.page || !r.sectionKey) continue;
+    if (r.category !== 'component' && r.category !== 'section_guidance') continue;
     if (!byPage.has(r.page)) byPage.set(r.page, new Map());
     const sectionMap = byPage.get(r.page)!;
     if (!sectionMap.has(r.sectionKey)) {
       sectionMap.set(r.sectionKey, {
         sectionKey: r.sectionKey,
         sectionName: r.sectionName ?? r.sectionKey,
+        guidance: null,
         components: [],
       });
     }
-    sectionMap.get(r.sectionKey)!.components.push(r);
+    const section = sectionMap.get(r.sectionKey)!;
+    if (r.category === 'section_guidance') {
+      section.guidance = r;
+    } else {
+      section.components.push(r);
+    }
   }
   const pages: Page[] = [];
   for (const [page, sectionMap] of byPage.entries()) {
@@ -129,9 +137,14 @@ export function PromptTree({ prompts, selectedKey, onSelect }: Props) {
         <ul className="space-y-0.5">
           {pages.map((p) => {
             const pageOpen = openPages[p.page] ?? false;
-            const pageHasModified = p.sections.some((s) => s.components.some((c) => c.isModified));
+            const pageHasModified = p.sections.some((s) =>
+              s.components.some((c) => c.isModified) || (s.guidance?.isModified ?? false),
+            );
             const pageFeedback = p.sections.reduce(
-              (sum, s) => sum + s.components.reduce((ss, c) => ss + (c.feedbackCount ?? 0), 0),
+              (sum, s) =>
+                sum +
+                s.components.reduce((ss, c) => ss + (c.feedbackCount ?? 0), 0) +
+                (s.guidance?.feedbackCount ?? 0),
               0,
             );
             return (
@@ -157,11 +170,11 @@ export function PromptTree({ prompts, selectedKey, onSelect }: Props) {
                   <ul className="ml-4 mt-0.5 space-y-0.5 border-l border-border pl-2">
                     {p.sections.map((s) => {
                       const sectionOpen = openSections[s.sectionKey] ?? true;
-                      const sectionHasModified = s.components.some((c) => c.isModified);
-                      const sectionFeedback = s.components.reduce(
-                        (sum, c) => sum + (c.feedbackCount ?? 0),
-                        0,
-                      );
+                      const sectionHasModified =
+                        s.components.some((c) => c.isModified) || (s.guidance?.isModified ?? false);
+                      const sectionFeedback =
+                        s.components.reduce((sum, c) => sum + (c.feedbackCount ?? 0), 0) +
+                        (s.guidance?.feedbackCount ?? 0);
                       return (
                         <li key={s.sectionKey}>
                           <button
@@ -179,6 +192,38 @@ export function PromptTree({ prompts, selectedKey, onSelect }: Props) {
                           </button>
                           {sectionOpen && (
                             <ul className="ml-3 space-y-0.5">
+                              {s.guidance && (() => {
+                                const g = s.guidance;
+                                const active = selectedKey === g.promptKey;
+                                return (
+                                  <li key={g.promptKey}>
+                                    <button
+                                      onClick={() => onSelect(g.promptKey)}
+                                      className={cn(
+                                        'flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-sm transition-colors',
+                                        active
+                                          ? 'bg-primary/10 text-primary font-medium'
+                                          : 'hover:bg-accent',
+                                      )}
+                                    >
+                                      <Compass size={13} className="shrink-0 text-foreground/70" />
+                                      <span className="truncate">General</span>
+                                      <div className="ml-auto flex items-center gap-1.5 shrink-0">
+                                        <span className="text-[10px] uppercase tracking-wider text-foreground/50">
+                                          general
+                                        </span>
+                                        {g.isModified && (
+                                          <span
+                                            className="size-1.5 rounded-full bg-amber-500"
+                                            title="Modified from default"
+                                          />
+                                        )}
+                                        {g.feedbackCount > 0 && feedbackBadge(g.feedbackCount)}
+                                      </div>
+                                    </button>
+                                  </li>
+                                );
+                              })()}
                               {s.components.map((c) => {
                                 const active = selectedKey === c.promptKey;
                                 return (

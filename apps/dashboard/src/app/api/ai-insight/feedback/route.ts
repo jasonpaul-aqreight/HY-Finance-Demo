@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getPool } from '@/lib/postgres';
-import { routeAndCompact } from '@/lib/ai-insight/feedback-llm';
+import { routeFeedback } from '@/lib/ai-insight/feedback-llm';
 import { SECTION_COMPONENTS } from '@/lib/ai-insight/prompts';
 import type { SectionKey } from '@/lib/ai-insight/types';
 
@@ -50,12 +50,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const routed = await routeAndCompact({
+    const routed = await routeFeedback({
       section_key: sectionKey as SectionKey,
       page,
       raw_feedback: raw,
     });
 
+    // No rewrite step — store raw feedback verbatim in both columns. The
+    // compact_feedback column is preserved for back-compat (read by the
+    // surgical-editor preview route); future cleanup may drop it.
     const pool = getPool();
     const { rows } = await pool.query<{ id: number }>(
       `INSERT INTO ai_insight_feedback
@@ -67,7 +70,7 @@ export async function POST(req: NextRequest) {
         sectionKey,
         page,
         raw,
-        routed.compact_feedback,
+        raw,
         routed.target_prompt_key,
         submittedBy,
       ],
