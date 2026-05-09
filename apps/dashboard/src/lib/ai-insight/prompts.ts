@@ -208,6 +208,7 @@ export async function buildComponentUserPrompt(params: {
   const componentPrompt = await getComponentPrompt(params.componentKey);
 
   const sectionName = SECTION_NAMES[params.sectionKey];
+  const pageName = SECTION_PAGE[params.sectionKey];
   const dateInfo = params.dateRange
     ? `Date Range: ${params.dateRange.start} to ${params.dateRange.end}`
     : params.fiscalPeriod
@@ -216,6 +217,7 @@ export async function buildComponentUserPrompt(params: {
 
   return `${componentPrompt}
 
+Page: ${pageName}
 Section: ${sectionName}
 Component: ${params.componentName} (${params.componentType})
 ${dateInfo}

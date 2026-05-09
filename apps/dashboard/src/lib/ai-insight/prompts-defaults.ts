@@ -19,9 +19,11 @@ Rules:
 - Match the Scope line (period / snapshot / fiscal).
 
 Output format (MANDATORY):
+**Current Status:** <one-line TL;DR ending with an alert tag — 🔴 Critical / 🟡 Watch / 🟢 Healthy / ⚪ Neutral>
+
 **Key Observations**
-- Up to 4 bullets, as many as the data supports.
-- Each bullet starts with a specific number from the data.
+- 1–4 bullets, as many as the data supports.
+- Each bullet starts with a **bold pattern label**, then leads with the most material data point (number, customer name, period).
 - No paragraphs, no closing summary.`;
 
 // ─── Component System Prompts ────────────────────────────────────────────────
@@ -30,16 +32,14 @@ export const DEFAULT_COMPONENT_PROMPTS: Record<string, string> = {
   // Payment Section 1: Payment Collection Trend
   avg_collection_days: `"Avg Collection Days" KPI — average days to collect payment after invoicing.
 
-Formula: per month (AR outstanding at month-end / monthly credit sales) × days in month, averaged across months with non-zero credit sales.
+How it's measured: monthly collection days (based on month-end AR vs that month's credit sales) averaged across months with credit-sale activity.
 
 Thresholds:
 - ≤30 = Good
 - ≤60 = Warning
 - >60 = Critical (cash-flow risk)`,
 
-  collection_rate: `"Collection Rate" KPI — % of invoiced amount collected as cash in the period.
-
-Formula: (Collected / Invoiced) × 100. Excludes contra/non-cash offsets.
+  collection_rate: `"Collection Rate" KPI — share of the period's invoiced amount that converted to cash. Excludes contra / non-cash offsets.
 
 Thresholds:
 - ≥80% = Good
@@ -113,9 +113,7 @@ Report:
 - Skew toward older (bad) vs newer (ok) buckets
 - Size of 120+ bucket (potential bad debt)`,
 
-  credit_usage_distribution: `"Credit Usage Distribution" donut chart — customers per credit usage band.
-
-Credit Usage % = Outstanding / Credit Limit × 100
+  credit_usage_distribution: `"Credit Usage Distribution" donut chart — customers grouped by how much of their credit limit they're using.
 
 Categories:
 - Within Limit (<80%) = healthy
@@ -328,10 +326,9 @@ Report:
 - Return-rate baseline: <3% normal vs >5% systemic (upstream quality)`,
 
   // ═══ Supplier Margin Overview (Section 3) ═══
-  sp_net_sales: `"Est. Net Sales" KPI — sales revenue attributed to active suppliers for the period.
-Formula: SUM(sales_revenue) from pc_supplier_margin where is_active='T'.
+  sp_net_sales: `"Est. Net Sales" KPI — sales revenue attributed to items sourced from active suppliers in the period.
 
-Note: "Est." prefix means the figure is from the supplier-margin pre-compute, not raw invoices. Mirrors Customer Margin Net Sales unmodulated, may diverge under supplier/item-group filters.
+Note: "Est." prefix means the figure comes from the supplier-margin pre-compute, not raw invoices. Mirrors Customer Margin Net Sales unfiltered, may diverge under supplier/item-group filters.
 
 Thresholds (MoM):
 - ≥5% growth = Good
@@ -341,8 +338,7 @@ Thresholds (MoM):
 
 Report level and direction vs prior period if available; comment on tracking vs trailing baseline.`,
 
-  sp_cogs: `"Est. Cost of Sales" KPI — attributed COGS from active suppliers.
-Formula: SUM(attributed_cogs) where is_active='T'.
+  sp_cogs: `"Est. Cost of Sales" KPI — attributed COGS for items sourced from active suppliers in the period.
 
 Supplier-page framing — rising COGS is NOT automatically bad:
 - Bad: COGS rising faster than Net Sales AND margin % falling = real cost pressure
@@ -360,7 +356,7 @@ Thresholds (GP vs Net Sales direction):
 
 Key signal: whether GP grows faster/slower than Net Sales — this reveals whether the current supplier mix is delivering margin or just volume. Report level and direction vs prior period.`,
 
-  sp_margin_pct: `"Gross Margin %" KPI — (Est. GP / Est. Net Sales) × 100.
+  sp_margin_pct: `"Gross Margin %" KPI — Est. Gross Profit as a share of Est. Net Sales.
 
 Thresholds (fruit distribution, supplier-side):
 - ≥15% = Good
@@ -501,7 +497,7 @@ Thresholds (unsettled % of return value):
 
 Report: scale vs total return pool, whether driver is partials (process friction) or outstandings (stuck on customer action), and reconciliation rate as overall health signal.`,
 
-  rt_return_pct: `"Return %" KPI — return value ÷ net sales × 100. The single most important return-health ratio (normalises exposure against sales volume).
+  rt_return_pct: `"Return %" KPI — return value as a share of net sales. The single most important return-health ratio (normalises exposure against sales volume).
 
 Data: return rate %, period return value, period net sales.
 
