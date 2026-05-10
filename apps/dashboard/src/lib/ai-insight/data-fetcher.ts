@@ -102,6 +102,20 @@ const fetchers: Record<string, DataFetcher> = {
     const maxCd = cdValues.length ? Math.max(...cdValues) : null;
     const minRow = valid.find((r: { collection_days: number }) => Number(r.collection_days) === minCd);
     const maxRow = valid.find((r: { collection_days: number }) => Number(r.collection_days) === maxCd);
+    const rankedSlowest = valid
+      .map((r: { month: string; collection_days: number }) => ({
+        month: r.month,
+        value: Number(r.collection_days),
+      }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 3);
+    const rankedFastest = valid
+      .map((r: { month: string; collection_days: number }) => ({
+        month: r.month,
+        value: Number(r.collection_days),
+      }))
+      .sort((a, b) => a.value - b.value)
+      .slice(0, 3);
     const monthsAbove60 = cdValues.filter((d: number) => d > 60).length;
     const monthsAbove30 = cdValues.filter((d: number) => d > 30).length;
 
@@ -116,6 +130,12 @@ const fetchers: Record<string, DataFetcher> = {
       (daysAboveWarning !== null ? `- Days above 60-day (Warning) benchmark: ${daysAboveWarning > 0 ? '+' : ''}${daysAboveWarning} days\n` : '') +
       (minRow ? `- Best month: ${minRow.month} at ${minCd} days\n` : '') +
       (maxRow ? `- Worst month: ${maxRow.month} at ${maxCd} days\n` : '') +
+      (rankedSlowest.length
+        ? `- Slowest collection-days months in order: ${rankedSlowest.map(r => `${r.month} at ${r.value} days`).join('; ')}\n`
+        : '') +
+      (rankedFastest.length
+        ? `- Fastest collection-days months in order: ${rankedFastest.map(r => `${r.month} at ${r.value} days`).join('; ')}\n`
+        : '') +
       `- Months above 30-day benchmark: ${monthsAbove30} of ${cdValues.length}\n` +
       `- Months above 60-day benchmark: ${monthsAbove60} of ${cdValues.length}\n`;
 
@@ -127,6 +147,8 @@ const fetchers: Record<string, DataFetcher> = {
     if (daysAboveWarning !== null) allowed.push(days('days above 60-day benchmark', daysAboveWarning));
     if (minCd !== null) allowed.push(days('best month days', minCd));
     if (maxCd !== null) allowed.push(days('worst month days', maxCd));
+    for (const r of rankedSlowest) allowed.push(days(`slowest collection-days month ${r.month}`, r.value));
+    for (const r of rankedFastest) allowed.push(days(`fastest collection-days month ${r.month}`, r.value));
     allowed.push(cnt('months above 30-day benchmark', monthsAbove30));
     allowed.push(cnt('months above 60-day benchmark', monthsAbove60));
     allowed.push(cnt('total months in period', cdValues.length));
@@ -210,6 +232,20 @@ const fetchers: Record<string, DataFetcher> = {
       ? valid.reduce((s: number, r: { collection_days: number }) => s + Number(r.collection_days), 0) / valid.length
       : NaN;
     const avg = isNaN(avgNum) ? '--' : avgNum.toFixed(1);
+    const rankedSlowest = valid
+      .map((r: { month: string; collection_days: number }) => ({
+        month: r.month,
+        value: Number(r.collection_days),
+      }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 3);
+    const rankedFastest = valid
+      .map((r: { month: string; collection_days: number }) => ({
+        month: r.month,
+        value: Number(r.collection_days),
+      }))
+      .sort((a, b) => a.value - b.value)
+      .slice(0, 3);
 
     let table = '| Month | Collection Days |\n|-------|----------------|\n';
     for (const r of rows) {
@@ -218,11 +254,18 @@ const fetchers: Record<string, DataFetcher> = {
 
     const allowed: AllowedValue[] = [];
     if (!isNaN(avgNum)) allowed.push(days('period avg collection days', avgNum));
+    for (const r of rankedSlowest) allowed.push(days(`slowest collection-days month ${r.month}`, r.value));
+    for (const r of rankedFastest) allowed.push(days(`fastest collection-days month ${r.month}`, r.value));
     for (const r of rows) {
       if (r.collection_days != null) allowed.push(days(`${r.month} collection days`, Number(r.collection_days)));
     }
 
-    return { prompt: `Data points:\n${table}\nAverage: ${avg} days`, allowed };
+    const rankLines =
+      `Pre-calculated rank checks (use these for any highest/lowest/ordinal claim — do not infer ranks):\n` +
+      (rankedSlowest.length ? `- Slowest months in order: ${rankedSlowest.map(r => `${r.month} at ${r.value} days`).join('; ')}\n` : '') +
+      (rankedFastest.length ? `- Fastest months in order: ${rankedFastest.map(r => `${r.month} at ${r.value} days`).join('; ')}\n` : '');
+
+    return { prompt: `Data points:\n${table}\nAverage: ${avg} days\n\n${rankLines}`, allowed };
   },
 
   async invoiced_vs_collected(dr) {
@@ -287,6 +330,7 @@ const fetchers: Record<string, DataFetcher> = {
       table += `| ${r.month} | RM ${r.invoiced.toLocaleString('en-MY')} | RM ${r.collected.toLocaleString('en-MY')} | ${r.gap >= 0 ? '+' : ''}RM ${r.gap.toLocaleString('en-MY')} |\n`;
     }
     const gap = totalCol - totalInv;
+    const avgGap = gapRows.length > 0 ? gap / gapRows.length : 0;
 
     const preCalc =
       `Pre-calculated monthly gap analysis (use these values directly — do not cherry-pick a rosy sub-range):\n` +
@@ -297,6 +341,7 @@ const fetchers: Record<string, DataFetcher> = {
       (best ? `- Best month: ${best.month} at ${best.gap >= 0 ? '+' : ''}RM ${best.gap.toLocaleString('en-MY')}\n` : '') +
       (worstTwoPct ? `- Worst two months combined = ${worstTwoPct}% of the full-period negative gap\n` : '') +
       `- Period total negative gap: RM ${negSum.toLocaleString('en-MY', { minimumFractionDigits: 2 })}\n` +
+      `- Full-period average gap per month: ${fmtSigned(avgGap)}/month\n` +
       `\nPre-calculated half-period averages (use these ONLY — do NOT compute your own H1/H2/"first half"/"last 4 months" or any other sub-period averages):\n` +
       (h1Rows.length ? `- H1 months (${h1Rows.length}): ${h1MonthList}\n` : '') +
       (h1Rows.length ? `- H1 avg gap: ${fmtSigned(h1Avg)}/month\n` : '') +
@@ -310,6 +355,7 @@ const fetchers: Record<string, DataFetcher> = {
     allowed.push(rm('total invoiced', totalInv));
     allowed.push(rm('total collected', totalCol));
     allowed.push(rm('cumulative gap', gap));
+    allowed.push(rm('full-period average gap per month', avgGap));
     allowed.push(rm('avg monthly collection', Math.round(avgCol)));
     allowed.push(rm('avg monthly collection (raw)', avgCol));
     allowed.push(cnt('months with negative gap', negMonths.length));
