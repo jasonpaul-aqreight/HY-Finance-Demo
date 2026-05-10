@@ -4249,6 +4249,13 @@ const SECTION_SCOPE: Record<SectionKey, ScopeType> = {
   financial_pnl: 'fiscal_period',
   financial_balance_sheet: 'fiscal_period',
   financial_variance: 'fiscal_period',
+  // HR scaffold (Phase 2) — config-only, no analyze pipeline yet. Scope value
+  // is a placeholder; HR analyze flow will be wired in a separate effort.
+  employee_demographics: 'snapshot',
+  attendance_leave: 'period',
+  overtime_work_hours: 'period',
+  payroll_compensation: 'period',
+  performance_talent: 'period',
 };
 
 // Per-section snapshot source: each snapshot section anchors its "as of" date on a different table.

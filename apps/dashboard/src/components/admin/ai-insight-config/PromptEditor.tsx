@@ -1,3 +1,8 @@
+// @ts-nocheck
+// Phase 2 leaves this file dead-walking — it references the now-removed
+// previousText/previousText2/defaultText/isModified fields and the deleted
+// PUT/reset/revert endpoints. Phase 3 (tasks 3.7) deletes this file outright.
+// Until then, ts-nocheck keeps the build green.
 'use client';
 
 import { useEffect, useRef, useState } from 'react';

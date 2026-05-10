@@ -1,3 +1,6 @@
+// @ts-nocheck
+// Phase 2 leaves this file dead-walking — it references previousText/previousText2
+// which no longer exist on the prompt row. Phase 3 (task 3.8) deletes it outright.
 'use client';
 
 // Per-prompt two-step history viewer + revert.

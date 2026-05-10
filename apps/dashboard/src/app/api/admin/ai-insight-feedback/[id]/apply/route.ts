@@ -1,11 +1,13 @@
 // Admin: apply a previewed surgical edit.
-// In one transaction: rotate history (previous_text_2 ← previous_text,
-// previous_text ← prompt_text, prompt_text ← proposed), then delete the
-// feedback row. Cache is invalidated so the next analysis sees the new text.
+// Inserts a new version row (and selects it) via prompt-store.insertVersionAndSelect,
+// then deletes the feedback row. Cache invalidation happens inside the helper.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getPool } from '@/lib/postgres';
-import { invalidateCache } from '@/lib/ai-insight/prompt-loader';
+import {
+  insertVersionAndSelect,
+  VERSION_CAP_REACHED,
+} from '@/lib/ai-insight/prompt-store';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,81 +34,52 @@ export async function POST(
     }
 
     const pool = getPool();
-    const client = await pool.connect();
+    const feedback = await pool.query<{ id: number; target_prompt_key: string }>(
+      `SELECT id, target_prompt_key FROM ai_insight_feedback WHERE id = $1`,
+      [numericId],
+    );
+    if (feedback.rowCount === 0) {
+      return NextResponse.json({ error: 'Feedback not found' }, { status: 404 });
+    }
+    const targetKey = feedback.rows[0].target_prompt_key;
+
+    let inserted;
     try {
-      await client.query('BEGIN');
-
-      // Lock the feedback row first so concurrent apply/discard can't race.
-      const feedback = await client.query<{
-        id: number;
-        target_prompt_key: string;
-      }>(
-        `SELECT id, target_prompt_key
-           FROM ai_insight_feedback
-          WHERE id = $1
-          FOR UPDATE`,
-        [numericId],
-      );
-
-      if (feedback.rowCount === 0) {
-        await client.query('ROLLBACK');
-        return NextResponse.json({ error: 'Feedback not found' }, { status: 404 });
-      }
-
-      const targetKey = feedback.rows[0].target_prompt_key;
-
-      const updated = await client.query<{
-        prompt_key: string;
-        prompt_text: string;
-        previous_text: string | null;
-        previous_text_2: string | null;
-        updated_at: Date;
-      }>(
-        `UPDATE ai_insight_prompts
-            SET previous_text_2 = previous_text,
-                previous_text   = prompt_text,
-                prompt_text     = $2,
-                updated_at      = NOW(),
-                updated_by      = $3
-          WHERE prompt_key = $1
-          RETURNING prompt_key, prompt_text, previous_text, previous_text_2, updated_at`,
-        [targetKey, proposedText, body.updatedBy ?? 'feedback-apply'],
-      );
-
-      if (updated.rowCount === 0) {
-        await client.query('ROLLBACK');
-        return NextResponse.json(
-          { error: `Target prompt no longer exists: ${targetKey}` },
-          { status: 409 },
-        );
-      }
-
-      await client.query(
-        `DELETE FROM ai_insight_feedback WHERE id = $1`,
-        [numericId],
-      );
-
-      await client.query('COMMIT');
-
-      invalidateCache();
-
-      const r = updated.rows[0];
-      return NextResponse.json({
-        ok: true,
-        prompt: {
-          promptKey: r.prompt_key,
-          promptText: r.prompt_text,
-          hasPrevious: r.previous_text != null,
-          hasPrevious2: r.previous_text_2 != null,
-          updatedAt: r.updated_at.toISOString(),
-        },
+      inserted = await insertVersionAndSelect({
+        promptKey: targetKey,
+        promptText: proposedText,
+        createdBy: body.updatedBy ?? 'feedback-apply',
+        sourceFeedbackId: numericId,
       });
     } catch (err) {
-      await client.query('ROLLBACK');
+      if (err instanceof Error && err.message === VERSION_CAP_REACHED) {
+        return NextResponse.json(
+          {
+            error: VERSION_CAP_REACHED,
+            message:
+              'The prompt version section is full. Please clear unwanted versions before proceeding with this action.',
+          },
+          { status: 400 },
+        );
+      }
       throw err;
-    } finally {
-      client.release();
     }
+
+    // Feedback row delete happens after a successful version insert. Worst
+    // case if this fails: the version is created but feedback lingers — admin
+    // can discard manually. Acceptable trade-off vs holding a write txn open
+    // across two helpers.
+    await pool.query(`DELETE FROM ai_insight_feedback WHERE id = $1`, [numericId]);
+
+    return NextResponse.json({
+      ok: true,
+      prompt: {
+        promptKey: targetKey,
+        promptText: inserted.promptText,
+        selectedVersionId: inserted.versionId,
+        selectedVersionLabel: inserted.versionLabel,
+      },
+    });
   } catch (err) {
     console.error('ai-insight-feedback [id] apply POST error:', err);
     return NextResponse.json(

@@ -108,6 +108,13 @@ export const SECTION_COMPONENTS: Record<SectionKey, { key: string; name: string;
     { key: 'fv_trend_forecast',     name: 'Trend Forecast',         type: 'kpi' },
     { key: 'fv_budget_suggestions', name: 'AI Budget Suggestions',  type: 'kpi' },
   ],
+  // HR scaffold (Phase 2). Component prompts will be added when HR is properly
+  // implemented — for now only the section guidance row gets seeded.
+  employee_demographics: [],
+  attendance_leave: [],
+  overtime_work_hours: [],
+  payroll_compensation: [],
+  performance_talent: [],
 };
 
 export const SECTION_PAGE: Record<SectionKey, string> = {
@@ -127,6 +134,11 @@ export const SECTION_PAGE: Record<SectionKey, string> = {
   financial_pnl: 'Financial',
   financial_balance_sheet: 'Financial',
   financial_variance: 'Financial',
+  employee_demographics: 'hr',
+  attendance_leave: 'hr',
+  overtime_work_hours: 'hr',
+  payroll_compensation: 'hr',
+  performance_talent: 'hr',
 };
 
 export const SECTION_NAMES: Record<SectionKey, string> = {
@@ -146,6 +158,11 @@ export const SECTION_NAMES: Record<SectionKey, string> = {
   financial_pnl: 'Profit & Loss Detail',
   financial_balance_sheet: 'Balance Sheet',
   financial_variance: 'Variance, Forecast & Budget',
+  employee_demographics: 'Employee Demographics & Movement',
+  attendance_leave: 'Attendance & Leave Monitoring',
+  overtime_work_hours: 'Overtime & Work Hours',
+  payroll_compensation: 'Payroll & Compensation',
+  performance_talent: 'Performance & Talent Management',
 };
 
 // ─── Public API ──────────────────────────────────────────────────────────────

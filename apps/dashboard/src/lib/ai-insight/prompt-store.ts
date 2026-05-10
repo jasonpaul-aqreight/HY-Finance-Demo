@@ -3,6 +3,10 @@
 //
 // Reads should go through prompt-loader.ts (cached). This module only
 // exposes the surface needed by admin API routes.
+//
+// Phase 2 redesign: 2-slot history is gone. Versions live in
+// ai_insight_prompt_versions. ai_insight_prompts.prompt_text is a denormalised
+// cache of the selected version's body — runtime keeps a single-row read.
 
 import { getPool } from '../postgres';
 import {
@@ -13,15 +17,11 @@ import {
   DEFAULT_SURGICAL_EDITOR_SYSTEM,
   DEFAULT_SECTION_GUIDANCE,
 } from './prompts-defaults';
-import { invalidateCache, type PromptCategory, type PromptRow } from './prompt-loader';
+import { invalidateCache } from './prompt-loader';
 
-const SUMMARY_DELIMITER_MARKERS = ['===INSIGHT===', '---DETAIL---', '===END==='] as const;
-
-export interface UpdateResult {
-  ok: boolean;
-  error?: string;
-  warnings?: string[];
-}
+// Static cap: 1 Default + 5 feedback-derived versions per prompt.
+export const VERSION_CAP = 6;
+export const VERSION_CAP_REACHED = 'VERSION_CAP_REACHED';
 
 export function getDefaultPromptText(promptKey: string): string | null {
   if (promptKey === 'global_system') return DEFAULT_GLOBAL_SYSTEM;
@@ -37,197 +37,147 @@ export function getDefaultPromptText(promptKey: string): string | null {
   return DEFAULT_COMPONENT_PROMPTS[promptKey] ?? null;
 }
 
-function validatePromptText(promptKey: string, promptText: string): UpdateResult {
-  if (!promptText || !promptText.trim()) {
-    return { ok: false, error: 'Prompt text cannot be empty' };
-  }
+// ─── Version row view (admin UI shape) ──────────────────────────────────────
 
-  const warnings: string[] = [];
-
-  if (promptKey === 'summary_system') {
-    const missing = SUMMARY_DELIMITER_MARKERS.filter((m) => !promptText.includes(m));
-    if (missing.length > 0) {
-      warnings.push(
-        `Summary parser depends on these delimiters: ${missing.join(', ')}. ` +
-        `Removing them will break section summaries until restored.`
-      );
-    }
-  }
-
-  return warnings.length ? { ok: true, warnings } : { ok: true };
+export interface VersionRowView {
+  id: number;
+  label: string;
+  isDefault: boolean;
+  isSelected: boolean;
+  createdAt: string;
+  createdBy: string | null;
 }
 
-// Shared write that rotates the two-step history in one statement.
-// Used by every path that changes prompt_text (manual save, reset, surgical
-// apply rotates inline in its own transaction, revert rotates explicitly).
-// Per Phase-2 lessons: centralising rotation prevents silent corruption when
-// any path forgets to rotate.
-interface RotatedRow {
+interface VersionDbRow {
+  id: number;
   prompt_key: string;
+  version_label: string;
+  is_default: boolean;
   prompt_text: string;
-  previous_text: string | null;
-  previous_text_2: string | null;
-  category: PromptCategory;
-  page: string | null;
-  section_key: string | null;
-  section_name: string | null;
-  component_type: 'kpi' | 'chart' | 'table' | 'breakdown' | null;
-  display_name: string;
-  sort_order: number;
-  updated_at: Date;
-  updated_by: string | null;
+  created_at: Date;
+  created_by: string | null;
+  source_feedback_id: number | null;
 }
 
-async function rotateAndWrite(
-  promptKey: string,
-  newText: string,
-  updatedBy: string | null,
-): Promise<{ rowCount: number; row?: RotatedRow }> {
-  const pool = getPool();
-  const { rows, rowCount } = await pool.query<RotatedRow>(
-    `UPDATE ai_insight_prompts
-        SET previous_text_2 = previous_text,
-            previous_text   = prompt_text,
-            prompt_text     = $2,
-            updated_at      = NOW(),
-            updated_by      = $3
-      WHERE prompt_key = $1
-      RETURNING prompt_key, prompt_text, previous_text, previous_text_2,
-                category, page, section_key, section_name, component_type,
-                display_name, sort_order, updated_at, updated_by`,
-    [promptKey, newText, updatedBy],
-  );
-  return { rowCount: rowCount ?? 0, row: rows[0] };
-}
-
-export async function updatePrompt(
-  promptKey: string,
-  promptText: string,
-  updatedBy: string | null,
-): Promise<UpdateResult> {
-  const validation = validatePromptText(promptKey, promptText);
-  if (!validation.ok) return validation;
-
-  const { rowCount } = await rotateAndWrite(promptKey, promptText, updatedBy);
-
-  if (rowCount === 0) {
-    return { ok: false, error: `Unknown prompt key: ${promptKey}` };
-  }
-
-  invalidateCache();
-  return validation; // carries warnings (if any)
-}
-
-export async function resetPrompt(
-  promptKey: string,
-  updatedBy: string | null,
-): Promise<{ ok: boolean; prompt?: PromptRow; error?: string }> {
-  const defaultText = getDefaultPromptText(promptKey);
-  if (defaultText == null) {
-    return { ok: false, error: `Unknown prompt key: ${promptKey}` };
-  }
-
-  const { rowCount, row: r } = await rotateAndWrite(promptKey, defaultText, updatedBy);
-
-  if (rowCount === 0 || !r) {
-    return { ok: false, error: `Prompt not found in DB: ${promptKey}. Has the seed endpoint been run?` };
-  }
-
-  invalidateCache();
-
+function toView(row: VersionDbRow, selectedVersionId: number | null): VersionRowView {
   return {
-    ok: true,
-    prompt: {
-      promptKey: r.prompt_key,
-      promptText: r.prompt_text,
-      previousText: r.previous_text,
-      previousText2: r.previous_text_2,
-      category: r.category,
-      page: r.page,
-      sectionKey: r.section_key,
-      sectionName: r.section_name,
-      componentType: r.component_type,
-      displayName: r.display_name,
-      sortOrder: r.sort_order,
-      updatedAt: r.updated_at.toISOString(),
-      updatedBy: r.updated_by,
-    },
+    id: row.id,
+    label: row.version_label,
+    isDefault: row.is_default,
+    isSelected: selectedVersionId === row.id,
+    createdAt: row.created_at.toISOString(),
+    createdBy: row.created_by,
   };
 }
 
-// Revert restores either the previous or previous-2 snapshot into prompt_text,
-// rotating the history slots so the action is itself reversible. Returns the
-// new state of all three slots so the caller can refresh its UI.
-export async function revertPrompt(
-  promptKey: string,
-  to: 'previous' | 'previous_2',
-  updatedBy: string | null,
-): Promise<{
-  ok: boolean;
-  error?: string;
-  prompt?: {
-    promptKey: string;
-    promptText: string;
-    hasPrevious: boolean;
-    hasPrevious2: boolean;
-    updatedAt: string;
-  };
-}> {
+// ─── Read: list versions ────────────────────────────────────────────────────
+
+// Returns versions sorted Default-first, then created_at DESC. Includes the
+// `isSelected` flag for each row so the UI can highlight the active card.
+export async function listVersions(promptKey: string): Promise<VersionRowView[]> {
+  const pool = getPool();
+  const sel = await pool.query<{ selected_version_id: number | null }>(
+    `SELECT selected_version_id FROM ai_insight_prompts WHERE prompt_key = $1`,
+    [promptKey],
+  );
+  if (sel.rowCount === 0) return [];
+  const selectedVersionId = sel.rows[0].selected_version_id;
+
+  const { rows } = await pool.query<VersionDbRow>(
+    `SELECT id, prompt_key, version_label, is_default, prompt_text,
+            created_at, created_by, source_feedback_id
+       FROM ai_insight_prompt_versions
+      WHERE prompt_key = $1
+      ORDER BY is_default DESC, created_at DESC`,
+    [promptKey],
+  );
+  return rows.map((r) => toView(r, selectedVersionId));
+}
+
+// ─── Write: insert version + select + cache through ─────────────────────────
+
+export interface InsertVersionInput {
+  promptKey: string;
+  promptText: string;
+  createdBy: string | null;
+  sourceFeedbackId?: number | null;
+  versionLabel?: string;
+}
+
+export interface InsertVersionResult {
+  versionId: number;
+  promptText: string;
+  versionLabel: string;
+}
+
+// Inserts a new version row, updates selected_version_id, writes prompt_text
+// cache — all in one transaction. Throws VERSION_CAP_REACHED if the prompt
+// already has VERSION_CAP versions. Caller must catch and translate.
+//
+// versionLabel defaults to `${createdBy} · ${formatted date}` per Mary's
+// label format. UTC formatting kept simple — UI can re-format later if needed.
+export async function insertVersionAndSelect(
+  input: InsertVersionInput,
+): Promise<InsertVersionResult> {
   const pool = getPool();
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const current = await client.query<{
-      prompt_text: string;
-      previous_text: string | null;
-      previous_text_2: string | null;
-    }>(
-      `SELECT prompt_text, previous_text, previous_text_2
-         FROM ai_insight_prompts
-        WHERE prompt_key = $1
-        FOR UPDATE`,
-      [promptKey],
+
+    // Lock the prompt row so concurrent applies can't both pass the cap check.
+    const promptCheck = await client.query<{ prompt_key: string }>(
+      `SELECT prompt_key FROM ai_insight_prompts WHERE prompt_key = $1 FOR UPDATE`,
+      [input.promptKey],
     );
-    if (current.rowCount === 0) {
+    if (promptCheck.rowCount === 0) {
       await client.query('ROLLBACK');
-      return { ok: false, error: `Unknown prompt key: ${promptKey}` };
+      throw new Error(`Unknown prompt key: ${input.promptKey}`);
     }
-    const c = current.rows[0];
-    const target = to === 'previous' ? c.previous_text : c.previous_text_2;
-    if (target == null) {
+
+    const countResult = await client.query<{ count: string }>(
+      `SELECT COUNT(*)::text AS count FROM ai_insight_prompt_versions WHERE prompt_key = $1`,
+      [input.promptKey],
+    );
+    const count = Number.parseInt(countResult.rows[0].count, 10) || 0;
+    if (count >= VERSION_CAP) {
       await client.query('ROLLBACK');
-      return { ok: false, error: `No ${to} snapshot available for ${promptKey}` };
+      throw new Error(VERSION_CAP_REACHED);
     }
-    // Rotate identically to a normal write so the revert is itself reversible.
-    const updated = await client.query<{
-      prompt_key: string;
-      prompt_text: string;
-      previous_text: string | null;
-      previous_text_2: string | null;
-      updated_at: Date;
-    }>(
+
+    const label = input.versionLabel ?? buildVersionLabel(input.createdBy);
+
+    const inserted = await client.query<{ id: number; version_label: string }>(
+      `INSERT INTO ai_insight_prompt_versions
+         (prompt_key, version_label, is_default, prompt_text, created_by, source_feedback_id)
+       VALUES ($1, $2, FALSE, $3, $4, $5)
+       RETURNING id, version_label`,
+      [
+        input.promptKey,
+        label,
+        input.promptText,
+        input.createdBy,
+        input.sourceFeedbackId ?? null,
+      ],
+    );
+    const versionId = inserted.rows[0].id;
+
+    await client.query(
       `UPDATE ai_insight_prompts
-          SET previous_text_2 = previous_text,
-              previous_text   = prompt_text,
-              prompt_text     = $2,
-              updated_at      = NOW(),
-              updated_by      = $3
-        WHERE prompt_key = $1
-        RETURNING prompt_key, prompt_text, previous_text, previous_text_2, updated_at`,
-      [promptKey, target, updatedBy],
+          SET selected_version_id = $2,
+              prompt_text         = $3,
+              updated_at          = NOW(),
+              updated_by          = $4
+        WHERE prompt_key = $1`,
+      [input.promptKey, versionId, input.promptText, input.createdBy],
     );
+
     await client.query('COMMIT');
     invalidateCache();
-    const r = updated.rows[0];
+
     return {
-      ok: true,
-      prompt: {
-        promptKey: r.prompt_key,
-        promptText: r.prompt_text,
-        hasPrevious: r.previous_text != null,
-        hasPrevious2: r.previous_text_2 != null,
-        updatedAt: r.updated_at.toISOString(),
-      },
+      versionId,
+      promptText: input.promptText,
+      versionLabel: inserted.rows[0].version_label,
     };
   } catch (err) {
     await client.query('ROLLBACK');
@@ -237,38 +187,171 @@ export async function revertPrompt(
   }
 }
 
-export async function resetAllPrompts(updatedBy: string | null): Promise<{ ok: boolean; count: number }> {
+// ─── Write: select an existing version ──────────────────────────────────────
+
+export interface SelectVersionInput {
+  promptKey: string;
+  versionId: number;
+}
+
+export async function selectVersion(input: SelectVersionInput): Promise<{ ok: boolean; error?: string }> {
   const pool = getPool();
   const client = await pool.connect();
-  let count = 0;
   try {
     await client.query('BEGIN');
-    const { rows } = await client.query<{ prompt_key: string }>(
-      `SELECT prompt_key FROM ai_insight_prompts`
+
+    const v = await client.query<{ prompt_text: string; prompt_key: string }>(
+      `SELECT prompt_text, prompt_key
+         FROM ai_insight_prompt_versions
+        WHERE id = $1 AND prompt_key = $2
+        FOR UPDATE`,
+      [input.versionId, input.promptKey],
     );
-    for (const { prompt_key } of rows) {
-      const defaultText = getDefaultPromptText(prompt_key);
-      if (defaultText == null) continue; // orphan row (key removed from defaults) — skip
-      await client.query(
-        `UPDATE ai_insight_prompts
-            SET previous_text_2 = previous_text,
-                previous_text   = prompt_text,
-                prompt_text     = $2,
-                updated_at      = NOW(),
-                updated_by      = $3
-          WHERE prompt_key = $1`,
-        [prompt_key, defaultText, updatedBy],
-      );
-      count++;
+    if (v.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return { ok: false, error: `Version ${input.versionId} not found for ${input.promptKey}` };
     }
+
+    await client.query(
+      `UPDATE ai_insight_prompts
+          SET selected_version_id = $2,
+              prompt_text         = $3,
+              updated_at          = NOW()
+        WHERE prompt_key = $1`,
+      [input.promptKey, input.versionId, v.rows[0].prompt_text],
+    );
+
     await client.query('COMMIT');
+    invalidateCache();
+    return { ok: true };
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;
   } finally {
     client.release();
   }
+}
 
-  invalidateCache();
-  return { ok: true, count };
+// ─── Write: delete a non-default version ────────────────────────────────────
+
+export interface DeleteVersionInput {
+  promptKey: string;
+  versionId: number;
+}
+
+export interface DeleteVersionResult {
+  ok: boolean;
+  error?: string;
+  // When the deleted version was selected, this is the version that took its
+  // place (next-newer in created_at order, falling back to Default).
+  newSelectedVersionId?: number;
+}
+
+export async function deleteVersion(input: DeleteVersionInput): Promise<DeleteVersionResult> {
+  const pool = getPool();
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const target = await client.query<{
+      id: number;
+      is_default: boolean;
+      created_at: Date;
+    }>(
+      `SELECT id, is_default, created_at
+         FROM ai_insight_prompt_versions
+        WHERE id = $1 AND prompt_key = $2
+        FOR UPDATE`,
+      [input.versionId, input.promptKey],
+    );
+    if (target.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return { ok: false, error: `Version ${input.versionId} not found for ${input.promptKey}` };
+    }
+    if (target.rows[0].is_default) {
+      await client.query('ROLLBACK');
+      return { ok: false, error: 'Cannot delete the Default version.' };
+    }
+
+    const promptRow = await client.query<{ selected_version_id: number | null }>(
+      `SELECT selected_version_id FROM ai_insight_prompts WHERE prompt_key = $1 FOR UPDATE`,
+      [input.promptKey],
+    );
+    const wasSelected = promptRow.rows[0]?.selected_version_id === input.versionId;
+
+    let newSelectedVersionId: number | undefined;
+    if (wasSelected) {
+      // Pick fallback: next-newer non-default, else Default. Use the deleted
+      // row's created_at as the boundary so we resolve symmetrically whether
+      // it was newest, oldest, or middle.
+      const fallback = await client.query<{ id: number; prompt_text: string }>(
+        `SELECT id, prompt_text
+           FROM ai_insight_prompt_versions
+          WHERE prompt_key = $1
+            AND id <> $2
+          ORDER BY
+            CASE WHEN created_at > $3 THEN 0 ELSE 1 END,
+            CASE WHEN created_at > $3 THEN created_at END ASC,
+            CASE WHEN created_at <= $3 THEN created_at END DESC,
+            is_default DESC
+          LIMIT 1`,
+        [input.promptKey, input.versionId, target.rows[0].created_at],
+      );
+      if (fallback.rowCount === 0) {
+        await client.query('ROLLBACK');
+        return { ok: false, error: 'No fallback version available.' };
+      }
+      newSelectedVersionId = fallback.rows[0].id;
+      await client.query(
+        `UPDATE ai_insight_prompts
+            SET selected_version_id = $2,
+                prompt_text         = $3,
+                updated_at          = NOW()
+          WHERE prompt_key = $1`,
+        [input.promptKey, newSelectedVersionId, fallback.rows[0].prompt_text],
+      );
+    }
+
+    await client.query(
+      `DELETE FROM ai_insight_prompt_versions WHERE id = $1`,
+      [input.versionId],
+    );
+
+    await client.query('COMMIT');
+    invalidateCache();
+    return { ok: true, newSelectedVersionId };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+function buildVersionLabel(createdBy: string | null): string {
+  // Format: "${created_by} · May 10, 10:53 AM" — UTC time, simple Intl format.
+  // The UI is free to re-render in the user's locale; we just need a stable
+  // human-readable label for fallback display.
+  const who = createdBy && createdBy.trim() ? createdBy : 'system';
+  const now = new Date();
+  const date = now.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+  return `${who} · ${date}`;
+}
+
+// Convenience: read the currently-selected version id for a prompt.
+export async function getSelectedVersionId(promptKey: string): Promise<number | null> {
+  const pool = getPool();
+  const { rows } = await pool.query<{ selected_version_id: number | null }>(
+    `SELECT selected_version_id FROM ai_insight_prompts WHERE prompt_key = $1`,
+    [promptKey],
+  );
+  return rows[0]?.selected_version_id ?? null;
 }

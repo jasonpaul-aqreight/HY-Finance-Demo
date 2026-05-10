@@ -10,8 +10,8 @@ import { useRole } from '@/components/layout/RoleProvider';
 export interface PromptRowView {
   promptKey: string;
   promptText: string;
-  previousText: string | null;
-  previousText2: string | null;
+  selectedVersionId: number | null;
+  selectedVersionLabel: string | null;
   category: 'system' | 'component' | 'section_guidance';
   page: string | null;
   sectionKey: string | null;
@@ -21,9 +21,12 @@ export interface PromptRowView {
   sortOrder: number;
   updatedAt: string;
   updatedBy: string | null;
-  defaultText: string | null;
-  isModified: boolean;
   feedbackCount: number;
+  // Phase 2 transitional: backend no longer emits these. Phase 3 (task 3.5)
+  // removes the modified-dot rendering in PromptTree.tsx along with these
+  // optional fields. Runtime value is always undefined → falsy → no dot.
+  isModified?: boolean;
+  defaultText?: string | null;
 }
 
 const fetcher = async (url: string) => {

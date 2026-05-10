@@ -90,11 +90,16 @@ function buildSeedRows(): SeedRow[] {
     // Guidance row — sort_order 0 so it sits above the components in the admin
     // sidebar tree. Stored under DB category `section_guidance` (the column
     // value stays for back-compat); the user-facing label is "Guidance".
+    // HR sections (page='hr') always get a row, even when DEFAULT_SECTION_GUIDANCE
+    // has no entry — Phase 2 scaffold ships them empty so admin/HR PRD work
+    // can fill them in. Migration 020 dropped the non-empty CHECK constraint
+    // so '' is now a valid prompt_text.
     const guidanceText = DEFAULT_SECTION_GUIDANCE[sectionKey];
-    if (guidanceText) {
+    const isHr = SECTION_PAGE[sectionKey] === 'hr';
+    if (guidanceText || isHr) {
       rows.push({
         prompt_key: sectionGuidanceKey(sectionKey),
-        prompt_text: guidanceText,
+        prompt_text: guidanceText ?? '',
         category: 'section_guidance',
         page: SECTION_PAGE[sectionKey],
         section_key: sectionKey,
@@ -180,6 +185,28 @@ export async function POST(req: NextRequest) {
       );
       if (result.rowCount && result.rowCount > 0) touched++;
     }
+
+    // Ensure every prompt has a Default version + selected_version_id pointing
+    // at it. This catches both newly-inserted prompts (no version yet) and any
+    // legacy gap. Idempotent: NOT EXISTS skips prompts that already have a Default.
+    await pool.query(`
+      INSERT INTO ai_insight_prompt_versions
+        (prompt_key, version_label, is_default, prompt_text, created_by)
+      SELECT p.prompt_key, 'Default', TRUE, p.prompt_text, 'seed'
+        FROM ai_insight_prompts p
+       WHERE NOT EXISTS (
+         SELECT 1 FROM ai_insight_prompt_versions v
+          WHERE v.prompt_key = p.prompt_key AND v.is_default = TRUE
+       )
+    `);
+    await pool.query(`
+      UPDATE ai_insight_prompts p
+         SET selected_version_id = v.id
+        FROM ai_insight_prompt_versions v
+       WHERE v.prompt_key = p.prompt_key
+         AND v.is_default = TRUE
+         AND p.selected_version_id IS NULL
+    `);
 
     invalidateCache();
 

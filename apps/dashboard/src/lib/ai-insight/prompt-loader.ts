@@ -25,8 +25,7 @@ export type PromptCategory = 'system' | 'component' | 'section_guidance';
 export interface PromptRow {
   promptKey: string;
   promptText: string;
-  previousText: string | null;
-  previousText2: string | null;
+  selectedVersionId: number | null;
   category: PromptCategory;
   page: string | null;
   sectionKey: string | null;
@@ -52,8 +51,7 @@ async function loadSnapshot(): Promise<Snapshot> {
   const { rows } = await pool.query<{
     prompt_key: string;
     prompt_text: string;
-    previous_text: string | null;
-    previous_text_2: string | null;
+    selected_version_id: number | null;
     category: PromptCategory;
     page: string | null;
     section_key: string | null;
@@ -64,7 +62,7 @@ async function loadSnapshot(): Promise<Snapshot> {
     updated_at: Date;
     updated_by: string | null;
   }>(`
-    SELECT prompt_key, prompt_text, previous_text, previous_text_2,
+    SELECT prompt_key, prompt_text, selected_version_id,
            category, page, section_key, section_name,
            component_type, display_name, sort_order, updated_at, updated_by
     FROM ai_insight_prompts
@@ -77,8 +75,7 @@ async function loadSnapshot(): Promise<Snapshot> {
     return {
       promptKey: r.prompt_key,
       promptText: r.prompt_text,
-      previousText: r.previous_text,
-      previousText2: r.previous_text_2,
+      selectedVersionId: r.selected_version_id,
       category: r.category,
       page: r.page,
       sectionKey: r.section_key,

@@ -21,6 +21,14 @@ const SECTION_POLICY: Record<SectionKey, ToolPolicy> = {
   financial_pnl: 'aggregate_only',
   financial_balance_sheet: 'aggregate_only',
   financial_variance: 'aggregate_only',
+  // HR scaffold (Phase 2) — config-only, no analyze pipeline yet. 'none' until
+  // HR fetchers are built; safe default since the analyze route never reaches
+  // these section keys today.
+  employee_demographics: 'none',
+  attendance_leave: 'none',
+  overtime_work_hours: 'none',
+  payroll_compensation: 'none',
+  performance_talent: 'none',
 };
 
 const AGGREGATE_LOCAL_TABLES = new Set([

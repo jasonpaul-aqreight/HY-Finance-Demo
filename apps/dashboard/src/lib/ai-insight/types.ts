@@ -1,6 +1,6 @@
 // ─── AI Insight Engine — Shared Types ────────────────────────────────────────
 
-export type PageKey = 'payment' | 'sales' | 'customer-margin' | 'supplier-performance' | 'return' | 'expenses' | 'financial';
+export type PageKey = 'payment' | 'sales' | 'customer-margin' | 'supplier-performance' | 'return' | 'expenses' | 'financial' | 'hr';
 
 export type SectionKey =
   | 'payment_collection_trend'
@@ -18,7 +18,12 @@ export type SectionKey =
   | 'financial_overview'
   | 'financial_pnl'
   | 'financial_balance_sheet'
-  | 'financial_variance';
+  | 'financial_variance'
+  | 'employee_demographics'
+  | 'attendance_leave'
+  | 'overtime_work_hours'
+  | 'payroll_compensation'
+  | 'performance_talent';
 
 export type ComponentType = 'kpi' | 'chart' | 'table' | 'breakdown';
 

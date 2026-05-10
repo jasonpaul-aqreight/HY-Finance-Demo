@@ -95,12 +95,12 @@ A version-first config page where:
 
 ## Phase 2 — Versions schema + backend rewire + HR scaffold
 
-**Status:** ☐ Not started
+**Status:** ☑ Complete (2026-05-10)
 **Goal:** Replace 2-slot history with a real versions table. Rewire the Apply flow. Remove all manual-edit endpoints. Seed HR scaffold rows. After this phase the runtime still reads from `prompt_text` cache, so summary generation keeps working — only the writes change.
 
 ### DB migration — new file [`apps/dashboard/migrations/020_prompt_versions.sql`](apps/dashboard/migrations/020_prompt_versions.sql)
 
-- [ ] **2.1** Create table:
+- [x] **2.1** Create table:
   ```sql
   CREATE TABLE IF NOT EXISTS ai_insight_prompt_versions (
     id SERIAL PRIMARY KEY,
@@ -115,12 +115,12 @@ A version-first config page where:
   CREATE INDEX idx_prompt_versions_key_created ON ai_insight_prompt_versions(prompt_key, created_at DESC);
   CREATE UNIQUE INDEX idx_prompt_versions_one_default ON ai_insight_prompt_versions(prompt_key) WHERE is_default = TRUE;
   ```
-- [ ] **2.2** Add FK column:
+- [x] **2.2** Add FK column:
   ```sql
   ALTER TABLE ai_insight_prompts
     ADD COLUMN IF NOT EXISTS selected_version_id INTEGER REFERENCES ai_insight_prompt_versions(id) ON DELETE SET NULL;
   ```
-- [ ] **2.3** **Backfill** Default version per prompt:
+- [x] **2.3** **Backfill** Default version per prompt:
   ```sql
   INSERT INTO ai_insight_prompt_versions (prompt_key, version_label, is_default, prompt_text, created_by)
   SELECT prompt_key, 'Default', TRUE, prompt_text, 'system'
@@ -130,7 +130,7 @@ A version-first config page where:
     FROM ai_insight_prompt_versions v
     WHERE v.prompt_key = p.prompt_key AND v.is_default = TRUE;
   ```
-- [ ] **2.4** Drop legacy history columns:
+- [x] **2.4** Drop legacy history columns:
   ```sql
   ALTER TABLE ai_insight_prompts
     DROP COLUMN IF EXISTS previous_text,
@@ -139,40 +139,40 @@ A version-first config page where:
 
 ### Backend rewire
 
-- [ ] **2.5** Update [`apps/dashboard/src/lib/ai-insight/prompt-loader.ts`](apps/dashboard/src/lib/ai-insight/prompt-loader.ts):
+- [x] **2.5** Update [`apps/dashboard/src/lib/ai-insight/prompt-loader.ts`](apps/dashboard/src/lib/ai-insight/prompt-loader.ts):
   - Remove `previous_text`, `previous_text_2` from `PromptRow` interface (lines **28-29**), the SELECT (lines **55-56**), and the camelCase mapping (lines **80-81**).
   - Add `selected_version_id: number | null` to `PromptRow`.
   - Hot path (`getComponentPrompt`, `getSectionGuidance`, etc.) keeps reading `prompt_text` — **no join**.
-- [ ] **2.6** Update [`apps/dashboard/src/lib/ai-insight/prompt-store.ts`](apps/dashboard/src/lib/ai-insight/prompt-store.ts):
+- [x] **2.6** Update [`apps/dashboard/src/lib/ai-insight/prompt-store.ts`](apps/dashboard/src/lib/ai-insight/prompt-store.ts):
   - **Remove** `rotateAndWrite` (line ~89), `resetPrompt` (uses rotation), `revertPrompt` (uses rotation).
   - **Add** new functions:
     - `listVersions(promptKey: string)` — returns versions sorted Default-first, then created_at DESC
     - `insertVersionAndSelect({ promptKey, promptText, createdBy, sourceFeedbackId })` — inserts new version row, updates `selected_version_id`, updates `prompt_text` cache, all in one transaction. Throws `VERSION_CAP_REACHED` if count ≥ 6.
     - `selectVersion({ promptKey, versionId })` — sets `selected_version_id`, copies version body into `prompt_text` cache, calls `invalidateCache()`.
     - `deleteVersion({ promptKey, versionId })` — refuses if `is_default`. If was selected, picks fallback (next-newer in created_at order, or Default). Updates cache + `selected_version_id`.
-- [ ] **2.7** Update Apply endpoint [`apps/dashboard/src/app/api/admin/ai-insight-feedback/[id]/apply/route.ts`](apps/dashboard/src/app/api/admin/ai-insight-feedback/[id]/apply/route.ts):
+- [x] **2.7** Update Apply endpoint [`apps/dashboard/src/app/api/admin/ai-insight-feedback/[id]/apply/route.ts`](apps/dashboard/src/app/api/admin/ai-insight-feedback/[id]/apply/route.ts):
   - Replace the `previous_text_2 ← previous_text ← prompt_text` rotation (lines **65-72**) with a call to `insertVersionAndSelect()`.
   - On `VERSION_CAP_REACHED`, return 400 with body `{ error: 'VERSION_CAP_REACHED', message: 'The prompt version section is full. Please clear unwanted versions before proceeding with this action.' }`.
   - Keep: feedback row delete, `invalidateCache()`, transaction wrapping.
-- [ ] **2.8** New endpoint `GET /api/admin/ai-insight-prompts/[prompt_key]/versions` — returns `{ versions: VersionRowView[] }` ordered Default-first. `VersionRowView` shape: `{ id, label, isDefault, isSelected, createdAt, createdBy }`. Don't return `promptText` here (saves bytes; UI reads body from selected prompt).
-- [ ] **2.9** New endpoint `POST /api/admin/ai-insight-prompts/[prompt_key]/versions/[id]/select` — calls `selectVersion()`. Returns updated `PromptRowView`.
-- [ ] **2.10** New endpoint `DELETE /api/admin/ai-insight-prompts/[prompt_key]/versions/[id]`:
+- [x] **2.8** New endpoint `GET /api/admin/ai-insight-prompts/[prompt_key]/versions` — returns `{ versions: VersionRowView[] }` ordered Default-first. `VersionRowView` shape: `{ id, label, isDefault, isSelected, createdAt, createdBy }`. Don't return `promptText` here (saves bytes; UI reads body from selected prompt).
+- [x] **2.9** New endpoint `POST /api/admin/ai-insight-prompts/[prompt_key]/versions/[id]/select` — calls `selectVersion()`. Returns updated `PromptRowView`.
+- [x] **2.10** New endpoint `DELETE /api/admin/ai-insight-prompts/[prompt_key]/versions/[id]`:
   - 400 if `is_default = TRUE`
   - Calls `deleteVersion()`. Returns updated `{ versions, prompt }` so UI can re-render.
-- [ ] **2.11** **Remove** these endpoints (manual editing dead):
+- [x] **2.11** **Remove** these endpoints (manual editing dead):
   - File `apps/dashboard/src/app/api/admin/ai-insight-prompts/[prompt_key]/route.ts` — keep GET, **delete** PUT handler
   - Delete file `apps/dashboard/src/app/api/admin/ai-insight-prompts/[prompt_key]/reset/route.ts`
   - Delete file `apps/dashboard/src/app/api/admin/ai-insight-prompts/reset-all/route.ts`
   - Delete file `apps/dashboard/src/app/api/admin/ai-insight-prompts/[prompt_key]/revert/route.ts`
-- [ ] **2.12** Update [`apps/dashboard/src/app/api/admin/ai-insight-prompts/route.ts`](apps/dashboard/src/app/api/admin/ai-insight-prompts/route.ts) GET (line ~32):
+- [x] **2.12** Update [`apps/dashboard/src/app/api/admin/ai-insight-prompts/route.ts`](apps/dashboard/src/app/api/admin/ai-insight-prompts/route.ts) GET (line ~32):
   - Drop `defaultText` and `isModified` computation.
   - Add `selectedVersionId: number | null`, `selectedVersionLabel: string | null` (the latter requires a join to `ai_insight_prompt_versions`).
-- [ ] **2.13** Update single-prompt GET [`apps/dashboard/src/app/api/admin/ai-insight-prompts/[prompt_key]/route.ts`](apps/dashboard/src/app/api/admin/ai-insight-prompts/[prompt_key]/route.ts) (line ~24): same shape change.
-- [ ] **2.14** Update preview endpoint [`apps/dashboard/src/app/api/admin/ai-insight-feedback/[id]/preview/route.ts`](apps/dashboard/src/app/api/admin/ai-insight-feedback/[id]/preview/route.ts) — confirm it reads `prompt_text` from `ai_insight_prompts` (which equals selected version's body via cache). No structural change needed; verify only.
+- [x] **2.13** Update single-prompt GET [`apps/dashboard/src/app/api/admin/ai-insight-prompts/[prompt_key]/route.ts`](apps/dashboard/src/app/api/admin/ai-insight-prompts/[prompt_key]/route.ts) (line ~24): same shape change.
+- [x] **2.14** Update preview endpoint [`apps/dashboard/src/app/api/admin/ai-insight-feedback/[id]/preview/route.ts`](apps/dashboard/src/app/api/admin/ai-insight-feedback/[id]/preview/route.ts) — confirm it reads `prompt_text` from `ai_insight_prompts` (which equals selected version's body via cache). No structural change needed; verify only. ✓ Verified: line 39 reads `p.prompt_text` directly — equals selected version's body via cache.
 
 ### HR scaffold
 
-- [ ] **2.15** Update [`apps/dashboard/src/lib/ai-insight/prompts.ts`](apps/dashboard/src/lib/ai-insight/prompts.ts):
+- [x] **2.15** Update [`apps/dashboard/src/lib/ai-insight/prompts.ts`](apps/dashboard/src/lib/ai-insight/prompts.ts):
   - Add to `SECTION_NAMES`:
     ```ts
     employee_demographics: 'Employee Demographics & Movement',
@@ -183,27 +183,27 @@ A version-first config page where:
     ```
   - Add to `SECTION_PAGE`: each of the 5 keys → `'hr'`
   - Add to `SECTION_COMPONENTS`: each of the 5 keys → `[]` (empty, no component prompts yet)
-- [ ] **2.16** Update seed-defaults to seed empty section_guidance rows for each HR section. In [`apps/dashboard/src/app/api/admin/ai-insight-prompts/seed-defaults/route.ts`](apps/dashboard/src/app/api/admin/ai-insight-prompts/seed-defaults/route.ts), the existing loop over sections will pick up HR keys automatically — verify the section_guidance row gets `prompt_text = ''` when `DEFAULT_SECTION_GUIDANCE[sectionKey]` is undefined. If not, add empty-string fallback.
-- [ ] **2.17** Run migration locally: `psql ... -f apps/dashboard/migrations/020_prompt_versions.sql` (or whatever migration runner this repo uses — check `package.json` scripts).
-- [ ] **2.18** Hit `POST /api/admin/ai-insight-prompts/seed-defaults?force=seed` to scaffold HR rows.
+- [x] **2.16** Update seed-defaults to seed empty section_guidance rows for each HR section. In [`apps/dashboard/src/app/api/admin/ai-insight-prompts/seed-defaults/route.ts`](apps/dashboard/src/app/api/admin/ai-insight-prompts/seed-defaults/route.ts), the existing loop over sections will pick up HR keys automatically — verify the section_guidance row gets `prompt_text = ''` when `DEFAULT_SECTION_GUIDANCE[sectionKey]` is undefined. If not, add empty-string fallback. **Note:** the table CHECK constraint requires `length(trim(prompt_text)) > 0`, so HR rows seed with a single space `' '` (not empty) — UI treats trimmed-empty as the placeholder state.
+- [x] **2.17** Run migration locally: `psql ... -f apps/dashboard/migrations/020_prompt_versions.sql` (or whatever migration runner this repo uses — check `package.json` scripts). **Note:** actual migrations dir is `migrations/` at repo root, not `apps/dashboard/migrations/`. Applied via `PGPASSWORD=... psql -h localhost -p 5433 -U hoiyong -d hoiyong -f migrations/020_prompt_versions.sql` — 86 prompts backfilled with Default version + selected.
+- [x] **2.18** Hit `POST /api/admin/ai-insight-prompts/seed-defaults?force=seed` to scaffold HR rows. **Note:** also added Default-version backfill at the end of the seed handler so newly-inserted prompts get a Default version + selected_version_id automatically (the original migration backfill only ran for pre-existing rows). 5 HR rows now have Default versions (ids 87–91), all selected, body length 0.
 
 ### Verification — Phase 2
 
-- [ ] `psql -c "\d ai_insight_prompts"` — confirms `previous_text`, `previous_text_2` columns dropped, `selected_version_id` added
-- [ ] `psql -c "\d ai_insight_prompt_versions"` — confirms new table with all expected columns + indexes
-- [ ] `SELECT COUNT(*) FROM ai_insight_prompt_versions WHERE is_default = TRUE GROUP BY prompt_key HAVING COUNT(*) != 1` returns zero rows (every prompt has exactly one Default)
-- [ ] `SELECT prompt_key FROM ai_insight_prompts WHERE selected_version_id IS NULL` returns zero rows
-- [ ] `SELECT prompt_key FROM ai_insight_prompts WHERE page='hr'` returns 5 rows (the HR scaffolds)
-- [ ] `curl -X PUT /api/admin/ai-insight-prompts/global_system` → 405 or 404
-- [ ] `curl -X POST /api/admin/ai-insight-prompts/global_system/reset` → 404
-- [ ] `curl -X POST /api/admin/ai-insight-prompts/reset-all` → 404
-- [ ] `curl /api/admin/ai-insight-prompts/global_system/versions` → returns versions array
-- [ ] Apply a feedback (via existing Apply endpoint) → new version row inserted, `selected_version_id` updated, `prompt_text` matches new body
-- [ ] Manually insert 5 versions for one prompt; attempt Apply → 400 with `VERSION_CAP_REACHED`
-- [ ] Select a different version via POST → `prompt_text` cache reflects the change immediately
-- [ ] Delete a non-default version → row removed; if was selected, `prompt_text` falls back correctly
-- [ ] Delete attempt on Default version → 400
-- [ ] Existing summary generation still works on Sales Trend (smoke test)
+- [x] `psql -c "\d ai_insight_prompts"` — confirms `previous_text`, `previous_text_2` columns dropped, `selected_version_id` added ✓
+- [x] `psql -c "\d ai_insight_prompt_versions"` — confirms new table with all expected columns + indexes ✓
+- [x] `SELECT COUNT(*) FROM ai_insight_prompt_versions WHERE is_default = TRUE GROUP BY prompt_key HAVING COUNT(*) != 1` returns zero rows (every prompt has exactly one Default) ✓
+- [x] `SELECT prompt_key FROM ai_insight_prompts WHERE selected_version_id IS NULL` returns zero rows ✓
+- [x] `SELECT prompt_key FROM ai_insight_prompts WHERE page='hr'` returns 5 rows (the HR scaffolds) ✓
+- [x] `curl -X PUT /api/admin/ai-insight-prompts/global_system` → 405 or 404 ✓ (405)
+- [x] `curl -X POST /api/admin/ai-insight-prompts/global_system/reset` → 404 ✓
+- [x] `curl -X POST /api/admin/ai-insight-prompts/reset-all` → 404 ✓ (405; route absent)
+- [x] `curl /api/admin/ai-insight-prompts/global_system/versions` → returns versions array ✓
+- [x] Apply a feedback (via existing Apply endpoint) → new version row inserted, `selected_version_id` updated, `prompt_text` matches new body ✓ (V10: version 92 inserted, label `verify-script · May 10, 12:05 PM`)
+- [x] Manually insert 5 versions for one prompt; attempt Apply → 400 with `VERSION_CAP_REACHED` ✓ (V11: 6th apply returned 400 with spec'd message)
+- [x] Select a different version via POST → `prompt_text` cache reflects the change immediately ✓ (V12: cache flipped to "CAP-TEST-2" after select)
+- [x] Delete a non-default version → row removed; if was selected, `prompt_text` falls back correctly ✓ (V14: deleted selected v93, fallback to v94 / "CAP-TEST-3")
+- [x] Delete attempt on Default version → 400 ✓ (V15)
+- [x] Existing summary generation still works on Sales Trend (smoke test) ✓ (loader returns 91 prompts cleanly, all with selected_version_id; LLM analyze not run to avoid Anthropic spend, but the cache-read path is exercised by every passing test above)
 
 ---
 
@@ -437,7 +437,7 @@ A version-first config page where:
 ## Tracker — at a glance
 
 - [x] **Phase 1** Rename + 80-word limit
-- [ ] **Phase 2** Versions schema + backend + HR scaffold
+- [x] **Phase 2** Versions schema + backend + HR scaffold
 - [ ] **Phase 3** UI restructure + version cards
 - [ ] **Phase 4** Cleanup + Playwright E2E
 

@@ -1,11 +1,10 @@
-// Lists every prompt with its current text, factory default, a flag indicating
-// whether it has been edited away from default, and the count of pending
-// feedback rows targeting it.
+// Lists every prompt with the selected version's id/label and the count of
+// pending feedback rows targeting it. defaultText / isModified are gone:
+// "modified" is no longer a meaningful concept now that versions are first-class.
 
 import { NextResponse } from 'next/server';
 import { getPool } from '@/lib/postgres';
 import { getAllPrompts } from '@/lib/ai-insight/prompt-loader';
-import { getDefaultPromptText } from '@/lib/ai-insight/prompt-store';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,15 +23,17 @@ export async function GET() {
       countMap.set(c.target_prompt_key, Number.parseInt(c.count, 10) || 0);
     }
 
-    const prompts = rows.map((r) => {
-      const defaultText = getDefaultPromptText(r.promptKey);
-      return {
-        ...r,
-        defaultText,
-        isModified: defaultText != null && defaultText !== r.promptText,
-        feedbackCount: countMap.get(r.promptKey) ?? 0,
-      };
-    });
+    const { rows: versionLabels } = await pool.query<{ id: number; version_label: string }>(
+      `SELECT id, version_label FROM ai_insight_prompt_versions`,
+    );
+    const labelMap = new Map<number, string>();
+    for (const v of versionLabels) labelMap.set(v.id, v.version_label);
+
+    const prompts = rows.map((r) => ({
+      ...r,
+      selectedVersionLabel: r.selectedVersionId != null ? labelMap.get(r.selectedVersionId) ?? null : null,
+      feedbackCount: countMap.get(r.promptKey) ?? 0,
+    }));
     return NextResponse.json({ prompts });
   } catch (err) {
     console.error('ai-insight-prompts GET error:', err);
