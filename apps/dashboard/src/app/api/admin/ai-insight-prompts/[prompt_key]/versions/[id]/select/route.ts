@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { selectVersion, listVersions } from '@/lib/ai-insight/prompt-store';
-import { getAllPrompts } from '@/lib/ai-insight/prompt-loader';
+import { queryAllPromptsFromDB } from '@/lib/ai-insight/prompt-loader';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,7 +24,7 @@ export async function POST(
     }
 
     const versions = await listVersions(prompt_key);
-    const allPrompts = await getAllPrompts();
+    const allPrompts = await queryAllPromptsFromDB();
     const prompt = allPrompts.find((p) => p.promptKey === prompt_key);
 
     return NextResponse.json({ ok: true, prompt, versions });

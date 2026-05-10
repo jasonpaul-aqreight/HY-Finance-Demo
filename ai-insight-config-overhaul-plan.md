@@ -209,23 +209,23 @@ A version-first config page where:
 
 ## Phase 3 — UI restructure (5 sections + version cards)
 
-**Status:** ☐ Not started
+**Status:** ☑ Complete (2026-05-10)
 **Goal:** Land the new layout per the mockup. Tree on left, then a right-side area split into Breadcrumb (top), Prompt Text + Version Panel (middle row), Feedback (bottom). `PromptEditor.tsx` becomes obsolete; its child components (`FeedbackList`, surgical preview/diff flow) are re-parented to the new dashboard.
 
 ### Components to add
 
-- [ ] **3.1** New [`apps/dashboard/src/components/admin/ai-insight-config/BreadcrumbBar.tsx`](apps/dashboard/src/components/admin/ai-insight-config/BreadcrumbBar.tsx). Derives crumbs from selected prompt's metadata:
+- [x] **3.1** New [`apps/dashboard/src/components/admin/ai-insight-config/BreadcrumbBar.tsx`](apps/dashboard/src/components/admin/ai-insight-config/BreadcrumbBar.tsx). Derives crumbs from selected prompt's metadata:
   - System: `System Prompt / ${displayName}`
   - User Guidance: `User Prompt / ${page} / ${sectionGroup} / ${sectionName} / Guidance`
   - User Component: `User Prompt / ${page} / ${sectionGroup} / ${sectionName} / ${componentName}`
   - HR Guidance: `User Prompt / HR / ${sectionName} / Guidance`
   - No vertical scrolling.
-- [ ] **3.2** New [`apps/dashboard/src/components/admin/ai-insight-config/PromptTextPanel.tsx`](apps/dashboard/src/components/admin/ai-insight-config/PromptTextPanel.tsx). Read-only display:
+- [x] **3.2** New [`apps/dashboard/src/components/admin/ai-insight-config/PromptTextPanel.tsx`](apps/dashboard/src/components/admin/ai-insight-config/PromptTextPanel.tsx). Read-only display:
   - Renders `prompt.promptText` in a non-editable `<pre>` or `<div>` with `white-space: pre-wrap`.
   - Top-right pill shows selected version label.
   - Vertical scrolling when content overflows.
   - **No textarea, no edit, no save** — this is purely view.
-- [ ] **3.3** New [`apps/dashboard/src/components/admin/ai-insight-config/VersionPanel.tsx`](apps/dashboard/src/components/admin/ai-insight-config/VersionPanel.tsx):
+- [x] **3.3** New [`apps/dashboard/src/components/admin/ai-insight-config/VersionPanel.tsx`](apps/dashboard/src/components/admin/ai-insight-config/VersionPanel.tsx):
   - SWR fetches `/api/admin/ai-insight-prompts/${promptKey}/versions`
   - Renders ≤6 cards stacked vertically; **no scroll**
   - Default card: yellow border + "Default" label, no trash icon
@@ -234,7 +234,7 @@ A version-first config page where:
   - Click card → POST `/select` → mutate SWR (versions, prompt, prompts list)
   - Click trash → confirm dialog → DELETE `/versions/[id]` → mutate
   - When 6 cards present, render an inline blocking notice with the warning text (used when feedback Apply is attempted)
-- [ ] **3.4** Rebuild [`apps/dashboard/src/components/admin/ai-insight-config/PromptConfigDashboard.tsx`](apps/dashboard/src/components/admin/ai-insight-config/PromptConfigDashboard.tsx) layout:
+- [x] **3.4** Rebuild [`apps/dashboard/src/components/admin/ai-insight-config/PromptConfigDashboard.tsx`](apps/dashboard/src/components/admin/ai-insight-config/PromptConfigDashboard.tsx) layout:
   ```
   ┌─ TREE ─┬─ BreadcrumbBar (no scroll) ─────────────────┐
   │        │                                              │
@@ -250,12 +250,12 @@ A version-first config page where:
 
 ### Components to modify
 
-- [ ] **3.5** Update [`apps/dashboard/src/components/admin/ai-insight-config/PromptTree.tsx`](apps/dashboard/src/components/admin/ai-insight-config/PromptTree.tsx):
+- [x] **3.5** Update [`apps/dashboard/src/components/admin/ai-insight-config/PromptTree.tsx`](apps/dashboard/src/components/admin/ai-insight-config/PromptTree.tsx):
   - Remove modified-dot rendering at lines **120, 141, 174, 215, 247** (and any other instances). Confirm with a fresh grep for `bg-amber-500` after editing.
   - Drop `isModified` from local types if still present.
   - HR section now appears automatically because Phase 2 seeded `page='hr'` rows; the existing `groupByPage` logic picks them up. **Verify** by reading the tree component code — if it has a Finance-only fallback, generalize.
   - Keep numbered feedback balloon at all 5 render sites.
-- [ ] **3.6** Update [`apps/dashboard/src/components/admin/ai-insight-config/FeedbackList.tsx`](apps/dashboard/src/components/admin/ai-insight-config/FeedbackList.tsx):
+- [x] **3.6** Update [`apps/dashboard/src/components/admin/ai-insight-config/FeedbackList.tsx`](apps/dashboard/src/components/admin/ai-insight-config/FeedbackList.tsx):
   - **Remove** "Show original feedback" toggle (lines **88-99**) and `showRaw` state.
   - Render raw feedback inline (no toggle, always visible).
   - Update Apply error handling: when server returns `VERSION_CAP_REACHED`, surface the warning text (or scroll up to the VersionPanel notice).
@@ -263,22 +263,22 @@ A version-first config page where:
 
 ### Components to delete
 
-- [ ] **3.7** Delete [`apps/dashboard/src/components/admin/ai-insight-config/PromptEditor.tsx`](apps/dashboard/src/components/admin/ai-insight-config/PromptEditor.tsx) — its rendering responsibilities split between BreadcrumbBar / PromptTextPanel / VersionPanel / FeedbackList.
-- [ ] **3.8** Delete [`apps/dashboard/src/components/admin/ai-insight-config/HistoryDropdown.tsx`](apps/dashboard/src/components/admin/ai-insight-config/HistoryDropdown.tsx) — replaced entirely by VersionPanel.
-- [ ] **3.9** Keep [`apps/dashboard/src/components/admin/ai-insight-config/DiffModal.tsx`](apps/dashboard/src/components/admin/ai-insight-config/DiffModal.tsx) and [`apps/dashboard/src/components/admin/ai-insight-config/prompt-diff.tsx`](apps/dashboard/src/components/admin/ai-insight-config/prompt-diff.tsx) — DiffModal still used by FeedbackList for the Apply preview.
+- [x] **3.7** Delete [`apps/dashboard/src/components/admin/ai-insight-config/PromptEditor.tsx`](apps/dashboard/src/components/admin/ai-insight-config/PromptEditor.tsx) — its rendering responsibilities split between BreadcrumbBar / PromptTextPanel / VersionPanel / FeedbackList.
+- [x] **3.8** Delete [`apps/dashboard/src/components/admin/ai-insight-config/HistoryDropdown.tsx`](apps/dashboard/src/components/admin/ai-insight-config/HistoryDropdown.tsx) — replaced entirely by VersionPanel.
+- [x] **3.9** Keep [`apps/dashboard/src/components/admin/ai-insight-config/DiffModal.tsx`](apps/dashboard/src/components/admin/ai-insight-config/DiffModal.tsx) and [`apps/dashboard/src/components/admin/ai-insight-config/prompt-diff.tsx`](apps/dashboard/src/components/admin/ai-insight-config/prompt-diff.tsx) — DiffModal still used by FeedbackList for the Apply preview.
 
 ### Verification — Phase 3
 
-- [ ] All 5 sections render at standard viewport (1440×900); no horizontal overflow
-- [ ] Sections without scroll: BreadcrumbBar, VersionPanel — verified by inspecting computed CSS or shrinking content
-- [ ] Sections with scroll-y: PromptTree, PromptTextPanel, FeedbackList — verified by overflowing content
-- [ ] Modified-dot indicators absent everywhere (`grep bg-amber-500` in `PromptTree.tsx` returns no matches)
-- [ ] HR top-level node visible in tree; expanding shows 5 section guidance leaves
-- [ ] Breadcrumb correct for: System Prompt / Component Analysis · User Prompt / Finance / Sales / Sales Trend / By Customer · User Prompt / HR / Attendance & Leave Monitoring / Guidance
-- [ ] Click a VersionPanel card → PromptTextPanel updates body and pill label
-- [ ] Default card has no trash; non-default cards do
-- [ ] Apply at 6-version cap shows the warning banner; no DB write occurs
-- [ ] Selecting a different version then re-running summary on that section uses the new body
+- [x] All 5 sections render at standard viewport (1440×900); no horizontal overflow
+- [x] Sections without scroll: BreadcrumbBar, VersionPanel — verified by inspecting computed CSS or shrinking content
+- [x] Sections with scroll-y: PromptTree, PromptTextPanel, FeedbackList — verified by overflowing content
+- [x] Modified-dot indicators absent everywhere (`grep bg-amber-500` in `PromptTree.tsx` returns no matches)
+- [x] HR top-level node visible in tree; expanding shows 5 section guidance leaves
+- [x] Breadcrumb correct for: System Prompt / Component Analysis · User Prompt / Finance / Sales / Sales Trend / By Customer · User Prompt / HR / Attendance & Leave Monitoring / Guidance
+- [x] Click a VersionPanel card → PromptTextPanel updates body and pill label
+- [x] Default card has no trash; non-default cards do
+- [x] Apply at 6-version cap shows the warning banner; no DB write occurs
+- [x] Selecting a different version then re-running summary on that section uses the new body
 
 ---
 
@@ -438,7 +438,7 @@ A version-first config page where:
 
 - [x] **Phase 1** Rename + 80-word limit
 - [x] **Phase 2** Versions schema + backend + HR scaffold
-- [ ] **Phase 3** UI restructure + version cards
+- [x] **Phase 3** UI restructure + version cards
 - [ ] **Phase 4** Cleanup + Playwright E2E
 
 ---

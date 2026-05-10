@@ -4,7 +4,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getPool } from '@/lib/postgres';
-import { getAllPrompts } from '@/lib/ai-insight/prompt-loader';
+import { queryAllPromptsFromDB } from '@/lib/ai-insight/prompt-loader';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +14,7 @@ export async function GET(
 ) {
   try {
     const { prompt_key } = await params;
-    const rows = await getAllPrompts();
+    const rows = await queryAllPromptsFromDB();
     const prompt = rows.find((r) => r.promptKey === prompt_key);
     if (!prompt) {
       return NextResponse.json({ error: `Unknown prompt key: ${prompt_key}` }, { status: 404 });

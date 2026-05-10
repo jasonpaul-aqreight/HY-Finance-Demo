@@ -45,6 +45,7 @@ interface Snapshot {
 
 let snapshot: Snapshot | null = null;
 let inflight: Promise<Snapshot> | null = null;
+let cacheGen = 0;
 
 async function loadSnapshot(): Promise<Snapshot> {
   const pool = getPool();
@@ -94,9 +95,10 @@ async function loadSnapshot(): Promise<Snapshot> {
 async function getSnapshot(): Promise<Snapshot> {
   if (snapshot && Date.now() - snapshot.loadedAt < CACHE_TTL_MS) return snapshot;
   if (inflight) return inflight;
+  const gen = cacheGen;
   inflight = loadSnapshot()
     .then((s) => {
-      snapshot = s;
+      if (cacheGen === gen) snapshot = s;
       return s;
     })
     .catch((err) => {
@@ -104,7 +106,7 @@ async function getSnapshot(): Promise<Snapshot> {
       // Empty snapshot — every getter falls back to the default. Cache briefly
       // so a broken DB doesn't generate per-request warnings.
       const empty: Snapshot = { loadedAt: Date.now(), byKey: new Map(), rows: [] };
-      snapshot = empty;
+      if (cacheGen === gen) snapshot = empty;
       return empty;
     })
     .finally(() => {
@@ -115,6 +117,8 @@ async function getSnapshot(): Promise<Snapshot> {
 
 export function invalidateCache(): void {
   snapshot = null;
+  inflight = null;
+  cacheGen++;
 }
 
 export async function getGlobalSystemPrompt(): Promise<string> {
@@ -184,4 +188,11 @@ export async function getSectionGuidance(sectionKey: string): Promise<string | n
 export async function getAllPrompts(): Promise<PromptRow[]> {
   const s = await getSnapshot();
   return s.rows;
+}
+
+/** Direct DB query — bypasses the in-memory snapshot cache. Use this for admin
+ *  routes that need fresh data immediately after a write. */
+export async function queryAllPromptsFromDB(): Promise<PromptRow[]> {
+  const { rows } = await loadSnapshot();
+  return rows;
 }

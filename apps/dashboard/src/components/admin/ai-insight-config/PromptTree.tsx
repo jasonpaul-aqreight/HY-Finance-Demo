@@ -56,10 +56,16 @@ function groupByPage(rows: PromptRowView[]): Page[] {
       })),
     });
   }
-  return pages.sort((a, b) => a.page.localeCompare(b.page));
+  // HR last (so Finance pages stay grouped on top); otherwise alphabetical.
+  return pages.sort((a, b) => {
+    if (a.page === 'hr') return 1;
+    if (b.page === 'hr') return -1;
+    return a.page.localeCompare(b.page);
+  });
 }
 
 function pageLabel(page: string): string {
+  if (page === 'hr') return 'HR';
   return page
     .split(/[_-]/)
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
@@ -96,8 +102,8 @@ export function PromptTree({ prompts, selectedKey, onSelect }: Props) {
   }
 
   return (
-    <Card className="lg:sticky lg:top-4">
-      <CardContent className="p-2 max-h-[calc(100vh-12rem)] overflow-y-auto">
+    <Card data-testid="prompt-tree" className="h-full">
+      <CardContent className="h-full overflow-y-auto p-2">
         {/* System group */}
         <div className="px-2 pt-1 pb-1.5 text-xs font-semibold uppercase tracking-wider text-foreground">
           System Prompts
@@ -107,6 +113,8 @@ export function PromptTree({ prompts, selectedKey, onSelect }: Props) {
             <li key={p.promptKey}>
               <button
                 onClick={() => onSelect(p.promptKey)}
+                data-testid="prompt-tree-leaf"
+                data-prompt-key={p.promptKey}
                 className={cn(
                   'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors',
                   selectedKey === p.promptKey
@@ -117,12 +125,6 @@ export function PromptTree({ prompts, selectedKey, onSelect }: Props) {
                 <Cog size={14} className="shrink-0" />
                 <span className="truncate">{p.displayName}</span>
                 <div className="ml-auto flex items-center gap-1.5 shrink-0">
-                  {p.isModified && (
-                    <span
-                      className="size-1.5 rounded-full bg-amber-500"
-                      title="Modified from default"
-                    />
-                  )}
                   {feedbackBadge(p.feedbackCount)}
                 </div>
               </button>
@@ -137,9 +139,6 @@ export function PromptTree({ prompts, selectedKey, onSelect }: Props) {
         <ul className="space-y-0.5">
           {pages.map((p) => {
             const pageOpen = openPages[p.page] ?? false;
-            const pageHasModified = p.sections.some((s) =>
-              s.components.some((c) => c.isModified) || (s.guidance?.isModified ?? false),
-            );
             const pageFeedback = p.sections.reduce(
               (sum, s) =>
                 sum +
@@ -151,17 +150,13 @@ export function PromptTree({ prompts, selectedKey, onSelect }: Props) {
               <li key={p.page}>
                 <button
                   onClick={() => togglePage(p.page)}
+                  data-testid="prompt-tree-page"
+                  data-page={p.page}
                   className="flex w-full items-center gap-1 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent"
                 >
                   {pageOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                   <span className="font-medium truncate">{pageLabel(p.page)}</span>
                   <div className="ml-auto flex items-center gap-1.5 shrink-0">
-                    {pageHasModified && (
-                      <span
-                        className="size-1.5 rounded-full bg-amber-500"
-                        title="Has modified prompts"
-                      />
-                    )}
                     {feedbackBadge(pageFeedback)}
                   </div>
                 </button>
@@ -170,8 +165,6 @@ export function PromptTree({ prompts, selectedKey, onSelect }: Props) {
                   <ul className="ml-4 mt-0.5 space-y-0.5 border-l border-border pl-2">
                     {p.sections.map((s) => {
                       const sectionOpen = openSections[s.sectionKey] ?? true;
-                      const sectionHasModified =
-                        s.components.some((c) => c.isModified) || (s.guidance?.isModified ?? false);
                       const sectionFeedback =
                         s.components.reduce((sum, c) => sum + (c.feedbackCount ?? 0), 0) +
                         (s.guidance?.feedbackCount ?? 0);
@@ -184,9 +177,6 @@ export function PromptTree({ prompts, selectedKey, onSelect }: Props) {
                             {sectionOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                             <span className="truncate">{s.sectionName}</span>
                             <div className="ml-auto flex items-center gap-1.5 shrink-0">
-                              {sectionHasModified && (
-                                <span className="size-1.5 rounded-full bg-amber-500" />
-                              )}
                               {feedbackBadge(sectionFeedback)}
                             </div>
                           </button>
@@ -199,6 +189,8 @@ export function PromptTree({ prompts, selectedKey, onSelect }: Props) {
                                   <li key={g.promptKey}>
                                     <button
                                       onClick={() => onSelect(g.promptKey)}
+                                      data-testid="prompt-tree-leaf"
+                                      data-prompt-key={g.promptKey}
                                       className={cn(
                                         'flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-sm transition-colors',
                                         active
@@ -212,12 +204,6 @@ export function PromptTree({ prompts, selectedKey, onSelect }: Props) {
                                         <span className="text-[10px] uppercase tracking-wider text-foreground/50">
                                           guidance
                                         </span>
-                                        {g.isModified && (
-                                          <span
-                                            className="size-1.5 rounded-full bg-amber-500"
-                                            title="Modified from default"
-                                          />
-                                        )}
                                         {g.feedbackCount > 0 && feedbackBadge(g.feedbackCount)}
                                       </div>
                                     </button>
@@ -230,6 +216,8 @@ export function PromptTree({ prompts, selectedKey, onSelect }: Props) {
                                   <li key={c.promptKey}>
                                     <button
                                       onClick={() => onSelect(c.promptKey)}
+                                      data-testid="prompt-tree-leaf"
+                                      data-prompt-key={c.promptKey}
                                       className={cn(
                                         'flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-sm transition-colors',
                                         active
@@ -243,12 +231,6 @@ export function PromptTree({ prompts, selectedKey, onSelect }: Props) {
                                           <span className="text-[10px] uppercase tracking-wider text-foreground/50">
                                             {c.componentType}
                                           </span>
-                                        )}
-                                        {c.isModified && (
-                                          <span
-                                            className="size-1.5 rounded-full bg-amber-500"
-                                            title="Modified from default"
-                                          />
                                         )}
                                         {c.feedbackCount > 0 && feedbackBadge(c.feedbackCount)}
                                       </div>

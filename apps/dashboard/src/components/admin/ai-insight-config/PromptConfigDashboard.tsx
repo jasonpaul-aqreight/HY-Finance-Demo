@@ -4,7 +4,10 @@ import { useMemo, useState } from 'react';
 import useSWR from 'swr';
 import { ShieldAlert } from 'lucide-react';
 import { PromptTree } from './PromptTree';
-import { PromptEditor } from './PromptEditor';
+import { BreadcrumbBar } from './BreadcrumbBar';
+import { PromptTextPanel } from './PromptTextPanel';
+import { VersionPanel } from './VersionPanel';
+import { FeedbackList } from './FeedbackList';
 import { useRole } from '@/components/layout/RoleProvider';
 
 export interface PromptRowView {
@@ -22,11 +25,6 @@ export interface PromptRowView {
   updatedAt: string;
   updatedBy: string | null;
   feedbackCount: number;
-  // Phase 2 transitional: backend no longer emits these. Phase 3 (task 3.5)
-  // removes the modified-dot rendering in PromptTree.tsx along with these
-  // optional fields. Runtime value is always undefined → falsy → no dot.
-  isModified?: boolean;
-  defaultText?: string | null;
 }
 
 const fetcher = async (url: string) => {
@@ -72,24 +70,52 @@ export function PromptConfigDashboard() {
   }
 
   return (
-    <div className="max-w-[1400px] mx-auto px-6 py-6 space-y-4">
+    <div
+      data-testid="ai-insight-config-dashboard"
+      className="mx-auto flex h-[calc(100vh-6rem)] max-w-[1400px] flex-col gap-3 px-6 py-4"
+    >
       {!isAdmin && (
-        <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+        <div className="flex shrink-0 items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
           <ShieldAlert className="size-4 shrink-0" />
-          Admin only — Save and Reset are hidden.
+          Admin only — version controls are hidden.
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-[20rem_1fr] gap-4 lg:items-start">
+      {/* Outer 2-column grid: tree (fixed width) | right column (fills rest) */}
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[20rem_minmax(0,1fr)]">
         <PromptTree
           prompts={prompts}
           selectedKey={activeKey}
           onSelect={setSelectedKey}
         />
-        <PromptEditor
-          prompt={selected}
-          isAdmin={isAdmin}
-        />
+
+        {/* Right column: breadcrumb (auto) | text+versions row (1fr) | feedback (auto) */}
+        <div className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)_minmax(0,18rem)] gap-3">
+          <BreadcrumbBar prompt={selected} />
+
+          {/* Middle row: text panel (fills) | version panel (intrinsic) */}
+          <div className="grid min-h-0 grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_18rem]">
+            <PromptTextPanel prompt={selected} />
+            {selected ? (
+              <VersionPanel promptKey={selected.promptKey} />
+            ) : (
+              <div className="rounded-lg border border-border bg-background p-4 text-sm text-foreground/60">
+                Select a prompt to see versions.
+              </div>
+            )}
+          </div>
+
+          {selected && isAdmin ? (
+            <FeedbackList
+              promptKey={selected.promptKey}
+              promptDisplayName={selected.displayName}
+            />
+          ) : (
+            <div className="rounded-lg border border-border bg-background p-4 text-sm text-foreground/60">
+              {selected ? 'Admin only.' : 'Select a prompt to see feedback.'}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

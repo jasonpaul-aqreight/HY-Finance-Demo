@@ -4,13 +4,13 @@
 
 import { NextResponse } from 'next/server';
 import { getPool } from '@/lib/postgres';
-import { getAllPrompts } from '@/lib/ai-insight/prompt-loader';
+import { queryAllPromptsFromDB } from '@/lib/ai-insight/prompt-loader';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const rows = await getAllPrompts();
+    const rows = await queryAllPromptsFromDB();
 
     const pool = getPool();
     const { rows: counts } = await pool.query<{ target_prompt_key: string; count: string }>(

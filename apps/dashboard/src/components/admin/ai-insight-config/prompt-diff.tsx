@@ -1,7 +1,6 @@
-// Shared line-diff helpers for prompt comparison views (DiffModal,
-// HistoryDropdown). Per Phase-2 lessons-learned: surgical edits and history
-// snapshots both preserve most lines verbatim, so a per-line set-membership
-// check is enough to highlight changes without pulling in a diff library.
+// Shared line-diff helpers for the DiffModal (Apply preview). Surgical edits
+// preserve most lines verbatim, so a per-line set-membership check is enough
+// to highlight changes without pulling in a diff library.
 
 interface DiffLine {
   status: 'same' | 'added' | 'removed';

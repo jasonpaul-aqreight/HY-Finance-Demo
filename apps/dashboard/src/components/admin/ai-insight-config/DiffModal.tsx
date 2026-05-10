@@ -1,15 +1,8 @@
 'use client';
 
 // Side-by-side current vs. proposed prompt with a one-line change summary.
-// Used by the feedback "tick" flow: PromptEditor passes the LLM's preview
-// payload here, admin confirms or cancels.
-//
-// Per Phase-1 lessons-learned: state is derived from props (open / loading /
-// data). No setState-in-effect. Parent owns open/close and wiring.
-//
-// Per project memory (older-executive readability): no muted/gray text;
-// changed lines highlighted on solid green/red backgrounds with strong
-// foreground colors.
+// Used by FeedbackList's Apply flow: it passes the LLM's preview payload here,
+// admin confirms or cancels.
 
 import { useMemo } from 'react';
 import { Loader2 } from 'lucide-react';
