@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getPool } from '@/lib/postgres';
 import { routeFeedback } from '@/lib/ai-insight/feedback-llm';
 import { SECTION_COMPONENTS } from '@/lib/ai-insight/prompts';
+import { FEEDBACK_MAX_WORDS, countWords } from '@/lib/ai-insight/word-count';
 import type { SectionKey } from '@/lib/ai-insight/types';
 
 export const dynamic = 'force-dynamic';
@@ -17,8 +18,6 @@ interface FeedbackBody {
   raw_feedback?: string;
   submitted_by?: string | null;
 }
-
-const MAX_FEEDBACK_CHARS = 2000;
 
 export async function POST(req: NextRequest) {
   try {
@@ -43,9 +42,9 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       );
     }
-    if (raw.length > MAX_FEEDBACK_CHARS) {
+    if (countWords(raw) > FEEDBACK_MAX_WORDS) {
       return NextResponse.json(
-        { error: `Feedback exceeds ${MAX_FEEDBACK_CHARS} characters` },
+        { error: `Feedback exceeds ${FEEDBACK_MAX_WORDS} words.` },
         { status: 400 },
       );
     }

@@ -1021,7 +1021,7 @@ Max 3 good + 3 bad insights total. Rank by business impact.
 
 ### Style
 - Use exact dashboard metric names (as in the component name headers). Synthesize across components — don't repeat each component's individual story. No contradicting good/bad insights on the same metric. State facts, not recommendations; no jargon, no filler.
-- If a "General" block is provided, follow it and **answer its deterministic questions** inside the Detail body. If it includes an "Output Override", apply that override in place of the Detail structure above.`;
+- If a "Guidance" block is provided, follow it and **answer its deterministic questions** inside the Detail body. If it includes an "Output Override", apply that override in place of the Detail structure above.`;
 
 // ─── Section Guidance Prompts ────────────────────────────────────────────────
 // One per dashboard section. Injected into the Summary user message so Sonnet
@@ -1033,115 +1033,87 @@ Max 3 good + 3 bad insights total. Rank by business impact.
 // Empty string ⇒ injection skipped at builder time. Defaults are non-empty.
 
 export const DEFAULT_SECTION_GUIDANCE: Record<string, string> = {
-  payment_collection_trend: `Answer these questions in order:
-1. Is avg collection days improving or worsening vs last month?
-2. Is collection rate above or below 80%?
-3. Which month had the worst collection?
+  payment_collection_trend: `- Lens: is cash conversion getting faster or slower once seasonality is stripped out
+- Watch for: collection days drifting up while sales hold steady (silent term creep); a single month breaking the run with no obvious cause
+- Fruit angle: festive periods (CNY, Hari Raya, Mooncake) push receivables forward — the post-peak recovery is the honest signal; hypermarket vs wholesaler terms differ enough that DSO shifts often reflect channel mix, not behaviour
+- Escalate: unagreed term slippage; the same customers repeatedly driving the worst month`,
 
-Lean into: month-over-month direction, the gap between invoiced and collected, and any single month that breaks the pattern.`,
+  payment_outstanding: `- Lens: where is the receivable book most exposed today, is it ageing the wrong way, and does each customer's payment history (credit score) support the exposure they are carrying
+- Watch for: few accounts carrying disproportionate >60d share; credit-limit breaches on customers who used to pay cleanly; customers whose ageing pattern no longer matches their historical credit score
+- Fruit angle: one large wholesaler can mask the long tail; one tier-1 hypermarket spike can swallow the week's plan; FX-exposed export accounts fail differently from domestic
+- Escalate: any account whose default would trigger a cash event; balances migrating from <60d into >60d; credit-score deterioration on accounts still extending exposure`,
 
-  payment_outstanding: `Answer these questions in order:
-1. How much total is outstanding?
-2. What % is in the >60 days bucket?
-3. Which customers have the highest outstanding?
+  sales_trend: `- Lens: volume, price, mix, or pure calendar — which is moving the line
+- Watch for: directional change that survives YoY normalisation; a single month introducing a new pattern
+- Fruit angle: Malaysian fruit cycles (CNY / Ramadan / Mooncake lift; monsoon and durian-glut soften) — almost always "calendar or structural?"; credit notes can quietly distort the headline
+- Escalate: persistent MoM decline not explained by season; a month the prior trend cannot reconcile with`,
 
-Lean into: aging concentration (how much sits in the worst buckets), credit-limit breaches, and the 3–5 customers driving most of the exposure.`,
+  sales_breakdown: `- Lens: which customer / product / region is carrying the period, and what happens if it wobbles
+- Watch for: single-customer share crossing ~25%; a category quietly shifting share without commercial intent; one outlet or agent producing outsized credit notes
+- Fruit angle: premium imports (Korean strawberry, Japanese melon) and local staples (banana, watermelon) carry very different margin and risk — concentration in low-margin staples is not the same problem as concentration in premium SKUs; agent spread is a coverage signal
+- Escalate: structural single-customer dependency; CN pockets hiding inside "sales"; agent outliers that look like territory not performance`,
 
-  sales_trend: `Answer these questions in order:
-1. Is net sales up or down vs last month and vs same month last year?
-2. What's the month-over-month growth rate?
+  customer_margin_overview: `- Lens: is headline margin a story of pricing power, mix, or cost pressure
+- Watch for: GP direction diverging from Net Sales direction (volume up, GP flat = compression); growing share of customers in the loss zone
+- Fruit angle: margin compression usually originates upstream (FX, weather, freight on imports) before it hits selling price — weakening margin on stable revenue almost always points at procurement, not customer
+- Escalate: sustained loss-zone share increase; GP-vs-Net-Sales divergence holding two-plus periods`,
 
-Lean into: direction (MoM and YoY), seasonality vs structural change, and any single month that breaks the run.`,
+  customer_margin_breakdown: `- Lens: which customers pay us in margin vs only in volume — the output is meant to inform pricing-strategy decisions (where can we reprice, where can't we, where is grade-leakage masking pricing)
+- Watch for: high-revenue customers in the bottom margin band; otherwise-profitable customers being eroded by credit notes
+- Fruit angle: hypermarkets = volume at thin margin; wet-market wholesalers and HORECA = better margin on smaller tickets — a "premium-channel" customer running at hypermarket margins is the anomaly (unauthorised discount, grade leakage)
+- Escalate: customers below the loss line on meaningful revenue; customers pushed into loss only after CN settlement`,
 
-  sales_breakdown: `Answer these questions in order:
-1. Does the top customer exceed 25% of total sales?
-2. Which product category drives the most revenue?
-3. Is credit note ratio below 1%?
+  supplier_margin_overview: `- Lens: is the supplier portfolio delivering margin, or just volume
+- Watch for: slipping headline margin with stable or growing supplier count (mix problem, not supplier problem)
+- Fruit angle: local (RM-priced, short lead) and import (USD/THB-priced, longer lead) suppliers behave differently — margin shifts often reflect the local/import balance more than any single relationship
+- Escalate: drift toward lower-margin sources; rising loss-supplier share; headline margin moving with no supplier and no sales story to explain it`,
 
-Lean into: concentration risk across customers/products/outlets, agent performance spread, and unusual credit-note pockets.`,
+  supplier_margin_breakdown: `- Lens: which suppliers earn margin, which cost us, where is the widest pricing arbitrage — the output is meant to inform negotiation and procurement decisions (which suppliers to renegotiate, which to consolidate, which to drop)
+- Watch for: items with wide best-vs-worst spread where we are buying from the wrong side; suppliers materially below portfolio margin on items the market prices similarly
+- Fruit angle: premium-grade fruit looks identical on a PO but differs on shelf-life and shrinkage — purchase price misleads; landed margin on the same anchor item is the real test
+- Escalate: suppliers dragging portfolio below the lower band; loss items concentrated on one supplier (structural quality); volume sitting on the more expensive supplier without a quality justification`,
 
-  customer_margin_overview: `Answer these questions in order:
-1. Is overall gross margin above 15%?
-2. Is margin trending up or down over the last 3 months?
-3. How many customers have negative margin?
+  return_trend: `- Lens: is the return pattern signalling a quality, ops, or commercial-policy problem
+- Watch for: items repeating in the top-returns list across periods (structural, not one-off)
+- Fruit angle: fresh-produce returns rarely have recoverable value — closer to a margin write-off than a refund event; rising return rate usually means quality / cold chain / pre-sell forecasting is deteriorating before churn shows it
+- Reconciliation angle: CNs reduce net sales and can distort margin reads if knock-off and refund channels are not separated — flag any signal that headline figures are being moved by CN reclassification rather than underlying performance
+- Escalate: chronic-return items; return rate climbing against flat sales; resolved-vs-unresolved mix shifting longer`,
 
-Lean into: GP direction vs Net Sales direction (margin compression vs volume loss), and the share of customers in the loss zone.`,
+  return_unsettled: `- Lens: how much cash is parked in unsettled CNs, how old it is, and which customers will not clear
+- Watch for: few customers carrying most of the unsettled book; balances ageing past 60d without a knock-off path
+- Fruit angle: a growing knock-off-vs-refund tilt usually means we are settling on future orders rather than returning cash — commercially fine, but it understates real cash position
+- Reconciliation angle: knock-off and refund channels must be tracked separately to keep net sales, AR, and cash readings honest — flag any pattern that suggests CN settlement is masking underlying receivable health
+- Escalate: chronic unresolved balances on 1–2 customers; ageing concentration moving into >60d; knock-off displacing genuine refund obligations`,
 
-  customer_margin_breakdown: `Answer these questions in order:
-1. Who are the top 3 customers by gross profit?
-2. Who are the bottom 3 by margin %?
-3. Any customer with margin below 5%?
+  expense_overview: `- Lens: is total cost moving with revenue, and is the COGS-vs-OpEx mix drifting
+- Watch for: any category growing materially faster than revenue YoY; a few line items dominating cost growth
+- Fruit angle: COGS growth is partly external (weather, FX, freight) and not always a control failure — OpEx growth (logistics, cold storage, headcount) is internally controllable and deserves harder questions
+- Escalate: OpEx outpacing revenue on a sustained basis; COGS-to-revenue ratio drift; single lines distorting the period`,
 
-Lean into: per-customer GP contribution, margin outliers (very high or very low), and credit-note impact on otherwise profitable customers.`,
+  expense_breakdown: `- Lens: which lines do most of the work, and where is the controllable cost sitting
+- Watch for: 1–2 OpEx lines carrying disproportionate share; a category running above revenue growth without a volume justification
+- Fruit angle: cold chain, freight, and packaging concentrate OpEx; payroll and electricity are the two semi-fixed lines that lag volume hardest; packing materials should track volume directly — flag categories that should scale with volume but are not, and semi-fixed lines drifting without a structural reason
+- Escalate: OpEx decoupled from volume; single-line dominance creating dependency risk; sudden category jumps with no operational story`,
 
-  supplier_margin_overview: `Answer these questions in order:
-1. Is supplier margin above 10%?
-2. Is margin trending up or down?
-3. How many suppliers have negative margin?
+  financial_overview: `- Lens: is the bottom line moving because of revenue, cost mix, or one-offs — and is the direction sustainable
+- Watch for: profit margin slipping while revenue grows (worst quality of decline); profit holding while revenue falls (one-offs masking)
+- Fruit angle: net profit at this scale is often dominated by 2–3 swing lines (FX on imports, freight, large-customer CNs) — reading the headline without naming them misses the story
+- Escalate: any directional inflection; sustained margin compression; profit movement that is cost-driven, not volume-driven`,
 
-Lean into: trend direction, share of suppliers in loss, and any supplier mix shift driving the headline margin.`,
+  financial_pnl: `- Lens: which 1–2 lines on each side of the P&L explain most of the YoY movement
+- Watch for: GP margin shifting on flat revenue (pricing or sourcing); a cost line jumping without a revenue line moving with it (execution or external pressure)
+- Fruit angle: sourcing cost moves first (upstream weather and FX); selling price lags — a pure-COGS YoY explanation usually means cost is being absorbed that the business has not yet repriced
+- Escalate: GP% breaking historical band; expense lines moving independent of revenue lines; anomalies warranting a separate variance review`,
 
-  supplier_margin_breakdown: `Answer these questions in order:
-1. Which supplier gives the best margin?
-2. Which items have the biggest gap between purchase and selling price?
-3. Any supplier with margin below 5%?
+  financial_balance_sheet: `- Lens: can the business pay short-term obligations, and is leverage drifting
+- Watch for: current ratio dipping below the comfort band; debt rising without an asset response; working capital growing without sales support
+- Fruit angle: inventory growth on perishable stock is particularly expensive — shelf-life converts bloat into shrinkage faster than non-perishable categories, so a balance-sheet build here is a P&L warning
+- Escalate: liquidity drift; leverage moving without an investment story; working capital absorbing cash unproductively`,
 
-Lean into: supplier ranking by margin contribution, item-level pricing gaps, and suppliers materially below the portfolio average.`,
-
-  return_trend: `Answer these questions in order:
-1. Is return rate above 5%?
-2. Is the return trend increasing or decreasing?
-3. Which items have the most returns?
-
-Lean into: return-rate direction, settlement mix (resolved vs unresolved), and items that disproportionately drive volume.`,
-
-  return_unsettled: `Answer these questions in order:
-1. How much total unsettled returns?
-2. What % is older than 60 days?
-3. Which customers have the most unsettled returns?
-
-Lean into: aging of the unsettled pool, customer concentration of unresolved CNs, and the gap between knock-off and refund channels.`,
-
-  expense_overview: `Answer these questions in order:
-1. Is total cost up or down vs same period last year?
-2. Which cost category grew the most?
-3. What are the top 3 expenses?
-
-Lean into: YoY direction by category, COGS vs OpEx mix shift, and the handful of line items dominating total cost.`,
-
-  expense_breakdown: `Answer these questions in order:
-1. What's the COGS to revenue ratio?
-2. Which OpEx line item is the largest?
-3. Any expense category with >10% YoY increase?
-
-Lean into: COGS-to-revenue health, OpEx concentration in 1–2 lines, and any category growing materially faster than revenue.`,
-
-  financial_overview: `Answer these questions in order:
-1. Is net profit positive or negative?
-2. Is profit margin improving or declining?
-
-Lean into: bottom-line direction, the largest mover between revenue and expense lines, and whether margin movement is volume-driven or cost-driven.`,
-
-  financial_pnl: `Answer these questions in order:
-1. Which revenue line changed the most vs last year?
-2. Which expense line changed the most?
-3. Is gross profit margin stable?
-
-Lean into: the 1–2 lines on each side that explain most of the YoY change, and whether GP% holds despite movement.`,
-
-  financial_balance_sheet: `Answer these questions in order:
-1. Are total assets growing?
-2. Is current ratio above 1.5 (can pay short-term debts)?
-3. Is debt increasing or decreasing?
-
-Lean into: liquidity (current ratio), leverage direction, and the largest movements within asset/liability categories.`,
-
-  financial_variance: `Answer these questions in order:
-1. Which accounts missed budget by more than 15%?
-2. Is the total variance favorable or unfavorable?
-3. What's the biggest single variance item?
-
-Lean into: the handful of accounts driving most of the variance, favorable/unfavorable mix, and forecast direction vs budget.`,
+  financial_variance: `- Lens: where is performance diverging from plan, by how much, is it favourable or structural — and how credible are the underlying budget and forecast
+- Watch for: few accounts driving the bulk of variance (forecast risk); the same lines running unfavourable repeatedly (plan is wrong, or execution is); persistent forecast misses that suggest the forecast model is calibrated wrong
+- Fruit angle: variance often reflects macro exposure (FX, weather, festive timing) rather than operational miss — separating unforecastable macro from missed execution is the call this section supports; forecast credibility itself is part of the read
+- Escalate: persistent unfavourable on the same lines; single-line variances distorting the headline; forecast-credibility erosion; budget assumptions the data is now contradicting`,
 };
 
 // ─── Feedback Router System Prompt ───────────────────────────────────────────
@@ -1152,14 +1124,14 @@ Lean into: the handful of accounts driving most of the variance, favorable/unfav
 export const DEFAULT_FEEDBACK_ROUTER_SYSTEM = `You triage end-user feedback on AI Insight outputs at Hoi-Yong (Malaysian fruit distribution).
 
 The user message lists this section's prompt keys, each tagged:
-- \`(general)\` — the section's General prompt (one)
+- \`(guidance)\` — the section's Guidance prompt (one)
 - \`(kpi)\` / \`(chart)\` / \`(table)\` / \`(breakdown)\` — component prompts (one per card)
 
 What each prompt contains:
 - **Component prompt** — defines ONE card's metric, criteria, and thresholds (good/neutral/bad). Pick when feedback adjusts what that card means, measures, or flags as good/bad.
-- **General prompt** — defines the section's tone, expected output (format, structure), and which questions the summary must answer. Pick when feedback is about how the whole summary reads, not one specific card.
+- **Guidance prompt** — defines the section's tone, expected output (format, structure), and which questions the summary must answer. Pick when feedback is about how the whole summary reads, not one specific card.
 
-Pick exactly ONE key. Try components first; use General only when no component fits.
+Pick exactly ONE key. Try components first; use Guidance only when no component fits.
 
 Always call select_target. Never reply in prose. Never invent a key — choose only from the keys provided.`;
 
@@ -1172,7 +1144,7 @@ export const DEFAULT_SURGICAL_EDITOR_SYSTEM = `Surgical editor for AI Insight pr
 
 You receive either:
 - A **component prompt** — defines one card's metric, criteria, and thresholds.
-- A **General prompt** — defines the section's tone, output format, and which questions to answer.
+- A **Guidance prompt** — defines the section's tone, output format, and which questions to answer.
 
 Inputs:
 - CURRENT — the prompt being edited.
@@ -1186,9 +1158,9 @@ Rules:
 - Don't invent thresholds, numbers, or domain rules.
 - Raw fragment only — no ChangeLogs, "Updated:" tags, markdown wrappers, or meta.
 
-General prompt — special rule:
+Guidance prompt — special rule:
 If feedback targets Summary output structure or format (e.g. different subsections, shorter Detail, add/remove Current Status / Evidence / Implication):
-- Add or replace (wholesale) an \`## Output Override (this section only)\` block inside the General body. Example:
+- Add or replace (wholesale) an \`## Output Override (this section only)\` block inside the Guidance body. Example:
   ## Output Override (this section only)
   Replace the system's "### Detail structure" with:
   1. <new subsection 1>

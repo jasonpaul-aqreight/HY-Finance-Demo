@@ -196,12 +196,12 @@ ${c.rawData}`;
   );
   const components = componentBlocks.join('\n\n');
 
-  // General — section-scoped tone, expected output, and any deterministic
+  // Guidance — section-scoped tone, expected output, and any deterministic
   // questions or output overrides. Null when no guidance exists, in which
   // case the block is omitted entirely.
   const guidance = await getSectionGuidance(params.sectionKey);
   const guidanceBlock = guidance
-    ? `General:
+    ? `Guidance:
 """
 ${guidance}
 """

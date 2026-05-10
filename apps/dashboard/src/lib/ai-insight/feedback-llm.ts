@@ -3,7 +3,7 @@
 // Given a piece of raw user feedback + the section it was submitted from,
 // asks Haiku to pick the single prompt key within that section most likely
 // to be responsible for the feedback. Tries components first, falls back to
-// the section's General prompt only when no component fits. Raw feedback is
+// the section's Guidance prompt only when no component fits. Raw feedback is
 // stored as-is — no rewriting/compaction.
 //
 // Tool use is forced via tool_choice so the model must return structured
@@ -52,11 +52,11 @@ export async function routeFeedback(
   const sectionName = SECTION_NAMES[input.section_key] ?? input.section_key;
 
   // Components listed first so the router considers card-specific targets up
-  // top; General appears last to reinforce its fallback role.
+  // top; Guidance appears last to reinforce its fallback role.
   const targetKeys = [...components.map((c) => c.key), guidanceKey];
   const targetList = [
     ...components.map((c) => `- ${c.key} (${c.type}): ${c.name}`),
-    `- ${guidanceKey} (general): ${sectionName} — General prompt`,
+    `- ${guidanceKey} (guidance): ${sectionName} — Guidance prompt`,
   ].join('\n');
 
   const systemPrompt = await getFeedbackRouterSystemPrompt();
@@ -83,7 +83,7 @@ Pick the single prompt key this feedback should edit. Always call select_target.
       {
         name: 'select_target',
         description:
-          'Select the prompt this feedback should edit — a component key when feedback targets one card, or the General key when feedback is about how the whole summary reads.',
+          'Select the prompt this feedback should edit — a component key when feedback targets one card, or the Guidance key when feedback is about how the whole summary reads.',
         input_schema: {
           type: 'object',
           properties: {
@@ -91,7 +91,7 @@ Pick the single prompt key this feedback should edit. Always call select_target.
               type: 'string',
               enum: targetKeys,
               description:
-                'Prompt key from the provided list. Component keys for card-specific feedback; the General key only when no component fits.',
+                'Prompt key from the provided list. Component keys for card-specific feedback; the Guidance key only when no component fits.',
             },
           },
           required: ['target_prompt_key'],

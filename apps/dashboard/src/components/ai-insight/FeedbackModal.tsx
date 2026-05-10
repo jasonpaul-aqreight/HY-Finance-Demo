@@ -14,8 +14,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import type { SectionKey } from '@/lib/ai-insight/types';
-
-const MAX_CHARS = 2000;
+import { FEEDBACK_MAX_WORDS, countWords } from '@/lib/ai-insight/word-count';
 
 interface FeedbackModalProps {
   open: boolean;
@@ -48,7 +47,10 @@ export function FeedbackModal({
   }, [open]);
 
   const trimmed = text.trim();
-  const canSubmit = trimmed.length > 0 && trimmed.length <= MAX_CHARS && !submitting;
+  const wordCount = countWords(text);
+  const overLimit = wordCount > FEEDBACK_MAX_WORDS;
+  const nearLimit = wordCount > FEEDBACK_MAX_WORDS - 10 && !overLimit;
+  const canSubmit = wordCount > 0 && !overLimit && !submitting;
 
   async function handleSubmit() {
     if (!canSubmit) return;
@@ -94,14 +96,23 @@ export function FeedbackModal({
           <Textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder="e.g. Drop the collection-days metric. Focus only on the shortfall amount."
+            placeholder={`Up to ${FEEDBACK_MAX_WORDS} words. e.g. Drop the collection-days metric. Focus only on the shortfall amount.`}
             rows={6}
-            maxLength={MAX_CHARS}
             disabled={submitting}
             className="text-sm"
           />
-          <div className="flex items-center justify-between text-xs text-foreground/70">
-            <span>{trimmed.length} / {MAX_CHARS} characters</span>
+          <div className="flex items-center justify-between text-xs">
+            <span
+              className={
+                overLimit
+                  ? 'text-red-600 font-medium'
+                  : nearLimit
+                    ? 'text-amber-600 font-medium'
+                    : 'text-foreground'
+              }
+            >
+              {wordCount} / {FEEDBACK_MAX_WORDS} words
+            </span>
             {error && <span className="text-red-700 font-medium">{error}</span>}
           </div>
         </div>

@@ -207,10 +207,10 @@ export function PromptTree({ prompts, selectedKey, onSelect }: Props) {
                                       )}
                                     >
                                       <Compass size={13} className="shrink-0 text-foreground/70" />
-                                      <span className="truncate">General</span>
+                                      <span className="truncate">Guidance</span>
                                       <div className="ml-auto flex items-center gap-1.5 shrink-0">
                                         <span className="text-[10px] uppercase tracking-wider text-foreground/50">
-                                          general
+                                          guidance
                                         </span>
                                         {g.isModified && (
                                           <span

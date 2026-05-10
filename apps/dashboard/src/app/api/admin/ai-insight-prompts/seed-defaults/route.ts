@@ -100,7 +100,7 @@ function buildSeedRows(): SeedRow[] {
         section_key: sectionKey,
         section_name: SECTION_NAMES[sectionKey],
         component_type: null,
-        display_name: `${SECTION_NAMES[sectionKey]} — General`,
+        display_name: `${SECTION_NAMES[sectionKey]} — Guidance`,
         sort_order: 0,
       });
     }
