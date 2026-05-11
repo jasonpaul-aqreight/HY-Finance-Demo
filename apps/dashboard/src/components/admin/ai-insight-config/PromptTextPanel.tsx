@@ -28,12 +28,16 @@ export function PromptTextPanel({ prompt }: Props) {
       className="flex h-full min-h-0 flex-col rounded-lg border border-border bg-background"
     >
       <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-4 py-2.5">
-        <div className="text-xs font-semibold uppercase tracking-wider text-foreground">
+        <div className="text-sm font-semibold text-foreground">
           Prompt Text
         </div>
         <span
           data-testid="selected-version-pill"
-          className="inline-flex items-center rounded-full border border-blue-300 bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-900"
+          className={
+            versionLabel === 'Default'
+              ? 'inline-flex items-center rounded-full border border-amber-400 bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-900'
+              : 'inline-flex items-center rounded-full border border-blue-300 bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-900'
+          }
           title="Currently selected version"
         >
           {versionLabel}

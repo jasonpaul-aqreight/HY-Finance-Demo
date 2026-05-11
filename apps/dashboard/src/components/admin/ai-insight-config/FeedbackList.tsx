@@ -5,7 +5,6 @@ import useSWR, { mutate } from 'swr';
 import {
   Check,
   Loader2,
-  MessageSquare,
   X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -237,12 +236,8 @@ export function FeedbackList({ promptKey, promptDisplayName }: Props) {
       data-testid="feedback-list"
       className="flex h-full min-h-0 flex-col rounded-lg border border-border bg-background"
     >
-      <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-2.5 text-sm font-semibold text-foreground">
-        <MessageSquare className="h-4 w-4 text-blue-700" />
-        Pending feedback
-        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
-          {rows.length}
-        </span>
+      <div className="flex shrink-0 items-center border-b border-border px-4 py-2.5">
+        <div className="text-sm font-semibold text-foreground">Feedback:</div>
       </div>
 
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3">

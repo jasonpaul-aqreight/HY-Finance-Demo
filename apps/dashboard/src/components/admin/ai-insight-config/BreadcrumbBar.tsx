@@ -1,6 +1,5 @@
 'use client';
 
-import { ChevronRight } from 'lucide-react';
 import type { PromptRowView } from './PromptConfigDashboard';
 
 interface Props {
@@ -13,9 +12,38 @@ function pageLabel(page: string | null): string {
   return page;
 }
 
+function systemDisplayName(prompt: PromptRowView): string {
+  if (prompt.promptKey === 'component_analysis' || prompt.promptKey === 'global_system') {
+    return 'Component Analysis';
+  }
+  if (prompt.promptKey === 'summary_analysis' || prompt.promptKey === 'summary_system') {
+    return 'Summary Analysis';
+  }
+  if (prompt.promptKey === 'feedback_router' || prompt.promptKey === 'feedback_router_system') {
+    return 'Feedback Router';
+  }
+  if (prompt.promptKey === 'surgical_editor' || prompt.promptKey === 'surgical_editor_system') {
+    return 'Surgical Editor';
+  }
+  return prompt.displayName;
+}
+
 function buildCrumbs(prompt: PromptRowView): string[] {
   if (prompt.category === 'system') {
-    return ['System Prompt', prompt.displayName];
+    const displayName = systemDisplayName(prompt);
+    if (
+      prompt.page === 'finance' ||
+      prompt.promptKey === 'component_analysis' ||
+      prompt.promptKey === 'summary_analysis' ||
+      prompt.promptKey === 'global_system' ||
+      prompt.promptKey === 'summary_system'
+    ) {
+      return ['System Prompt', 'Finance', displayName];
+    }
+    if (prompt.page === 'hr') {
+      return ['System Prompt', 'HR', displayName];
+    }
+    return ['System Prompt', displayName];
   }
 
   const isHr = prompt.page === 'hr';
@@ -60,12 +88,12 @@ export function BreadcrumbBar({ prompt }: Props) {
         const isLast = i === crumbs.length - 1;
         return (
           <span key={`${i}-${crumb}`} className="flex items-center gap-1.5">
+            {i > 0 && (
+              <span className="text-foreground/40">/</span>
+            )}
             <span className={isLast ? 'font-semibold text-foreground' : 'text-foreground/70'}>
               {crumb}
             </span>
-            {!isLast && (
-              <ChevronRight size={14} className="shrink-0 text-foreground/40" />
-            )}
           </span>
         );
       })}

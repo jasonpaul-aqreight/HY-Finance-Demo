@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import useSWR, { mutate } from 'swr';
-import { AlertTriangle, Loader2, Star, Trash2 } from 'lucide-react';
+import { AlertTriangle, Loader2, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -105,13 +105,13 @@ export function VersionPanel({ promptKey }: Props) {
       data-testid="version-panel"
       className="flex flex-col rounded-lg border border-border bg-background"
     >
-      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-4 py-2.5">
-        <div className="text-xs font-semibold uppercase tracking-wider text-foreground">
-          Versions
-        </div>
-        <span className="text-xs text-foreground/70">
-          {versions.length} / {MAX_VERSIONS}
-        </span>
+      <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-2.5">
+        <div className="text-sm font-semibold text-foreground">Version:</div>
+        {!isLoading && (
+          <span className="text-xs text-foreground/60">
+            {versions.length}/{MAX_VERSIONS}
+          </span>
+        )}
       </div>
 
       <div className="flex flex-col gap-2 px-3 py-3">
@@ -165,32 +165,10 @@ export function VersionPanel({ promptKey }: Props) {
                 selectingId != null && !isBusy && 'opacity-60',
               )}
             >
-              <div className="mt-0.5 shrink-0">
-                {v.isDefault ? (
-                  <Star className="h-4 w-4 text-amber-600" fill="currentColor" />
-                ) : (
-                  <span
-                    className={cn(
-                      'inline-block h-2.5 w-2.5 rounded-full',
-                      v.isSelected ? 'bg-blue-600' : 'bg-foreground/30',
-                    )}
-                  />
-                )}
-              </div>
               <div className="min-w-0 flex-1">
-                <div
-                  className={cn(
-                    'truncate text-sm',
-                    v.isDefault || v.isSelected ? 'font-semibold text-foreground' : 'text-foreground',
-                  )}
-                >
+                <div className="truncate text-sm font-medium text-foreground">
                   {v.label}
                 </div>
-                {v.isSelected && (
-                  <div className="text-[10px] font-semibold uppercase tracking-wider text-blue-700">
-                    Selected
-                  </div>
-                )}
               </div>
               {!v.isDefault && (
                 <span

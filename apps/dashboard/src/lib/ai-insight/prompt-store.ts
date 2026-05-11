@@ -24,10 +24,18 @@ export const VERSION_CAP = 6;
 export const VERSION_CAP_REACHED = 'VERSION_CAP_REACHED';
 
 export function getDefaultPromptText(promptKey: string): string | null {
-  if (promptKey === 'global_system') return DEFAULT_GLOBAL_SYSTEM;
-  if (promptKey === 'summary_system') return DEFAULT_SUMMARY_SYSTEM;
-  if (promptKey === 'feedback_router_system') return DEFAULT_FEEDBACK_ROUTER_SYSTEM;
-  if (promptKey === 'surgical_editor_system') return DEFAULT_SURGICAL_EDITOR_SYSTEM;
+  if (promptKey === 'component_analysis' || promptKey === 'global_system') {
+    return DEFAULT_GLOBAL_SYSTEM;
+  }
+  if (promptKey === 'summary_analysis' || promptKey === 'summary_system') {
+    return DEFAULT_SUMMARY_SYSTEM;
+  }
+  if (promptKey === 'feedback_router' || promptKey === 'feedback_router_system') {
+    return DEFAULT_FEEDBACK_ROUTER_SYSTEM;
+  }
+  if (promptKey === 'surgical_editor' || promptKey === 'surgical_editor_system') {
+    return DEFAULT_SURGICAL_EDITOR_SYSTEM;
+  }
   // Section Guidance keys end in `_guidance`; strip the suffix to get the
   // section_key used as the DEFAULT_SECTION_GUIDANCE map key.
   if (promptKey.endsWith('_guidance')) {

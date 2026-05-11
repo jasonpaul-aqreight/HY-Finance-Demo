@@ -123,33 +123,33 @@ export function invalidateCache(): void {
 
 export async function getGlobalSystemPrompt(): Promise<string> {
   const s = await getSnapshot();
-  const text = s.byKey.get('global_system');
+  const text = s.byKey.get('component_analysis') ?? s.byKey.get('global_system');
   if (text) return text;
-  console.warn('[prompt-loader] DB miss for global_system, using default');
+  console.warn('[prompt-loader] DB miss for component_analysis, using default');
   return DEFAULT_GLOBAL_SYSTEM;
 }
 
 export async function getSummarySystemPrompt(): Promise<string> {
   const s = await getSnapshot();
-  const text = s.byKey.get('summary_system');
+  const text = s.byKey.get('summary_analysis') ?? s.byKey.get('summary_system');
   if (text) return text;
-  console.warn('[prompt-loader] DB miss for summary_system, using default');
+  console.warn('[prompt-loader] DB miss for summary_analysis, using default');
   return DEFAULT_SUMMARY_SYSTEM;
 }
 
 export async function getFeedbackRouterSystemPrompt(): Promise<string> {
   const s = await getSnapshot();
-  const text = s.byKey.get('feedback_router_system');
+  const text = s.byKey.get('feedback_router') ?? s.byKey.get('feedback_router_system');
   if (text) return text;
-  console.warn('[prompt-loader] DB miss for feedback_router_system, using default');
+  console.warn('[prompt-loader] DB miss for feedback_router, using default');
   return DEFAULT_FEEDBACK_ROUTER_SYSTEM;
 }
 
 export async function getSurgicalEditorSystemPrompt(): Promise<string> {
   const s = await getSnapshot();
-  const text = s.byKey.get('surgical_editor_system');
+  const text = s.byKey.get('surgical_editor') ?? s.byKey.get('surgical_editor_system');
   if (text) return text;
-  console.warn('[prompt-loader] DB miss for surgical_editor_system, using default');
+  console.warn('[prompt-loader] DB miss for surgical_editor, using default');
   return DEFAULT_SURGICAL_EDITOR_SYSTEM;
 }
 

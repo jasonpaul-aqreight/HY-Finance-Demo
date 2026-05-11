@@ -41,48 +41,70 @@ interface SeedRow {
 function buildSeedRows(): SeedRow[] {
   const rows: SeedRow[] = [
     {
-      prompt_key: 'global_system',
+      prompt_key: 'component_analysis',
       prompt_text: DEFAULT_GLOBAL_SYSTEM,
       category: 'system',
-      page: null,
+      page: 'finance',
       section_key: null,
       section_name: null,
       component_type: null,
-      display_name: 'Global System Prompt',
+      display_name: 'Component Analysis',
       sort_order: 0,
     },
     {
-      prompt_key: 'summary_system',
+      prompt_key: 'summary_analysis',
       prompt_text: DEFAULT_SUMMARY_SYSTEM,
       category: 'system',
-      page: null,
+      page: 'finance',
       section_key: null,
       section_name: null,
       component_type: null,
-      display_name: 'Summary System Prompt',
+      display_name: 'Summary Analysis',
       sort_order: 1,
     },
     {
-      prompt_key: 'feedback_router_system',
+      prompt_key: 'hr_component_analysis',
+      prompt_text: '',
+      category: 'system',
+      page: 'hr',
+      section_key: null,
+      section_name: null,
+      component_type: null,
+      display_name: 'Component Analysis',
+      sort_order: 2,
+    },
+    {
+      prompt_key: 'hr_summary_analysis',
+      prompt_text: '',
+      category: 'system',
+      page: 'hr',
+      section_key: null,
+      section_name: null,
+      component_type: null,
+      display_name: 'Summary Analysis',
+      sort_order: 3,
+    },
+    {
+      prompt_key: 'feedback_router',
       prompt_text: DEFAULT_FEEDBACK_ROUTER_SYSTEM,
       category: 'system',
       page: null,
       section_key: null,
       section_name: null,
       component_type: null,
-      display_name: 'Feedback Router Prompt',
-      sort_order: 2,
+      display_name: 'Feedback Router',
+      sort_order: 4,
     },
     {
-      prompt_key: 'surgical_editor_system',
+      prompt_key: 'surgical_editor',
       prompt_text: DEFAULT_SURGICAL_EDITOR_SYSTEM,
       category: 'system',
       page: null,
       section_key: null,
       section_name: null,
       component_type: null,
-      display_name: 'Surgical Editor Prompt',
-      sort_order: 3,
+      display_name: 'Surgical Editor',
+      sort_order: 5,
     },
   ];
 
@@ -90,25 +112,21 @@ function buildSeedRows(): SeedRow[] {
     // Guidance row — sort_order 0 so it sits above the components in the admin
     // sidebar tree. Stored under DB category `section_guidance` (the column
     // value stays for back-compat); the user-facing label is "Guidance".
-    // HR sections (page='hr') always get a row, even when DEFAULT_SECTION_GUIDANCE
-    // has no entry — Phase 2 scaffold ships them empty so admin/HR PRD work
-    // can fill them in. Migration 020 dropped the non-empty CHECK constraint
-    // so '' is now a valid prompt_text.
+    // Guidance rows are always seeded, even when the default body is blank.
+    // Finance now intentionally ships blank Guidance prompts; feedback can fill
+    // them later without losing the tree entry.
     const guidanceText = DEFAULT_SECTION_GUIDANCE[sectionKey];
-    const isHr = SECTION_PAGE[sectionKey] === 'hr';
-    if (guidanceText || isHr) {
-      rows.push({
-        prompt_key: sectionGuidanceKey(sectionKey),
-        prompt_text: guidanceText ?? '',
-        category: 'section_guidance',
-        page: SECTION_PAGE[sectionKey],
-        section_key: sectionKey,
-        section_name: SECTION_NAMES[sectionKey],
-        component_type: null,
-        display_name: `${SECTION_NAMES[sectionKey]} — Guidance`,
-        sort_order: 0,
-      });
-    }
+    rows.push({
+      prompt_key: sectionGuidanceKey(sectionKey),
+      prompt_text: guidanceText ?? '',
+      category: 'section_guidance',
+      page: SECTION_PAGE[sectionKey],
+      section_key: sectionKey,
+      section_name: SECTION_NAMES[sectionKey],
+      component_type: null,
+      display_name: `${SECTION_NAMES[sectionKey]} — Guidance`,
+      sort_order: 0,
+    });
 
     const components = SECTION_COMPONENTS[sectionKey];
     components.forEach((comp, idx) => {
@@ -196,9 +214,20 @@ export async function POST(req: NextRequest) {
         FROM ai_insight_prompts p
        WHERE NOT EXISTS (
          SELECT 1 FROM ai_insight_prompt_versions v
-          WHERE v.prompt_key = p.prompt_key AND v.is_default = TRUE
+         WHERE v.prompt_key = p.prompt_key AND v.is_default = TRUE
        )
     `);
+    if (force === 'all' || force === 'seed') {
+      for (const r of rows) {
+        await pool.query(
+          `UPDATE ai_insight_prompt_versions
+              SET prompt_text = $2
+            WHERE prompt_key = $1
+              AND is_default = TRUE`,
+          [r.prompt_key, r.prompt_text],
+        );
+      }
+    }
     await pool.query(`
       UPDATE ai_insight_prompts p
          SET selected_version_id = v.id

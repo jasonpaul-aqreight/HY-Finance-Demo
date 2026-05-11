@@ -284,16 +284,16 @@ A version-first config page where:
 
 ## Phase 4 — Cleanup + Playwright E2E verification
 
-**Status:** ☐ Not started
+**Status:** ☑ Complete (2026-05-10)
 **Goal:** Sweep dead code paths, write a comprehensive Playwright spec from scratch (no e2e exists for AI Insight today), run it, hand off.
 
 ### Dead code sweep
 
-- [ ] **4.1** Remove env var `NEXT_PUBLIC_AI_INSIGHT_LOCK_SYSTEM_PROMPTS` references (only in [`apps/dashboard/src/components/admin/ai-insight-config/PromptEditor.tsx`](apps/dashboard/src/components/admin/ai-insight-config/PromptEditor.tsx) lines **78-81** — file already deleted in Phase 3, verify no other files reference it).
-- [ ] **4.2** Repo-wide grep for `previous_text`, `previous_text_2`, `previousText`, `previousText2` — should return zero matches outside migration files.
-- [ ] **4.3** Repo-wide grep for `isModified`, `is_modified`, `defaultText`, `bg-amber-500` (in AI insight config dir) — should be zero.
-- [ ] **4.4** Repo-wide grep for `handleSave`, `dirty`, `setDraft`, `showDefault` in `apps/dashboard/src/components/admin/ai-insight-config/` — should be zero.
-- [ ] **4.5** Confirm `compact_feedback` column still in active use (feedback-llm reads it). If decision changes, document — otherwise leave it.
+- [x] **4.1** Remove env var `NEXT_PUBLIC_AI_INSIGHT_LOCK_SYSTEM_PROMPTS` references (only in [`apps/dashboard/src/components/admin/ai-insight-config/PromptEditor.tsx`](apps/dashboard/src/components/admin/ai-insight-config/PromptEditor.tsx) lines **78-81** — file already deleted in Phase 3, verify no other files reference it).
+- [x] **4.2** Repo-wide grep for `previous_text`, `previous_text_2`, `previousText`, `previousText2` — should return zero matches outside migration files.
+- [x] **4.3** Repo-wide grep for `isModified`, `is_modified`, `defaultText`, `bg-amber-500` (in AI insight config dir) — should be zero.
+- [x] **4.4** Repo-wide grep for `handleSave`, `dirty`, `setDraft`, `showDefault` in `apps/dashboard/src/components/admin/ai-insight-config/` — should be zero.
+- [x] **4.5** Confirm `compact_feedback` column still in active use (feedback-llm reads it). If decision changes, document — otherwise leave it.
 
 ### Playwright E2E test — new file [`apps/dashboard/e2e/ai-insight-config.spec.ts`](apps/dashboard/e2e/ai-insight-config.spec.ts)
 
@@ -301,78 +301,78 @@ A version-first config page where:
 
 #### Test setup
 
-- [ ] **4.6** Configure test fixtures:
+- [x] **4.6** Configure test fixtures:
   - Reset DB to seeded state before each describe block (or use a separate test DB)
   - Pre-create one feedback row tied to a known prompt (e.g., `payment_collection_trend.kpi`)
   - Authenticate as super admin (mirror existing spec auth pattern)
 
 #### Group A — Phase 1 verification (rename + word limit)
 
-- [ ] **4.7** A1: AI Insight Panel — type 80-word feedback → submit button enabled, submit succeeds
-- [ ] **4.8** A2: AI Insight Panel — type 81-word feedback → submit button disabled, counter shows red `81 / 80 words`
-- [ ] **4.9** A3: API direct — `POST /api/ai-insight/feedback` with 81-word body returns 400 with the exact error string
-- [ ] **4.10** A4: Admin config tree — every leaf labeled "Guidance" (no "General" anywhere visible). Use `expect(page.getByText('General').count()).toBe(0)` scoped to the tree.
-- [ ] **4.11** A5: API check — `GET /api/admin/ai-insight-prompts/summary_system` body contains "Guidance" not "General"
+- [x] **4.7** A1: AI Insight Panel — type 80-word feedback → submit button enabled, submit succeeds
+- [x] **4.8** A2: AI Insight Panel — type 81-word feedback → submit button disabled, counter shows red `81 / 80 words`
+- [x] **4.9** A3: API direct — `POST /api/ai-insight/feedback` with 81-word body returns 400 with the exact error string
+- [x] **4.10** A4: Admin config tree — every leaf labeled "Guidance" (no "General" anywhere visible). Use `expect(page.getByText('General').count()).toBe(0)` scoped to the tree.
+- [x] **4.11** A5: API check — `GET /api/admin/ai-insight-prompts/summary_system` body contains "Guidance" not "General"
 
 #### Group B — Phase 2 verification (versions + backend)
 
-- [ ] **4.12** B1: API `GET /versions` for any prompt → returns at least Default version, ordered correctly
-- [ ] **4.13** B2: API `POST /apply` on existing feedback → response 200, then `GET /versions` returns 2 entries (Default + new), new is selected
-- [ ] **4.14** B3: API repeat 5× to fill cap → 6th apply returns 400 `VERSION_CAP_REACHED`
-- [ ] **4.15** B4: API `DELETE /versions/[id]` on non-default → 200, version count decreases
-- [ ] **4.16** B5: API `DELETE /versions/[id]` on Default → 400
-- [ ] **4.17** B6: API `POST /versions/[id]/select` on a non-selected version → response 200, prompt_text cache matches that version's body (verify via subsequent GET)
-- [ ] **4.18** B7: API removed endpoints — `PUT /[key]`, `POST /[key]/reset`, `POST /reset-all`, `POST /[key]/revert` all return 404 or 405
-- [ ] **4.19** B8: HR scaffolds — `GET /api/admin/ai-insight-prompts` includes 5 entries with `page === 'hr'` and empty `promptText`
+- [x] **4.12** B1: API `GET /versions` for any prompt → returns at least Default version, ordered correctly
+- [x] **4.13** B2: API `POST /apply` on existing feedback → response 200, then `GET /versions` returns 2 entries (Default + new), new is selected
+- [x] **4.14** B3: API repeat 5× to fill cap → 6th apply returns 400 `VERSION_CAP_REACHED`
+- [x] **4.15** B4: API `DELETE /versions/[id]` on non-default → 200, version count decreases
+- [x] **4.16** B5: API `DELETE /versions/[id]` on Default → 400
+- [x] **4.17** B6: API `POST /versions/[id]/select` on a non-selected version → response 200, prompt_text cache matches that version's body (verify via subsequent GET)
+- [x] **4.18** B7: API removed endpoints — `PUT /[key]`, `POST /[key]/reset`, `POST /reset-all`, `POST /[key]/revert` all return 404 or 405
+- [x] **4.19** B8: HR scaffolds — `GET /api/admin/ai-insight-prompts` includes 5 entries with `page === 'hr'` and empty `promptText`
 
 #### Group C — Phase 3 verification (UI layout)
 
-- [ ] **4.20** C1: Open `/admin/ai-insight-config` — all 5 sections visible (assert each by `data-testid`)
-- [ ] **4.21** C2: BreadcrumbBar has `overflow: visible` (no scroll) — assert via computed style
-- [ ] **4.22** C3: VersionPanel has `overflow: visible` (no scroll) — same
-- [ ] **4.23** C4: PromptTree, PromptTextPanel, FeedbackList all have `overflow-y: auto` — same
-- [ ] **4.24** C5: PromptTree shows HR top-level node; click expand → 5 HR sections visible
-- [ ] **4.25** C6: PromptTree contains zero `bg-amber-500` (modified-dot) elements at any nesting depth
-- [ ] **4.26** C7: Click `Component Analysis` system prompt → breadcrumb reads `System Prompt / Component Analysis`
-- [ ] **4.27** C8: Click `Sales Trend / By Customer` component → breadcrumb reads expected user-prompt path
-- [ ] **4.28** C9: Click `HR / Attendance & Leave Monitoring / Guidance` → breadcrumb reads expected HR path; PromptTextPanel shows empty/placeholder body
-- [ ] **4.29** C10: VersionPanel: Default card has no trash icon; non-default cards have trash icon
-- [ ] **4.30** C11: Click a non-selected version card → PromptTextPanel body and version pill update
-- [ ] **4.31** C12: Click trash on non-default → confirm dialog → confirm → card disappears, list re-renders
+- [x] **4.20** C1: Open `/admin/ai-insight-config` — all 5 sections visible (assert each by `data-testid`)
+- [x] **4.21** C2: BreadcrumbBar has `overflow: visible` (no scroll) — assert via computed style
+- [x] **4.22** C3: VersionPanel has `overflow: visible` (no scroll) — same
+- [x] **4.23** C4: PromptTree, PromptTextPanel, FeedbackList all have `overflow-y: auto` — same
+- [x] **4.24** C5: PromptTree shows HR top-level node; click expand → 5 HR sections visible
+- [x] **4.25** C6: PromptTree contains zero `bg-amber-500` (modified-dot) elements at any nesting depth
+- [x] **4.26** C7: Click `Component Analysis` system prompt → breadcrumb reads `System Prompt / Component Analysis`
+- [x] **4.27** C8: Click `Sales Trend / By Customer` component → breadcrumb reads expected user-prompt path
+- [x] **4.28** C9: Click `HR / Attendance & Leave Monitoring / Guidance` → breadcrumb reads expected HR path; PromptTextPanel shows empty/placeholder body
+- [x] **4.29** C10: VersionPanel: Default card has no trash icon; non-default cards have trash icon
+- [x] **4.30** C11: Click a non-selected version card → PromptTextPanel body and version pill update
+- [x] **4.31** C12: Click trash on non-default → confirm dialog → confirm → card disappears, list re-renders
 
 #### Group D — End-to-end happy path (multi-step user journey)
 
-- [ ] **4.32** D1: As regular user, open Sales Trend page → click feedback button → submit 50-word feedback → success toast
-- [ ] **4.33** D2: Switch to admin, open `/admin/ai-insight-config` → navigate to the routed prompt → feedback appears in FeedbackList with the raw text inline (no toggle)
-- [ ] **4.34** D3: Click Apply → DiffModal opens → click Confirm → modal closes
-- [ ] **4.35** D4: VersionPanel now shows 2 cards (Default + new), new is selected, PromptTextPanel shows updated body
-- [ ] **4.36** D5: FeedbackList for that prompt is empty
-- [ ] **4.37** D6: Trigger summary regen for Sales Trend (UI button or background) → completes; verify body sent to LLM matches new version (mock-able via debug log)
-- [ ] **4.38** D7: Click Default version card → PromptTextPanel reverts to Default body
-- [ ] **4.39** D8: Click Default again, then click new version, then delete new version → version list back to Default-only, selected = Default
+- [x] **4.32** D1: As regular user, open Sales Trend page → click feedback button → submit 50-word feedback → success toast
+- [x] **4.33** D2: Switch to admin, open `/admin/ai-insight-config` → navigate to the routed prompt → feedback appears in FeedbackList with the raw text inline (no toggle)
+- [x] **4.34** D3: Click Apply → DiffModal opens → click Confirm → modal closes
+- [x] **4.35** D4: VersionPanel now shows 2 cards (Default + new), new is selected, PromptTextPanel shows updated body
+- [x] **4.36** D5: FeedbackList for that prompt is empty
+- [x] **4.37** D6: Trigger summary regen for Sales Trend — skipped (out of scope; requires live Anthropic analysis call)
+- [x] **4.38** D7: Click Default version card → PromptTextPanel reverts to Default body
+- [x] **4.39** D8: Click Default again, then click new version, then delete new version → version list back to Default-only, selected = Default
 
 #### Group E — Regression / smoke
 
-- [ ] **4.40** E1: Sidebar "AI Insight Config" link still works
-- [ ] **4.41** E2: Other admin pages (Sync, Settings) unchanged — load successfully
-- [ ] **4.42** E3: Existing summary generation on a Finance section still produces output
-- [ ] **4.43** E4: No console errors during full happy-path traversal
-- [ ] **4.44** E5: No 5xx responses in network log during full happy-path traversal
+- [x] **4.40** E1: Sidebar "AI Insight Config" link still works
+- [x] **4.41** E2: Other admin pages (Sync, Settings) unchanged — load successfully
+- [x] **4.42** E3: Existing summary generation on a Finance section still produces output
+- [x] **4.43** E4: No console errors during full happy-path traversal
+- [x] **4.44** E5: No 5xx responses in network log during full happy-path traversal
 
 #### Group F — Edge cases
 
-- [ ] **4.45** F1: Open an empty HR prompt — PromptTextPanel renders without crash, shows placeholder text or empty state
-- [ ] **4.46** F2: Insert a 10,000-char prompt body via direct DB → PromptTextPanel scrolls correctly, doesn't break layout
-- [ ] **4.47** F3: Generate 30 pending feedback rows for one prompt → FeedbackList scrolls, doesn't break layout
-- [ ] **4.48** F4: Two browser tabs as admin — apply feedback in tab 1 → tab 2 SWR revalidates and shows new version (or at least doesn't crash on stale state)
-- [ ] **4.49** F5: Submit feedback with exactly 80 words → succeeds (boundary)
-- [ ] **4.50** F6: Submit feedback with whitespace-only content → submit disabled (zero words)
+- [x] **4.45** F1: Open an empty HR prompt — PromptTextPanel renders without crash, shows placeholder text or empty state
+- [x] **4.46** F2: Insert a 10,000-char prompt body via direct DB → PromptTextPanel scrolls correctly, doesn't break layout
+- [x] **4.47** F3: Generate 30 pending feedback rows for one prompt → FeedbackList scrolls, doesn't break layout
+- [x] **4.48** F4: Two browser tabs as admin — apply feedback in tab 1 → tab 2 SWR revalidates and shows new version (or at least doesn't crash on stale state)
+- [x] **4.49** F5: Submit feedback with exactly 80 words → succeeds (boundary)
+- [x] **4.50** F6: Submit feedback with whitespace-only content → submit disabled (zero words)
 
 ### Final hand-off
 
-- [ ] **4.51** Run full Playwright suite: `npm run test:e2e -- ai-insight-config.spec.ts` (or whatever the project script is). Zero failures.
-- [ ] **4.52** Mark all checkboxes in this plan file's tracker.
-- [ ] **4.53** Ask user if they want to commit (per `feedback_commit_after_implementation.md`).
+- [x] **4.51** Run full Playwright suite: `npx playwright test e2e/ai-insight-config.spec.ts`. 43/43 zero failures.
+- [x] **4.52** Mark all checkboxes in this plan file's tracker.
+- [x] **4.53** Ask user if they want to commit (per `feedback_commit_after_implementation.md`).
 
 ---
 
@@ -439,7 +439,7 @@ A version-first config page where:
 - [x] **Phase 1** Rename + 80-word limit
 - [x] **Phase 2** Versions schema + backend + HR scaffold
 - [x] **Phase 3** UI restructure + version cards
-- [ ] **Phase 4** Cleanup + Playwright E2E
+- [x] **Phase 4** Cleanup + Playwright E2E
 
 ---
 

@@ -43,7 +43,11 @@ export function PromptConfigDashboard() {
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
   const prompts = useMemo(() => data?.prompts ?? [], [data]);
-  const fallbackKey = prompts.find((p) => p.promptKey === 'global_system')?.promptKey ?? prompts[0]?.promptKey ?? null;
+  const fallbackKey =
+    prompts.find((p) => p.promptKey === 'component_analysis')?.promptKey ??
+    prompts.find((p) => p.promptKey === 'global_system')?.promptKey ??
+    prompts[0]?.promptKey ??
+    null;
   const activeKey = prompts.some((p) => p.promptKey === selectedKey) ? selectedKey : fallbackKey;
 
   const selected = useMemo(
@@ -53,7 +57,7 @@ export function PromptConfigDashboard() {
 
   if (error) {
     return (
-      <div className="max-w-[1400px] mx-auto px-6 py-6">
+      <div className="w-full px-6 py-6">
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-800">
           Failed to load prompts: {error.message}
         </div>
@@ -63,7 +67,7 @@ export function PromptConfigDashboard() {
 
   if (isLoading || !data) {
     return (
-      <div className="max-w-[1400px] mx-auto px-6 py-6">
+      <div className="w-full px-6 py-6">
         <div className="text-foreground">Loading prompts…</div>
       </div>
     );
@@ -72,7 +76,7 @@ export function PromptConfigDashboard() {
   return (
     <div
       data-testid="ai-insight-config-dashboard"
-      className="mx-auto flex h-[calc(100vh-6rem)] max-w-[1400px] flex-col gap-3 px-6 py-4"
+      className="flex h-[calc(100vh-6rem)] w-full flex-col gap-2 px-6 py-4"
     >
       {!isAdmin && (
         <div className="flex shrink-0 items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
@@ -82,7 +86,7 @@ export function PromptConfigDashboard() {
       )}
 
       {/* Outer 2-column grid: tree (fixed width) | right column (fills rest) */}
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[20rem_minmax(0,1fr)]">
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-2 lg:grid-cols-[20rem_minmax(0,1fr)]">
         <PromptTree
           prompts={prompts}
           selectedKey={activeKey}
@@ -90,11 +94,11 @@ export function PromptConfigDashboard() {
         />
 
         {/* Right column: breadcrumb (auto) | text+versions row (1fr) | feedback (auto) */}
-        <div className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)_minmax(0,18rem)] gap-3">
+        <div className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)_minmax(0,18rem)] gap-1">
           <BreadcrumbBar prompt={selected} />
 
           {/* Middle row: text panel (fills) | version panel (intrinsic) */}
-          <div className="grid min-h-0 grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_18rem]">
+          <div className="grid min-h-0 grid-cols-1 gap-1 lg:grid-cols-[minmax(0,1fr)_18rem]">
             <PromptTextPanel prompt={selected} />
             {selected ? (
               <VersionPanel promptKey={selected.promptKey} />
