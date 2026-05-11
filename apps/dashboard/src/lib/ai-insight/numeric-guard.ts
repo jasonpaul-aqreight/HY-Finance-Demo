@@ -68,11 +68,11 @@ const NUMBER_PATTERNS: { unit: AllowedValueUnit; regex: RegExp; parse: (m: RegEx
       return n;
     },
   },
-  // 84.7%
+  // 84.7%, 1,172%
   {
     unit: 'pct',
-    regex: /(-?\d+(?:\.\d+)?)\s*(?:%|percent|pp|percentage points?)/gi,
-    parse: (m) => parseFloat(m[1]),
+    regex: /(-?\d{1,3}(?:,\d{3})+(?:\.\d+)?|-?\d+(?:\.\d+)?)\s*(?:%|percent|pp|percentage points?)/gi,
+    parse: (m) => parseFloat(m[1].replace(/,/g, '')),
   },
   // 52 days, 1,873 days
   {
@@ -193,6 +193,22 @@ function isDerivedPercentage(found: FoundNumber, allowed: AllowedValue[]): boole
   return false;
 }
 
+function isSupportedLowerBound(found: FoundNumber, allowed: AllowedValue[], text: string): boolean {
+  const before = text.slice(Math.max(0, found.index - 40), found.index).toLowerCase();
+  const hasLowerBoundMarker =
+    /\b(?:over|above|more than|greater than|exceed(?:s|ed|ing)?|older than|beyond)\s+$/.test(before) ||
+    /[>≥]\s*$/.test(before);
+  if (!hasLowerBoundMarker) return false;
+
+  return allowed.some((av) => {
+    if (av.unit && av.unit !== found.unit) return false;
+    const tol = tolerance(av);
+    const sourceValue = found.unit === 'RM' ? Math.abs(av.value) : av.value;
+    const threshold = found.unit === 'RM' ? Math.abs(found.value) : found.value;
+    return sourceValue > threshold + tol;
+  });
+}
+
 export function runNumericGuard(text: string, allowed: AllowedValue[]): GuardResult {
   const found = extractNumbers(text);
   const unmatched: FoundNumber[] = [];
@@ -202,6 +218,7 @@ export function runNumericGuard(text: string, allowed: AllowedValue[]): GuardRes
     if (f.unit === 'count' && SAFE_INTEGERS.has(f.value)) continue;
     if (matchesAllowed(f, allowed)) continue;
     if (isDerivedPercentage(f, allowed)) continue;
+    if (isSupportedLowerBound(f, allowed, text)) continue;
     unmatched.push(f);
   }
 

@@ -135,75 +135,75 @@ Follow the iteration process strictly:
 <claude-mem-context>
 # Memory Context
 
-# [Hoi-Yong_Finance] recent context, 2026-05-08 9:03am GMT+8
+# [Hoi-Yong_Finance] recent context, 2026-05-11 10:27am GMT+8
 
 Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
 Format: ID TIME TYPE TITLE
 Fetch details: get_observations([IDs]) | Search: mem-search skill
 
-Stats: 50 obs (14,880t read) | 108,004t work | 86% savings
+Stats: 50 obs (24,459t read) | 549,328t work | 96% savings
 
-### May 8, 2026
-S367 Sales page validation Steps 0–3 complete — awaiting user approval + hallucination scoring clarification (May 8 at 7:38 AM)
-S368 Validation Study Page 1 (sales_trend) — executing all 4 measurement runs (2 baseline + 2 after) per HOW_TO_RUN_PAGE.md procedure (May 8 at 7:38 AM)
-S369 Validation Study Page 1 (sales_trend) — all 4 measurement runs executing; AFTER run #2 (cache proof run) in progress (May 8 at 7:44 AM)
-S370 Validation Study Page 1 (sales_trend) — AFTER run #2 (cache proof run) still in progress; multiple Analyze clicks observed (May 8 at 7:44 AM)
-S371 Validation Study continuation — Page 1 (sales_trend) AFTER run #2 pending API credit replenishment (May 8 at 7:47 AM)
-S372 Restart the Next.js dashboard dev server for Hoi-Yong_Finance (May 8 at 7:48 AM)
-S373 BMad Analyst Agent (Mary) initialized for Hoi-Yong Finance project — awaiting user task selection (May 8 at 7:56 AM)
-S375 AI Insight Config — DB-backed prompt system: Session 1 backend rewire complete, handoff created for Session 2 (API routes + UI) (May 8 at 7:57 AM)
-2234 8:18a ⚖️ AI Insight Config Implementation Split Into 2 Sessions
-2235 " ⚖️ AI Insight Config Plan Finalized and Submitted for Approval
-2236 8:19a 🟣 AI Insight Config Implementation Begun — Plan Approved
-2237 " 🔵 Confirmed Exact Line Boundaries for Phase A Extraction in prompts.ts
-2238 " 🔵 Actual Component Count is 66, Not ~42 as Estimated in Plan
-2239 " 🔵 tsx Not in Dashboard devDependencies — Seed Script Runner Needs Alternative
-2240 8:20a 🔵 tsx and ts-node Absent From Entire Monorepo — Seed Script Must Use npx tsx
-2241 " ⚖️ Seed Script Replaced With Next.js API Endpoint to Avoid tsx Dependency
-2242 " 🟣 prompts-defaults.ts Created — Phase A Extraction Complete
-2243 8:21a 🔵 prompts-defaults.ts Verified: 66 Component Prompts, 3 Exports at Correct Line Numbers
-2244 " 🔄 prompts.ts Slimmed From 1,856 to 228 Lines — Phase A Bridge Import in Place
-2245 " 🟣 Phase A TypeScript Check Passes — prompts.ts Bridge Import Compiles Clean
-2246 " 🟣 Migration 016_ai_insight_prompts.sql Created — Phase B DB Schema
-2247 " 🟣 prompt-loader.ts Created — Phase B DB Loader With 30s In-Memory Cache
-2248 8:22a 🟣 prompt-store.ts Created — Phase B Write Helpers With Delimiter Validation
-2249 8:23a 🔵 Admin API Directory Structure Confirmed — ai-insight-prompts Folder Created
-2250 8:24a 🟣 seed-defaults/route.ts Created — Idempotent Seed Endpoint for ai_insight_prompts
-2251 " 🟣 Phase B TypeScript Check Passes — DB Layer Compiles Clean
-2252 " 🔵 Phase C Targets Confirmed in Current prompts.ts — 3 Functions to Make Async
-S374 bmad-agent-dev session startup for Hoi-Yong Finance project (May 8 at 8:25 AM)
-2253 8:29a 🔵 Hoi-Yong Finance BMAD Configuration Loaded
-2254 8:30a 🔵 No project-context.md Found in Hoi-Yong Finance
-2255 " ⚖️ AI Insight Config Page Plan Loaded — Prompts Move from Code to DB
-2256 " 🔵 Phase B Backend Files Already Exist in Hoi-Yong Finance
-S376 AI Insight Config feature — Session 1 backend committed to git, ready to start Session 2 (admin API routes + UI) (May 8 at 8:31 AM)
-2257 8:31a 🔵 prompt-store.ts Fully Implemented with Validation and Transaction Safety
-2258 " 🔵 prompt-loader.ts Uses Inflight Deduplication Pattern on Top of 30s TTL Cache
-2259 " 🔵 Seed-Defaults API Route Complete with Idempotent INSERT and Telemetry Response
-2260 " 🟣 GET /api/admin/ai-insight-prompts Route Created
-2261 8:32a 🟣 GET + PUT /api/admin/ai-insight-prompts/[prompt_key] Route Created
-2262 " 🟣 POST /api/admin/ai-insight-prompts/[prompt_key]/reset Route Created
-2263 " 🟣 POST /api/admin/ai-insight-prompts/reset-all Route Created — Phase D Complete
-2264 " 🔵 TypeScript Type Check Passes Clean After Phase D API Routes
-2265 8:33a 🔵 AppSidebar adminItems Has Only Data Sync; All Required UI Primitives Confirmed Present
-2266 " 🔵 Admin Guard Pattern Confirmed: useRole() Returns isAdmin from localStorage-Backed RoleContext
-2267 " 🔵 Textarea Uses field-sizing-content Auto-Resize — Prompt Editor Will Need Explicit Height Override
-2268 " 🔵 SyncScheduleForm Confirms Admin Guard Pattern: Disable Inputs + Conditional Sections via isAdmin
-2269 8:35a 🔵 SWR v2.4.1 Present but Existing Admin Components Only Use mutate(), Not useSWR Hook
-2270 " 🔵 Dialog Component Built on @base-ui/react — Uses data-open/data-closed, Not Radix data-state
-2271 " ✅ Sparkles Icon Imported in AppSidebar — Nav Link Addition in Progress
-2272 8:36a 🟣 AppSidebar Now Shows AI Insight Config Nav Link in Admin Section
-2273 " 🟣 AI Insight Config Page Shell Created at /admin/ai-insight-config
-2274 8:37a 🟣 PromptConfigDashboard Client Component Created with useSWR Data Fetching
-2275 " 🔴 PromptConfigDashboard Auto-Select Fixed: useEffect Imported to Replace useMemo Side Effect
-2276 " 🔴 PromptConfigDashboard Auto-Select Converted from useMemo to useEffect
-2279 " 🟣 Phase E Complete — All UI Components Pass TypeScript with Zero Errors
-2280 " 🔵 Next.js Dev Server Not Running — Verification Cannot Proceed Without Starting It
-2277 8:38a 🟣 PromptTree Component Created with Three-Level Collapsible Navigation
-2278 " 🟣 PromptEditor Component Created — Full CRUD Editor with Show Default, Warnings, and Reset All Dialog
-2282 8:39a ✅ Next.js Dev Server Ready on localhost:3000 — Phase F Verification Can Begin
-2283 " 🔵 GET /api/admin/ai-insight-prompts Returns 68 Prompts — DB Already Seeded, All at Default
-2281 8:40a ✅ Next.js Dev Server Started in Background for Phase F Verification
+### May 10, 2026
+S568 Phase 2 of AI Insight Config Overhaul — complete and commit all backend/schema/HR scaffold work (May 10 at 11:31 AM)
+S567 Phase 2 of AI Insight Config Overhaul — complete implementation, verification, and commit/push (May 10 at 12:07 PM)
+S569 Phase 2 AI Insight Config Overhaul — pre-commit git status check confirms all changes ready to stage (May 10 at 12:12 PM)
+S570 Phase 2 AI Insight Config Overhaul — commit and push all changes to GitHub (May 10 at 12:13 PM)
+S571 BMad agent dev session initialized for Hoi-Yong_Finance project (May 10 at 12:14 PM)
+S572 UI polish pass: Amelia reviewing mockup differences against current Phase 3 implementation before making targeted component changes (May 10 at 5:33 PM)
+S573 Full-width layout + VersionPanel improvements for ai-insight-config admin page (May 10 at 5:37 PM)
+S574 BMad agent dev session started for Hoi-Yong_Finance project (May 10 at 7:56 PM)
+S576 Sales Trend AI Insight KPI cards show AnalyzeIcon but orchestrator never generates their component analysis — awaiting fix decision (May 10 at 8:02 PM)
+S575 Sales Trend AI Insight config mismatch — only 2 of 5 components shown; KPI cards have AnalyzeIcon but no orchestrator analysis (May 10 at 8:24 PM)
+3180 10:43p 🔵 S01 Playwright Eval Exposed Three Concrete AI Output Bugs
+3181 " ✅ ROLLOUT_TRACKER.md Updated with S01 Evaluation Row
+3182 10:50p 🔴 S01 Data Fetcher Fixed with Pre-computed Rank Labels and Average Gap
+3183 " ⚖️ S01 Tool Policy Changed from aggregate_only to none
+3184 " ✅ Rollout Tracker Gains Formal Quality Issue Handling Process
+3185 " 🔵 Next.js Build Fails in Sandboxed Shell Without Network Access
+3187 10:55p ⚖️ S01 Committed and Pushed; S02 Rollout Next
+3188 " 🔄 Sales Summary Fetcher Split into Four Individual Component Fetchers
+3189 10:56p 🔵 Working Tree Contains Large Uncommitted AI Insight Config Admin UI Overhaul
+3193 " ⚖️ Selective Hunk Staging Used to Isolate S01 Fixes from Sales Refactor in data-fetcher.ts
+3190 10:57p 🟣 S01 payment_collection_trend Rollout Completed — 9/10 Quality Achieved
+3191 " 🔵 data-fetcher.ts Contains Unrelated Uncommitted Sales Fetchers from Prior Session
+3192 " 🔵 git index.lock Requires Escalated Sandbox Permissions
+3194 " ✅ Hunks 1–9 Staged for S01 Commit; Hunk 10 (New Sales Fetchers) Skipped
+3195 10:58p 🔵 git restore --staged Failed Due to Index Lock from Active git add -p TTY Session
+3196 " 🔴 Accidental Sales Hunk Unstaged via git restore with Escalated Permissions
+3197 " ✅ Corrected Hunk Staging: Only S01 Hunks 1–8 Staged, Both Sales Hunks 9–10 Skipped
+3198 10:59p ✅ ROLLOUT_TRACKER.md and tool-policy.ts Staged to Complete S01 Commit Index
+3200 " 🔵 AI Insight Improvement Rollout Tracker — S03 Next in Queue
+3199 " 🔵 Staged Index Verified: data-fetcher.ts Shows 48 Insertions Confirming Sales Hunks Excluded
+3201 " 🔵 AI Insight Live Architecture and Verified Improvement State
+3202 11:01p 🔵 AI Insight Study MASTER_LOG — Iteration History, Architectural Lessons, and Pending Iter 8.1
+3203 " 🔵 S03 Sales Summary Split — Partial Implementation State Audit
+3204 " 🔵 Iter 8.1 Implementation Spec — Provider Abstraction, Tool Schema Translation, and Open Gate Items
+3205 " 🔵 Git Working Tree State Before S03 Rollout — Pre-existing Modifications Confirmed
+3206 11:02p 🔵 S03 sales_trend Codebase Audit — Tool Policy, Data Sources, and Allowed Columns
+3207 " 🔵 S03 net_sales_trend Fetcher Has Sparse Allowed Whitelist — No Pre-computed Aggregates
+3208 11:03p 🔵 sales_trend Section Already Refactored — sales_summary Split Into 4 Individual KPI Fetchers
+3209 " 🔵 Complete SECTION_COMPONENTS Mapping for All Finance AI Insight Sections
+3211 " 🔵 Sales KPI UI Components Wired to New Individual sales_trend Component Keys
+3210 11:04p 🔵 sales_trend Component Prompts Populated in Defaults with Correct Thresholds
+3212 11:18p 🔵 AI Insight Rollout Tracker State Read for S04 Resume
+3213 11:19p 🔵 AI Insight System Architecture and Handoff Context Loaded
+3215 11:20p 🔵 AI Insight Optimization MASTER_LOG Full History Loaded
+3216 " 🔵 Iter 8.1 OpenRouter/GLM-5.1 Implementation Spec and Study Stop Criteria
+3217 " 🔵 Working Tree Dirty State Before S04 Work Begins
+3218 " 🔵 S04 sales_breakdown Audit: Summary Prompt Is Empty in prompts-defaults.ts
+3214 " 🔵 S04 sales_breakdown Section Audit: Architecture and Data Sources Mapped
+3219 11:23p 🔵 S04 sales_breakdown Tool Policy Discrepancy: Code Is 'full' But Compaction Notes Say 'aggregate_only'
+3220 " 🔵 sales_breakdown Component Registry Confirmed: Four 'breakdown' Type Components
+3221 11:24p 🔵 Full Tool Policy Map for All 16 Finance Sections Confirmed
+3222 " 🔵 Section Scope Classification Map and Fetcher Routing Logic Confirmed
+3223 " 🔵 S04 Fetcher Bug: by_agent Fetcher Queries pc_sales_by_outlet Instead of an Agent Table
+3224 11:25p 🔵 S04 Fetcher Implementation Fully Audited: by_agent Uses Correct Multi-Dimension Table
+3225 " 🔵 S04 Component Prompt Thresholds Confirmed in prompts-defaults.ts
+3226 11:26p 🔵 PRD Summary Questions for All 16 Sections and Tool Policy Rationale Confirmed
+3228 " 🔵 Historical sales_breakdown Logs Confirm Recurring Summary Tool-Call Schema Failures Since April 2026
+3227 11:27p 🔵 pc_sales_daily Has Pre-computed cn_total and net_revenue for Section-Level CN Ratio
+3229 11:35p ⚖️ AI Insight Rollout Policy Correction: Section Guidance Empty by Default, Tools Must Stay
+3230 " 🟣 S04 sales_breakdown Fetchers Overhauled with Pre-calculated Diagnostics and Richer Allowed Values
 
-Access 108k tokens of past work via get_observations([IDs]) or mem-search skill.
+Access 549k tokens of past work via get_observations([IDs]) or mem-search skill.
 </claude-mem-context>

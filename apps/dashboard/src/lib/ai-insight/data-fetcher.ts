@@ -61,6 +61,250 @@ const pct = (label: string, value: number): AllowedValue => ({ label, value, uni
 const days = (label: string, value: number): AllowedValue => ({ label, value, unit: 'days' });
 const cnt = (label: string, value: number): AllowedValue => ({ label, value, unit: 'count' });
 
+const pctOf = (num: number, denom: number): number => (denom !== 0 ? (num / denom) * 100 : 0);
+const round1 = (value: number): number => Number(value.toFixed(1));
+const round2 = (value: number): number => Number(value.toFixed(2));
+const fmtRM = (value: number): string => `RM ${value.toLocaleString('en-MY', { maximumFractionDigits: 2 })}`;
+const fmtPct1 = (value: number): string => `${value.toFixed(1)}%`;
+const fmtPct2 = (value: number): string => `${value.toFixed(2)}%`;
+
+interface SalesPeriodTotals {
+  netSales: number;
+  invoiceSales: number;
+  cashSales: number;
+  creditNotes: number;
+  grossSales: number;
+  priorNetSales: number;
+  yoyPct: number;
+  invoiceSharePct: number;
+  cashSharePct: number;
+  creditNoteRatioPct: number;
+  creditNotesShareOfNetPct: number;
+  nonInvoiceNetEffect: number;
+  nonInvoiceSharePct: number;
+  nonCashNetSales: number;
+  nonCashSharePct: number;
+}
+
+async function fetchSalesPeriodTotals(dr: DateRange): Promise<SalesPeriodTotals> {
+  const pool = getPool();
+  const { rows } = await pool.query(
+    `WITH current_period AS (
+       SELECT COALESCE(SUM(net_revenue), 0)::float AS net_sales,
+              COALESCE(SUM(invoice_total), 0)::float AS invoice_sales,
+              COALESCE(SUM(cash_total), 0)::float AS cash_sales,
+              ABS(COALESCE(SUM(cn_total), 0))::float AS credit_notes
+         FROM pc_sales_daily
+        WHERE doc_date BETWEEN $1 AND $2
+     ),
+     prior_period AS (
+       SELECT COALESCE(SUM(net_revenue), 0)::float AS prior_net_sales
+         FROM pc_sales_daily
+        WHERE doc_date BETWEEN ($1::date - INTERVAL '1 year')
+                           AND ($2::date - INTERVAL '1 year')
+     )
+     SELECT c.net_sales,
+            c.invoice_sales,
+            c.cash_sales,
+            c.credit_notes,
+            p.prior_net_sales
+       FROM current_period c
+       CROSS JOIN prior_period p`,
+    [dr.start, dr.end],
+  );
+
+  const r = rows[0];
+  const netSales = Number(r.net_sales);
+  const invoiceSales = Number(r.invoice_sales);
+  const cashSales = Number(r.cash_sales);
+  const creditNotes = Number(r.credit_notes);
+  const grossSales = invoiceSales + cashSales;
+  const priorNetSales = Number(r.prior_net_sales);
+  const nonInvoiceNetEffect = cashSales - creditNotes;
+  const nonCashNetSales = netSales - cashSales;
+
+  return {
+    netSales,
+    invoiceSales,
+    cashSales,
+    creditNotes,
+    grossSales,
+    priorNetSales,
+    yoyPct: round1(pctOf(netSales - priorNetSales, priorNetSales)),
+    invoiceSharePct: round1(pctOf(invoiceSales, netSales)),
+    cashSharePct: round1(pctOf(cashSales, netSales)),
+    creditNoteRatioPct: round2(pctOf(creditNotes, grossSales)),
+    creditNotesShareOfNetPct: round1(pctOf(creditNotes, netSales)),
+    nonInvoiceNetEffect,
+    nonInvoiceSharePct: round1(pctOf(nonInvoiceNetEffect, netSales)),
+    nonCashNetSales,
+    nonCashSharePct: round1(pctOf(nonCashNetSales, netSales)),
+  };
+}
+
+interface SalesMonthlyTrendRow {
+  month: string;
+  invoiceSales: number;
+  cashSales: number;
+  creditNotes: number;
+  netSales: number;
+  grossSales: number;
+  priorNetSales: number;
+  momPct: number | null;
+  yoyPct: number | null;
+  vsAveragePct: number;
+  creditNoteRatioPct: number;
+  netSalesRank: number;
+  creditNotesRank: number;
+}
+
+interface SalesTrendDiagnostics {
+  rows: SalesMonthlyTrendRow[];
+  periodAverageNetSales: number;
+  firstMonth: SalesMonthlyTrendRow;
+  lastMonth: SalesMonthlyTrendRow;
+  peakMonth: SalesMonthlyTrendRow;
+  troughMonth: SalesMonthlyTrendRow;
+  topCreditNoteMonth: SalesMonthlyTrendRow;
+  secondCreditNoteMonth: SalesMonthlyTrendRow | null;
+  longestDeclineStreak: number;
+  longestGrowthStreak: number;
+  hasThreeMonthDecline: boolean;
+  hasThreeMonthGrowth: boolean;
+  mayToSeptemberChange: number | null;
+  mayToSeptemberChangePct: number | null;
+  mayToSeptemberHasJulyUptick: boolean;
+  h1AverageNetSales: number | null;
+  h2AverageNetSales: number | null;
+  h2VsH1AverageChange: number | null;
+  h2VsH1AverageChangePct: number | null;
+  h2MinNetSales: number | null;
+  h2MaxNetSales: number | null;
+}
+
+function avg(values: number[]): number {
+  return values.length === 0 ? 0 : values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function longestDirectionalStreak(rows: SalesMonthlyTrendRow[], direction: 'up' | 'down'): number {
+  let current = 0;
+  let longest = 0;
+  for (const row of rows) {
+    if (row.momPct == null) continue;
+    const matches = direction === 'up' ? row.momPct > 0 : row.momPct < 0;
+    if (matches) {
+      current++;
+      longest = Math.max(longest, current);
+    } else {
+      current = 0;
+    }
+  }
+  return longest;
+}
+
+async function fetchSalesMonthlyTrend(dr: DateRange): Promise<SalesTrendDiagnostics> {
+  const pool = getPool();
+  const { rows } = await pool.query(
+    `WITH current_monthly AS (
+       SELECT to_char(doc_date, 'YYYY-MM') AS month,
+              COALESCE(SUM(invoice_total), 0)::float AS invoice_sales,
+              COALESCE(SUM(cash_total), 0)::float AS cash_sales,
+              ABS(COALESCE(SUM(cn_total), 0))::float AS credit_notes,
+              COALESCE(SUM(net_revenue), 0)::float AS net_sales
+         FROM pc_sales_daily
+        WHERE doc_date BETWEEN $1 AND $2
+        GROUP BY to_char(doc_date, 'YYYY-MM')
+     ),
+     prior_monthly AS (
+       SELECT to_char(doc_date + INTERVAL '1 year', 'YYYY-MM') AS month,
+              COALESCE(SUM(net_revenue), 0)::float AS prior_net_sales
+         FROM pc_sales_daily
+        WHERE doc_date BETWEEN ($1::date - INTERVAL '1 year')
+                           AND ($2::date - INTERVAL '1 year')
+        GROUP BY to_char(doc_date + INTERVAL '1 year', 'YYYY-MM')
+     )
+     SELECT c.month,
+            c.invoice_sales,
+            c.cash_sales,
+            c.credit_notes,
+            c.net_sales,
+            COALESCE(p.prior_net_sales, 0)::float AS prior_net_sales
+       FROM current_monthly c
+       LEFT JOIN prior_monthly p ON p.month = c.month
+       ORDER BY c.month`,
+    [dr.start, dr.end],
+  );
+
+  const baseRows = rows.map((r) => ({
+    month: String(r.month),
+    invoiceSales: Number(r.invoice_sales),
+    cashSales: Number(r.cash_sales),
+    creditNotes: Number(r.credit_notes),
+    netSales: Number(r.net_sales),
+    grossSales: Number(r.invoice_sales) + Number(r.cash_sales),
+    priorNetSales: Number(r.prior_net_sales),
+  }));
+  const periodAverageNetSales = avg(baseRows.map((r) => r.netSales));
+  const netSorted = [...baseRows].sort((a, b) => b.netSales - a.netSales);
+  const cnSorted = [...baseRows].sort((a, b) => b.creditNotes - a.creditNotes);
+
+  const trendRows: SalesMonthlyTrendRow[] = baseRows.map((r, idx) => {
+    const prev = idx > 0 ? baseRows[idx - 1] : null;
+    return {
+      ...r,
+      momPct: prev ? round1(pctOf(r.netSales - prev.netSales, prev.netSales)) : null,
+      yoyPct: r.priorNetSales > 0 ? round1(pctOf(r.netSales - r.priorNetSales, r.priorNetSales)) : null,
+      vsAveragePct: round1(pctOf(r.netSales - periodAverageNetSales, periodAverageNetSales)),
+      creditNoteRatioPct: round2(pctOf(r.creditNotes, r.grossSales)),
+      netSalesRank: netSorted.findIndex((candidate) => candidate.month === r.month) + 1,
+      creditNotesRank: cnSorted.findIndex((candidate) => candidate.month === r.month) + 1,
+    };
+  });
+
+  const firstMonth = trendRows[0];
+  const lastMonth = trendRows[trendRows.length - 1];
+  const peakMonth = [...trendRows].sort((a, b) => b.netSales - a.netSales)[0];
+  const troughMonth = [...trendRows].sort((a, b) => a.netSales - b.netSales)[0];
+  const creditNoteRows = [...trendRows].sort((a, b) => b.creditNotes - a.creditNotes);
+  const may = trendRows.find((r) => r.month.endsWith('-05')) ?? null;
+  const july = trendRows.find((r) => r.month.endsWith('-07')) ?? null;
+  const september = trendRows.find((r) => r.month.endsWith('-09')) ?? null;
+  const h1Rows = trendRows.slice(0, 6);
+  const h2Rows = trendRows.slice(6);
+  const h2NetValues = h2Rows.map((r) => r.netSales);
+  const h1AverageNetSales = h1Rows.length > 0 ? avg(h1Rows.map((r) => r.netSales)) : null;
+  const h2AverageNetSales = h2Rows.length > 0 ? avg(h2Rows.map((r) => r.netSales)) : null;
+  const h2VsH1AverageChange = h1AverageNetSales != null && h2AverageNetSales != null
+    ? h2AverageNetSales - h1AverageNetSales
+    : null;
+
+  return {
+    rows: trendRows,
+    periodAverageNetSales,
+    firstMonth,
+    lastMonth,
+    peakMonth,
+    troughMonth,
+    topCreditNoteMonth: creditNoteRows[0],
+    secondCreditNoteMonth: creditNoteRows[1] ?? null,
+    longestDeclineStreak: longestDirectionalStreak(trendRows, 'down'),
+    longestGrowthStreak: longestDirectionalStreak(trendRows, 'up'),
+    hasThreeMonthDecline: longestDirectionalStreak(trendRows, 'down') >= 3,
+    hasThreeMonthGrowth: longestDirectionalStreak(trendRows, 'up') >= 3,
+    mayToSeptemberChange: may && september ? september.netSales - may.netSales : null,
+    mayToSeptemberChangePct: may && september ? round1(pctOf(september.netSales - may.netSales, may.netSales)) : null,
+    mayToSeptemberHasJulyUptick: !!(july && may && september && july.netSales > trendRows[trendRows.findIndex((r) => r.month === july.month) - 1]?.netSales),
+    h1AverageNetSales,
+    h2AverageNetSales,
+    h2VsH1AverageChange,
+    h2VsH1AverageChangePct: h1AverageNetSales != null && h2VsH1AverageChange != null
+      ? round1(pctOf(h2VsH1AverageChange, h1AverageNetSales))
+      : null,
+    h2MinNetSales: h2NetValues.length > 0 ? Math.min(...h2NetValues) : null,
+    h2MaxNetSales: h2NetValues.length > 0 ? Math.max(...h2NetValues) : null,
+  };
+}
+
 // ─── Data fetchers per component ─────────────────────────────────────────────
 // Each returns the formatted prompt block AND an `allowed` whitelist of every
 // numeric value that legally appears in (or could be derived from) the prompt.
@@ -415,6 +659,13 @@ const fetchers: Record<string, DataFetcher> = {
     );
 
     const allowed: AllowedValue[] = [rm('total outstanding', total)];
+    const top3Outstanding = top5
+      .slice(0, 3)
+      .reduce((sum: number, r: { total_outstanding: number }) => sum + Number(r.total_outstanding), 0);
+    const top5Outstanding = top5
+      .reduce((sum: number, r: { total_outstanding: number }) => sum + Number(r.total_outstanding), 0);
+    const top3Share = total > 0 ? (top3Outstanding / total) * 100 : 0;
+    const top5CombinedShare = total > 0 ? (top5Outstanding / total) * 100 : 0;
     let top5Share = 0;
     let topTable = '| Rank | Customer | Outstanding | % of Total |\n|------|----------|-------------|------------|\n';
     top5.forEach((r: { company_name: string; total_outstanding: number }, i: number) => {
@@ -426,9 +677,18 @@ const fetchers: Record<string, DataFetcher> = {
       allowed.push(pct(`${r.company_name} share of total`, sharePct));
     });
     allowed.push(pct('top 5 share of total', top5Share));
+    allowed.push(rm('top 3 outstanding combined', top3Outstanding));
+    allowed.push(pct('top 3 outstanding share', top3Share));
+    allowed.push(rm('top 5 outstanding combined', top5Outstanding));
+    allowed.push(pct('top 5 outstanding combined share', top5CombinedShare));
 
     return {
-      prompt: `Value: RM ${total.toLocaleString('en-MY')}\n\nTop 5 contributors (${top5Share.toFixed(1)}% of total):\n${topTable}`,
+      prompt:
+        `Value: RM ${total.toLocaleString('en-MY')}\n\n` +
+        `Pre-calculated concentration (cite these directly — do not sum customer rows):\n` +
+        `- Top 3 contributors combined: RM ${top3Outstanding.toLocaleString('en-MY')} (${top3Share.toFixed(1)}% of total)\n` +
+        `- Top 5 contributors combined: RM ${top5Outstanding.toLocaleString('en-MY')} (${top5CombinedShare.toFixed(1)}% of total)\n\n` +
+        `Top 5 contributors (${top5Share.toFixed(1)}% of total):\n${topTable}`,
       allowed,
     };
   },
@@ -453,6 +713,8 @@ const fetchers: Record<string, DataFetcher> = {
     const total_customers = Number(rows[0].total_customers);
     const pctNum = total > 0 ? (overdue / total) * 100 : 0;
     const pctStr = total > 0 ? pctNum.toFixed(1) : '0';
+    const notOverdue = total - overdue;
+    const notOverduePct = total > 0 ? (notOverdue / total) * 100 : 0;
 
     const { rows: top5 } = await pool.query(
       `SELECT company_name, overdue_amount, max_overdue_days
@@ -467,10 +729,24 @@ const fetchers: Record<string, DataFetcher> = {
     const allowed: AllowedValue[] = [
       rm('total outstanding', total),
       rm('total overdue', overdue),
+      rm('not overdue outstanding', notOverdue),
       pct('overdue % of outstanding', pctNum),
+      pct('not overdue % of outstanding', notOverduePct),
       cnt('overdue customers', overdue_customers),
       cnt('total customers', total_customers),
     ];
+
+    const top3Overdue = top5
+      .slice(0, 3)
+      .reduce((sum: number, r: { overdue_amount: number }) => sum + Number(r.overdue_amount), 0);
+    const top5Overdue = top5
+      .reduce((sum: number, r: { overdue_amount: number }) => sum + Number(r.overdue_amount), 0);
+    const top3OverdueShare = overdue > 0 ? (top3Overdue / overdue) * 100 : 0;
+    const top5OverdueShare = overdue > 0 ? (top5Overdue / overdue) * 100 : 0;
+    allowed.push(rm('top 3 overdue combined', top3Overdue));
+    allowed.push(pct('top 3 overdue share', top3OverdueShare));
+    allowed.push(rm('top 5 overdue combined', top5Overdue));
+    allowed.push(pct('top 5 overdue share', top5OverdueShare));
 
     let topTable = '| Rank | Customer | Overdue Amount | Max Overdue Days | % of Overdue |\n|------|----------|----------------|-------------------|--------------|\n';
     top5.forEach((r: { company_name: string; overdue_amount: number; max_overdue_days: number | null }, i: number) => {
@@ -484,7 +760,16 @@ const fetchers: Record<string, DataFetcher> = {
     });
 
     return {
-      prompt: `Value: RM ${overdue.toLocaleString('en-MY')}\nPercentage of total: ${pctStr}%\nOverdue customers: ${overdue_customers}\nTotal customers: ${total_customers}\n\nTop 5 overdue customers:\n${topTable}`,
+      prompt:
+        `Value: RM ${overdue.toLocaleString('en-MY')}\n` +
+        `Percentage of total: ${pctStr}%\n` +
+        `Not-overdue outstanding: RM ${notOverdue.toLocaleString('en-MY')} (${notOverduePct.toFixed(1)}% of total)\n` +
+        `Overdue customers: ${overdue_customers}\n` +
+        `Total customers: ${total_customers}\n\n` +
+        `Pre-calculated overdue concentration (cite these directly — do not sum customer rows):\n` +
+        `- Top 3 overdue customers combined: RM ${top3Overdue.toLocaleString('en-MY')} (${top3OverdueShare.toFixed(1)}% of overdue)\n` +
+        `- Top 5 overdue customers combined: RM ${top5Overdue.toLocaleString('en-MY')} (${top5OverdueShare.toFixed(1)}% of overdue)\n\n` +
+        `Top 5 overdue customers:\n${topTable}`,
       allowed,
     };
   },
@@ -494,20 +779,27 @@ const fetchers: Record<string, DataFetcher> = {
     const { rows: [latest] } = await pool.query(`SELECT MAX(snapshot_date) AS d FROM pc_ar_customer_snapshot`);
     if (!latest?.d) return { prompt: 'No snapshot data available.', allowed: [] };
     const { rows } = await pool.query(
-      `SELECT COUNT(*) AS breach_count
+      `SELECT COUNT(*) FILTER (WHERE credit_limit > 0) AS limited_customers,
+              COUNT(*) FILTER (WHERE credit_limit > 0 AND total_outstanding > credit_limit) AS breach_count
        FROM pc_ar_customer_snapshot
-       WHERE snapshot_date = $1 AND credit_limit > 0 AND total_outstanding > credit_limit
+       WHERE snapshot_date = $1
          AND is_active = 'T'
          AND company_name NOT ILIKE 'CASH SALES%'`,
       [latest.d],
     );
     const count = parseInt(rows[0].breach_count);
+    const limitedCustomers = parseInt(rows[0].limited_customers);
+    const breachPct = limitedCustomers > 0 ? (count / limitedCustomers) * 100 : 0;
     const color = count === 0 ? 'Green (Good)' : 'Red (Concern)';
 
-    const allowed: AllowedValue[] = [cnt('breach count', count)];
+    const allowed: AllowedValue[] = [
+      cnt('breach count', count),
+      cnt('limited customer count', limitedCustomers),
+      pct('breach share of limited customers', breachPct),
+    ];
 
     if (count === 0) {
-      return { prompt: `Value: ${count} customers\nColor: ${color}`, allowed };
+      return { prompt: `Value: ${count} customers\nCredit-limited active customers: ${limitedCustomers}\nBreach share: ${breachPct.toFixed(1)}%\nColor: ${color}`, allowed };
     }
 
     const { rows: breaches } = await pool.query(
@@ -520,6 +812,18 @@ const fetchers: Record<string, DataFetcher> = {
        LIMIT 10`,
       [latest.d],
     );
+
+    const totalBreachOutstanding = breaches.reduce(
+      (sum: number, r: { total_outstanding: number }) => sum + Number(r.total_outstanding),
+      0,
+    );
+    const top5BreachOutstanding = breaches
+      .slice(0, 5)
+      .reduce((sum: number, r: { total_outstanding: number }) => sum + Number(r.total_outstanding), 0);
+    const top5BreachShare = totalBreachOutstanding > 0 ? (top5BreachOutstanding / totalBreachOutstanding) * 100 : 0;
+    allowed.push(rm('shown breach outstanding', totalBreachOutstanding));
+    allowed.push(rm('top 5 breach outstanding', top5BreachOutstanding));
+    allowed.push(pct('top 5 breach outstanding share', top5BreachShare));
 
     let breachTable = '| Rank | Customer | Credit Limit | Outstanding | Utilization |\n|------|----------|--------------|-------------|-------------|\n';
     breaches.forEach((r: { company_name: string; credit_limit: number; total_outstanding: number; utilization_pct: number | null }, i: number) => {
@@ -535,7 +839,15 @@ const fetchers: Record<string, DataFetcher> = {
     const heading = count > 10 ? `Top ${showing} breaching customers (of ${count}) by utilization:` : `Breaching customers (${count}) by utilization:`;
     allowed.push(cnt('breaches shown', showing));
     return {
-      prompt: `Value: ${count} customers\nColor: ${color}\n\n${heading}\n${breachTable}`,
+      prompt:
+        `Value: ${count} customers\n` +
+        `Credit-limited active customers: ${limitedCustomers}\n` +
+        `Breach share: ${breachPct.toFixed(1)}%\n` +
+        `Color: ${color}\n\n` +
+        `Pre-calculated breach concentration (shown top ${showing}; cite these directly — do not sum rows):\n` +
+        `- Shown breaching customers outstanding: RM ${totalBreachOutstanding.toLocaleString('en-MY')}\n` +
+        `- Top 5 shown breachers outstanding: RM ${top5BreachOutstanding.toLocaleString('en-MY')} (${top5BreachShare.toFixed(1)}% of shown breach outstanding)\n\n` +
+        `${heading}\n${breachTable}`,
       allowed,
     };
   },
@@ -561,18 +873,49 @@ const fetchers: Record<string, DataFetcher> = {
     );
     const total = rows.reduce((s: number, r: { amount: number }) => s + Number(r.amount), 0);
 
-    const allowed: AllowedValue[] = [rm('total outstanding (aging)', total)];
+    const allowed: AllowedValue[] = [
+      rm('total outstanding (aging)', total),
+      days('aging bucket threshold 30 days', 30),
+      days('aging bucket threshold 60 days', 60),
+      days('aging bucket threshold 90 days', 90),
+      days('aging bucket threshold 120 days', 120),
+    ];
     let table = '| Bucket | Amount | % of Total | Invoices |\n|--------|--------|-----------|----------|\n';
+    let notYetDueAmount = 0;
+    let overdueAmount = 0;
+    let old120Amount = 0;
+    let old120Invoices = 0;
     for (const r of rows) {
       const amt = Number(r.amount);
       const sharePct = total > 0 ? (amt / total) * 100 : 0;
       table += `| ${r.bucket} | RM ${amt.toLocaleString('en-MY')} | ${sharePct.toFixed(1)}% | ${r.invoices} |\n`;
+      if (r.bucket === 'Not Yet Due') notYetDueAmount += amt;
+      else overdueAmount += amt;
+      if (r.bucket === '120+') {
+        old120Amount += amt;
+        old120Invoices += Number(r.invoices);
+      }
       allowed.push(rm(`${r.bucket} amount`, amt));
       allowed.push(pct(`${r.bucket} share`, sharePct));
       allowed.push(cnt(`${r.bucket} invoices`, Number(r.invoices)));
     }
+    const notYetDueShare = total > 0 ? (notYetDueAmount / total) * 100 : 0;
+    const overdueShare = total > 0 ? (overdueAmount / total) * 100 : 0;
+    const old120Share = total > 0 ? (old120Amount / total) * 100 : 0;
+    allowed.push(rm('not yet due amount', notYetDueAmount));
+    allowed.push(pct('not yet due share', notYetDueShare));
+    allowed.push(rm('overdue aging amount', overdueAmount));
+    allowed.push(pct('overdue aging share', overdueShare));
+    allowed.push(rm('120+ aging amount', old120Amount));
+    allowed.push(pct('120+ aging share', old120Share));
+    allowed.push(cnt('120+ invoice count', old120Invoices));
     return {
-      prompt: `Data:\n${table}\nTotal Outstanding: RM ${total.toLocaleString('en-MY')}`,
+      prompt:
+        `Pre-calculated aging diagnostics (cite these directly — do not recompute bucket totals):\n` +
+        `- Not Yet Due: RM ${notYetDueAmount.toLocaleString('en-MY')} (${notYetDueShare.toFixed(1)}% of total)\n` +
+        `- Overdue buckets combined: RM ${overdueAmount.toLocaleString('en-MY')} (${overdueShare.toFixed(1)}% of total)\n` +
+        `- 120+ bucket: RM ${old120Amount.toLocaleString('en-MY')} (${old120Share.toFixed(1)}% of total), ${old120Invoices.toLocaleString('en-MY')} invoices\n\n` +
+        `Data:\n${table}\nTotal Outstanding: RM ${total.toLocaleString('en-MY')}`,
       allowed,
     };
   },
@@ -594,15 +937,35 @@ const fetchers: Record<string, DataFetcher> = {
       [latest.d],
     );
     const r = rows[0];
+    const totalCustomers = Number(r.total);
+    const withinLimit = Number(r.within_limit);
+    const nearLimit = Number(r.near_limit);
+    const overLimit = Number(r.over_limit);
+    const noLimit = Number(r.no_limit);
+    const withinLimitPct = totalCustomers > 0 ? (withinLimit / totalCustomers) * 100 : 0;
+    const nearLimitPct = totalCustomers > 0 ? (nearLimit / totalCustomers) * 100 : 0;
+    const overLimitPct = totalCustomers > 0 ? (overLimit / totalCustomers) * 100 : 0;
+    const noLimitPct = totalCustomers > 0 ? (noLimit / totalCustomers) * 100 : 0;
     const allowed: AllowedValue[] = [
-      cnt('within limit customers', Number(r.within_limit)),
-      cnt('near limit customers', Number(r.near_limit)),
-      cnt('over limit customers', Number(r.over_limit)),
-      cnt('no limit customers', Number(r.no_limit)),
-      cnt('total customers', Number(r.total)),
+      cnt('within limit customers', withinLimit),
+      cnt('near limit customers', nearLimit),
+      cnt('over limit customers', overLimit),
+      cnt('no limit customers', noLimit),
+      cnt('total customers', totalCustomers),
+      pct('within limit share', withinLimitPct),
+      pct('near limit share', nearLimitPct),
+      pct('over limit share', overLimitPct),
+      pct('no limit share', noLimitPct),
     ];
     return {
-      prompt: `Categories:\n- Within Limit (< 80%): ${r.within_limit} customers\n- Near Limit (80-99%): ${r.near_limit} customers\n- Over Limit (>= 100%): ${r.over_limit} customers\n- No Limit Set: ${r.no_limit} customers\nTotal: ${r.total} customers`,
+      prompt:
+        `Categories:\n` +
+        `- Within Limit (< 80%): ${withinLimit} customers (${withinLimitPct.toFixed(1)}%)\n` +
+        `- Near Limit (80-99%): ${nearLimit} customers (${nearLimitPct.toFixed(1)}%)\n` +
+        `- Over Limit (>= 100%): ${overLimit} customers (${overLimitPct.toFixed(1)}%)\n` +
+        `- No Limit Set: ${noLimit} customers (${noLimitPct.toFixed(1)}%)\n` +
+        `Total: ${totalCustomers} customers\n\n` +
+        `Use these pre-calculated percentages directly; do not recompute category shares.`,
       allowed,
     };
   },
@@ -653,10 +1016,29 @@ const fetchers: Record<string, DataFetcher> = {
     );
     const totalCustomers = summary.reduce((s: number, r: { count: string }) => s + parseInt(r.count), 0);
     const totalOutstanding = summary.reduce((s: number, r: { total_outstanding: number }) => s + Number(r.total_outstanding), 0);
+    const highRisk = summary.find((r: { risk_tier: string }) => r.risk_tier === 'High');
+    const moderateRisk = summary.find((r: { risk_tier: string }) => r.risk_tier === 'Moderate');
+    const highRiskOutstanding = highRisk ? Number(highRisk.total_outstanding) : 0;
+    const moderateRiskOutstanding = moderateRisk ? Number(moderateRisk.total_outstanding) : 0;
+    const highModerateOutstanding = highRiskOutstanding + moderateRiskOutstanding;
+    const highModerateShare = totalOutstanding > 0 ? (highModerateOutstanding / totalOutstanding) * 100 : 0;
+    const top3Outstanding = topByOutstanding
+      .slice(0, 3)
+      .reduce((sum: number, r: { total_outstanding: number }) => sum + Number(r.total_outstanding), 0);
+    const top5Outstanding = topByOutstanding
+      .reduce((sum: number, r: { total_outstanding: number }) => sum + Number(r.total_outstanding), 0);
+    const top3OutstandingShare = totalOutstanding > 0 ? (top3Outstanding / totalOutstanding) * 100 : 0;
+    const top5OutstandingShare = totalOutstanding > 0 ? (top5Outstanding / totalOutstanding) * 100 : 0;
 
     const allowed: AllowedValue[] = [
       cnt('total customers', totalCustomers),
       rm('total outstanding', totalOutstanding),
+      rm('high and moderate risk outstanding', highModerateOutstanding),
+      pct('high and moderate risk outstanding share', highModerateShare),
+      rm('top 3 credit health outstanding combined', top3Outstanding),
+      pct('top 3 credit health outstanding share', top3OutstandingShare),
+      rm('top 5 credit health outstanding combined', top5Outstanding),
+      pct('top 5 credit health outstanding share', top5OutstandingShare),
     ];
 
     let riskTable = '| Risk Tier | Count | % of Customers | Outstanding | % of Outstanding |\n|-----------|-------|----------------|-------------|------------------|\n';
@@ -710,81 +1092,212 @@ const fetchers: Record<string, DataFetcher> = {
     const scoreConfig = `\nScore Configuration:\n- Weights: Utilization ${w.utilization}%, Overdue Days ${w.overdueDays}%, Timeliness ${w.timeliness}%, Double Breach ${w.doubleBreach}%\n- Risk Thresholds: Score >= ${t.low} = Low Risk, Score <= ${t.high} = High Risk, between = Moderate`;
 
     return {
-      prompt: `Summary:\n- Total customers: ${totalCustomers}\n\nRisk distribution:\n${riskTable}\nTop 5 by outstanding amount:\n${outstandingTable}\nTop 5 by max overdue days (most delinquent):\n${overdueTable}\nTop 5 by utilization % (most over credit limit):\n${utilTable}${scoreConfig}`,
+      prompt:
+        `Summary:\n` +
+        `- Total customers: ${totalCustomers}\n` +
+        `- Total outstanding: RM ${totalOutstanding.toLocaleString('en-MY')}\n\n` +
+        `Pre-calculated risk and concentration diagnostics (cite these directly — do not sum rows):\n` +
+        `- High + Moderate risk outstanding: RM ${highModerateOutstanding.toLocaleString('en-MY')} (${highModerateShare.toFixed(1)}% of outstanding)\n` +
+        `- Top 3 outstanding customers combined: RM ${top3Outstanding.toLocaleString('en-MY')} (${top3OutstandingShare.toFixed(1)}% of outstanding)\n` +
+        `- Top 5 outstanding customers combined: RM ${top5Outstanding.toLocaleString('en-MY')} (${top5OutstandingShare.toFixed(1)}% of outstanding)\n\n` +
+        `Risk distribution:\n${riskTable}\nTop 5 by outstanding amount:\n${outstandingTable}\nTop 5 by max overdue days (most delinquent):\n${overdueTable}\nTop 5 by utilization % (most over credit limit):\n${utilTable}${scoreConfig}`,
       allowed,
     };
   },
 
-  // Sales Section 3 — combined summary
-  async sales_summary(dr) {
-    const pool = getPool();
-    const { rows } = await pool.query(
-      `SELECT COALESCE(SUM(invoice_total), 0) AS invoice_sales,
-              COALESCE(SUM(cash_total), 0) AS cash_sales,
-              COALESCE(SUM(cn_total), 0) AS credit_notes,
-              COALESCE(SUM(net_revenue), 0) AS net_sales
-       FROM pc_sales_daily
-       WHERE doc_date BETWEEN $1 AND $2`,
-      [dr!.start, dr!.end],
-    );
-    const r = rows[0];
-    const inv = Number(r.invoice_sales);
-    const cash = Number(r.cash_sales);
-    const cnAbs = Math.abs(Number(r.credit_notes));
-    const net = Number(r.net_sales);
-    const gross = inv + cash;
-    const invShare = net > 0 ? (inv / net) * 100 : 0;
-    const cashShare = net > 0 ? (cash / net) * 100 : 0;
-    const cnShare = gross > 0 ? (cnAbs / gross) * 100 : 0;
-
+  // Sales Section 3 — individual KPI fetchers
+  async net_sales(dr) {
+    const totals = await fetchSalesPeriodTotals(dr!);
     return {
       prompt:
-        `Net Sales: RM ${net.toLocaleString('en-MY')}\n` +
-        `Breakdown:\n` +
-        `- Invoice Sales: RM ${inv.toLocaleString('en-MY')} (${invShare.toFixed(1)}% of net)\n` +
-        `- Cash Sales: RM ${cash.toLocaleString('en-MY')} (${cashShare.toFixed(1)}% of net)\n` +
-        `- Credit Notes: -RM ${cnAbs.toLocaleString('en-MY')} (${cnShare.toFixed(2)}% of gross sales)`,
+        `Net Sales: ${fmtRM(totals.netSales)}\n` +
+        `Prior-year same window Net Sales: ${fmtRM(totals.priorNetSales)}\n` +
+        `YoY Growth: ${fmtPct1(totals.yoyPct)}\n` +
+        `Gross Sales before Credit Notes: ${fmtRM(totals.grossSales)}\n` +
+        `- Invoice Sales: ${fmtRM(totals.invoiceSales)} (${fmtPct1(totals.invoiceSharePct)} of net)\n` +
+        `- Cash Sales: ${fmtRM(totals.cashSales)} (${fmtPct1(totals.cashSharePct)} of net)\n` +
+        `- Credit Notes: -${fmtRM(totals.creditNotes)} (${fmtPct2(totals.creditNoteRatioPct)} of gross; ${fmtPct1(totals.creditNotesShareOfNetPct)} of net)\n` +
+        `- Credit-note status: Monitor (above the <=1% Good threshold and below the >3% Concern threshold)\n` +
+        `- Non-invoice net effect (Cash Sales less Credit Notes): ${fmtRM(totals.nonInvoiceNetEffect)} (${fmtPct1(totals.nonInvoiceSharePct)} of net)\n\n` +
+        `Do not recompute Net Sales, YoY Growth, or mix percentages; use the pre-calculated lines above.`,
       allowed: [
-        rm('net sales', net),
-        rm('invoice sales', inv),
-        rm('cash sales', cash),
-        rm('credit notes', cnAbs),
-        rm('gross sales', gross),
-        pct('invoice share of net', invShare),
-        pct('cash share of net', cashShare),
-        pct('cn share of gross', cnShare),
+        rm('net sales', totals.netSales),
+        rm('prior-year net sales', totals.priorNetSales),
+        rm('invoice sales', totals.invoiceSales),
+        rm('cash sales', totals.cashSales),
+        rm('credit notes', totals.creditNotes),
+        rm('gross sales', totals.grossSales),
+        rm('non-invoice net effect', totals.nonInvoiceNetEffect),
+        pct('net sales yoy growth', totals.yoyPct),
+        pct('invoice share of net', totals.invoiceSharePct),
+        pct('cash share of net', totals.cashSharePct),
+        pct('cn share of gross', totals.creditNoteRatioPct),
+        pct('credit notes share of net', totals.creditNotesShareOfNetPct),
+        pct('non-invoice net effect share of net', totals.nonInvoiceSharePct),
       ],
     };
   },
 
-  async net_sales_trend(dr) {
-    const pool = getPool();
-    const { rows } = await pool.query(
-      `SELECT to_char(doc_date, 'YYYY-MM') AS month,
-              COALESCE(SUM(invoice_total), 0) AS invoice_sales,
-              COALESCE(SUM(cash_total), 0) AS cash_sales,
-              COALESCE(SUM(cn_total), 0) AS credit_notes,
-              COALESCE(SUM(net_revenue), 0) AS net_sales
-       FROM pc_sales_daily
-       WHERE doc_date BETWEEN $1 AND $2
-       GROUP BY to_char(doc_date, 'YYYY-MM')
-       ORDER BY month`,
-      [dr!.start, dr!.end],
-    );
-    const allowed: AllowedValue[] = [];
-    let table = '| Month | Invoice Sales | Cash Sales | Credit Notes | Net Sales |\n|-------|-------------|-----------|-------------|----------|\n';
-    for (const r of rows) {
-      const inv = Number(r.invoice_sales);
-      const cash = Number(r.cash_sales);
-      const cn = Number(r.credit_notes);
-      const net = Number(r.net_sales);
-      table += `| ${r.month} | RM ${inv.toLocaleString('en-MY')} | RM ${cash.toLocaleString('en-MY')} | -RM ${Math.abs(cn).toLocaleString('en-MY')} | RM ${net.toLocaleString('en-MY')} |\n`;
-      allowed.push(rm(`${r.month} invoice sales`, inv));
-      allowed.push(rm(`${r.month} cash sales`, cash));
-      allowed.push(rm(`${r.month} credit notes`, Math.abs(cn)));
-      allowed.push(rm(`${r.month} net sales`, net));
+  async invoice_sales(dr) {
+    const totals = await fetchSalesPeriodTotals(dr!);
+    return {
+      prompt:
+        `Invoice Sales: ${fmtRM(totals.invoiceSales)}\n` +
+        `Share of Net Sales: ${fmtPct1(totals.invoiceSharePct)}\n` +
+        `Net Sales (period): ${fmtRM(totals.netSales)}\n` +
+        `Non-invoice net effect (Cash Sales less Credit Notes): ${fmtRM(totals.nonInvoiceNetEffect)}\n` +
+        `Non-invoice share of Net Sales: ${fmtPct1(totals.nonInvoiceSharePct)}\n` +
+        `Cash Sales reference: ${fmtRM(totals.cashSales)}\n` +
+        `Credit Notes reference: -${fmtRM(totals.creditNotes)}`,
+      allowed: [
+        rm('invoice sales', totals.invoiceSales),
+        rm('net sales', totals.netSales),
+        rm('non-invoice net effect', totals.nonInvoiceNetEffect),
+        rm('cash sales reference', totals.cashSales),
+        rm('credit notes reference', totals.creditNotes),
+        pct('invoice share of net', totals.invoiceSharePct),
+        pct('non-invoice share of net', totals.nonInvoiceSharePct),
+      ],
+    };
+  },
+
+  async cash_sales(dr) {
+    const totals = await fetchSalesPeriodTotals(dr!);
+    return {
+      prompt:
+        `Cash Sales: ${fmtRM(totals.cashSales)}\n` +
+        `Share of Net Sales: ${fmtPct1(totals.cashSharePct)}\n` +
+        `Net Sales (period): ${fmtRM(totals.netSales)}\n` +
+        `Non-cash Net Sales: ${fmtRM(totals.nonCashNetSales)}\n` +
+        `Non-cash Share of Net Sales: ${fmtPct1(totals.nonCashSharePct)}\n` +
+        `Invoice Sales reference: ${fmtRM(totals.invoiceSales)}\n` +
+        `Credit Notes reference: -${fmtRM(totals.creditNotes)}`,
+      allowed: [
+        rm('cash sales', totals.cashSales),
+        rm('net sales', totals.netSales),
+        rm('non-cash net sales', totals.nonCashNetSales),
+        rm('invoice sales reference', totals.invoiceSales),
+        rm('credit notes reference', totals.creditNotes),
+        pct('cash share of net', totals.cashSharePct),
+        pct('non-cash share of net', totals.nonCashSharePct),
+      ],
+    };
+  },
+
+  async credit_notes(dr) {
+    const totals = await fetchSalesPeriodTotals(dr!);
+    const trend = await fetchSalesMonthlyTrend(dr!);
+    const topCnRows = trend.rows
+      .filter((r) => r.creditNotes > 0)
+      .sort((a, b) => b.creditNotes - a.creditNotes)
+      .slice(0, 5);
+    const topCnTable = topCnRows.length === 0
+      ? 'No credit-note months in the selected period.'
+      : [
+          '| Rank | Month | Credit Notes | CN Ratio | Net Sales |',
+          '|---:|---|---:|---:|---:|',
+          ...topCnRows.map((r, idx) =>
+            `| ${idx + 1} | ${r.month} | ${fmtRM(r.creditNotes)} | ${fmtPct2(r.creditNoteRatioPct)} | ${fmtRM(r.netSales)} |`,
+          ),
+        ].join('\n');
+    const allowed: AllowedValue[] = [
+      rm('credit notes', totals.creditNotes),
+      rm('gross sales', totals.grossSales),
+      rm('invoice sales', totals.invoiceSales),
+      rm('cash sales', totals.cashSales),
+      pct('cn ratio', totals.creditNoteRatioPct),
+    ];
+    for (const r of topCnRows) {
+      allowed.push(rm(`${r.month} credit notes`, r.creditNotes));
+      allowed.push(pct(`${r.month} cn ratio`, r.creditNoteRatioPct));
+      allowed.push(rm(`${r.month} net sales`, r.netSales));
+      allowed.push(cnt(`${r.month} credit-note rank`, r.creditNotesRank));
     }
-    return { prompt: `Data points:\n${table}`, allowed };
+    return {
+      prompt:
+        `Credit Notes: -${fmtRM(totals.creditNotes)}\n` +
+        `CN Ratio (CN / gross sales): ${fmtPct2(totals.creditNoteRatioPct)}\n` +
+        `CN Status: Monitor (above the <=1% Good threshold and below the >3% Concern threshold)\n` +
+        `Gross Sales (period): ${fmtRM(totals.grossSales)}\n\n` +
+        `Top Credit Note Months:\n${topCnTable}\n\n` +
+        `Use the table for spike claims. Do not compute your own monthly CN ratios.`,
+      allowed,
+    };
+  },
+
+  async net_sales_trend(dr) {
+    const totals = await fetchSalesPeriodTotals(dr!);
+    const trend = await fetchSalesMonthlyTrend(dr!);
+    const allowed: AllowedValue[] = [
+      rm('period net sales', totals.netSales),
+      rm('prior-year period net sales', totals.priorNetSales),
+      rm('period average monthly net sales', trend.periodAverageNetSales),
+      pct('period net sales yoy growth', totals.yoyPct),
+      cnt('sales trend month count', trend.rows.length),
+      cnt('longest net sales decline streak months', trend.longestDeclineStreak),
+      cnt('longest net sales growth streak months', trend.longestGrowthStreak),
+      cnt('three-month decline threshold', 3),
+      cnt('three-month growth threshold', 3),
+    ];
+    if (trend.h1AverageNetSales != null) allowed.push(rm('first-half average monthly net sales', trend.h1AverageNetSales));
+    if (trend.h2AverageNetSales != null) allowed.push(rm('second-half average monthly net sales', trend.h2AverageNetSales));
+    if (trend.h2VsH1AverageChange != null) allowed.push(rm('second-half average lift vs first-half', trend.h2VsH1AverageChange));
+    if (trend.h2VsH1AverageChangePct != null) allowed.push(pct('second-half average lift vs first-half pct', trend.h2VsH1AverageChangePct));
+    if (trend.h2MinNetSales != null) allowed.push(rm('second-half minimum monthly net sales', trend.h2MinNetSales));
+    if (trend.h2MaxNetSales != null) allowed.push(rm('second-half maximum monthly net sales', trend.h2MaxNetSales));
+    if (trend.mayToSeptemberChange != null) allowed.push(rm('May to September net sales change', trend.mayToSeptemberChange));
+    if (trend.mayToSeptemberChangePct != null) allowed.push(pct('May to September net sales change pct', trend.mayToSeptemberChangePct));
+
+    let table = '| Month | Invoice Sales | Cash Sales | Credit Notes | CN Ratio | Net Sales | MoM % | YoY % | Net Rank | CN Rank |\n|-------|-------------|-----------|-------------|---------:|----------|------:|------:|---------:|--------:|\n';
+    for (const r of trend.rows) {
+      table += `| ${r.month} | ${fmtRM(r.invoiceSales)} | ${fmtRM(r.cashSales)} | -${fmtRM(r.creditNotes)} | ${fmtPct2(r.creditNoteRatioPct)} | ${fmtRM(r.netSales)} | ${r.momPct == null ? 'n/a' : fmtPct1(r.momPct)} | ${r.yoyPct == null ? 'n/a' : fmtPct1(r.yoyPct)} | ${r.netSalesRank} | ${r.creditNotesRank} |\n`;
+      allowed.push(rm(`${r.month} invoice sales`, r.invoiceSales));
+      allowed.push(rm(`${r.month} cash sales`, r.cashSales));
+      allowed.push(rm(`${r.month} credit notes`, r.creditNotes));
+      allowed.push(rm(`${r.month} net sales`, r.netSales));
+      allowed.push(rm(`${r.month} gross sales`, r.grossSales));
+      allowed.push(rm(`${r.month} prior-year net sales`, r.priorNetSales));
+      allowed.push(pct(`${r.month} credit-note ratio`, r.creditNoteRatioPct));
+      allowed.push(pct(`${r.month} vs average net sales`, r.vsAveragePct));
+      allowed.push(cnt(`${r.month} net sales rank`, r.netSalesRank));
+      allowed.push(cnt(`${r.month} credit notes rank`, r.creditNotesRank));
+      if (r.momPct != null) allowed.push(pct(`${r.month} mom net sales change`, r.momPct));
+      if (r.yoyPct != null) allowed.push(pct(`${r.month} yoy net sales change`, r.yoyPct));
+    }
+
+    const diagnostics =
+      `Pre-calculated Trend Diagnostics:\n` +
+      `- Months in period: ${trend.rows.length}\n` +
+      `- Period Net Sales: ${fmtRM(totals.netSales)}\n` +
+      `- Prior-year same window Net Sales: ${fmtRM(totals.priorNetSales)}\n` +
+      `- Period YoY Growth: ${fmtPct1(totals.yoyPct)}\n` +
+      `- Average Monthly Net Sales: ${fmtRM(trend.periodAverageNetSales)}\n` +
+      `- Peak month: ${trend.peakMonth.month} at ${fmtRM(trend.peakMonth.netSales)} (rank ${trend.peakMonth.netSalesRank})\n` +
+      `- Trough month: ${trend.troughMonth.month} at ${fmtRM(trend.troughMonth.netSales)} (rank ${trend.troughMonth.netSalesRank})\n` +
+      `- Highest Credit Notes month: ${trend.topCreditNoteMonth.month} at ${fmtRM(trend.topCreditNoteMonth.creditNotes)} (${fmtPct2(trend.topCreditNoteMonth.creditNoteRatioPct)} CN ratio)\n` +
+      (trend.secondCreditNoteMonth
+        ? `- Second-highest Credit Notes month: ${trend.secondCreditNoteMonth.month} at ${fmtRM(trend.secondCreditNoteMonth.creditNotes)} (${fmtPct2(trend.secondCreditNoteMonth.creditNoteRatioPct)} CN ratio)\n`
+        : '') +
+      `- Longest consecutive monthly Net Sales decline streak: ${trend.longestDeclineStreak} months\n` +
+      `- Longest consecutive monthly Net Sales growth streak: ${trend.longestGrowthStreak} months\n` +
+      `- 3+ month decline present: ${trend.hasThreeMonthDecline ? 'Yes' : 'No'}\n` +
+      `- 3+ month growth present: ${trend.hasThreeMonthGrowth ? 'Yes' : 'No'}\n` +
+      (trend.h1AverageNetSales != null && trend.h2AverageNetSales != null
+        ? `- First 6 months average: ${fmtRM(trend.h1AverageNetSales)}; last 6 months average: ${fmtRM(trend.h2AverageNetSales)}\n`
+        : '') +
+      (trend.h2VsH1AverageChange != null && trend.h2VsH1AverageChangePct != null
+        ? `- Last 6 months average lift vs first 6 months: ${fmtRM(trend.h2VsH1AverageChange)} (${fmtPct1(trend.h2VsH1AverageChangePct)})\n`
+        : '') +
+      (trend.h2MinNetSales != null && trend.h2MaxNetSales != null
+        ? `- Last 6 months range: ${fmtRM(trend.h2MinNetSales)} to ${fmtRM(trend.h2MaxNetSales)}\n`
+        : '') +
+      (trend.mayToSeptemberChange != null && trend.mayToSeptemberChangePct != null
+        ? `- May to September Net Sales change: ${fmtRM(trend.mayToSeptemberChange)} (${fmtPct1(trend.mayToSeptemberChangePct)})\n`
+        : '') +
+      `- May to September was not an uninterrupted monthly decline: ${trend.mayToSeptemberHasJulyUptick ? 'July rose from June' : 'no July uptick detected'}.\n\n` +
+      `Use these diagnostics for all streak, growth, decline, rank, YoY, and average claims. Do not calculate new streaks, averages, or percentages.`;
+
+    return { prompt: `Data points:\n${table}\n\n${diagnostics}`, allowed };
   },
 
   // Sales Section 4: Breakdown
@@ -792,10 +1305,10 @@ const fetchers: Record<string, DataFetcher> = {
     const pool = getPool();
     const { rows } = await pool.query(
       `SELECT debtor_code, company_name, debtor_type,
-              SUM(total_sales) AS net_sales,
-              SUM(invoice_sales) AS invoice_sales,
-              SUM(cash_sales) AS cash_sales,
-              SUM(credit_notes) AS credit_notes
+              COALESCE(SUM(total_sales), 0)::float AS net_sales,
+              COALESCE(SUM(invoice_sales), 0)::float AS invoice_sales,
+              COALESCE(SUM(cash_sales), 0)::float AS cash_sales,
+              ABS(COALESCE(SUM(credit_notes), 0))::float AS credit_notes
        FROM pc_sales_by_customer
        WHERE doc_date BETWEEN $1 AND $2
        GROUP BY debtor_code, company_name, debtor_type
@@ -804,19 +1317,27 @@ const fetchers: Record<string, DataFetcher> = {
       [dr!.start, dr!.end],
     );
     const { rows: totals } = await pool.query(
-      `SELECT SUM(total_sales) AS total_net,
+      `SELECT COALESCE(SUM(total_sales), 0)::float AS total_net,
+              COALESCE(SUM(invoice_sales), 0)::float AS invoice_sales,
+              COALESCE(SUM(cash_sales), 0)::float AS cash_sales,
+              ABS(COALESCE(SUM(credit_notes), 0))::float AS credit_notes,
               COUNT(DISTINCT debtor_code) AS customer_count
        FROM pc_sales_by_customer
        WHERE doc_date BETWEEN $1 AND $2`,
       [dr!.start, dr!.end],
     );
     const totalNet = Number(totals[0]?.total_net ?? 0);
+    const totalInvoice = Number(totals[0]?.invoice_sales ?? 0);
+    const totalCash = Number(totals[0]?.cash_sales ?? 0);
+    const totalCreditNotes = Number(totals[0]?.credit_notes ?? 0);
+    const grossSales = totalInvoice + totalCash;
     const customerCount = Number(totals[0]?.customer_count ?? 0);
+    const totalCnRatio = round2(pctOf(totalCreditNotes, grossSales));
 
     const { rows: typeMix } = await pool.query(
       `SELECT COALESCE(NULLIF(debtor_type, ''), '(Unknown)') AS debtor_type,
               COUNT(DISTINCT debtor_code) AS cust_count,
-              SUM(total_sales) AS net_sales
+              COALESCE(SUM(total_sales), 0)::float AS net_sales
        FROM pc_sales_by_customer
        WHERE doc_date BETWEEN $1 AND $2
        GROUP BY COALESCE(NULLIF(debtor_type, ''), '(Unknown)')
@@ -824,21 +1345,50 @@ const fetchers: Record<string, DataFetcher> = {
       [dr!.start, dr!.end],
     );
 
+    const { rows: topCreditNotes } = await pool.query(
+      `SELECT company_name,
+              COALESCE(NULLIF(debtor_type, ''), '(Unknown)') AS debtor_type,
+              COALESCE(SUM(total_sales), 0)::float AS net_sales,
+              COALESCE(SUM(invoice_sales), 0)::float AS invoice_sales,
+              COALESCE(SUM(cash_sales), 0)::float AS cash_sales,
+              ABS(COALESCE(SUM(credit_notes), 0))::float AS credit_notes
+       FROM pc_sales_by_customer
+       WHERE doc_date BETWEEN $1 AND $2
+       GROUP BY company_name, COALESCE(NULLIF(debtor_type, ''), '(Unknown)')
+       HAVING ABS(COALESCE(SUM(credit_notes), 0)) > 0
+       ORDER BY ABS(COALESCE(SUM(credit_notes), 0)) DESC
+       LIMIT 5`,
+      [dr!.start, dr!.end],
+    );
+
     const allowed: AllowedValue[] = [
       rm('total net sales', totalNet),
+      rm('customer invoice sales', totalInvoice),
+      rm('customer cash sales', totalCash),
+      rm('customer credit notes', totalCreditNotes),
+      rm('customer gross sales', grossSales),
+      pct('customer credit-note ratio', totalCnRatio),
       cnt('customer count', customerCount),
     ];
-    let table = '| Rank | Customer | Type | Net Sales | % of Total |\n|------|----------|------|-----------|------------|\n';
+    let table = '| Rank | Customer | Type | Net Sales | % of Total | Credit Notes | CN Ratio |\n|------|----------|------|-----------|------------|--------------|----------|\n';
     let top5Share = 0;
     let top10Share = 0;
     rows.forEach((r: Record<string, unknown>, i: number) => {
       const ns = Number(r.net_sales);
-      const sharePct = totalNet > 0 ? (ns / totalNet) * 100 : 0;
+      const inv = Number(r.invoice_sales);
+      const cash = Number(r.cash_sales);
+      const cn = Number(r.credit_notes);
+      const sharePct = pctOf(ns, totalNet);
+      const cnRatio = round2(pctOf(cn, inv + cash));
       if (i < 5) top5Share += sharePct;
       if (i < 10) top10Share += sharePct;
-      table += `| ${i + 1} | ${r.company_name} | ${r.debtor_type || '(Unknown)'} | RM ${ns.toLocaleString('en-MY')} | ${sharePct.toFixed(1)}% |\n`;
+      table += `| ${i + 1} | ${r.company_name} | ${r.debtor_type || '(Unknown)'} | ${fmtRM(ns)} | ${fmtPct1(sharePct)} | -${fmtRM(cn)} | ${fmtPct2(cnRatio)} |\n`;
       allowed.push(rm(`${r.company_name} net sales`, ns));
+      allowed.push(rm(`${r.company_name} invoice sales`, inv));
+      allowed.push(rm(`${r.company_name} cash sales`, cash));
+      allowed.push(rm(`${r.company_name} credit notes`, cn));
       allowed.push(pct(`${r.company_name} share of total`, sharePct));
+      allowed.push(pct(`${r.company_name} cn ratio`, cnRatio));
     });
     allowed.push(pct('top 5 customer share', top5Share));
     allowed.push(pct('top 10 customer share', top10Share));
@@ -846,15 +1396,56 @@ const fetchers: Record<string, DataFetcher> = {
     let typeTable = '| Type | Customers | Net Sales | % of Total |\n|------|-----------|-----------|------------|\n';
     for (const t of typeMix) {
       const ns = Number(t.net_sales);
-      const sharePct = totalNet > 0 ? (ns / totalNet) * 100 : 0;
-      typeTable += `| ${t.debtor_type} | ${t.cust_count} | RM ${ns.toLocaleString('en-MY')} | ${sharePct.toFixed(1)}% |\n`;
+      const sharePct = pctOf(ns, totalNet);
+      typeTable += `| ${t.debtor_type} | ${t.cust_count} | ${fmtRM(ns)} | ${fmtPct1(sharePct)} |\n`;
       allowed.push(rm(`${t.debtor_type} type net sales`, ns));
       allowed.push(pct(`${t.debtor_type} type share`, sharePct));
       allowed.push(cnt(`${t.debtor_type} type customer count`, Number(t.cust_count)));
     }
 
+    let creditNoteTable = '| Customer | Type | Credit Notes | CN Ratio | Net Sales |\n|----------|------|--------------|----------|-----------|\n';
+    for (const r of topCreditNotes) {
+      const ns = Number(r.net_sales);
+      const inv = Number(r.invoice_sales);
+      const cash = Number(r.cash_sales);
+      const cn = Number(r.credit_notes);
+      const cnRatio = round2(pctOf(cn, inv + cash));
+      creditNoteTable += `| ${r.company_name} | ${r.debtor_type} | -${fmtRM(cn)} | ${fmtPct2(cnRatio)} | ${fmtRM(ns)} |\n`;
+      allowed.push(rm(`${r.company_name} top credit notes`, cn));
+      allowed.push(pct(`${r.company_name} top credit-note ratio`, cnRatio));
+      allowed.push(rm(`${r.company_name} top credit-note net sales`, ns));
+    }
+
+    const topCustomer = rows[0];
+    const topCustomerShare = topCustomer ? pctOf(Number(topCustomer.net_sales), totalNet) : 0;
+    const topCustomerStatus = topCustomerShare > 25
+      ? 'Bad: above the >25% over-reliance threshold'
+      : topCustomerShare >= 15
+        ? 'Neutral: within the 15-25% moderate concentration band'
+        : 'Good: below the <15% diversified threshold';
+    const cnStatus = totalCnRatio <= 1
+      ? 'Good: at or below the <=1% normal-returns threshold'
+      : totalCnRatio <= 3
+        ? 'Monitor: above the <=1% good threshold and below the >3% concern threshold'
+        : 'Concern: above the >3% quality/order-accuracy threshold';
+
     return {
-      prompt: `Dimension: Customer\nTotal net sales: RM ${totalNet.toLocaleString('en-MY')}\nActive customers in period: ${customerCount}\n\nConcentration risk (pre-calculated):\n- Top 5 customers: ${top5Share.toFixed(1)}% of total revenue\n- Top 10 customers: ${top10Share.toFixed(1)}% of total revenue\n\nTop 15 by net sales:\n${table}\nCustomer type mix:\n${typeTable}`,
+      prompt:
+        `Dimension: Customer\n` +
+        `Total net sales: ${fmtRM(totalNet)}\n` +
+        `Active customers in period: ${customerCount}\n` +
+        `Credit-note ratio: ${fmtPct2(totalCnRatio)} of gross sales (${cnStatus})\n\n` +
+        `Pre-calculated customer diagnostics:\n` +
+        `- Does the top customer exceed 25% of total sales? ${topCustomerShare > 25 ? 'Yes' : 'No'} — ${topCustomer ? topCustomer.company_name : 'n/a'} is ${fmtPct1(topCustomerShare)}. ${topCustomerStatus}.\n` +
+        `- Top 5 customers: ${fmtPct1(top5Share)} of total revenue\n` +
+        `- Top 10 customers: ${fmtPct1(top10Share)} of total revenue\n` +
+        `- Use these diagnostics for customer concentration and credit-note claims. Do not recompute shares or ratios.\n\n` +
+        `Top 15 by net sales:\n${table}\n` +
+        `Customer type mix:\n${typeTable}\n` +
+        `Top credit-note customers:\n${creditNoteTable}\n` +
+        `Optional Summary tool column mapping:\n` +
+        `- For pc_sales_by_customer, use company_name, debtor_type, total_sales, and credit_notes.\n` +
+        `- Do not query customer_name, customer_type, net_sales, or credit_note_amount; those are display labels, not table columns.`,
       allowed,
     };
   },
@@ -863,7 +1454,9 @@ const fetchers: Record<string, DataFetcher> = {
     const pool = getPool();
     const { rows } = await pool.query(
       `SELECT fruit_name, fruit_country, fruit_variant,
-              SUM(total_sales) AS net_sales, SUM(total_qty) AS qty
+              COALESCE(SUM(total_sales), 0)::float AS net_sales,
+              COALESCE(SUM(total_qty), 0)::float AS qty,
+              ABS(COALESCE(SUM(credit_notes), 0))::float AS credit_notes
        FROM pc_sales_by_fruit
        WHERE doc_date BETWEEN $1 AND $2
        GROUP BY fruit_name, fruit_country, fruit_variant
@@ -872,25 +1465,113 @@ const fetchers: Record<string, DataFetcher> = {
       [dr!.start, dr!.end],
     );
     const { rows: totals } = await pool.query(
-      `SELECT SUM(total_sales) AS total_net FROM pc_sales_by_fruit WHERE doc_date BETWEEN $1 AND $2`,
+      `SELECT COALESCE(SUM(total_sales), 0)::float AS total_net,
+              COALESCE(SUM(invoice_sales), 0)::float AS invoice_sales,
+              COALESCE(SUM(cash_sales), 0)::float AS cash_sales,
+              ABS(COALESCE(SUM(credit_notes), 0))::float AS credit_notes
+       FROM pc_sales_by_fruit WHERE doc_date BETWEEN $1 AND $2`,
+      [dr!.start, dr!.end],
+    );
+    const { rows: categories } = await pool.query(
+      `SELECT fruit_name,
+              COALESCE(SUM(total_sales), 0)::float AS net_sales,
+              COALESCE(SUM(total_qty), 0)::float AS qty,
+              ABS(COALESCE(SUM(credit_notes), 0))::float AS credit_notes
+       FROM pc_sales_by_fruit
+       WHERE doc_date BETWEEN $1 AND $2
+       GROUP BY fruit_name
+       ORDER BY SUM(total_sales) DESC
+       LIMIT 10`,
+      [dr!.start, dr!.end],
+    );
+    const { rows: countries } = await pool.query(
+      `SELECT COALESCE(NULLIF(fruit_country, ''), '(Unknown)') AS fruit_country,
+              COALESCE(SUM(total_sales), 0)::float AS net_sales,
+              COALESCE(SUM(total_qty), 0)::float AS qty
+       FROM pc_sales_by_fruit
+       WHERE doc_date BETWEEN $1 AND $2
+       GROUP BY COALESCE(NULLIF(fruit_country, ''), '(Unknown)')
+       ORDER BY SUM(total_sales) DESC
+       LIMIT 8`,
       [dr!.start, dr!.end],
     );
     const totalNet = Number(totals[0]?.total_net ?? 0);
+    const grossSales = Number(totals[0]?.invoice_sales ?? 0) + Number(totals[0]?.cash_sales ?? 0);
+    const totalCreditNotes = Number(totals[0]?.credit_notes ?? 0);
+    const cnRatio = round2(pctOf(totalCreditNotes, grossSales));
 
-    const allowed: AllowedValue[] = [rm('total net sales', totalNet)];
-    let table = '| Rank | Product | Country | Net Sales | % | Qty |\n|------|---------|---------|-----------|---|-----|\n';
+    const allowed: AllowedValue[] = [
+      rm('total net sales', totalNet),
+      rm('product gross sales', grossSales),
+      rm('product credit notes', totalCreditNotes),
+      pct('product credit-note ratio', cnRatio),
+    ];
+    let table = '| Rank | Product | Country | Variant | Net Sales | % | Qty | Credit Notes |\n|------|---------|---------|---------|-----------|---|-----|--------------|\n';
+    let top5Share = 0;
     rows.forEach((r: Record<string, unknown>, i: number) => {
       const ns = Number(r.net_sales);
       const qty = Number(r.qty);
-      const sharePct = totalNet > 0 ? (ns / totalNet) * 100 : 0;
-      table += `| ${i + 1} | ${r.fruit_name} | ${r.fruit_country || '-'} | RM ${ns.toLocaleString('en-MY')} | ${sharePct.toFixed(1)}% | ${qty.toLocaleString('en-MY')} |\n`;
-      allowed.push(rm(`${r.fruit_name} net sales`, ns));
-      allowed.push(pct(`${r.fruit_name} share`, sharePct));
-      allowed.push(cnt(`${r.fruit_name} qty`, qty));
+      const cn = Number(r.credit_notes);
+      const sharePct = pctOf(ns, totalNet);
+      if (i < 5) top5Share += sharePct;
+      const label = `${r.fruit_name} ${r.fruit_country || ''} ${r.fruit_variant || ''}`.trim();
+      table += `| ${i + 1} | ${r.fruit_name} | ${r.fruit_country || '-'} | ${r.fruit_variant || '-'} | ${fmtRM(ns)} | ${fmtPct1(sharePct)} | ${qty.toLocaleString('en-MY', { maximumFractionDigits: 2 })} | -${fmtRM(cn)} |\n`;
+      allowed.push(rm(`${label} net sales`, ns));
+      allowed.push(pct(`${label} share`, sharePct));
+      allowed.push(cnt(`${label} qty`, qty));
+      allowed.push(rm(`${label} credit notes`, cn));
     });
+    allowed.push(pct('top 5 product share', top5Share));
+
+    let categoryTable = '| Rank | Product Category | Net Sales | % of Total | Qty | Credit Notes |\n|------|------------------|-----------|------------|-----|--------------|\n';
+    for (const [i, r] of categories.entries()) {
+      const ns = Number(r.net_sales);
+      const qty = Number(r.qty);
+      const cn = Number(r.credit_notes);
+      const sharePct = pctOf(ns, totalNet);
+      categoryTable += `| ${i + 1} | ${r.fruit_name} | ${fmtRM(ns)} | ${fmtPct1(sharePct)} | ${qty.toLocaleString('en-MY', { maximumFractionDigits: 2 })} | -${fmtRM(cn)} |\n`;
+      allowed.push(rm(`${r.fruit_name} category net sales`, ns));
+      allowed.push(pct(`${r.fruit_name} category share`, sharePct));
+      allowed.push(cnt(`${r.fruit_name} category qty`, qty));
+      allowed.push(rm(`${r.fruit_name} category credit notes`, cn));
+    }
+
+    let countryTable = '| Country | Net Sales | % of Total | Qty |\n|---------|-----------|------------|-----|\n';
+    for (const r of countries) {
+      const ns = Number(r.net_sales);
+      const qty = Number(r.qty);
+      const sharePct = pctOf(ns, totalNet);
+      countryTable += `| ${r.fruit_country} | ${fmtRM(ns)} | ${fmtPct1(sharePct)} | ${qty.toLocaleString('en-MY', { maximumFractionDigits: 2 })} |\n`;
+      allowed.push(rm(`${r.fruit_country} country net sales`, ns));
+      allowed.push(pct(`${r.fruit_country} country share`, sharePct));
+      allowed.push(cnt(`${r.fruit_country} country qty`, qty));
+    }
+
+    const topProduct = rows[0];
+    const topProductShare = topProduct ? pctOf(Number(topProduct.net_sales), totalNet) : 0;
+    const topProductStatus = topProductShare > 35
+      ? 'Bad: above the >35% product concentration threshold'
+      : topProductShare >= 20
+        ? 'Neutral: within the 20-35% concentration band'
+        : 'Good: below the <20% diversified threshold';
+    const topCategory = categories[0];
 
     return {
-      prompt: `Dimension: Product\nTotal net sales: RM ${totalNet.toLocaleString('en-MY')}\n\nTop 15 by net sales:\n${table}`,
+      prompt:
+        `Dimension: Product\n` +
+        `Total net sales: ${fmtRM(totalNet)}\n` +
+        `Credit-note ratio: ${fmtPct2(cnRatio)} of gross sales\n\n` +
+        `Pre-calculated product diagnostics:\n` +
+        `- Top product-country-variant: ${topProduct ? `${topProduct.fruit_name} / ${topProduct.fruit_country || '-'} / ${topProduct.fruit_variant || '-'}` : 'n/a'} at ${fmtPct1(topProductShare)} of total. ${topProductStatus}.\n` +
+        `- Top 5 product-country-variant rows: ${fmtPct1(top5Share)} of total revenue\n` +
+        `- Product category that drives the most revenue: ${topCategory ? topCategory.fruit_name : 'n/a'} at ${topCategory ? fmtRM(Number(topCategory.net_sales)) : 'n/a'} (${topCategory ? fmtPct1(pctOf(Number(topCategory.net_sales), totalNet)) : 'n/a'})\n` +
+        `- Use these diagnostics for product/category concentration. Do not recompute shares or category totals.\n\n` +
+        `Top 15 product-country-variant rows by net sales:\n${table}\n` +
+        `Top product categories:\n${categoryTable}\n` +
+        `Country-of-origin mix:\n${countryTable}\n` +
+        `Optional Summary tool column mapping:\n` +
+        `- For pc_sales_by_fruit, use fruit_name, fruit_country, fruit_variant, total_sales, total_qty, and credit_notes.\n` +
+        `- Do not query country_of_origin, net_sales, qty_sold, or credit_note_amount; those are display labels, not table columns.`,
       allowed,
     };
   },
@@ -898,34 +1579,123 @@ const fetchers: Record<string, DataFetcher> = {
   async by_agent(dr) {
     const pool = getPool();
     const { rows } = await pool.query(
-      `SELECT dimension_key AS agent_name, MAX(is_active::text) AS is_active,
-              SUM(invoice_sales) AS invoice_sales, SUM(cash_sales) AS cash_sales,
-              SUM(total_sales) AS net_sales, SUM(customer_count) AS customer_count
-       FROM pc_sales_by_outlet
-       WHERE dimension = 'agent' AND doc_date BETWEEN $1 AND $2
-       GROUP BY dimension_key
-       ORDER BY SUM(total_sales) DESC`,
+      `WITH current_agent AS (
+         SELECT COALESCE(NULLIF(dimension_key, ''), '(Unassigned)') AS agent_name,
+                MAX(is_active::text) AS is_active,
+                COALESCE(SUM(invoice_sales), 0)::float AS invoice_sales,
+                COALESCE(SUM(cash_sales), 0)::float AS cash_sales,
+                ABS(COALESCE(SUM(credit_notes), 0))::float AS credit_notes,
+                COALESCE(SUM(total_sales), 0)::float AS net_sales,
+                COALESCE(SUM(customer_count), 0)::float AS customer_count
+         FROM pc_sales_by_outlet
+         WHERE dimension = 'agent' AND doc_date BETWEEN $1 AND $2
+         GROUP BY COALESCE(NULLIF(dimension_key, ''), '(Unassigned)')
+       ),
+       prior_agent AS (
+         SELECT COALESCE(NULLIF(dimension_key, ''), '(Unassigned)') AS agent_name,
+                COALESCE(SUM(total_sales), 0)::float AS prior_net_sales
+         FROM pc_sales_by_outlet
+         WHERE dimension = 'agent'
+           AND doc_date BETWEEN ($1::date - INTERVAL '1 year')
+                            AND ($2::date - INTERVAL '1 year')
+         GROUP BY COALESCE(NULLIF(dimension_key, ''), '(Unassigned)')
+       )
+       SELECT COALESCE(c.agent_name, p.agent_name) AS agent_name,
+              c.is_active,
+              COALESCE(c.invoice_sales, 0)::float AS invoice_sales,
+              COALESCE(c.cash_sales, 0)::float AS cash_sales,
+              COALESCE(c.credit_notes, 0)::float AS credit_notes,
+              COALESCE(c.net_sales, 0)::float AS net_sales,
+              COALESCE(c.customer_count, 0)::float AS customer_count,
+              COALESCE(p.prior_net_sales, 0)::float AS prior_net_sales,
+              (COALESCE(c.net_sales, 0) - COALESCE(p.prior_net_sales, 0))::float AS yoy_delta,
+              CASE WHEN COALESCE(p.prior_net_sales, 0) <> 0
+                   THEN ((COALESCE(c.net_sales, 0) - p.prior_net_sales) / ABS(p.prior_net_sales)) * 100
+                   ELSE NULL
+              END AS yoy_pct
+       FROM current_agent c
+       FULL OUTER JOIN prior_agent p ON p.agent_name = c.agent_name
+       ORDER BY COALESCE(c.net_sales, 0) DESC`,
       [dr!.start, dr!.end],
     );
-    const total = rows.reduce((s: number, r: { net_sales: number }) => s + Number(r.net_sales), 0);
+    const currentRows = rows.filter((r: Record<string, unknown>) => Number(r.net_sales) !== 0);
+    const decliningRows = rows
+      .filter((r: Record<string, unknown>) => Number(r.prior_net_sales) > 0 && r.yoy_pct != null && Number(r.yoy_pct) <= -10)
+      .sort((a: Record<string, unknown>, b: Record<string, unknown>) => Number(a.yoy_pct) - Number(b.yoy_pct))
+      .slice(0, 8);
+    const inactiveRows = currentRows.filter((r: Record<string, unknown>) => r.is_active === 'F');
+    const total = currentRows.reduce((s: number, r: Record<string, unknown>) => s + Number(r.net_sales), 0);
+    const top3Share = currentRows.slice(0, 3).reduce((s: number, r: Record<string, unknown>) => s + pctOf(Number(r.net_sales), total), 0);
+    const inactiveSales = inactiveRows.reduce((s: number, r: Record<string, unknown>) => s + Number(r.net_sales), 0);
+    const inactiveShare = pctOf(inactiveSales, total);
 
-    const allowed: AllowedValue[] = [rm('total net sales', total)];
-    let table = '| Agent | Active | Net Sales | % of Total | Invoice | Cash | Customers |\n|-------|--------|-----------|-----------|---------|------|-----------|\n';
-    for (const r of rows) {
+    const allowed: AllowedValue[] = [
+      rm('total net sales', total),
+      pct('top 3 agent share', top3Share),
+      rm('inactive agent sales', inactiveSales),
+      pct('inactive agent share', inactiveShare),
+      cnt('inactive agent count', inactiveRows.length),
+      cnt('declining agent count', decliningRows.length),
+    ];
+    let table = '| Agent | Active | Net Sales | % of Total | Prior Period | YoY RM Change | YoY % | Invoice | Cash | Credit Notes | Customers |\n|-------|--------|-----------|-----------|--------------|---------------|-------|---------|------|--------------|-----------|\n';
+    for (const r of currentRows) {
       const ns = Number(r.net_sales);
       const inv = Number(r.invoice_sales);
       const cash = Number(r.cash_sales);
+      const cn = Number(r.credit_notes);
       const custCount = Number(r.customer_count);
-      const sharePct = total > 0 ? (ns / total) * 100 : 0;
-      table += `| ${r.agent_name} | ${r.is_active} | RM ${ns.toLocaleString('en-MY')} | ${sharePct.toFixed(1)}% | RM ${inv.toLocaleString('en-MY')} | RM ${cash.toLocaleString('en-MY')} | ${custCount} |\n`;
+      const prior = Number(r.prior_net_sales);
+      const yoyDelta = Number(r.yoy_delta);
+      const yoyPct = r.yoy_pct == null ? null : round1(Number(r.yoy_pct));
+      const sharePct = pctOf(ns, total);
+      const activeLabel = r.is_active === 'T' ? 'Active' : r.is_active === 'F' ? 'Inactive' : '(Unassigned)';
+      table += `| ${r.agent_name} | ${activeLabel} | ${fmtRM(ns)} | ${fmtPct1(sharePct)} | ${fmtRM(prior)} | ${fmtRM(yoyDelta)} | ${yoyPct == null ? 'n/a' : fmtPct1(yoyPct)} | ${fmtRM(inv)} | ${fmtRM(cash)} | -${fmtRM(cn)} | ${custCount} |\n`;
       allowed.push(rm(`${r.agent_name} net sales`, ns));
       allowed.push(pct(`${r.agent_name} share`, sharePct));
       allowed.push(rm(`${r.agent_name} invoice sales`, inv));
       allowed.push(rm(`${r.agent_name} cash sales`, cash));
+      allowed.push(rm(`${r.agent_name} credit notes`, cn));
+      allowed.push(rm(`${r.agent_name} prior net sales`, prior));
+      allowed.push(rm(`${r.agent_name} yoy rm change`, yoyDelta));
+      if (yoyPct != null) allowed.push(pct(`${r.agent_name} yoy change`, yoyPct));
       allowed.push(cnt(`${r.agent_name} customer count`, custCount));
     }
+
+    let declineTable = '| Agent | Current Net Sales | Prior Period | YoY RM Change | YoY % |\n|-------|-------------------|--------------|---------------|-------|\n';
+    if (decliningRows.length === 0) {
+      declineTable += '| None | RM 0 | RM 0 | RM 0 | n/a |\n';
+    } else {
+      for (const r of decliningRows) {
+        const current = Number(r.net_sales);
+        const prior = Number(r.prior_net_sales);
+        const yoyDelta = Number(r.yoy_delta);
+        const yoyPct = round1(Number(r.yoy_pct));
+        declineTable += `| ${r.agent_name} | ${fmtRM(current)} | ${fmtRM(prior)} | ${fmtRM(yoyDelta)} | ${fmtPct1(yoyPct)} |\n`;
+        allowed.push(rm(`${r.agent_name} decline current sales`, current));
+        allowed.push(rm(`${r.agent_name} decline prior sales`, prior));
+        allowed.push(rm(`${r.agent_name} decline rm change`, yoyDelta));
+        allowed.push(pct(`${r.agent_name} decline yoy`, yoyPct));
+      }
+    }
+
+    const topAgent = currentRows[0];
+    const topAgentShare = topAgent ? pctOf(Number(topAgent.net_sales), total) : 0;
     return {
-      prompt: `Dimension: Sales Agent\nTotal net sales: RM ${total.toLocaleString('en-MY')}\n\n${table}`,
+      prompt:
+        `Dimension: Sales Agent\n` +
+        `Total net sales: ${fmtRM(total)}\n\n` +
+        `Pre-calculated agent diagnostics:\n` +
+        `- Top agent: ${topAgent ? topAgent.agent_name : 'n/a'} at ${fmtPct1(topAgentShare)} of total sales\n` +
+        `- Top 3 agents: ${fmtPct1(top3Share)} of total sales\n` +
+        `- Agents declining more than 10% vs prior same window: ${decliningRows.length}\n` +
+        `- Inactive agents with current-period sales: ${inactiveRows.length}, totaling ${fmtRM(inactiveSales)} (${fmtPct1(inactiveShare)} of total)\n` +
+        `- Use the YoY RM Change column for any "lost" or "added" revenue claim. Do not subtract current minus prior yourself.\n` +
+        `- Use these diagnostics for performance spread, decline, and inactive-agent claims. Do not recompute shares, RM changes, or YoY percentages.\n\n` +
+        `${table}\n` +
+        `Agents declining more than 10% vs prior same window:\n${declineTable}\n` +
+        `Optional Summary tool column mapping:\n` +
+        `- For pc_sales_by_outlet agent queries, filter dimension = 'agent'. Use dimension_key or dimension_label for the agent name, total_sales for net sales, and credit_notes for CN.\n` +
+        `- Do not query agent_name, net_sales, or credit_note_amount; those are display labels, not table columns.`,
       allowed,
     };
   },
@@ -933,34 +1703,65 @@ const fetchers: Record<string, DataFetcher> = {
   async by_outlet(dr) {
     const pool = getPool();
     const { rows } = await pool.query(
-      `SELECT dimension_key AS outlet,
-              SUM(invoice_sales) AS invoice_sales, SUM(cash_sales) AS cash_sales,
-              SUM(credit_notes) AS credit_notes, SUM(total_sales) AS net_sales
+      `SELECT COALESCE(NULLIF(dimension_key, ''), '(Unassigned)') AS outlet,
+              COALESCE(SUM(invoice_sales), 0)::float AS invoice_sales,
+              COALESCE(SUM(cash_sales), 0)::float AS cash_sales,
+              ABS(COALESCE(SUM(credit_notes), 0))::float AS credit_notes,
+              COALESCE(SUM(total_sales), 0)::float AS net_sales,
+              COALESCE(SUM(customer_count), 0)::float AS customer_count
        FROM pc_sales_by_outlet
        WHERE dimension = 'location' AND doc_date BETWEEN $1 AND $2
-       GROUP BY dimension_key
+       GROUP BY COALESCE(NULLIF(dimension_key, ''), '(Unassigned)')
        ORDER BY SUM(total_sales) DESC`,
       [dr!.start, dr!.end],
     );
     const total = rows.reduce((s: number, r: { net_sales: number }) => s + Number(r.net_sales), 0);
+    const gross = rows.reduce((s: number, r: Record<string, unknown>) => s + Number(r.invoice_sales) + Number(r.cash_sales), 0);
+    const totalCreditNotes = rows.reduce((s: number, r: Record<string, unknown>) => s + Number(r.credit_notes), 0);
+    const totalCnRatio = round2(pctOf(totalCreditNotes, gross));
+    const topOutlet = rows[0];
+    const topOutletShare = topOutlet ? pctOf(Number(topOutlet.net_sales), total) : 0;
+    const topOutletStatus = topOutletShare > 50
+      ? 'Concern: above the >50% geographic concentration threshold'
+      : 'Good: at or below the <=50% geographic diversification threshold';
 
-    const allowed: AllowedValue[] = [rm('total net sales', total)];
-    let table = '| Outlet | Net Sales | % | Invoice | Cash | Credit Notes |\n|--------|-----------|---|---------|------|--------------|\n';
+    const allowed: AllowedValue[] = [
+      rm('total net sales', total),
+      rm('outlet gross sales', gross),
+      rm('outlet credit notes', totalCreditNotes),
+      pct('outlet credit-note ratio', totalCnRatio),
+      pct('top outlet share', topOutletShare),
+    ];
+    let table = '| Outlet | Net Sales | % | Invoice | Cash | Credit Notes | CN Ratio | Customers |\n|--------|-----------|---|---------|------|--------------|----------|-----------|\n';
     for (const r of rows) {
       const ns = Number(r.net_sales);
       const inv = Number(r.invoice_sales);
       const cash = Number(r.cash_sales);
       const cn = Number(r.credit_notes);
-      const sharePct = total > 0 ? (ns / total) * 100 : 0;
-      table += `| ${r.outlet} | RM ${ns.toLocaleString('en-MY')} | ${sharePct.toFixed(1)}% | RM ${inv.toLocaleString('en-MY')} | RM ${cash.toLocaleString('en-MY')} | -RM ${Math.abs(cn).toLocaleString('en-MY')} |\n`;
+      const custCount = Number(r.customer_count);
+      const sharePct = pctOf(ns, total);
+      const cnRatio = round2(pctOf(cn, inv + cash));
+      table += `| ${r.outlet} | ${fmtRM(ns)} | ${fmtPct1(sharePct)} | ${fmtRM(inv)} | ${fmtRM(cash)} | -${fmtRM(cn)} | ${fmtPct2(cnRatio)} | ${custCount} |\n`;
       allowed.push(rm(`${r.outlet} net sales`, ns));
       allowed.push(pct(`${r.outlet} share`, sharePct));
       allowed.push(rm(`${r.outlet} invoice sales`, inv));
       allowed.push(rm(`${r.outlet} cash sales`, cash));
-      allowed.push(rm(`${r.outlet} credit notes`, Math.abs(cn)));
+      allowed.push(rm(`${r.outlet} credit notes`, cn));
+      allowed.push(pct(`${r.outlet} cn ratio`, cnRatio));
+      allowed.push(cnt(`${r.outlet} customer count`, custCount));
     }
     return {
-      prompt: `Dimension: Outlet\nTotal net sales: RM ${total.toLocaleString('en-MY')}\n\n${table}`,
+      prompt:
+        `Dimension: Outlet\n` +
+        `Total net sales: ${fmtRM(total)}\n` +
+        `Credit-note ratio: ${fmtPct2(totalCnRatio)} of gross sales\n\n` +
+        `Pre-calculated outlet diagnostics:\n` +
+        `- Does one outlet exceed 50% of total sales? ${topOutletShare > 50 ? 'Yes' : 'No'} — ${topOutlet ? topOutlet.outlet : 'n/a'} is ${fmtPct1(topOutletShare)}. ${topOutletStatus}.\n` +
+        `- Use these diagnostics for geographic concentration and outlet credit-note claims. Do not recompute shares or ratios.\n\n` +
+        `${table}\n` +
+        `Optional Summary tool column mapping:\n` +
+        `- For pc_sales_by_outlet outlet queries, filter dimension = 'location'. Use dimension_key or dimension_label for the outlet name, total_sales for net sales, and credit_notes for CN.\n` +
+        `- Do not query outlet_name, net_sales, or credit_note_amount; those are display labels, not table columns.`,
       allowed,
     };
   },

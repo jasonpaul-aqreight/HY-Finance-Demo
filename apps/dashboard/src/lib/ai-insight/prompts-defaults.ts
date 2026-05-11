@@ -7,7 +7,7 @@
 // NEVER imported by orchestrator.ts or any analysis-time code path.
 // Runtime reads prompts from the ai_insight_prompts table via prompt-loader.ts.
 
-// ─── Global System Prompt (prepended to all component calls) ─────────────────
+// ─── Component Analysis System Prompt (prepended to all component calls) ─────
 
 export const DEFAULT_GLOBAL_SYSTEM = `You are a senior financial analyst at Hoi-Yong (Malaysian fruit distribution). You explain dashboard metrics to a senior director.
 
@@ -135,22 +135,35 @@ Report:
 
 Focus on patterns and outliers — do not list every customer.`,
 
-  // Sales Section 3: Sales Trend
-  sales_summary: `"Sales Summary" KPI — Net Sales and its breakdown into Invoice Sales, Cash Sales, Credit Notes.
-
-Formula: Net Sales = Invoice Sales + Cash Sales − Credit Notes.
+  // Sales Section 3: Sales Trend — individual KPI prompts
+  net_sales: `"Net Sales" KPI — total revenue for the period (Invoice Sales + Cash Sales − Credit Notes).
 
 Evaluate:
-- Net Sales level vs business scale
+- Absolute level vs business scale
 - Invoice vs Cash mix: invoice ≥90% of net is normal for credit-customer distribution; falling ratio = shift to cash/retail or loss of credit customers
-- Cash share: higher = lower credit risk and faster cash flow, but may signal smaller/retail buyers
+- Credit-note ratio (CN / gross sales): ≤1% = Good · 1–3% = Monitor · >3% = Concern`,
+
+  invoice_sales: `"Invoice Sales" KPI — credit sales billed to customers on payment terms.
+
+Evaluate:
+- Absolute value for the period
+- Share of net sales: ≥90% is normal for a credit-customer distribution business
+- A falling share means a shift toward cash/retail buyers, or loss of credit customers`,
+
+  cash_sales: `"Cash Sales" KPI — immediate payment at point of sale (zero credit risk).
+
+Evaluate:
+- Absolute value and share of net sales
+- Rising cash share = lower credit risk and faster cash flow, but may signal smaller/retail buyers replacing credit customers`,
+
+  credit_notes: `"Credit Notes" KPI — returns and adjustments that reduce net revenue (shown in red).
 
 Credit-note ratio (CN / gross sales):
 - ≤1% = Good (normal returns)
 - 1–3% = Monitor
-- >3% = Concern (quality / accuracy issue)
+- >3% = Concern (quality or order-accuracy issue)
 
-Cover all four lenses.`,
+Flag sudden spikes — they usually point to a product quality event or delivery problem.`,
 
   net_sales_trend: `"Net Sales Trend" stacked bar chart — Invoice Sales + Cash Sales (positive stack), Credit Notes (negative). Combined height = Net Sales. Granularity: Daily / Weekly / Monthly.
 
@@ -993,7 +1006,7 @@ Senior financial analyst summarizing a dashboard section for a senior director a
 - If data is insufficient, say so.
 
 ## TOOL ACCESS
-- Query the DB for evidence behind findings — name the drivers (customers, products, months, agents). Max 4 calls; stop when you have enough.
+- Query the DB for evidence behind findings — name the drivers (customers, products, months, agents). Max 2 calls; stop when you have enough.
 - Don't re-query data already in the raw data blocks.
 - Prefer pre-aggregated \`pc_*\` tables. Use \`dbo.*\` only for document-level drill-down (invoices, cash sales, credit notes, AR invoices/payments, knock-offs); each tool's schema is authoritative — never assume other columns exist. \`dbo.*\` queries for IV/CS/CN/ARInvoice/ARPayment must include \`Cancelled = 'F'\`.
 
@@ -1030,90 +1043,27 @@ Max 3 good + 3 bad insights total. Rank by business impact.
 // Feedback Router so section-wide feedback ("the whole Sales section is too
 // verbose") has a home instead of being forced into a single component prompt.
 //
-// Empty string ⇒ injection skipped at builder time. Defaults are non-empty.
+// Empty string => injection skipped at builder time. Finance Guidance defaults
+// are intentionally blank so the summary prompt only receives a Guidance block
+// after admins create a non-empty version from feedback.
 
 export const DEFAULT_SECTION_GUIDANCE: Record<string, string> = {
-  payment_collection_trend: `- Lens: is cash conversion getting faster or slower once seasonality is stripped out
-- Watch for: collection days drifting up while sales hold steady (silent term creep); a single month breaking the run with no obvious cause
-- Fruit angle: festive periods (CNY, Hari Raya, Mooncake) push receivables forward — the post-peak recovery is the honest signal; hypermarket vs wholesaler terms differ enough that DSO shifts often reflect channel mix, not behaviour
-- Escalate: unagreed term slippage; the same customers repeatedly driving the worst month`,
-
-  payment_outstanding: `- Lens: where is the receivable book most exposed today, is it ageing the wrong way, and does each customer's payment history (credit score) support the exposure they are carrying
-- Watch for: few accounts carrying disproportionate >60d share; credit-limit breaches on customers who used to pay cleanly; customers whose ageing pattern no longer matches their historical credit score
-- Fruit angle: one large wholesaler can mask the long tail; one tier-1 hypermarket spike can swallow the week's plan; FX-exposed export accounts fail differently from domestic
-- Escalate: any account whose default would trigger a cash event; balances migrating from <60d into >60d; credit-score deterioration on accounts still extending exposure`,
-
-  sales_trend: `- Lens: volume, price, mix, or pure calendar — which is moving the line
-- Watch for: directional change that survives YoY normalisation; a single month introducing a new pattern
-- Fruit angle: Malaysian fruit cycles (CNY / Ramadan / Mooncake lift; monsoon and durian-glut soften) — almost always "calendar or structural?"; credit notes can quietly distort the headline
-- Escalate: persistent MoM decline not explained by season; a month the prior trend cannot reconcile with`,
-
-  sales_breakdown: `- Lens: which customer / product / region is carrying the period, and what happens if it wobbles
-- Watch for: single-customer share crossing ~25%; a category quietly shifting share without commercial intent; one outlet or agent producing outsized credit notes
-- Fruit angle: premium imports (Korean strawberry, Japanese melon) and local staples (banana, watermelon) carry very different margin and risk — concentration in low-margin staples is not the same problem as concentration in premium SKUs; agent spread is a coverage signal
-- Escalate: structural single-customer dependency; CN pockets hiding inside "sales"; agent outliers that look like territory not performance`,
-
-  customer_margin_overview: `- Lens: is headline margin a story of pricing power, mix, or cost pressure
-- Watch for: GP direction diverging from Net Sales direction (volume up, GP flat = compression); growing share of customers in the loss zone
-- Fruit angle: margin compression usually originates upstream (FX, weather, freight on imports) before it hits selling price — weakening margin on stable revenue almost always points at procurement, not customer
-- Escalate: sustained loss-zone share increase; GP-vs-Net-Sales divergence holding two-plus periods`,
-
-  customer_margin_breakdown: `- Lens: which customers pay us in margin vs only in volume — the output is meant to inform pricing-strategy decisions (where can we reprice, where can't we, where is grade-leakage masking pricing)
-- Watch for: high-revenue customers in the bottom margin band; otherwise-profitable customers being eroded by credit notes
-- Fruit angle: hypermarkets = volume at thin margin; wet-market wholesalers and HORECA = better margin on smaller tickets — a "premium-channel" customer running at hypermarket margins is the anomaly (unauthorised discount, grade leakage)
-- Escalate: customers below the loss line on meaningful revenue; customers pushed into loss only after CN settlement`,
-
-  supplier_margin_overview: `- Lens: is the supplier portfolio delivering margin, or just volume
-- Watch for: slipping headline margin with stable or growing supplier count (mix problem, not supplier problem)
-- Fruit angle: local (RM-priced, short lead) and import (USD/THB-priced, longer lead) suppliers behave differently — margin shifts often reflect the local/import balance more than any single relationship
-- Escalate: drift toward lower-margin sources; rising loss-supplier share; headline margin moving with no supplier and no sales story to explain it`,
-
-  supplier_margin_breakdown: `- Lens: which suppliers earn margin, which cost us, where is the widest pricing arbitrage — the output is meant to inform negotiation and procurement decisions (which suppliers to renegotiate, which to consolidate, which to drop)
-- Watch for: items with wide best-vs-worst spread where we are buying from the wrong side; suppliers materially below portfolio margin on items the market prices similarly
-- Fruit angle: premium-grade fruit looks identical on a PO but differs on shelf-life and shrinkage — purchase price misleads; landed margin on the same anchor item is the real test
-- Escalate: suppliers dragging portfolio below the lower band; loss items concentrated on one supplier (structural quality); volume sitting on the more expensive supplier without a quality justification`,
-
-  return_trend: `- Lens: is the return pattern signalling a quality, ops, or commercial-policy problem
-- Watch for: items repeating in the top-returns list across periods (structural, not one-off)
-- Fruit angle: fresh-produce returns rarely have recoverable value — closer to a margin write-off than a refund event; rising return rate usually means quality / cold chain / pre-sell forecasting is deteriorating before churn shows it
-- Reconciliation angle: CNs reduce net sales and can distort margin reads if knock-off and refund channels are not separated — flag any signal that headline figures are being moved by CN reclassification rather than underlying performance
-- Escalate: chronic-return items; return rate climbing against flat sales; resolved-vs-unresolved mix shifting longer`,
-
-  return_unsettled: `- Lens: how much cash is parked in unsettled CNs, how old it is, and which customers will not clear
-- Watch for: few customers carrying most of the unsettled book; balances ageing past 60d without a knock-off path
-- Fruit angle: a growing knock-off-vs-refund tilt usually means we are settling on future orders rather than returning cash — commercially fine, but it understates real cash position
-- Reconciliation angle: knock-off and refund channels must be tracked separately to keep net sales, AR, and cash readings honest — flag any pattern that suggests CN settlement is masking underlying receivable health
-- Escalate: chronic unresolved balances on 1–2 customers; ageing concentration moving into >60d; knock-off displacing genuine refund obligations`,
-
-  expense_overview: `- Lens: is total cost moving with revenue, and is the COGS-vs-OpEx mix drifting
-- Watch for: any category growing materially faster than revenue YoY; a few line items dominating cost growth
-- Fruit angle: COGS growth is partly external (weather, FX, freight) and not always a control failure — OpEx growth (logistics, cold storage, headcount) is internally controllable and deserves harder questions
-- Escalate: OpEx outpacing revenue on a sustained basis; COGS-to-revenue ratio drift; single lines distorting the period`,
-
-  expense_breakdown: `- Lens: which lines do most of the work, and where is the controllable cost sitting
-- Watch for: 1–2 OpEx lines carrying disproportionate share; a category running above revenue growth without a volume justification
-- Fruit angle: cold chain, freight, and packaging concentrate OpEx; payroll and electricity are the two semi-fixed lines that lag volume hardest; packing materials should track volume directly — flag categories that should scale with volume but are not, and semi-fixed lines drifting without a structural reason
-- Escalate: OpEx decoupled from volume; single-line dominance creating dependency risk; sudden category jumps with no operational story`,
-
-  financial_overview: `- Lens: is the bottom line moving because of revenue, cost mix, or one-offs — and is the direction sustainable
-- Watch for: profit margin slipping while revenue grows (worst quality of decline); profit holding while revenue falls (one-offs masking)
-- Fruit angle: net profit at this scale is often dominated by 2–3 swing lines (FX on imports, freight, large-customer CNs) — reading the headline without naming them misses the story
-- Escalate: any directional inflection; sustained margin compression; profit movement that is cost-driven, not volume-driven`,
-
-  financial_pnl: `- Lens: which 1–2 lines on each side of the P&L explain most of the YoY movement
-- Watch for: GP margin shifting on flat revenue (pricing or sourcing); a cost line jumping without a revenue line moving with it (execution or external pressure)
-- Fruit angle: sourcing cost moves first (upstream weather and FX); selling price lags — a pure-COGS YoY explanation usually means cost is being absorbed that the business has not yet repriced
-- Escalate: GP% breaking historical band; expense lines moving independent of revenue lines; anomalies warranting a separate variance review`,
-
-  financial_balance_sheet: `- Lens: can the business pay short-term obligations, and is leverage drifting
-- Watch for: current ratio dipping below the comfort band; debt rising without an asset response; working capital growing without sales support
-- Fruit angle: inventory growth on perishable stock is particularly expensive — shelf-life converts bloat into shrinkage faster than non-perishable categories, so a balance-sheet build here is a P&L warning
-- Escalate: liquidity drift; leverage moving without an investment story; working capital absorbing cash unproductively`,
-
-  financial_variance: `- Lens: where is performance diverging from plan, by how much, is it favourable or structural — and how credible are the underlying budget and forecast
-- Watch for: few accounts driving the bulk of variance (forecast risk); the same lines running unfavourable repeatedly (plan is wrong, or execution is); persistent forecast misses that suggest the forecast model is calibrated wrong
-- Fruit angle: variance often reflects macro exposure (FX, weather, festive timing) rather than operational miss — separating unforecastable macro from missed execution is the call this section supports; forecast credibility itself is part of the read
-- Escalate: persistent unfavourable on the same lines; single-line variances distorting the headline; forecast-credibility erosion; budget assumptions the data is now contradicting`,
+  payment_collection_trend: '',
+  payment_outstanding: '',
+  sales_trend: '',
+  sales_breakdown: '',
+  customer_margin_overview: '',
+  customer_margin_breakdown: '',
+  supplier_margin_overview: '',
+  supplier_margin_breakdown: '',
+  return_trend: '',
+  return_unsettled: '',
+  expense_overview: '',
+  expense_breakdown: '',
+  financial_overview: '',
+  financial_pnl: '',
+  financial_balance_sheet: '',
+  financial_variance: '',
 };
 
 // ─── Feedback Router System Prompt ───────────────────────────────────────────
@@ -1165,4 +1115,4 @@ If feedback targets Summary output structure or format (e.g. different subsectio
   Replace the system's "### Detail structure" with:
   1. <new subsection 1>
   2. <new subsection 2>
-- Never edit the global summary_system prompt. Component prompts are out of scope for output-format changes.`;
+- Never edit the global summary_analysis prompt. Component prompts are out of scope for output-format changes.`;

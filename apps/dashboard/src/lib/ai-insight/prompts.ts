@@ -26,7 +26,10 @@ export const SECTION_COMPONENTS: Record<SectionKey, { key: string; name: string;
     { key: 'customer_credit_health', name: 'Customer Credit Health', type: 'table' },
   ],
   sales_trend: [
-    { key: 'sales_summary', name: 'Sales Summary', type: 'kpi' },
+    { key: 'net_sales', name: 'Net Sales', type: 'kpi' },
+    { key: 'invoice_sales', name: 'Invoice Sales', type: 'kpi' },
+    { key: 'cash_sales', name: 'Cash Sales', type: 'kpi' },
+    { key: 'credit_notes', name: 'Credit Notes', type: 'kpi' },
     { key: 'net_sales_trend', name: 'Net Sales Trend', type: 'chart' },
   ],
   sales_breakdown: [
@@ -238,6 +241,9 @@ describes the component's role in the dashboard and is the authority on good /
 neutral / bad. RAW DATA is what the dashboard shows the user. Every number you
 cite must be traceable to a specific line in a Raw Data block or a tool-call
 result.
+
+Tool budget for this run: at most 2 tool calls. Use the RAW DATA first; call a
+tool only when a specific driver is not already named in the raw data blocks.
 
 ${components}
 
