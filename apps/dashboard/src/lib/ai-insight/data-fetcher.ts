@@ -152,38 +152,16 @@ interface SalesMonthlyTrendRow {
   priorNetSales: number;
   momPct: number | null;
   yoyPct: number | null;
-  vsAveragePct: number;
   creditNoteRatioPct: number;
-  netSalesRank: number;
-  creditNotesRank: number;
 }
 
 interface SalesTrendDiagnostics {
   rows: SalesMonthlyTrendRow[];
-  periodAverageNetSales: number;
-  firstMonth: SalesMonthlyTrendRow;
-  lastMonth: SalesMonthlyTrendRow;
   peakMonth: SalesMonthlyTrendRow;
   troughMonth: SalesMonthlyTrendRow;
   topCreditNoteMonth: SalesMonthlyTrendRow;
-  secondCreditNoteMonth: SalesMonthlyTrendRow | null;
   longestDeclineStreak: number;
   longestGrowthStreak: number;
-  hasThreeMonthDecline: boolean;
-  hasThreeMonthGrowth: boolean;
-  mayToSeptemberChange: number | null;
-  mayToSeptemberChangePct: number | null;
-  mayToSeptemberHasJulyUptick: boolean;
-  h1AverageNetSales: number | null;
-  h2AverageNetSales: number | null;
-  h2VsH1AverageChange: number | null;
-  h2VsH1AverageChangePct: number | null;
-  h2MinNetSales: number | null;
-  h2MaxNetSales: number | null;
-}
-
-function avg(values: number[]): number {
-  return values.length === 0 ? 0 : values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
 function longestDirectionalStreak(rows: SalesMonthlyTrendRow[], direction: 'up' | 'down'): number {
@@ -244,64 +222,27 @@ async function fetchSalesMonthlyTrend(dr: DateRange): Promise<SalesTrendDiagnost
     grossSales: Number(r.invoice_sales) + Number(r.cash_sales),
     priorNetSales: Number(r.prior_net_sales),
   }));
-  const periodAverageNetSales = avg(baseRows.map((r) => r.netSales));
-  const netSorted = [...baseRows].sort((a, b) => b.netSales - a.netSales);
-  const cnSorted = [...baseRows].sort((a, b) => b.creditNotes - a.creditNotes);
-
   const trendRows: SalesMonthlyTrendRow[] = baseRows.map((r, idx) => {
     const prev = idx > 0 ? baseRows[idx - 1] : null;
     return {
       ...r,
       momPct: prev ? round1(pctOf(r.netSales - prev.netSales, prev.netSales)) : null,
       yoyPct: r.priorNetSales > 0 ? round1(pctOf(r.netSales - r.priorNetSales, r.priorNetSales)) : null,
-      vsAveragePct: round1(pctOf(r.netSales - periodAverageNetSales, periodAverageNetSales)),
       creditNoteRatioPct: round2(pctOf(r.creditNotes, r.grossSales)),
-      netSalesRank: netSorted.findIndex((candidate) => candidate.month === r.month) + 1,
-      creditNotesRank: cnSorted.findIndex((candidate) => candidate.month === r.month) + 1,
     };
   });
 
-  const firstMonth = trendRows[0];
-  const lastMonth = trendRows[trendRows.length - 1];
   const peakMonth = [...trendRows].sort((a, b) => b.netSales - a.netSales)[0];
   const troughMonth = [...trendRows].sort((a, b) => a.netSales - b.netSales)[0];
   const creditNoteRows = [...trendRows].sort((a, b) => b.creditNotes - a.creditNotes);
-  const may = trendRows.find((r) => r.month.endsWith('-05')) ?? null;
-  const july = trendRows.find((r) => r.month.endsWith('-07')) ?? null;
-  const september = trendRows.find((r) => r.month.endsWith('-09')) ?? null;
-  const h1Rows = trendRows.slice(0, 6);
-  const h2Rows = trendRows.slice(6);
-  const h2NetValues = h2Rows.map((r) => r.netSales);
-  const h1AverageNetSales = h1Rows.length > 0 ? avg(h1Rows.map((r) => r.netSales)) : null;
-  const h2AverageNetSales = h2Rows.length > 0 ? avg(h2Rows.map((r) => r.netSales)) : null;
-  const h2VsH1AverageChange = h1AverageNetSales != null && h2AverageNetSales != null
-    ? h2AverageNetSales - h1AverageNetSales
-    : null;
 
   return {
     rows: trendRows,
-    periodAverageNetSales,
-    firstMonth,
-    lastMonth,
     peakMonth,
     troughMonth,
     topCreditNoteMonth: creditNoteRows[0],
-    secondCreditNoteMonth: creditNoteRows[1] ?? null,
     longestDeclineStreak: longestDirectionalStreak(trendRows, 'down'),
     longestGrowthStreak: longestDirectionalStreak(trendRows, 'up'),
-    hasThreeMonthDecline: longestDirectionalStreak(trendRows, 'down') >= 3,
-    hasThreeMonthGrowth: longestDirectionalStreak(trendRows, 'up') >= 3,
-    mayToSeptemberChange: may && september ? september.netSales - may.netSales : null,
-    mayToSeptemberChangePct: may && september ? round1(pctOf(september.netSales - may.netSales, may.netSales)) : null,
-    mayToSeptemberHasJulyUptick: !!(july && may && september && july.netSales > trendRows[trendRows.findIndex((r) => r.month === july.month) - 1]?.netSales),
-    h1AverageNetSales,
-    h2AverageNetSales,
-    h2VsH1AverageChange,
-    h2VsH1AverageChangePct: h1AverageNetSales != null && h2VsH1AverageChange != null
-      ? round1(pctOf(h2VsH1AverageChange, h1AverageNetSales))
-      : null,
-    h2MinNetSales: h2NetValues.length > 0 ? Math.min(...h2NetValues) : null,
-    h2MaxNetSales: h2NetValues.length > 0 ? Math.max(...h2NetValues) : null,
   };
 }
 
@@ -1207,11 +1148,11 @@ const fetchers: Record<string, DataFetcher> = {
       rm('cash sales', totals.cashSales),
       pct('cn ratio', totals.creditNoteRatioPct),
     ];
-    for (const r of topCnRows) {
+    for (const [idx, r] of topCnRows.entries()) {
       allowed.push(rm(`${r.month} credit notes`, r.creditNotes));
       allowed.push(pct(`${r.month} cn ratio`, r.creditNoteRatioPct));
       allowed.push(rm(`${r.month} net sales`, r.netSales));
-      allowed.push(cnt(`${r.month} credit-note rank`, r.creditNotesRank));
+      allowed.push(cnt(`${r.month} credit-note rank`, idx + 1));
     }
     return {
       prompt:
@@ -1231,7 +1172,6 @@ const fetchers: Record<string, DataFetcher> = {
     const allowed: AllowedValue[] = [
       rm('period net sales', totals.netSales),
       rm('prior-year period net sales', totals.priorNetSales),
-      rm('period average monthly net sales', trend.periodAverageNetSales),
       pct('period net sales yoy growth', totals.yoyPct),
       cnt('sales trend month count', trend.rows.length),
       cnt('longest net sales decline streak months', trend.longestDeclineStreak),
@@ -1239,18 +1179,10 @@ const fetchers: Record<string, DataFetcher> = {
       cnt('three-month decline threshold', 3),
       cnt('three-month growth threshold', 3),
     ];
-    if (trend.h1AverageNetSales != null) allowed.push(rm('first-half average monthly net sales', trend.h1AverageNetSales));
-    if (trend.h2AverageNetSales != null) allowed.push(rm('second-half average monthly net sales', trend.h2AverageNetSales));
-    if (trend.h2VsH1AverageChange != null) allowed.push(rm('second-half average lift vs first-half', trend.h2VsH1AverageChange));
-    if (trend.h2VsH1AverageChangePct != null) allowed.push(pct('second-half average lift vs first-half pct', trend.h2VsH1AverageChangePct));
-    if (trend.h2MinNetSales != null) allowed.push(rm('second-half minimum monthly net sales', trend.h2MinNetSales));
-    if (trend.h2MaxNetSales != null) allowed.push(rm('second-half maximum monthly net sales', trend.h2MaxNetSales));
-    if (trend.mayToSeptemberChange != null) allowed.push(rm('May to September net sales change', trend.mayToSeptemberChange));
-    if (trend.mayToSeptemberChangePct != null) allowed.push(pct('May to September net sales change pct', trend.mayToSeptemberChangePct));
 
-    let table = '| Month | Invoice Sales | Cash Sales | Credit Notes | CN Ratio | Net Sales | MoM % | YoY % | Net Rank | CN Rank |\n|-------|-------------|-----------|-------------|---------:|----------|------:|------:|---------:|--------:|\n';
+    let table = '| Month | Invoice Sales | Cash Sales | Credit Notes | CN Ratio | Net Sales | MoM % | YoY % |\n|-------|-------------|-----------|-------------|---------:|----------|------:|------:|\n';
     for (const r of trend.rows) {
-      table += `| ${r.month} | ${fmtRM(r.invoiceSales)} | ${fmtRM(r.cashSales)} | -${fmtRM(r.creditNotes)} | ${fmtPct2(r.creditNoteRatioPct)} | ${fmtRM(r.netSales)} | ${r.momPct == null ? 'n/a' : fmtPct1(r.momPct)} | ${r.yoyPct == null ? 'n/a' : fmtPct1(r.yoyPct)} | ${r.netSalesRank} | ${r.creditNotesRank} |\n`;
+      table += `| ${r.month} | ${fmtRM(r.invoiceSales)} | ${fmtRM(r.cashSales)} | -${fmtRM(r.creditNotes)} | ${fmtPct2(r.creditNoteRatioPct)} | ${fmtRM(r.netSales)} | ${r.momPct == null ? 'n/a' : fmtPct1(r.momPct)} | ${r.yoyPct == null ? 'n/a' : fmtPct1(r.yoyPct)} |\n`;
       allowed.push(rm(`${r.month} invoice sales`, r.invoiceSales));
       allowed.push(rm(`${r.month} cash sales`, r.cashSales));
       allowed.push(rm(`${r.month} credit notes`, r.creditNotes));
@@ -1258,46 +1190,24 @@ const fetchers: Record<string, DataFetcher> = {
       allowed.push(rm(`${r.month} gross sales`, r.grossSales));
       allowed.push(rm(`${r.month} prior-year net sales`, r.priorNetSales));
       allowed.push(pct(`${r.month} credit-note ratio`, r.creditNoteRatioPct));
-      allowed.push(pct(`${r.month} vs average net sales`, r.vsAveragePct));
-      allowed.push(cnt(`${r.month} net sales rank`, r.netSalesRank));
-      allowed.push(cnt(`${r.month} credit notes rank`, r.creditNotesRank));
       if (r.momPct != null) allowed.push(pct(`${r.month} mom net sales change`, r.momPct));
       if (r.yoyPct != null) allowed.push(pct(`${r.month} yoy net sales change`, r.yoyPct));
     }
 
-    const diagnostics =
-      `Pre-calculated Trend Diagnostics:\n` +
+    const trendContext =
+      `Trend context:\n` +
       `- Months in period: ${trend.rows.length}\n` +
       `- Period Net Sales: ${fmtRM(totals.netSales)}\n` +
       `- Prior-year same window Net Sales: ${fmtRM(totals.priorNetSales)}\n` +
       `- Period YoY Growth: ${fmtPct1(totals.yoyPct)}\n` +
-      `- Average Monthly Net Sales: ${fmtRM(trend.periodAverageNetSales)}\n` +
-      `- Peak month: ${trend.peakMonth.month} at ${fmtRM(trend.peakMonth.netSales)} (rank ${trend.peakMonth.netSalesRank})\n` +
-      `- Trough month: ${trend.troughMonth.month} at ${fmtRM(trend.troughMonth.netSales)} (rank ${trend.troughMonth.netSalesRank})\n` +
+      `- Peak month: ${trend.peakMonth.month} at ${fmtRM(trend.peakMonth.netSales)}\n` +
+      `- Lowest month: ${trend.troughMonth.month} at ${fmtRM(trend.troughMonth.netSales)}\n` +
       `- Highest Credit Notes month: ${trend.topCreditNoteMonth.month} at ${fmtRM(trend.topCreditNoteMonth.creditNotes)} (${fmtPct2(trend.topCreditNoteMonth.creditNoteRatioPct)} CN ratio)\n` +
-      (trend.secondCreditNoteMonth
-        ? `- Second-highest Credit Notes month: ${trend.secondCreditNoteMonth.month} at ${fmtRM(trend.secondCreditNoteMonth.creditNotes)} (${fmtPct2(trend.secondCreditNoteMonth.creditNoteRatioPct)} CN ratio)\n`
-        : '') +
       `- Longest consecutive monthly Net Sales decline streak: ${trend.longestDeclineStreak} months\n` +
-      `- Longest consecutive monthly Net Sales growth streak: ${trend.longestGrowthStreak} months\n` +
-      `- 3+ month decline present: ${trend.hasThreeMonthDecline ? 'Yes' : 'No'}\n` +
-      `- 3+ month growth present: ${trend.hasThreeMonthGrowth ? 'Yes' : 'No'}\n` +
-      (trend.h1AverageNetSales != null && trend.h2AverageNetSales != null
-        ? `- First 6 months average: ${fmtRM(trend.h1AverageNetSales)}; last 6 months average: ${fmtRM(trend.h2AverageNetSales)}\n`
-        : '') +
-      (trend.h2VsH1AverageChange != null && trend.h2VsH1AverageChangePct != null
-        ? `- Last 6 months average lift vs first 6 months: ${fmtRM(trend.h2VsH1AverageChange)} (${fmtPct1(trend.h2VsH1AverageChangePct)})\n`
-        : '') +
-      (trend.h2MinNetSales != null && trend.h2MaxNetSales != null
-        ? `- Last 6 months range: ${fmtRM(trend.h2MinNetSales)} to ${fmtRM(trend.h2MaxNetSales)}\n`
-        : '') +
-      (trend.mayToSeptemberChange != null && trend.mayToSeptemberChangePct != null
-        ? `- May to September Net Sales change: ${fmtRM(trend.mayToSeptemberChange)} (${fmtPct1(trend.mayToSeptemberChangePct)})\n`
-        : '') +
-      `- May to September was not an uninterrupted monthly decline: ${trend.mayToSeptemberHasJulyUptick ? 'July rose from June' : 'no July uptick detected'}.\n\n` +
-      `Use these diagnostics for all streak, growth, decline, rank, YoY, and average claims. Do not calculate new streaks, averages, or percentages.`;
+      `- Longest consecutive monthly Net Sales growth streak: ${trend.longestGrowthStreak} months\n\n` +
+      `Use the monthly table and trend context for trend, YoY, credit-note, and streak claims. Do not calculate new streaks, averages, percentages, or ranks.`;
 
-    return { prompt: `Data points:\n${table}\n\n${diagnostics}`, allowed };
+    return { prompt: `Monthly trend data:\n${table}\n\n${trendContext}`, allowed };
   },
 
   // Sales Section 4: Breakdown
