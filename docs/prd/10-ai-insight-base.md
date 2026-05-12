@@ -37,7 +37,7 @@ There is no per-user-scoped data filter in code. The role check is purely a UI g
 | Tool catalog (`query_local_table`, `query_rds_table`), column whitelists, `Cancelled='F'` injection, WHERE-clause blocklist | Base | [tools.ts](../../apps/dashboard/src/lib/ai-insight/tools.ts) |
 | Tool policy levels (`none` / `aggregate_only` / `full`) | Base | [tool-policy.ts](../../apps/dashboard/src/lib/ai-insight/tool-policy.ts) |
 | Section → component registry (`SECTION_COMPONENTS`) | Base contract, Module data | [prompts.ts:12-121](../../apps/dashboard/src/lib/ai-insight/prompts.ts#L12-L121) (Finance fills it) |
-| Default system / component / section-guidance prompt text | **Module** | [prompts-defaults.ts](../../apps/dashboard/src/lib/ai-insight/prompts-defaults.ts) (Finance), HR PRD §HR Defaults |
+| Default system / component / section-guidance prompt text | **Module** | [prompts-defaults.ts](../../apps/dashboard/src/lib/ai-insight/prompts-defaults.ts) (Finance), HR PRD §5 |
 | Per-component data fetchers (`{ prompt, allowed }`) | **Module** | [data-fetcher.ts](../../apps/dashboard/src/lib/ai-insight/data-fetcher.ts) (Finance) |
 | Per-section tool policy mapping | **Module** | [tool-policy.ts:6-31](../../apps/dashboard/src/lib/ai-insight/tool-policy.ts#L6-L31) |
 | Per-section verification & tuning recipes | **Module** | [AI_Insight_Study/ROLLOUT_TRACKER.md](../../AI_Insight_Study/ROLLOUT_TRACKER.md) |
@@ -579,7 +579,7 @@ Applying or selecting a new prompt version does **not** automatically re-run the
 
 ## 10. Model Gateway & OpenRouter
 
-OpenRouter is the only model gateway. Direct Anthropic SDK use was removed during the 2026-05-11 migration documented in [AI_Insight_Study/OPENROUTER_ONLY_PLAN.md](../../AI_Insight_Study/OPENROUTER_ONLY_PLAN.md). The OpenAI SDK is not used either. If the production rebuild's stack is not Node.js / TypeScript, the gateway can be re-implemented in any language — the contract below is what matters.
+OpenRouter is the only model gateway. Direct Anthropic SDK use was removed per [AI_Insight_Study/OPENROUTER_ONLY_PLAN.md](../../AI_Insight_Study/OPENROUTER_ONLY_PLAN.md). The OpenAI SDK is not used either. If the production rebuild's stack is not Node.js / TypeScript, the gateway can be re-implemented in any language — the contract below is what matters.
 
 ### 10.1 Four slots
 

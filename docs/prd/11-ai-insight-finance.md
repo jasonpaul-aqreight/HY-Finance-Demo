@@ -471,9 +471,9 @@ Validated units:
 | Unit | Examples | Default tolerance |
 |---|---|---:|
 | RM | `RM 5,841,378`, `RM 2.29M`, `RM 450K` | RM 1.00 |
-| Percent | `84.3%`, `1,172%` | 0.15 percentage points |
-| Days | `43 days` | 0.2 days |
-| Count | count phrases detected by regex | 0 |
+| Percent | `84.3%`, `1,172%` | 0.1 percentage points |
+| Days | `43 days` | 0.1 days |
+| Count | count phrases detected by regex | 0.5 |
 
 Compatibility behavior:
 
@@ -569,13 +569,6 @@ Finance data-source migrations:
 | `012_sales_daily_grain.sql` | Rebuilds sales breakdown tables at daily grain to support mid-month filters and include cash accounts consistently. |
 | `013_supplier_margin_attributed_cogs.sql` | Adds attributed COGS to supplier margin. |
 | `015_budget_table.sql` | Adds approved budget storage used by financial variance/budget suggestions. |
-
-Production gaps to add before production acceptance:
-
-- Append-only AI run log table, separate from latest-result storage.
-- Evaluation result table that records expected values, quality score, hallucinations, guard attempts, provider/model, cost, latency, tool calls, and decision.
-- Tool-call log table if debug logs are not acceptable as the audit store.
-- Prompt version approval metadata if regulated prompt governance is required.
 
 ## 14. Financial Variance Budget Suggestions
 

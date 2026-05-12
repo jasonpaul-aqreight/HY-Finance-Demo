@@ -10,8 +10,8 @@ Total sessions: 4
 |--------:|-------|--------|------|-------------|
 | 1 | Plan + audit | ✅ Done | 2026-05-12 | Plan v3 + tracker |
 | 2 | Base PRD 10 + screenshots | ✅ Done | 2026-05-12 | `docs/prd/10-ai-insight-base.md` (20 sections + Appendix A) + 18/18 screenshots under `docs/prd/screenshots/` |
-| 3 | Finance PRD 11 | ✅ Done | 2026-05-12 | `docs/prd/11-ai-insight-finance.md` (17 sections + Appendix A, 1793 lines) — 16-section catalog, 69-component inventory, model/provider table, fetcher contract, tool whitelist, rollout status |
-| 4 | HR PRD 12 + cross-doc close-out | ✅ Done | 2026-05-12 | `docs/prd/12-ai-insight-hr.md` (12 sections + Appendix A, 825 lines) + v3 status block appended to `docs/prd/ai-insight-reverse-engineering-audit.md` §6 |
+| 3 | Finance PRD 11 | ✅ Done | 2026-05-12 | `docs/prd/11-ai-insight-finance.md` (17 sections + Appendix A, 1763 lines) — 16-section catalog, 69-component inventory, model/provider table, fetcher contract, tool whitelist, rollout status |
+| 4 | HR PRD 12 + cross-doc close-out | ✅ Done | 2026-05-12 | `docs/prd/12-ai-insight-hr.md` (12 sections + Appendix A, 821 lines) + v3 status block appended to `docs/prd/ai-insight-reverse-engineering-audit.md` §6 |
 
 **v3 rewrite is fully complete.** See `docs/prd/ai-insight-reverse-engineering-audit.md` §6 for the close-out summary and cross-doc consistency notes.
 
@@ -79,6 +79,10 @@ Total sessions: 4
   - [x] Tuning lessons cross-referenced in MASTER_LOG and reflected in the per-section evaluation discussion.
   - [x] Token count well within the 45k cap; Appendix A kept inline.
 - Pre-existing gap acknowledged: PRD 11 §15 is a single rollout summary rather than 16 per-section verification subsections matching the §17.6 template. v3 takes this as acceptable because (a) the §17.6 template lives in PRD 10, (b) `ROLLOUT_TRACKER.md` carries the same per-section data canonically, (c) PRD 11 already cites it. Closing as Done; future revisions may inline the template per section if needed.
+- Deep-check pass (2026-05-12 post-Session-3): two correctness defects found and fixed:
+  - §12 numeric-guard default tolerance table corrected to match `numeric-guard.ts:4-9` — `pct 0.1` (was `0.15`), `days 0.1` (was `0.2`), `count 0.5` (was `0`).
+  - §13 "Production gaps to add before production acceptance" subsection deleted — it mandated four items on the v3 "Confirmed NOT in code" exclusion list (run-log table, evaluation-result table, tool-call log table, prompt-version approval metadata).
+- §11 "Production tightening recommendation" left in place as a soft, labeled recommendation; reviewer may strike on next pass if strict source-of-truth is preferred.
 
 ## Session 4 — Done (2026-05-12)
 

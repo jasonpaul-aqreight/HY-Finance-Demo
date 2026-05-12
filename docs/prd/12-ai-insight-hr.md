@@ -267,7 +267,7 @@ Section → policy map (Base engine levels — `none` / `aggregate_only` / `full
 | `workforce_movement` | `aggregate_only` | 2 | Joiner / leaver / movement aggregates. |
 | `attendance_daily` | `none` | 0 | Fetcher should provide daily facts in full. |
 | `attendance_monthly` | `aggregate_only` | 2 | Attendance + hours aggregate drill-down. |
-| `attendance_flagged` | `full` | 2 | Flag-category and department root-cause aggregates. (Previously called `fixed_drilldown_tools`; mapped to engine's `full` level with the 2-call cap from Base §13.) |
+| `attendance_flagged` | `full` | 2 | Flag-category and department root-cause aggregates. Engine cap of 2 tool calls per summary from Base §13. |
 | `leave_application` | `aggregate_only` | 2 | Application + upcoming-leave aggregates. |
 | `leave_analysis` | `full` | 2 | Utilization + pattern aggregates. |
 | `leave_balance` | `aggregate_only` | 2 | Balance-bucket aggregates. |
@@ -450,7 +450,7 @@ Expected-values fixture
 
 Rollout status
 - Pending (scaffold only) as of 2026-05-12
-- High-risk section per old PRD 12 §14.3: requires two clean evaluation passes (Base §17 acceptance gate).
+- High-risk section: requires two clean evaluation passes (Base §17 acceptance gate).
 
 Known tuning lessons
 - None — pre-rollout. Tool policy is `full` so tools may drill into department-level aggregates; cap stays at 2 (`MAX_TOOL_CALLS_PER_SUMMARY`).

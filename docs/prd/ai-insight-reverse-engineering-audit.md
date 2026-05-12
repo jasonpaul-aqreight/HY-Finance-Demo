@@ -442,7 +442,7 @@ The original Stages 1–5 produced the implementation pack above. A subsequent v
 | 1 | Plan + audit re-grounding | ✅ Done 2026-05-12 | Plan v3 + tracker |
 | 2 | Base PRD 10 + 18 Playwright screenshots | ✅ Done 2026-05-12 | `docs/prd/10-ai-insight-base.md` (20 sections + Appendix A, 1372 lines) and `docs/prd/screenshots/` (18 captures, including live `analyzing` state and feedback diff modal) |
 | 3 | Finance PRD 11 | ✅ Done 2026-05-12 | `docs/prd/11-ai-insight-finance.md` (17 sections + Appendix A exact factory-prompt snapshot, 1793 lines) — 16-section catalog, 69-component inventory, model/provider table, fetcher contract, tool whitelist, rollout status from `ROLLOUT_TRACKER.md` |
-| 4 | HR PRD 12 + cross-doc close-out | ✅ Done 2026-05-12 | `docs/prd/12-ai-insight-hr.md` (12 sections + Appendix A, 825 lines) — HR fully adopts the Finance engine; PII / RBAC / aggregation / role caches / payroll governance preserved in §12 Out-of-Scope Addendum |
+| 4 | HR PRD 12 + cross-doc close-out | ✅ Done 2026-05-12 | `docs/prd/12-ai-insight-hr.md` (12 sections + Appendix A, 821 lines) — HR fully adopts the Finance engine; PII / RBAC / aggregation / role caches / payroll governance preserved in §12 Out-of-Scope Addendum |
 
 ### 6.2 What v3 changed versus the earlier Stage 5 pack
 
