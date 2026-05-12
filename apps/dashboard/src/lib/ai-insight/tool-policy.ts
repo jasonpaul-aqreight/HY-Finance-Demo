@@ -1,6 +1,5 @@
-import type Anthropic from '@anthropic-ai/sdk';
 import { AI_TOOLS } from './tools';
-import type { SectionKey } from './types';
+import type { AiTool, SectionKey } from './types';
 
 export type ToolPolicy = 'none' | 'aggregate_only' | 'full';
 
@@ -47,7 +46,7 @@ export function policyForSection(sectionKey: SectionKey): ToolPolicy {
   return SECTION_POLICY[sectionKey] ?? 'full';
 }
 
-export function toolsForSection(sectionKey: SectionKey): Anthropic.Tool[] {
+export function toolsForSection(sectionKey: SectionKey): AiTool[] {
   const policy = policyForSection(sectionKey);
   if (policy === 'none') return [];
   if (policy === 'full') return AI_TOOLS;
@@ -67,7 +66,7 @@ export function toolsForSection(sectionKey: SectionKey): Anthropic.Tool[] {
             table: { ...props.table, enum: restrictedTables },
           },
         },
-      } as Anthropic.Tool;
+      } as AiTool;
     });
 }
 

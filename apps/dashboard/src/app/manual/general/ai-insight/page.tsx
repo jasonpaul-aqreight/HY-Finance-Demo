@@ -198,8 +198,8 @@ export default function AiInsightPage() {
 
       <p className="text-base text-foreground">
         Curious what happens after you click <strong>Analyze</strong>? Each click triggers a{' '}
-        <strong>two-stage pipeline</strong> that talks to Claude (Anthropic&apos;s LLM) using two
-        different models for speed and quality.
+        <strong>two-stage pipeline</strong> that talks to OpenRouter using two configured model
+        slots for speed and quality.
       </p>
 
       <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 overflow-x-auto">
@@ -209,14 +209,14 @@ export default function AiInsightPage() {
 └──────────────────────┬──────────────────────────────┘
                        ▼
 ┌─────────────────────────────────────────────────────┐
-│  Stage 1 — Components  (Haiku 4.5)                  │
+│  Stage 1 — Components  (DeepSeek V4 Flash)          │
 │  N parallel API calls, one per component            │
 │  Output: short "Key Observations" bullets           │
 └──────────────────────┬──────────────────────────────┘
                        │  outputs feed into
                        ▼
 ┌─────────────────────────────────────────────────────┐
-│  Stage 2 — Summary  (Sonnet 4.6)                    │
+│  Stage 2 — Summary  (GLM 5.1)                       │
 │  1 API call + database tool access                  │
 │  Output: section insights with evidence             │
 └──────────────────────┬──────────────────────────────┘
@@ -238,9 +238,9 @@ export default function AiInsightPage() {
 
       <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 overflow-x-auto">
         <pre className="font-mono text-xs leading-relaxed text-slate-800 whitespace-pre">
-{`┌─────────── Anthropic API Request ──────────┐
+{`┌─────────── OpenRouter API Request ─────────┐
 │ system:  ┌─ Dashboard Component Prompt ─┐  │
-│          │ "You are a senior…"          │  │  cached
+│          │ "You are a senior…"          │  │  shared
 │          │ Output: Key Observations…    │  │
 │          └──────────────────────────────┘  │
 │                                            │
@@ -268,7 +268,7 @@ export default function AiInsightPage() {
 
       <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 overflow-x-auto">
         <pre className="font-mono text-xs leading-relaxed text-slate-800 whitespace-pre">
-{`┌─────────── Anthropic API Request ──────────┐
+{`┌─────────── OpenRouter API Request ─────────┐
 │ system:  ┌─ Summary Insight Prompt ─────┐  │
 │          │ "You are a senior…"          │  │
 │          │ Output: ===INSIGHT===…       │  │
@@ -278,9 +278,9 @@ export default function AiInsightPage() {
 │ messages: ┌─ user (auto-built) ─────────┐  │
 │           │ Section: <name>             │  │
 │           │ === Component A ===         │  │
-│           │ <Haiku analysis A>          │  │
+│           │ <Component analysis A>      │  │
 │           │ === Component B ===         │  │
-│           │ <Haiku analysis B>          │  │
+│           │ <Component analysis B>      │  │
 │           └─────────────────────────────┘  │
 │                                            │
 │ tools: [query_local, query_rds]            │
@@ -289,9 +289,9 @@ export default function AiInsightPage() {
       </div>
 
       <Callout type="info" title="Why two models?">
-        <strong>Haiku 4.5</strong> is fast and cheap — perfect for analyzing each component in
-        parallel. <strong>Sonnet 4.6</strong> is stronger at synthesis and reasoning across
-        multiple inputs — ideal for the section-level summary that powers the insight cards.
+        <strong>DeepSeek V4 Flash</strong> is fast and cheap — useful for component-level
+        analysis. <strong>GLM 5.1</strong> handles the section-level synthesis that powers the
+        insight cards. Claude can still be used through OpenRouter fallback model slugs if needed.
       </Callout>
 
       {/* ─── Important Notes ─── */}

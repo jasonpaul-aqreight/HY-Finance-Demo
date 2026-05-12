@@ -1,7 +1,7 @@
 // Feedback Router LLM (Phase 1 of feedback loop).
 //
 // Given a piece of raw user feedback + the section it was submitted from,
-// asks Haiku to pick the single prompt key within that section most likely
+// asks the router model to pick the single prompt key within that section most likely
 // to be responsible for the feedback. Tries components first, falls back to
 // the section's Guidance prompt only when no component fits. Raw feedback is
 // stored as-is — no rewriting/compaction.
@@ -10,7 +10,8 @@
 // output. The router cannot pick keys outside the section — the tool's enum
 // scopes it.
 
-import { getAnthropicClient } from './client';
+import { callAiModel, type AiToolUseBlock } from './model-provider';
+import { OPENROUTER_EDITOR_MODEL, OPENROUTER_ROUTER_MODEL } from './client';
 import {
   getFeedbackRouterSystemPrompt,
   getSurgicalEditorSystemPrompt,
@@ -20,10 +21,10 @@ import { SECTION_COMPONENTS, SECTION_NAMES } from './prompts';
 import type { SectionKey } from './types';
 
 const ROUTER_MODEL =
-  process.env.AI_INSIGHT_FEEDBACK_ROUTER_MODEL || 'claude-haiku-4-5-20251001';
+  process.env.AI_INSIGHT_OPENROUTER_ROUTER_MODEL || OPENROUTER_ROUTER_MODEL;
 
 const SURGICAL_EDITOR_MODEL =
-  process.env.AI_INSIGHT_SURGICAL_EDITOR_MODEL || 'claude-sonnet-4-6';
+  process.env.AI_INSIGHT_OPENROUTER_EDITOR_MODEL || OPENROUTER_EDITOR_MODEL;
 
 const ROUTER_MAX_TOKENS = 256;
 // Most component prompts are 200–600 tokens; allow plenty of headroom for the
@@ -74,10 +75,10 @@ ${input.raw_feedback}
 
 Pick the single prompt key this feedback should edit. Always call select_target.`;
 
-  const client = getAnthropicClient();
-  const response = await client.messages.create({
+  const response = await callAiModel({
+    slot: 'feedback_router',
     model: ROUTER_MODEL,
-    max_tokens: ROUTER_MAX_TOKENS,
+    maxTokens: ROUTER_MAX_TOKENS,
     system: systemPrompt,
     tools: [
       {
@@ -98,12 +99,12 @@ Pick the single prompt key this feedback should edit. Always call select_target.
         },
       },
     ],
-    tool_choice: { type: 'tool', name: 'select_target' },
+    toolChoice: { type: 'tool', name: 'select_target' },
     messages: [{ role: 'user', content: userMessage }],
   });
 
   const toolUse = response.content.find(
-    (block): block is Extract<typeof block, { type: 'tool_use' }> =>
+    (block): block is AiToolUseBlock =>
       block.type === 'tool_use' && block.name === 'select_target',
   );
 
@@ -122,7 +123,7 @@ Pick the single prompt key this feedback should edit. Always call select_target.
 }
 
 // ─── Surgical Editor (Phase 2) ──────────────────────────────────────────────
-// Given the current prompt text + compacted feedback, asks Sonnet to produce a
+// Given the current prompt text + compacted feedback, asks the editor model to produce a
 // minimally-edited new version plus a one-line change summary. Forced tool use
 // guarantees structured output.
 
@@ -165,10 +166,10 @@ ${input.compact_feedback}
 
 Produce the smallest edit that incorporates the feedback. Always call propose_edit.`;
 
-  const client = getAnthropicClient();
-  const response = await client.messages.create({
+  const response = await callAiModel({
+    slot: 'surgical_editor',
     model: SURGICAL_EDITOR_MODEL,
-    max_tokens: SURGICAL_EDITOR_MAX_TOKENS,
+    maxTokens: SURGICAL_EDITOR_MAX_TOKENS,
     system: systemPrompt,
     tools: [
       {
@@ -193,12 +194,12 @@ Produce the smallest edit that incorporates the feedback. Always call propose_ed
         },
       },
     ],
-    tool_choice: { type: 'tool', name: 'propose_edit' },
+    toolChoice: { type: 'tool', name: 'propose_edit' },
     messages: [{ role: 'user', content: userMessage }],
   });
 
   const toolUse = response.content.find(
-    (block): block is Extract<typeof block, { type: 'tool_use' }> =>
+    (block): block is AiToolUseBlock =>
       block.type === 'tool_use' && block.name === 'propose_edit',
   );
 

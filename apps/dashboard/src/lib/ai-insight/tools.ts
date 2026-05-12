@@ -1,5 +1,5 @@
-import type Anthropic from '@anthropic-ai/sdk';
 import { getPool, queryRds } from '../postgres';
+import type { AiTool } from './types';
 
 // ─── Column whitelists (from spec Section 9) ────────────────────────────────
 
@@ -87,9 +87,9 @@ function ensureRdsCancelledFilter(table: string, where: string | undefined): str
   return `(${where}) AND ${filter}`;
 }
 
-// ─── Tool definitions for Claude ─────────────────────────────────────────────
+// ─── Tool definitions ───────────────────────────────────────────────────────
 
-export const AI_TOOLS: Anthropic.Tool[] = [
+export const AI_TOOLS: AiTool[] = [
   {
     name: 'query_local_table',
     description: `Query a pre-calculated local PostgreSQL table (pc_* tables). These tables are pre-aggregated and should be queried first before trying RDS tables. Available tables: ${Object.keys(LOCAL_WHITELIST).join(', ')}. Maximum ${ROW_LIMIT} rows returned. Only whitelisted columns are allowed.`,

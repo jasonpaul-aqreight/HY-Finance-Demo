@@ -71,10 +71,69 @@ export interface NumericGuardReport {
   unmatched: { raw: string; value: number; unit: string }[];
 }
 
+export type AiRole = 'user' | 'assistant';
+
+export interface AiTextBlock {
+  type: 'text';
+  text: string;
+}
+
+export interface AiToolUseBlock {
+  type: 'tool_use';
+  id: string;
+  name: string;
+  input: unknown;
+}
+
+export interface AiToolResultBlock {
+  type: 'tool_result';
+  tool_use_id: string;
+  content: string;
+}
+
+export type AiMessageContentBlock = AiTextBlock | AiToolUseBlock | AiToolResultBlock;
+
+export interface AiMessage {
+  role: AiRole;
+  content: string | AiMessageContentBlock[];
+}
+
+export interface AiTool {
+  name: string;
+  description: string;
+  input_schema: Record<string, unknown>;
+}
+
+export type AiToolChoice =
+  | { type: 'tool'; name: string }
+  | { type: 'any' }
+  | { type: 'auto' };
+
+export interface AiProviderMetadata {
+  sdk: 'openrouter';
+  providerLabel: 'OpenRouter';
+  model: string;
+  requestedModel?: string;
+  upstreamProvider?: string;
+  providerOrder?: string[];
+  providerFallbackPath?: string[];
+  modelFallbackPath?: string[];
+  modelFallbackUsed?: boolean;
+  fallbackUsed: boolean;
+  fallbackReason?: string;
+  costSource: 'openrouter_usage_cost' | 'local_estimate';
+  reasoningTokens?: number;
+  primarySdk?: 'openrouter';
+  modelsUsed?: string[];
+  summarySdk?: 'openrouter';
+  summaryModel?: string;
+}
+
 export interface SummaryJson {
   good: SummaryInsight[];
   bad: SummaryInsight[];
   numericGuard?: NumericGuardReport;
+  providerMeta?: AiProviderMetadata;
 }
 
 export type AllowedValueUnit = 'RM' | 'pct' | 'days' | 'count';
@@ -100,6 +159,8 @@ export interface ComponentResult {
   token_count: number;
   input_tokens: number;
   output_tokens: number;
+  cost_usd?: number;
+  providerMeta?: AiProviderMetadata;
 }
 
 export interface SectionResult {
@@ -109,6 +170,7 @@ export interface SectionResult {
   analysis_time_s: number;
   token_count: number;
   cost_usd: number;
+  provider_metadata?: AiProviderMetadata | null;
 }
 
 export interface LockStatus {
@@ -132,4 +194,5 @@ export interface SSECompleteData {
   analysis_time_s: number;
   token_count: number;
   cost_usd: number;
+  provider_metadata?: AiProviderMetadata;
 }

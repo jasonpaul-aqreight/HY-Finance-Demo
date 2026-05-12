@@ -15,5 +15,6 @@ export async function GET(
   return Response.json({
     exists: true,
     ...insight,
+    provider_metadata: insight.summary_json?.providerMeta ?? null,
   });
 }

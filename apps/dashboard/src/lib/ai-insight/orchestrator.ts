@@ -1,5 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk';
-import { getAnthropicClient, AI_MODEL, SUMMARY_MODEL, MAX_TOKENS, estimateCost, LOG_PROMPTS } from './client';
+import { AI_MODEL, SUMMARY_MODEL, MAX_TOKENS, LOG_PROMPTS } from './client';
 import {
   getGlobalSystemPrompt,
   getSummarySystemPrompt,
@@ -9,8 +8,9 @@ import {
 } from './prompts';
 import { executeToolCall } from './tools';
 import { toolsForSection, validateToolForSection } from './tool-policy';
-import { runNumericGuard, formatGuardError, extractNumbers, extractToolResultNumbers } from './numeric-guard';
+import { runNumericGuard, formatGuardError, extractToolResultNumbers } from './numeric-guard';
 import { fetchComponentData } from './data-fetcher';
+import { callAiModel, summarizeProviderMetadata, type AiTextBlock, type AiToolUseBlock } from './model-provider';
 import {
   initDebugSession,
   logComponentStart,
@@ -22,20 +22,32 @@ import {
   logNumericGuard,
   logSessionEnd,
 } from './debug-logger';
-import type { SectionKey, DateRange, FiscalPeriod, ComponentResult, SummaryJson, SummaryInsight, ComponentType, AllowedValue, AllowedValueUnit } from './types';
+import type {
+  AiMessage,
+  AiTool,
+  AiToolResultBlock,
+  SectionKey,
+  DateRange,
+  FiscalPeriod,
+  ComponentResult,
+  SummaryJson,
+  SummaryInsight,
+  ComponentType,
+  AllowedValue,
+  AllowedValueUnit,
+  AiProviderMetadata,
+} from './types';
 
 const MAX_CONCURRENCY = 2; // Keep low to avoid rate limits on lower-tier API plans
 const MAX_TOOL_CALLS_PER_SUMMARY = 2; // Summary can drill down for evidence/root causes — stop once enough context
 const MAX_COST_PER_SECTION = 0.50;
 const MAX_RUNTIME_MS = 5 * 60 * 1000; // 5 minutes
 const SUMMARY_MAX_TOKENS = 4096; // Summary needs more tokens for tool reasoning + formatted output
-const RATE_LIMIT_RETRIES = 3;
-const RATE_LIMIT_BASE_DELAY_MS = 15_000; // 15s base backoff for rate limits
 
 // Validation Study toggle: when "1", strip cache_control markers so baseline runs
 // produce a true pre-Iter-5 measurement. Default (unset/0) keeps caching ON.
 const VALIDATION_BASELINE = process.env.AI_INSIGHT_VALIDATION_BASELINE === '1';
-const CACHE_MARKER = VALIDATION_BASELINE ? {} : { cache_control: { type: 'ephemeral' as const } };
+const CACHE_SYSTEM = !VALIDATION_BASELINE;
 
 export interface ProgressCallback {
   (component: string, status: 'analyzing' | 'complete' | 'error', message?: string): void;
@@ -46,6 +58,7 @@ export interface AnalysisResult {
   summary: SummaryJson;
   totalTokens: number;
   totalCost: number;
+  providerMeta?: AiProviderMetadata;
 }
 
 export async function runSectionAnalysis(
@@ -92,7 +105,7 @@ export async function runSectionAnalysis(
         const result = await analyzeComponent(comp.key, comp.name, comp.type, sectionKey, dateRange, abortSignal, logFile, fiscalPeriod);
         componentResults.push(result);
         totalTokens += result.token_count;
-        totalCost += estimateCost(result.input_tokens, result.output_tokens);
+        totalCost += result.cost_usd ?? 0;
 
         if (totalCost > MAX_COST_PER_SECTION) {
           throw new Error(`Cost limit exceeded: $${totalCost.toFixed(4)} > $${MAX_COST_PER_SECTION}`);
@@ -130,43 +143,22 @@ export async function runSectionAnalysis(
     onProgress('summary', 'analyzing');
     const summary = await runSummaryAnalysis(sectionKey, dateRange, componentResults, abortSignal, logFile, fiscalPeriod);
     totalTokens += summary.tokenCount;
-    totalCost += estimateCost(summary.inputTokens, summary.outputTokens, SUMMARY_MODEL);
+    totalCost += summary.costUsd;
     onProgress('summary', 'complete');
 
-    logSessionEnd(logFile, totalTokens, totalCost, componentResults.length);
+    const providerMeta = summary.json.providerMeta;
+    logSessionEnd(logFile, totalTokens, totalCost, componentResults.length, providerMeta);
 
     return {
       components: componentResults,
       summary: summary.json,
       totalTokens,
       totalCost,
+      providerMeta,
     };
   } finally {
     clearTimeout(timeoutId);
   }
-}
-
-// ─── Rate-limit-aware API call wrapper ───────────────────────────────────────
-
-async function callWithRetry(
-  fn: () => Promise<Anthropic.Message>,
-  abortSignal: AbortSignal,
-): Promise<Anthropic.Message> {
-  for (let attempt = 0; attempt <= RATE_LIMIT_RETRIES; attempt++) {
-    if (abortSignal.aborted) throw new Error('Analysis aborted');
-    try {
-      return await fn();
-    } catch (err) {
-      const isRateLimit = (err instanceof Anthropic.RateLimitError) ||
-        (err instanceof Error && (err.message.includes('429') || err.message.includes('rate_limit')));
-      if (!isRateLimit || attempt === RATE_LIMIT_RETRIES) throw err;
-
-      const delay = RATE_LIMIT_BASE_DELAY_MS * (attempt + 1);
-      console.log(`Rate limited, retrying in ${delay / 1000}s (attempt ${attempt + 1}/${RATE_LIMIT_RETRIES})`);
-      await new Promise(resolve => setTimeout(resolve, delay));
-    }
-  }
-  throw new Error('Exhausted rate limit retries');
 }
 
 // ─── Single component analysis ───────────────────────────────────────────────
@@ -181,8 +173,6 @@ async function analyzeComponent(
   logFile: string | null,
   fiscalPeriod: FiscalPeriod | null = null,
 ): Promise<ComponentResult> {
-  const client = getAnthropicClient();
-
   // Fetch dashboard data for this component
   const { prompt: formattedValues, allowed } = await fetchComponentData(componentKey, sectionKey, dateRange, fiscalPeriod);
 
@@ -212,30 +202,26 @@ async function analyzeComponent(
   if (abortSignal.aborted) throw new Error('Analysis aborted');
 
   // Single LLM call — no tools. Components narrate/interpret the pre-fetched data.
-  // System prompt cached (ephemeral, 5min TTL) — same prompt reused across all
-  // component calls within one click, so calls 2..N hit cache.
-  const response = await callWithRetry(
-    () => client.messages.create({
-      model: AI_MODEL,
-      max_tokens: MAX_TOKENS,
-      system: [
-        { type: 'text', text: systemPrompt, ...CACHE_MARKER },
-      ],
-      messages: [{ role: 'user', content: userPrompt }],
-    }),
+  const response = await callAiModel({
+    slot: 'component',
+    model: AI_MODEL,
+    maxTokens: MAX_TOKENS,
+    system: systemPrompt,
+    messages: [{ role: 'user', content: userPrompt }],
     abortSignal,
-  );
+    cacheSystem: CACHE_SYSTEM,
+  });
 
-  const inputTokens = response.usage?.input_tokens ?? 0;
-  const outputTokens = response.usage?.output_tokens ?? 0;
+  const inputTokens = response.usage.inputTokens;
+  const outputTokens = response.usage.outputTokens;
 
   logApiResponse(logFile, 1, response, AI_MODEL);
 
   const textBlock = response.content.find(
-    (b): b is Anthropic.TextBlock => b.type === 'text',
+    (b): b is AiTextBlock => b.type === 'text',
   );
   const analysis = textBlock?.text ?? 'No analysis generated.';
-  logComponentEnd(logFile, componentKey, analysis, inputTokens, outputTokens, 0, AI_MODEL);
+  logComponentEnd(logFile, componentKey, analysis, inputTokens, outputTokens, 0, AI_MODEL, response.providerMeta, response.usage.costUsd);
 
   return {
     component_key: componentKey,
@@ -246,6 +232,8 @@ async function analyzeComponent(
     token_count: inputTokens + outputTokens,
     input_tokens: inputTokens,
     output_tokens: outputTokens,
+    cost_usd: response.usage.costUsd,
+    providerMeta: response.providerMeta,
   };
 }
 
@@ -258,10 +246,9 @@ async function runSummaryAnalysis(
   abortSignal: AbortSignal,
   logFile: string | null,
   fiscalPeriod: FiscalPeriod | null = null,
-): Promise<{ json: SummaryJson; tokenCount: number; inputTokens: number; outputTokens: number }> {
+): Promise<{ json: SummaryJson; tokenCount: number; inputTokens: number; outputTokens: number; costUsd: number }> {
   if (abortSignal.aborted) throw new Error('Analysis aborted');
 
-  const client = getAnthropicClient();
   const components = SECTION_COMPONENTS[sectionKey];
 
   const systemPrompt = await getSummarySystemPrompt();
@@ -292,12 +279,14 @@ async function runSummaryAnalysis(
 
   logSummaryStart(logFile, sectionKey, systemPrompt, userPrompt, SUMMARY_MODEL);
 
-  const messages: Anthropic.MessageParam[] = [
+  const messages: AiMessage[] = [
     { role: 'user', content: userPrompt },
   ];
 
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
+  let totalCostUsd = 0;
+  const providerMetas: AiProviderMetadata[] = [];
 
   const sectionTools = toolsForSection(sectionKey);
   const toolsAllowed = sectionTools.length > 0;
@@ -316,7 +305,6 @@ async function runSummaryAnalysis(
     if (abortSignal.aborted) throw new Error('Analysis aborted');
 
     const loopResult = await runSummaryAgentLoop({
-      client,
       sectionKey,
       messages,
       systemPrompt,
@@ -328,6 +316,8 @@ async function runSummaryAnalysis(
 
     totalInputTokens += loopResult.inputTokens;
     totalOutputTokens += loopResult.outputTokens;
+    totalCostUsd += loopResult.costUsd;
+    providerMetas.push(...loopResult.providerMetas);
     lastText = loopResult.textBlock?.text ?? '';
 
     parsed = parseSummaryResponse(
@@ -372,41 +362,46 @@ async function runSummaryAnalysis(
     attempts: attempt,
     unmatched: unmatched.map(u => ({ raw: u.raw, value: u.value, unit: u.unit })),
   };
+  parsed.json.providerMeta = summarizeProviderMetadata(providerMetas, providerMetas.at(-1));
 
   return {
     json: parsed.json,
     tokenCount: totalInputTokens + totalOutputTokens,
     inputTokens: totalInputTokens,
     outputTokens: totalOutputTokens,
+    costUsd: totalCostUsd,
   };
 }
 
 // ─── Inner agent loop (one summary attempt, with tool use) ───────────────────
 
 interface AgentLoopParams {
-  client: Anthropic;
   sectionKey: SectionKey;
-  messages: Anthropic.MessageParam[];
+  messages: AiMessage[];
   systemPrompt: string;
-  sectionTools: Anthropic.Tool[];
+  sectionTools: AiTool[];
   toolsAllowed: boolean;
   abortSignal: AbortSignal;
   logFile: string | null;
 }
 
 interface AgentLoopResult {
-  textBlock: Anthropic.TextBlock | undefined;
+  textBlock: AiTextBlock | undefined;
   inputTokens: number;
   outputTokens: number;
+  costUsd: number;
+  providerMetas: AiProviderMetadata[];
   toolResultTexts: string[];
 }
 
 async function runSummaryAgentLoop(p: AgentLoopParams): Promise<AgentLoopResult> {
   let inputTokens = 0;
   let outputTokens = 0;
+  let costUsd = 0;
   let toolCallCount = 0;
   let turnNumber = 0;
   const toolResultTexts: string[] = [];
+  const providerMetas: AiProviderMetadata[] = [];
 
   while (true) {
     if (p.abortSignal.aborted) throw new Error('Analysis aborted');
@@ -415,30 +410,26 @@ async function runSummaryAgentLoop(p: AgentLoopParams): Promise<AgentLoopResult>
     const isLastTurn = toolCallCount >= MAX_TOOL_CALLS_PER_SUMMARY;
     const includeTools = p.toolsAllowed && !isLastTurn;
 
-    // System prompt cached (ephemeral, 5min TTL). Because tools sit BEFORE
-    // system in the prompt prefix, this single cache_control marker also
-    // captures the tools array — so multi-turn agent loops within one click
-    // pay full price only on the first turn, then read cache on turns 2..N.
-    const response = await callWithRetry(
-      () => p.client.messages.create({
-        model: SUMMARY_MODEL,
-        max_tokens: SUMMARY_MAX_TOKENS,
-        system: [
-          { type: 'text', text: p.systemPrompt, ...CACHE_MARKER },
-        ],
-        ...(includeTools ? { tools: p.sectionTools } : {}),
-        messages: p.messages,
-      }),
-      p.abortSignal,
-    );
+    const response = await callAiModel({
+      slot: 'summary',
+      model: SUMMARY_MODEL,
+      maxTokens: SUMMARY_MAX_TOKENS,
+      system: p.systemPrompt,
+      ...(includeTools ? { tools: p.sectionTools } : {}),
+      messages: p.messages,
+      abortSignal: p.abortSignal,
+      cacheSystem: CACHE_SYSTEM,
+    });
 
-    inputTokens += response.usage?.input_tokens ?? 0;
-    outputTokens += response.usage?.output_tokens ?? 0;
+    inputTokens += response.usage.inputTokens;
+    outputTokens += response.usage.outputTokens;
+    costUsd += response.usage.costUsd;
+    providerMetas.push(response.providerMeta);
     logApiResponse(p.logFile, turnNumber, response, SUMMARY_MODEL);
 
     const finalize = (): AgentLoopResult => {
       const textBlock = response.content.find(
-        (b): b is Anthropic.TextBlock => b.type === 'text',
+        (b): b is AiTextBlock => b.type === 'text',
       );
       if (LOG_PROMPTS && textBlock) {
         console.log(`\n${'─'.repeat(80)}`);
@@ -446,19 +437,19 @@ async function runSummaryAgentLoop(p: AgentLoopParams): Promise<AgentLoopResult>
         console.log(`${'─'.repeat(80)}\n`);
       }
       logSummaryResponse(p.logFile, response, textBlock?.text ?? '(no text block)');
-      return { textBlock, inputTokens, outputTokens, toolResultTexts };
+      return { textBlock, inputTokens, outputTokens, costUsd, providerMetas, toolResultTexts };
     };
 
-    if (response.stop_reason !== 'tool_use') return finalize();
+    if (response.stopReason !== 'tool_use') return finalize();
 
     const toolBlocks = response.content.filter(
-      (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use',
+      (b): b is AiToolUseBlock => b.type === 'tool_use',
     );
     if (toolBlocks.length === 0) return finalize();
 
     p.messages.push({ role: 'assistant', content: response.content });
 
-    const toolResults: Anthropic.ToolResultBlockParam[] = [];
+    const toolResults: AiToolResultBlock[] = [];
     for (const toolBlock of toolBlocks) {
       toolCallCount++;
       const policyError = validateToolForSection(
@@ -494,7 +485,7 @@ async function runSummaryAgentLoop(p: AgentLoopParams): Promise<AgentLoopResult>
 // ─── Summary response parser ────────────────────────────────────────────────
 
 function parseSummaryResponse(
-  textBlock: Anthropic.TextBlock | undefined,
+  textBlock: AiTextBlock | undefined,
   tokenCount: number,
   inputTokens: number,
   outputTokens: number,

@@ -139,7 +139,7 @@ If a section evaluation finds hallucinations, weak relevance, low actionability,
 | S02 | `payment_outstanding` | Payment | Done | Revalidated under revised gate; S02 rollups/guard false positives fixed |
 | S03 | `sales_trend` | Sales | Done | Surgical rebase accepted; aggregate-only tools restored; failed calls immaterial |
 | S04 | `sales_breakdown` | Sales | Done | Headed eval accepted; 2 valid no-row tool calls; no material hallucination |
-| S05 | `customer_margin_overview` | Customer Margin | Pending |  |
+| S05 | `customer_margin_overview` | Customer Margin | Done | OpenRouter headed eval accepted; fallback not used; 2 failed tool calls immaterial |
 | S06 | `customer_margin_breakdown` | Customer Margin | Pending |  |
 | S07 | `supplier_margin_overview` | Supplier Performance | Pending |  |
 | S08 | `supplier_margin_breakdown` | Supplier Performance | Pending |  |
@@ -177,6 +177,9 @@ Use one Playwright evaluation run per section unless the user requests more.
 | S03 | `sales_trend` | 2026-05-10 | Post-fix headed Playwright run | $0.0446 | 9/10 | 3/3 | 2/3 | 2/2 | 2/2 | 0 | Pass, attempt 1, unmatched 0 | 0 | 0 | Done | `apps/dashboard/logs/ai-debug-sales_trend-2026-05-10T15-13-26.log` | Tool policy set to none after raw data gained precomputed YoY, MoM, rank, CN-ratio, half-period, and streak diagnostics. Cost down 66.9% vs failed run; minor relevance deduction for light causal language around seasonal cash sales/returns. |
 | S03 | `sales_trend` | 2026-05-11 | Surgical rebase headed Playwright run | $0.0984 | 9/10 | 3/3 | 2/3 | 2/2 | 2/2 | 0 | Pass, attempt 2, unmatched 0 | 2 | 2 | Done | `apps/dashboard/logs/ai-debug-sales_trend-2026-05-11T01-30-00.log` | `MAX_TOOL_CALLS_PER_SUMMARY=2` and tool policy restored to `aggregate_only`. Final output was numerically clean and avoided the old false decline. Two aggregate-tool calls failed on invalid columns and first attempt hallucinated `RM 4,269,427.34`, but guard retry corrected the final output. Failed calls were immaterial to business meaning. |
 | S04 | `sales_breakdown` | 2026-05-11 | First accepted headed Playwright run | $0.1178 | 9/10 | 3/3 | 2/3 | 2/2 | 2/2 | 0 | Pass, attempt 1, unmatched 0 | 2 | 0 | Done | `apps/dashboard/logs/ai-debug-sales_breakdown-2026-05-11T01-31-07.log` | Accepted as implemented. Final output surfaced material drivers: Caelen decline, CR-SL concentration, SRI TERNAK MART CN ratio, product/customer diversification, and Vincent growth. Tool calls were valid but returned no rows. Minor residuals: correct but derived arithmetic (`RM 2,637K`, `RM 15.9M`, `~RM 5.8M`) and some qualified causal wording; none changed business meaning. |
+| S05 | `customer_margin_overview` | 2026-05-11 | OpenRouter headed Playwright run | $0.0162 | 9/10 | 3/3 | 2/3 | 2/2 | 2/2 | 0 material | Pass, attempt 2, unmatched 0 | 2 | 2 | Done | `apps/dashboard/logs/ai-debug-customer_margin_overview-2026-05-11T04-13-38.log` | Provider path verified: component model `deepseek/deepseek-v4-flash-20260423` via Parasail; summary model `z-ai/glm-5.1-20260406` via DeepInfra; Claude fallback not used. Final output was numerically clean and correctly surfaced the -186.39% margin collapse plus 13.61% net-sales growth. Two aggregate tool calls failed on invalid derived columns, but final output relied on raw S05 blocks and the failures were immaterial. No fresh Claude S05 baseline was captured in this one-run Phase 2 evaluation. |
+| S05 | `customer_margin_overview` | 2026-05-11 | OpenRouter-only smoke plus headed metadata check | $0.0167 | Smoke pass | Not fully scored | Not fully scored | Not fully scored | Not fully scored | 0 material observed | Pass, attempt 2, unmatched 0 | 2 | 2 | Done | `apps/dashboard/logs/ai-debug-customer_margin_overview-2026-05-11T08-43-40.log` | Validated the OpenRouter-only provider migration after direct Claude SDK removal. Components used `deepseek/deepseek-v4-flash-20260423`; summary used `z-ai/glm-5.1-20260406`; model fallback not used; cost source was OpenRouter `usage.cost`. Separate headed Playwright check confirmed the panel displays Provider `OpenRouter` and Model `z-ai/glm-5.1`. |
+| S02 | `payment_outstanding` | 2026-05-11 | OpenRouter-only stress plus headed metadata check | $0.0156 | Stress pass | 3/3 spot check | 3/3 spot check | Not fully scored | Not fully scored | 0 material observed | Pass, attempt 1, unmatched 0 | 2 | 2 | Done | `apps/dashboard/logs/ai-debug-payment_outstanding-2026-05-11T08-47-32.log` | Validated the OpenRouter-only provider migration on the arithmetic-risk section. Components used `deepseek/deepseek-v4-flash-20260423`; summary used `z-ai/glm-5.1-20260406`; model fallback not used; cost source was OpenRouter `usage.cost`. Two invalid-column tool calls were immaterial because final output relied on raw S02 blocks and passed numeric guard on the first final attempt. |
 
 ## Section Notes
 
@@ -267,6 +270,22 @@ Residual note:
 - Final output is materially trustworthy: the three findings are the right executive risks — 100% 120+ overdue, 97% High/Moderate-risk exposure, and 21 credit-limit breaches.
 - First summary attempt still retried on `120 days` bucket wording; the aging threshold whitelist was added after the accepted run to prevent that avoidable retry.
 
+OpenRouter-only provider stress check:
+
+- Date: 2026-05-11
+- Log: `apps/dashboard/logs/ai-debug-payment_outstanding-2026-05-11T08-47-32.log`
+- Cost: `$0.0156`
+- Tokens: `16,157`
+- Numeric guard: passed on attempt 1 with 0 unmatched
+- Provider path: OpenRouter only; components used `deepseek/deepseek-v4-flash-20260423`; summary used `z-ai/glm-5.1-20260406`
+- Model fallback: not used
+- Cost source: OpenRouter `usage.cost`
+- Headed Playwright metadata check passed for provider/model display
+
+Residual note:
+
+- The summary attempted 2 invalid-column tool calls. This remains a tool-schema cleanup issue, but it was immaterial in this run because the final output relied on raw S02 blocks and passed numeric guard on the first final attempt.
+
 ### S03 - `sales_trend`
 
 Status: Done.
@@ -349,3 +368,38 @@ Residual note:
 
 - Final output used correct but derived arithmetic (`RM 2,637K`, `RM 15.9M`, `~RM 5.8M`) and some qualified causal language.
 - Under the revised gate, these are minor because they do not change the business interpretation: agent decline, outlet concentration, CN-risk customers, product/customer diversification, and Vincent growth are all supported by raw data.
+
+### S05 - `customer_margin_overview`
+
+Status: Done.
+
+Accepted evaluation:
+
+- Date: 2026-05-11
+- Log: `apps/dashboard/logs/ai-debug-customer_margin_overview-2026-05-11T04-13-38.log`
+- Provider path: OpenRouter primary; components used `deepseek/deepseek-v4-flash-20260423` via Parasail; summary used `z-ai/glm-5.1-20260406` via DeepInfra
+- Claude fallback: not used; provider metadata stored with `fallbackUsed=false`
+- Cost: `$0.0162`
+- Tokens: `18,688`
+- Numeric guard: passed on attempt 2 with 0 unmatched
+- Tool calls: 2 total, 2 failed invalid-column aggregate calls; failures were immaterial to final output
+- Quality score: `9/10`
+- Hallucinations: 0 material
+
+Residual note:
+
+- Final output was numerically clean for all RM, percentage, and count citations: margin `-186.39%`, COGS `RM 232,676,122.44`, net sales `RM 81,245,243.49`, customer counts, and margin-distribution shares all trace to raw S05 blocks.
+- Relevance scored `2/3` because the final output includes a generic account-level implication without naming customers and an approximate `3-6x` ratio. These are minor because the core interpretation is still supported: COGS spikes drove a severe margin collapse while top-line demand and customer count grew.
+- No Phase 3 S05 tuning is recommended from this run. The useful follow-up is tool-schema cleanup later, not S05 fetcher or prompt tuning.
+
+OpenRouter-only provider smoke check:
+
+- Date: 2026-05-11
+- Log: `apps/dashboard/logs/ai-debug-customer_margin_overview-2026-05-11T08-43-40.log`
+- Cost: `$0.0167`
+- Tokens: `18,912`
+- Numeric guard: passed on attempt 2 with 0 unmatched
+- Provider path: OpenRouter only; components used `deepseek/deepseek-v4-flash-20260423`; summary used `z-ai/glm-5.1-20260406`
+- Model fallback: not used
+- Cost source: OpenRouter `usage.cost`
+- Headed Playwright metadata check passed for provider/model display

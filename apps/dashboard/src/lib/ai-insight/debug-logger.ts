@@ -1,7 +1,8 @@
 import { writeFileSync, appendFileSync, mkdirSync, existsSync } from 'fs';
 import path from 'path';
-import type Anthropic from '@anthropic-ai/sdk';
 import { estimateCost } from './client';
+import type { AiModelResponse } from './model-provider';
+import type { AiProviderMetadata } from './types';
 
 export const DEBUG_FILE_ENABLED = process.env.AI_INSIGHT_DEBUG_FILE === 'true';
 
@@ -71,27 +72,43 @@ export function logComponentStart(
 export function logApiResponse(
   logFile: string | null,
   turnNumber: number,
-  response: Anthropic.Message,
+  response: AiModelResponse,
   model?: string,
 ) {
   if (!logFile) return;
 
   const usage = response.usage;
-  const inputTokens = usage?.input_tokens ?? 0;
-  const outputTokens = usage?.output_tokens ?? 0;
-  const cacheCreation = (usage as { cache_creation_input_tokens?: number })?.cache_creation_input_tokens ?? 0;
-  const cacheRead = (usage as { cache_read_input_tokens?: number })?.cache_read_input_tokens ?? 0;
-  const cost = estimateCost(inputTokens, outputTokens, model);
+  const inputTokens = usage.inputTokens;
+  const outputTokens = usage.outputTokens;
+  const cacheCreation = usage.cacheCreationInputTokens ?? 0;
+  const cacheRead = usage.cacheReadInputTokens ?? 0;
+  const cost = usage.costUsd ?? estimateCost(inputTokens, outputTokens, model);
 
   const lines: string[] = [
     `${SUB_DIVIDER}`,
-    `TURN ${turnNumber} — Claude Response`,
+    `TURN ${turnNumber} — ${response.providerMeta.providerLabel} Response`,
     `${SUB_DIVIDER}`,
+    `sdk        : ${response.providerMeta.providerLabel}`,
     `model      : ${response.model}`,
-    `stop_reason: ${response.stop_reason}`,
+    ...(response.providerMeta.requestedModel && response.providerMeta.requestedModel !== response.model
+      ? [`requested  : ${response.providerMeta.requestedModel}`]
+      : []),
+    ...(response.providerMeta.upstreamProvider ? [`route      : ${response.providerMeta.upstreamProvider}`] : []),
+    ...(response.providerMeta.providerOrder?.length
+      ? [`order      : ${response.providerMeta.providerOrder.join(' -> ')}`]
+      : []),
+    ...(response.providerMeta.providerFallbackPath?.length
+      ? [`providers  : ${response.providerMeta.providerFallbackPath.join(' -> ')}`]
+      : []),
+    ...(response.providerMeta.modelFallbackPath?.length
+      ? [`models     : ${response.providerMeta.modelFallbackPath.join(' -> ')}`]
+      : []),
+    ...(response.providerMeta.fallbackReason ? [`fallback   : ${response.providerMeta.fallbackReason}`] : []),
+    `stop_reason: ${response.stopReason}`,
     `tokens     : input=${inputTokens}, output=${outputTokens}, total=${inputTokens + outputTokens}`,
     `cache      : created=${cacheCreation}, read=${cacheRead}`,
-    `cost       : $${cost.toFixed(6)}`,
+    ...(usage.reasoningTokens !== undefined ? [`reasoning  : ${usage.reasoningTokens}`] : []),
+    `cost       : $${cost.toFixed(6)} (${usage.costSource})`,
     '',
   ];
 
@@ -142,17 +159,26 @@ export function logComponentEnd(
   outputTokens: number,
   toolCallCount: number,
   model?: string,
+  providerMeta?: AiProviderMetadata,
+  costUsd?: number,
 ) {
   if (!logFile) return;
-  const cost = estimateCost(inputTokens, outputTokens, model);
+  const cost = costUsd ?? estimateCost(inputTokens, outputTokens, model);
   append(logFile, [
     `${SUB_DIVIDER}`,
     `COMPONENT COMPLETE: ${componentKey}`,
     `${SUB_DIVIDER}`,
     `Finished at: ${new Date().toISOString()}`,
+    ...(providerMeta ? [`SDK       : ${providerMeta.providerLabel}`, `Model     : ${providerMeta.model}`] : []),
+    ...(providerMeta?.requestedModel && providerMeta.requestedModel !== providerMeta.model ? [`Requested : ${providerMeta.requestedModel}`] : []),
+    ...(providerMeta?.upstreamProvider ? [`Route     : ${providerMeta.upstreamProvider}`] : []),
+    ...(providerMeta?.providerOrder?.length ? [`Order     : ${providerMeta.providerOrder.join(' -> ')}`] : []),
+    ...(providerMeta?.providerFallbackPath?.length ? [`Providers : ${providerMeta.providerFallbackPath.join(' -> ')}`] : []),
+    ...(providerMeta?.modelFallbackPath?.length ? [`Models    : ${providerMeta.modelFallbackPath.join(' -> ')}`] : []),
+    ...(providerMeta?.fallbackReason ? [`Fallback  : ${providerMeta.fallbackReason}`] : []),
     `Tool calls : ${toolCallCount}`,
     `Tokens     : input=${inputTokens}, output=${outputTokens}, total=${inputTokens + outputTokens}`,
-    `Cost       : $${cost.toFixed(6)}`,
+    `Cost       : $${cost.toFixed(6)}${providerMeta ? ` (${providerMeta.costSource})` : ''}`,
     '',
     '[FINAL ANALYSIS]',
     finalAnalysis,
@@ -191,22 +217,33 @@ export function logSummaryStart(
 
 export function logSummaryResponse(
   logFile: string | null,
-  response: Anthropic.Message,
+  response: AiModelResponse,
   parsedText: string,
 ) {
   if (!logFile) return;
 
   const usage = response.usage;
-  const cacheCreation = (usage as { cache_creation_input_tokens?: number })?.cache_creation_input_tokens ?? 0;
-  const cacheRead = (usage as { cache_read_input_tokens?: number })?.cache_read_input_tokens ?? 0;
+  const cacheCreation = usage.cacheCreationInputTokens ?? 0;
+  const cacheRead = usage.cacheReadInputTokens ?? 0;
 
   append(logFile, [
     `${SUB_DIVIDER}`,
     'SUMMARY RESPONSE',
     `${SUB_DIVIDER}`,
+    `sdk    : ${response.providerMeta.providerLabel}`,
     `model  : ${response.model}`,
-    `tokens : input=${response.usage?.input_tokens ?? 0}, output=${response.usage?.output_tokens ?? 0}`,
+    ...(response.providerMeta.requestedModel && response.providerMeta.requestedModel !== response.model
+      ? [`request: ${response.providerMeta.requestedModel}`]
+      : []),
+    ...(response.providerMeta.upstreamProvider ? [`route  : ${response.providerMeta.upstreamProvider}`] : []),
+    ...(response.providerMeta.providerOrder?.length ? [`order  : ${response.providerMeta.providerOrder.join(' -> ')}`] : []),
+    ...(response.providerMeta.providerFallbackPath?.length ? [`routes : ${response.providerMeta.providerFallbackPath.join(' -> ')}`] : []),
+    ...(response.providerMeta.modelFallbackPath?.length ? [`models : ${response.providerMeta.modelFallbackPath.join(' -> ')}`] : []),
+    ...(response.providerMeta.fallbackReason ? [`fallback: ${response.providerMeta.fallbackReason}`] : []),
+    `tokens : input=${usage.inputTokens}, output=${usage.outputTokens}`,
     `cache  : created=${cacheCreation}, read=${cacheRead}`,
+    ...(usage.reasoningTokens !== undefined ? [`reasoning: ${usage.reasoningTokens}`] : []),
+    `cost   : $${usage.costUsd.toFixed(6)} (${usage.costSource})`,
     '',
     '[RAW RESPONSE]',
     parsedText,
@@ -243,6 +280,7 @@ export function logSessionEnd(
   totalTokens: number,
   totalCost: number,
   componentCount: number,
+  providerMeta?: AiProviderMetadata,
 ) {
   if (!logFile) return;
   append(logFile, [
@@ -251,8 +289,18 @@ export function logSessionEnd(
     'SESSION COMPLETE',
     DIVIDER,
     `Components analyzed : ${componentCount}`,
+    ...(providerMeta ? [
+      `Summary SDK         : ${providerMeta.providerLabel}`,
+      `Summary model       : ${providerMeta.model}`,
+      ...(providerMeta.requestedModel && providerMeta.requestedModel !== providerMeta.model ? [`Requested model     : ${providerMeta.requestedModel}`] : []),
+      ...(providerMeta.upstreamProvider ? [`Summary route       : ${providerMeta.upstreamProvider}`] : []),
+      ...(providerMeta.providerOrder?.length ? [`Provider order      : ${providerMeta.providerOrder.join(' -> ')}`] : []),
+      ...(providerMeta.providerFallbackPath?.length ? [`Provider path       : ${providerMeta.providerFallbackPath.join(' -> ')}`] : []),
+      ...(providerMeta.modelFallbackPath?.length ? [`Model path          : ${providerMeta.modelFallbackPath.join(' -> ')}`] : []),
+      ...(providerMeta.fallbackReason ? [`Fallback reason     : ${providerMeta.fallbackReason}`] : []),
+    ] : []),
     `Total tokens        : ${totalTokens}`,
-    `Estimated cost      : $${totalCost.toFixed(4)} USD`,
+    `Cost                : $${totalCost.toFixed(4)} USD`,
     `Finished at         : ${new Date().toISOString()}`,
     DIVIDER,
   ]);

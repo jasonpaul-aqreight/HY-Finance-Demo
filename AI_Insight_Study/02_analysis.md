@@ -106,7 +106,9 @@
 
 ### Iteration 8.1: OpenRouter as Primary, Claude SDK as Fallback
 
-**Status:** ⏳ Pending — to be run in a new worker session.
+**Status:** ✅ Superseded and implemented differently on 2026-05-11.
+
+**2026-05-11 update:** This older Claude-SDK-fallback spec is historical only. The approved implementation is now `OPENROUTER_ONLY_PLAN.md`: OpenRouter is the only AI Insight model gateway, direct `@anthropic-ai/sdk` usage is removed from AI Insight, and Claude is allowed only through OpenRouter model slugs.
 
 **What:** Refactor the AI Insight engine to call **OpenRouter** as the primary model provider for both **component insights (Haiku-class)** and **AI Panel summary (Sonnet-class)**. Keep the existing `@anthropic-ai/sdk` path as a hard fallback (network errors, rate limits, OpenRouter-side outages, or model-unavailable conditions).
 
@@ -123,7 +125,7 @@ The exact OpenRouter model under evaluation is **`z-ai/glm-5.1`** (GLM-5.1 from 
 - Reasoning-enabled model (exposes a `reasoning` parameter; reasoning tokens billed as output)
 - **Reasoning policy (user direction):** OFF for component-insight calls; ON for AI-Panel summary call.
 - Tool/function calling support **not explicitly confirmed** on the model page — must be verified at session start (see Open Questions)
-- Credential env var: `OPEN_ROUTER_API` (currently in project-root `.env`; verify Next.js loads it or relocate to `apps/dashboard/.env.local`)
+- Credential env var: `OPENROUTER_API_KEY` in the dashboard app env.
 
 **Pricing reality check vs Iter 8 Haiku baseline (Z.ai-pinned pricing, with user's reasoning policy applied):**
 
@@ -152,14 +154,14 @@ The exact OpenRouter model under evaluation is **`z-ai/glm-5.1`** (GLM-5.1 from 
 **Implementation sketch (subject to refinement at Step 1 of next session):**
 1. **Pre-flight tool-calling probe (BEFORE any production code edit):** issue a one-off OpenRouter request to `z-ai/glm-5.1` with our actual tools array and a trivial user message that should trigger a tool call. If the response includes a `tool_calls` block, we're green. If not, the candidate fails for the summary slot immediately and Iter 8.1 either shrinks to component-only or aborts. Don't write the orchestrator integration until this probe passes.
 2. Introduce a thin provider abstraction: `callModel({ model, messages, tools, system, reasoning?, ... })` that:
-   - Tries OpenRouter first (HTTPS to `https://openrouter.ai/api/v1/chat/completions`, OpenAI-style payload + tools schema)
+   - Tries OpenRouter first through `@openrouter/sdk` Client SDK (`client.chat.send(...)`, OpenAI-style payload + tools schema)
    - On network error / 5xx / model-unavailable / rate-limit, falls back to `@anthropic-ai/sdk` (current code path) using `claude-haiku-4-5-20251001`
    - Returns a normalized response shape (`{ content, toolUse, usage, stop_reason }`) so the orchestrator doesn't care which provider answered.
 3. Add `OPENROUTER_API_KEY` env var. Existing `ANTHROPIC_API_KEY` stays.
 4. Pricing table in `client.ts` extended with `z-ai/glm-5.1` (`{ input: 1.05, output: 3.50 }`) for accurate cost estimation. Note reasoning tokens count as output for billing.
 5. Logger (`debug-logger.ts`) records (a) which provider answered each turn, (b) reasoning tokens consumed (if any), (c) fallback events. Needed for the study's keep/revert call.
 6. Tools-array translation: OpenRouter follows OpenAI-style tool schemas; Anthropic's `Anthropic.Tool` shape needs a small adapter. Verify both providers see the *same* whitelist + descriptions so the policy validator (`validateToolForSection`) keeps working.
-7. Reasoning-mode policy: default `reasoning: { exclude: true }` (or whatever OpenRouter's "off" flag is) so reasoning tokens don't blow up the bill. If quality is poor with reasoning off, run a second comparison with reasoning on and document the cost delta.
+7. Reasoning-mode policy: default `reasoning: { effort: "none" }` so reasoning tokens don't blow up the bill. If quality is poor with reasoning off, run a second comparison with reasoning on and document the cost delta.
 
 **Decision rule (Z.ai-pinned pricing + user reasoning policy — after running on `payment_outstanding` and `financial_variance`):**
 
@@ -181,11 +183,11 @@ The exact OpenRouter model under evaluation is **`z-ai/glm-5.1`** (GLM-5.1 from 
 - Provider: **Z.ai** pinned (see https://openrouter.ai/z-ai/glm-5.1/providers). OpenRouter request must include `provider: { only: ["Z.ai"] }` (or equivalent per OpenRouter's current API spec) so requests don't fall through to a cheaper but unverified provider.
 - Reasoning mode: **OFF for component-insight calls, ON for AI-Panel summary call.** Per-call toggle.
 - Same model for both slots (no split).
-- Credential env var: `OPEN_ROUTER_API`, currently in project-root `.env`.
+- Credential env var: `OPENROUTER_API_KEY` in the dashboard app env.
 
 **Open items to resolve at session start (Step 1):**
 1. **Tool/function calling probe — HARD PREREQUISITE.** Send a one-off OpenRouter request to `z-ai/glm-5.1` with our actual tools array (or a minimal one) and a prompt that should trigger a tool call. Confirm `tool_calls` come back. **If unsupported, abort Iter 8.1 at the gate — do not write any orchestrator code.**
-2. **Env-var loading.** `OPEN_ROUTER_API` lives in `/Users/aqreight/Documents/Projects/Hoi-Yong_Finance/.env`. Verify whether the dashboard Next.js dev server (started in `apps/dashboard/`) actually picks it up — Next.js auto-loads `.env.local`, `.env.development.local`, `.env.development`, `.env` from the **app root**, not the monorepo root. If `process.env.OPEN_ROUTER_API` is undefined in the dashboard process, copy/symlink the var to `apps/dashboard/.env.local`.
+2. **Env-var loading.** Verify `OPENROUTER_API_KEY` is available to the dashboard Next.js server process. Next.js auto-loads `.env.local`, `.env.development.local`, `.env.development`, and `.env` from the **app root**, so keep the key in `apps/dashboard/.env.local` or another dashboard app env file outside version control.
 3. **Cost ceiling acceptance.** With reasoning ON for summary, projected cost ~$0.13/click — close to Sonnet baseline. Confirm user accepts this trade-off or instructs to abort. (Default: proceed; framed as quality+diversification per Decision Rule above.)
 4. **Reasoning-tokens billing path.** Verify that OpenRouter passes through reasoning tokens via `usage.completion_tokens` so the existing `estimateCost` math doesn't undercount. If reasoning tokens come on a separate field (e.g. `reasoning_tokens`), update `client.ts` pricing logic to add them.
 5. **Cache-write/storage cost.** Z.ai providers page surfaces cache *read* at $0.26/M but doesn't surface cache *write* cost. Check whether OpenRouter charges a write premium (Anthropic does, +25%); if so, factor into break-even math (caching only saves money after enough multi-turn reuse).

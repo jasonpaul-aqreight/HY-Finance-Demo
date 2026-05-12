@@ -84,6 +84,7 @@ export async function POST(req: NextRequest) {
           analysis_time_s: analysisTimeS,
           token_count: result.totalTokens,
           cost_usd: parseFloat(result.totalCost.toFixed(4)),
+          provider_metadata: result.providerMeta,
         });
       } catch (err) {
         if (controller.signal.aborted) {

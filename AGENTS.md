@@ -21,7 +21,7 @@
 ## Current App Shape
 
 - Main app: `apps/dashboard`
-- Stack: Next.js 16.1.7, React 19, TypeScript strict, Tailwind 4, shadcn/Base UI primitives, Recharts, PostgreSQL via `pg`, Anthropic SDK `@anthropic-ai/sdk`.
+- Stack: Next.js 16.1.7, React 19, TypeScript strict, Tailwind 4, shadcn/Base UI primitives, Recharts, PostgreSQL via `pg`, OpenRouter SDK `@openrouter/sdk` for AI Insight model calls.
 - Supporting service: `apps/sync-service`
 - AI Insight implementation lives mainly in:
   - `apps/dashboard/src/lib/ai-insight/`
@@ -135,7 +135,7 @@ Follow the iteration process strictly:
 <claude-mem-context>
 # Memory Context
 
-# [Hoi-Yong_Finance] recent context, 2026-05-11 10:27am GMT+8
+# [Hoi-Yong_Finance] recent context, 2026-05-12 9:16am GMT+8
 
 Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
 Format: ID TIME TYPE TITLE

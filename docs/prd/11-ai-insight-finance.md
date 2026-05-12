@@ -1,2392 +1,506 @@
-# AI Insight Engine — Finance Configuration
+# Finance AI Insight Module
 
-> Finance-specific configuration for the AI Insight Engine. This document is self-contained: a junior developer can read it top-to-bottom and understand the full Finance AI Insight implementation. Shared platform patterns live in [doc 10 (10-ai-insight-base.md)](10-ai-insight-base.md) and are referenced as "See doc 10, §X" where needed — you do not need to read doc 10 unless you want deeper platform-level context.
+Primary base dependency: [10-ai-insight-base.md](10-ai-insight-base.md)
 
----
+This document describes the Finance-specific AI Insight module. It is intentionally separate from the base AI Insight engine. The base document defines shared UI, orchestration, prompt registry, provider, guard, persistence, feedback, and evaluation contracts. This file defines Finance pages, sections, components, prompts, data packages, tools, model defaults, database usage, and rollout evidence.
 
-## 1. Overview
+## 1. Scope
 
-The Finance configuration plugs into the base AI Insight Engine (doc 10) to provide automated analysis across seven dashboard modules:
+Finance AI Insight is an embedded analyst inside the Finance dashboard. Users do not type free-form questions. They click `Get Insight` on a Finance section, then read ranked positive and negative cards with detail dialogs and component-level narratives.
 
-| # | Module | Page | Sections | Components |
-|---|--------|------|----------|------------|
-| 1 | Payment | payment | 2 | 11 |
-| 2 | Sales | sales | 2 | 6 |
-| 3 | Customer Margin | customer-margin | 2 | 10 |
-| 4 | Supplier Performance | supplier-performance | 2 | 11 |
-| 5 | Returns | return | 2 | 9 |
-| 6 | Expenses | expenses | 2 | 9 |
-| 7 | Financial Statements | financial | 4 | 10 |
+Inventory:
 
-**Totals:** 16 sections, 66 components across 7 modules.
+- Pages: 7 Finance pages.
+- Sections: 16 Finance AI Insight sections.
+- Registered Finance components: 69.
 
-**How it works (simplified):**
+Finance-specific behavior must not leak into the reusable base engine. Future modules can reuse the base contracts but must provide their own section catalog, prompt library, data fetchers, tool policy, scopes, guard whitelists, and evaluation set.
 
-1. User clicks "Analyze" on a section header.
-2. The orchestrator fetches pre-computed data from PostgreSQL (and optionally from remote RDS for "full" tool-policy sections).
-3. Phase 1: Each component is analyzed in parallel by a fast model (Haiku) using the component prompt + data.
-4. Phase 2: A summary model (Sonnet) reads all component results and produces 1-6 structured insight cards (good + bad findings).
-5. Results are stored in PostgreSQL and displayed in the UI.
+## 2. User Behavior
 
-See doc 10, §2 for the full architecture diagram and §4 for the analysis lifecycle.
+The Finance user sees the normal dashboard first. AI Insight is an assistive layer beside section headings and components.
 
----
+User actions:
 
-## 2. Analysis Persona
+- Click `Get Insight` on a section.
+- Read up to 3 positive and up to 3 negative section cards.
+- Open a section detail dialog for evidence and root cause.
+- Click a component Analyze icon to read the component narrative generated during the section run.
+- Submit feedback on poor insight text.
+- Admin users review routed feedback, preview prompt edits, and create/select prompt versions.
 
-The global system prompt is sent as the `system` parameter on every component-level LLM call. It is the same for all 66 components. Component-specific prompts (documented in section 5) are prepended to the `user` message, not the system message. This keeps the system prompt cacheable across all calls.
+Non-goals:
 
-### Full Global System Prompt
+- No free-form chatbot.
+- No autonomous financial approvals.
+- No model-side arithmetic beyond using supplied values.
+- No raw unrestricted SQL.
 
-> You are a senior financial analyst at Hoi-Yong (Malaysian fruit distribution). You explain dashboard metrics to a senior director.
->
-> Rules:
-> - Be direct, concise, no jargon. State facts, not recommendations.
-> - Use RM with thousands separators (e.g., RM 5,841,378).
-> - Bullet points for observations. Markdown tables for comparisons.
-> - Compare at least 3 data points for trends.
-> - If data is insufficient, say so.
-> - Keep analysis under 150 words.
-> - Do NOT re-derive totals. Use values as given.
-> - Every number you cite MUST appear in the data block. Display rounding OK (e.g., RM 2,286,847 → RM 2.29M). Never back-solve or invent values.
-> - Match your language to the Scope line in the data (period vs snapshot vs fiscal).
+## 3. Finance Screenshots
 
-### Prompt Rules (extracted)
+Reference UI captures (see PRD 10 §3–§6 for the canonical UI shell screenshots).
 
-| Rule | Detail |
-|------|--------|
-| Currency | Malaysian Ringgit (RM) with thousands separators |
-| Language | Direct, concise, no jargon |
-| Format | Bullet points for observations, markdown tables for comparisons |
-| Component word limit | Max 150 words |
-| Summary detail word limit | 220–320 words |
-| Verbatim-copy rule | Every number must match a value from the data block (display rounding OK) |
-| Scope discipline | Match language to the Scope line in the data (period vs snapshot vs fiscal) |
-
----
-
-## 3. Scope Assignments
-
-Each section uses one of three scope types. The scope controls what language the AI uses when describing numbers and how date filtering works. See doc 10, §13 for scope type definitions.
-
-| Scope | Sections |
-|-------|----------|
-| `period` | payment_collection_trend, sales_trend, sales_breakdown, customer_margin_overview, customer_margin_breakdown, supplier_margin_overview, supplier_margin_breakdown, return_trend, expense_overview, expense_breakdown |
-| `snapshot` | payment_outstanding, return_unsettled |
-| `fiscal_period` | financial_overview, financial_pnl, financial_balance_sheet, financial_variance |
-
-**What each scope means:**
-
-- **period** — Numbers describe activity within a user-selected date range (e.g. "Nov 2024 – Oct 2025"). Language: "in the period", "during the range".
-- **snapshot** — Numbers describe current state at a point in time. Ignores the date-range selector. Language: "as of [date]", "currently".
-- **fiscal_period** — Numbers describe a fiscal year window (full FY, YTD, or last 12 months). Language: "for FY2025", "year-to-date".
-
----
-
-## 4. Dual-Model Strategy (Finance)
-
-Finance uses the shared dual-model strategy from the base platform. See doc 10, §3 for full details.
-
-| Phase | Model | Purpose | Finance notes |
-|-------|-------|---------|---------------|
-| Phase 1 — Component analysis | Haiku (claude-3-5-haiku-latest) | Fast, parallel analysis of each component | 66 components across 16 sections. Haiku keeps cost low. |
-| Phase 2 — Summary synthesis | Sonnet (claude-sonnet-4-20250514) | Synthesis of all component results into insight cards | Has tool access for root-cause investigation. Max 2 tool calls per summary. |
-
----
-
-## 5. Section & Component Catalog
-
-This section documents all 16 sections and their 66 components. For each section you will find:
-1. A metadata table (section key, page, scope, tool policy, data sources, component count)
-2. A component table (key, name, type, what it measures, thresholds)
-3. The exact component prompt from `prompts.ts` for each component, shown in a blockquote
-
----
-
-### 5.1 Payment Collection Trend
-
-| | |
+| UI evidence | Path |
 |---|---|
-| **Section Key** | `payment_collection_trend` |
-| **Page** | payment |
-| **Scope** | period |
-| **Tool Policy** | aggregate_only |
-| **Data Sources** | pc_ar_monthly |
-| **Components** | 5 |
+| Section header with Get Insight | `docs/prd/screenshots/payment/ai-insight-section-header.png` |
+| Completed AI panel | `docs/prd/screenshots/payment/ai-insight-panel-results.png` |
+| Insight detail dialog | `docs/prd/screenshots/payment/ai-insight-detail-dialog.png` |
+| Component Analyze icon | `docs/prd/screenshots/payment/ai-insight-component-icon.png` |
+| Component dialog | `docs/prd/screenshots/payment/ai-insight-component-dialog.png` |
+| Feedback modal | `docs/prd/screenshots/payment/ai-insight-feedback-modal.png` |
+| Idle panel | `docs/prd/screenshots/expenses/ai-insight-panel-idle.png` |
+| Admin config page (full) | `docs/prd/screenshots/ai-insight-admin/config-page-full.png` |
+| Prompt text panel | `docs/prd/screenshots/ai-insight-admin/prompt-text-panel.png` |
+| Version panel (default) | `docs/prd/screenshots/ai-insight-admin/version-panel-default.png` |
+| Version panel (with versions) | `docs/prd/screenshots/ai-insight-admin/version-panel-with-versions.png` |
+| Feedback list | `docs/prd/screenshots/ai-insight-admin/feedback-list.png` |
+| Feedback diff modal | `docs/prd/screenshots/ai-insight-admin/feedback-diff-modal.png` |
 
-| Key | Name | Type | What It Measures | Thresholds |
-|-----|------|------|-----------------|------------|
-| avg_collection_days | Avg Collection Days | kpi | Average days to collect payment after invoicing | ≤30 Good, ≤60 Warning, >60 Critical |
-| collection_rate | Collection Rate | kpi | Percentage of invoiced amount collected as cash | ≥80% Good, ≥50% Warning, <50% Critical |
-| avg_monthly_collection | Avg Monthly Collection | kpi | Average cash collected per month | No fixed threshold |
-| collection_days_trend | Avg Collection Days Trend | chart | Monthly collection days over time | Rising = bad, Falling = good, >60 spike = critical |
-| invoiced_vs_collected | Invoiced vs Collected | chart | Monthly cash received vs new credit sales | Bars below line = accumulating AR, above = clearing |
+![AI Insight section header](screenshots/payment/ai-insight-section-header.png)
 
-**Component Prompt — `avg_collection_days`:**
+![AI Insight completed panel](screenshots/payment/ai-insight-panel-results.png)
 
-> You are analyzing the "Avg Collection Days" KPI.
->
-> What it measures: The average number of days it takes to collect payment after invoicing.
->
-> Formula: For each month: (AR Outstanding at month-end / Monthly Credit Sales) x Days in that month. The KPI shows the average across all valid months in the selected period. Months with zero credit sales are excluded.
->
-> Performance thresholds:
-> - ≤30 days = Good (green) — efficient collection
-> - ≤60 days = Warning (yellow) — acceptable but monitor
-> - >60 days = Critical (red) — cash flow risk
->
-> Provide a concise analysis of this metric. If you need more data to understand why collection days are high or low, use the available tools to query the data.
+![AI Insight detail dialog](screenshots/payment/ai-insight-detail-dialog.png)
 
-**Component Prompt — `collection_rate`:**
+![AI Insight component dialog](screenshots/payment/ai-insight-component-dialog.png)
 
-> You are analyzing the "Collection Rate" KPI.
->
-> What it measures: The percentage of invoiced amount that was actually collected as cash payment in the selected period.
->
-> Formula: (Total Collected / Total Invoiced) x 100
-> - Collected = sum of all payment amounts (non-cancelled)
-> - Invoiced = sum of all invoice totals (non-cancelled)
-> - Excludes non-cash offsets (contra entries)
->
-> Performance thresholds:
-> - ≥80% = Good (green) — healthy cash conversion
-> - ≥50% = Warning (yellow) — growing receivables
-> - <50% = Critical (red) — serious collection problem
->
-> Provide a concise analysis of this metric.
+![AI Insight admin config](screenshots/ai-insight-admin/config-page-full.png)
 
-**Component Prompt — `avg_monthly_collection`:**
+## 4. Runtime Shape
 
-> You are analyzing the "Avg Monthly Collection" KPI.
->
-> What it measures: The average cash collected per month across the selected date range.
->
-> Formula: Total Collected / Number of Months in Range
->
-> There is no fixed threshold for this metric. Evaluate it relative to the invoiced amounts and historical trend. Rising collections with stable invoicing is positive. Falling collections signals concern.
->
-> Provide a concise analysis of this metric.
+Finance uses the base two-layer AI Insight flow.
 
-**Component Prompt — `collection_days_trend`:**
+1. Resolve Finance page, section key, and scope.
+2. Load the registered components for the section.
+3. Fetch each component data package from deterministic server fetchers.
+4. Run component analysis for each component with no tools.
+5. Build the section summary user prompt from raw component data, not component prose.
+6. Run the summary model with section-level tools according to policy.
+7. Execute at most 2 summary tool calls.
+8. Parse `===INSIGHT===` delimiter blocks into `{ good, bad }`.
+9. Run numeric guard across all raw-data allowed values plus tool-result numbers.
+10. Retry the summary once with guard feedback if numeric guard fails.
+11. Persist the accepted section and component results.
+12. Stream progress and final metadata to the UI.
 
-> You are analyzing the "Avg Collection Days Trend" line chart.
->
-> What it shows: Monthly collection days plotted over time with a dashed reference line at the period average.
->
-> How to read it:
-> - Rising trend = collection is slowing down (bad)
-> - Falling trend = collection is improving (good)
-> - Spikes above 60 days = critical months
-> - Consistency around or below 30 days = excellent
->
-> Look for: seasonal patterns, sudden spikes, sustained direction changes over 3+ months.
->
-> Provide a concise analysis of the trend pattern.
+Current runtime limits from `orchestrator.ts`:
 
-**Component Prompt — `invoiced_vs_collected`:**
+| Limit | Current value |
+|---|---:|
+| Component concurrency | 2 |
+| Component max tokens | 2,048 |
+| Summary max tokens | 4,096 |
+| Summary tool-call cap | 2 |
+| Numeric guard attempts | 2 |
+| Section cost cap | USD 0.50 |
+| Runtime timeout | 5 minutes |
 
-> You are analyzing the "Invoiced vs Collected" combo chart.
->
-> What it shows:
-> - Blue bars = monthly total collected (cash received)
-> - Red line = monthly total invoiced (new credit sales)
-> - Dashed reference = average monthly collection
->
-> How to read it:
-> - When bars consistently fall below the red line, the business is accumulating unpaid receivables — a cash flow warning.
-> - When bars exceed the red line, old receivables are being cleared.
-> - The gap between bars and line indicates collection efficiency.
->
-> Look for: widening/narrowing gaps, months where collection dropped sharply, seasonal collection patterns.
->
-> **Sub-period averaging is BANNED in this component.** The data block contains pre-computed H1/H2 averages, H1/H2 ranges, and an H1→H2 direction line. You may quote those verbatim. You may NOT:
-> - Define your own sub-period (e.g. "Jul-Oct", "Q3-Q4", "last 4 months", "second half") and average its gaps yourself.
-> - Cite a range ("RM -X to RM -Y") that excludes any month inside the stated sub-period.
-> - Narrate a "narrowing", "widening", "tightening", or "improving" trend that is contradicted by any month inside the sub-period.
-> - Do mental arithmetic on the monthly gap values.
->
-> Describe trends month-by-month, or use the pre-computed H1/H2 lines. Anything else is a fabrication.
->
-> Provide a concise analysis of the invoiced vs collected relationship.
+The summary must use raw fetcher data as source of truth. Component narratives are UI content, not evidence input for the summary.
 
----
+## 5. Section Catalog
 
-### 5.2 Outstanding Payment
+| ID | Page | Section key | Section | Scope | Tool policy | Components |
+|---|---|---|---|---|---|---:|
+| S01 | Payment | `payment_collection_trend` | Payment Collection Trend | period | aggregate_only | 5 |
+| S02 | Payment | `payment_outstanding` | Outstanding Payment | snapshot | full | 6 |
+| S03 | Sales | `sales_trend` | Sales Trend | period | aggregate_only | 5 |
+| S04 | Sales | `sales_breakdown` | Sales Breakdown | period | full | 4 |
+| S05 | Customer Margin | `customer_margin_overview` | Customer Margin Overview | period | aggregate_only | 7 |
+| S06 | Customer Margin | `customer_margin_breakdown` | Customer Margin Breakdown | period | full | 3 |
+| S07 | Supplier Performance | `supplier_margin_overview` | Supplier Margin Overview | period | aggregate_only | 7 |
+| S08 | Supplier Performance | `supplier_margin_breakdown` | Supplier Margin Breakdown | period | full | 4 |
+| S09 | Returns | `return_trend` | Return Trends | period | aggregate_only | 7 |
+| S10 | Returns | `return_unsettled` | Unsettled Returns | snapshot | full | 2 |
+| S11 | Expenses | `expense_overview` | Expense Overview | period | aggregate_only | 7 |
+| S12 | Expenses | `expense_breakdown` | Expense Breakdown | period | full | 2 |
+| S13 | Financial | `financial_overview` | Financial Overview | fiscal_period | aggregate_only | 2 |
+| S14 | Financial | `financial_pnl` | Profit & Loss Detail | fiscal_period | aggregate_only | 2 |
+| S15 | Financial | `financial_balance_sheet` | Balance Sheet | fiscal_period | aggregate_only | 2 |
+| S16 | Financial | `financial_variance` | Variance, Forecast & Budget | fiscal_period | aggregate_only | 4 |
 
-| | |
+Scope meanings:
+
+| Scope | Meaning |
 |---|---|
-| **Section Key** | `payment_outstanding` |
-| **Page** | payment |
-| **Scope** | snapshot |
-| **Tool Policy** | full |
-| **Data Sources** | pc_ar_customer_snapshot, pc_ar_aging_history |
-| **Components** | 6 |
+| `period` | Activity inside the selected calendar date range. |
+| `snapshot` | Current point-in-time state anchored to a snapshot table. |
+| `fiscal_period` | Financial page window selected by fiscal year plus `fy`, `last12`, or `ytd`. |
 
-| Key | Name | Type | What It Measures | Thresholds |
-|-----|------|------|-----------------|------------|
-| total_outstanding | Total Outstanding | kpi | Total unpaid invoices across all customers | Snapshot, evaluate in context |
-| overdue_amount | Overdue Amount | kpi | Portion past due date | <20% acceptable, >40% critical |
-| credit_limit_breaches | Credit Limit Breaches | kpi | Customers exceeding credit limit | 0 = Good, >0 = Concern |
-| aging_analysis | Aging Analysis | chart | Outstanding grouped by aging buckets (6 buckets) | Most in "Not Yet Due" = healthy |
-| credit_usage_distribution | Credit Usage Distribution | chart | Customer distribution by credit usage | Most within limit = healthy |
-| customer_credit_health | Customer Credit Health | table | Per-customer credit health with risk scoring (11 columns) | Low ≥75, Moderate 31–74, High ≤30 |
+Snapshot anchors:
 
-**Component Prompt — `total_outstanding`:**
-
-> You are analyzing the "Total Outstanding" KPI.
->
-> What it measures: The total amount currently owed by all customers — sum of all unpaid invoices from the beginning of time to now.
->
-> This is a snapshot metric — it reflects the current state regardless of date range selection.
->
-> There is no fixed threshold. Evaluate in context of total invoicing volume and trend direction. A growing outstanding balance alongside flat or declining sales is a red flag.
->
-> Provide a concise analysis of this metric.
-
-**Component Prompt — `overdue_amount`:**
-
-> You are analyzing the "Overdue Amount" KPI.
->
-> What it measures: The portion of total outstanding that is past its due date. Shown with the percentage of total and count of affected customers.
->
-> An invoice is "overdue" when the current date exceeds its due date.
->
-> Evaluate:
-> - Overdue as % of total outstanding: <20% is acceptable, >40% is critical
-> - Number of overdue customers vs total active customers
-> - Whether the overdue amount is concentrated in a few large customers or spread across many
->
-> Provide a concise analysis of this metric.
-
-**Component Prompt — `credit_limit_breaches`:**
-
-> You are analyzing the "Credit Limit Breaches" KPI.
->
-> What it measures: Count of active customers whose total outstanding exceeds their assigned credit limit. Only customers with a credit limit > 0 are evaluated.
->
-> Performance thresholds:
-> - 0 breaches = Good (green)
-> - >0 breaches = Concern (red)
->
-> If breaches exist, use tools to investigate which customers are in breach and by how much. A few large breaches is more concerning than many small ones.
->
-> Provide a concise analysis of this metric.
-
-**Component Prompt — `aging_analysis`:**
-
-> You are analyzing the "Aging Analysis" horizontal bar chart.
->
-> What it shows: Outstanding invoices grouped by how overdue they are.
->
-> Aging buckets (from healthiest to most critical):
-> - Not Yet Due (green) — invoices still within payment terms
-> - 1-30 Days overdue (yellow)
-> - 31-60 Days overdue (orange)
-> - 61-90 Days overdue (light red)
-> - 91-120 Days overdue (red)
-> - 120+ Days overdue (dark red) — highest risk of write-off
->
-> The chart also supports views by Sales Agent and by Customer Type.
->
-> Evaluate:
-> - What proportion of outstanding is "Not Yet Due" vs overdue?
-> - Is the distribution skewed toward older buckets (bad) or newer (okay)?
-> - Are there large amounts in the 120+ bucket (potential bad debt)?
->
-> Provide a concise analysis of the aging distribution.
-
-**Component Prompt — `credit_usage_distribution`:**
-
-> You are analyzing the "Credit Usage Distribution" donut chart.
->
-> What it shows: How customers are distributed across credit usage categories.
->
-> Categories:
-> - Within Limit (< 80% usage) — green, healthy
-> - Near Limit (>= 80% and < 100%) — yellow, watch closely
-> - Over Limit (> 100%) — red, policy breach
-> - No Limit Set — gray, uncontrolled credit risk
->
-> Credit Usage % = Total Outstanding / Credit Limit x 100
->
-> Evaluate:
-> - What % of customers with limits are over or near limit?
-> - How many customers have no limit set (uncontrolled risk)?
-> - Is the "Over Limit" segment growing?
->
-> Provide a concise analysis of the credit utilization distribution.
-
-**Component Prompt — `customer_credit_health`:**
-
-> You are analyzing the "Customer Credit Health" table.
->
-> What it shows: A comprehensive per-customer view with 11 columns: Code, Name, Type, Agent, Credit Limit, Outstanding, Credit Used %, Aging Count, Oldest Due, Health Score (0-100), Risk Level.
->
-> Credit Health Score is calculated from 4 weighted factors:
-> - Credit Usage (40%): How much of limit is used
-> - Overdue Days (30%): Age of oldest overdue invoice
-> - Payment Timeliness (20%): Average days late on payments
-> - Double Breach (10%): Both credit and overdue limits exceeded
->
-> Risk Tiers: Low (>=75, green), Moderate (31-74, yellow), High (<=30, red)
->
-> Evaluate:
-> - Distribution across risk tiers (how many high vs low risk?)
-> - Top offenders by outstanding amount and risk score
-> - Any patterns by customer type or sales agent?
-> - Customers with high outstanding but no credit limit set
->
-> Provide a concise analysis of the customer credit health landscape. Do not list every customer — focus on patterns and outliers.
-
----
-
-### 5.3 Sales Trend
-
-| | |
+| Section | Snapshot source |
 |---|---|
-| **Section Key** | `sales_trend` |
-| **Page** | sales |
-| **Scope** | period |
-| **Tool Policy** | aggregate_only |
-| **Data Sources** | pc_sales_daily |
-| **Components** | 2 |
+| `payment_outstanding` | Latest `pc_ar_customer_snapshot.snapshot_date` |
+| `return_unsettled` | Latest `pc_return_aging.snapshot_date` |
 
-| Key | Name | Type | What It Measures | Thresholds |
-|-----|------|------|-----------------|------------|
-| sales_summary | Sales Summary | kpi | Net Sales = Invoice + Cash − Credit Notes | CN ratio: ≤1% Good, 1–3% Monitor, >3% Concern |
-| net_sales_trend | Net Sales Trend | chart | Stacked bar: Invoice + Cash − CN over time | 3+ months growth = Good, 3+ decline = Bad |
+## 6. Full Component Catalog
 
-**Component Prompt — `sales_summary`:**
+| Page | Section key | Section | Component key | Component | Type | Scope | Tool policy |
+|---|---|---|---|---|---|---|---|
+| Payment | `payment_collection_trend` | Payment Collection Trend | `avg_collection_days` | Avg Collection Days | kpi | period | aggregate_only |
+| Payment | `payment_collection_trend` | Payment Collection Trend | `collection_rate` | Collection Rate | kpi | period | aggregate_only |
+| Payment | `payment_collection_trend` | Payment Collection Trend | `avg_monthly_collection` | Avg Monthly Collection | kpi | period | aggregate_only |
+| Payment | `payment_collection_trend` | Payment Collection Trend | `collection_days_trend` | Avg Collection Days Trend | chart | period | aggregate_only |
+| Payment | `payment_collection_trend` | Payment Collection Trend | `invoiced_vs_collected` | Invoiced vs Collected | chart | period | aggregate_only |
+| Payment | `payment_outstanding` | Outstanding Payment | `total_outstanding` | Total Outstanding | kpi | snapshot | full |
+| Payment | `payment_outstanding` | Outstanding Payment | `overdue_amount` | Overdue Amount | kpi | snapshot | full |
+| Payment | `payment_outstanding` | Outstanding Payment | `credit_limit_breaches` | Credit Limit Breaches | kpi | snapshot | full |
+| Payment | `payment_outstanding` | Outstanding Payment | `aging_analysis` | Aging Analysis | chart | snapshot | full |
+| Payment | `payment_outstanding` | Outstanding Payment | `credit_usage_distribution` | Credit Usage Distribution | chart | snapshot | full |
+| Payment | `payment_outstanding` | Outstanding Payment | `customer_credit_health` | Customer Credit Health | table | snapshot | full |
+| Sales | `sales_trend` | Sales Trend | `net_sales` | Net Sales | kpi | period | aggregate_only |
+| Sales | `sales_trend` | Sales Trend | `invoice_sales` | Invoice Sales | kpi | period | aggregate_only |
+| Sales | `sales_trend` | Sales Trend | `cash_sales` | Cash Sales | kpi | period | aggregate_only |
+| Sales | `sales_trend` | Sales Trend | `credit_notes` | Credit Notes | kpi | period | aggregate_only |
+| Sales | `sales_trend` | Sales Trend | `net_sales_trend` | Net Sales Trend | chart | period | aggregate_only |
+| Sales | `sales_breakdown` | Sales Breakdown | `by_customer` | By Customer | breakdown | period | full |
+| Sales | `sales_breakdown` | Sales Breakdown | `by_product` | By Product | breakdown | period | full |
+| Sales | `sales_breakdown` | Sales Breakdown | `by_agent` | By Sales Agent | breakdown | period | full |
+| Sales | `sales_breakdown` | Sales Breakdown | `by_outlet` | By Outlet | breakdown | period | full |
+| Customer Margin | `customer_margin_overview` | Customer Margin Overview | `cm_net_sales` | Net Sales | kpi | period | aggregate_only |
+| Customer Margin | `customer_margin_overview` | Customer Margin Overview | `cm_cogs` | COGS | kpi | period | aggregate_only |
+| Customer Margin | `customer_margin_overview` | Customer Margin Overview | `cm_gross_profit` | Gross Profit | kpi | period | aggregate_only |
+| Customer Margin | `customer_margin_overview` | Customer Margin Overview | `cm_margin_pct` | Margin % | kpi | period | aggregate_only |
+| Customer Margin | `customer_margin_overview` | Customer Margin Overview | `cm_active_customers` | Active Customers | kpi | period | aggregate_only |
+| Customer Margin | `customer_margin_overview` | Customer Margin Overview | `cm_margin_trend` | Margin Trend | chart | period | aggregate_only |
+| Customer Margin | `customer_margin_overview` | Customer Margin Overview | `cm_margin_distribution` | Margin Distribution | chart | period | aggregate_only |
+| Customer Margin | `customer_margin_breakdown` | Customer Margin Breakdown | `cm_top_customers` | Top Customers | chart | period | full |
+| Customer Margin | `customer_margin_breakdown` | Customer Margin Breakdown | `cm_customer_table` | Customer Margin Table | table | period | full |
+| Customer Margin | `customer_margin_breakdown` | Customer Margin Breakdown | `cm_credit_note_impact` | Credit Note Impact | table | period | full |
+| Supplier Performance | `supplier_margin_overview` | Supplier Margin Overview | `sp_net_sales` | Est. Net Sales | kpi | period | aggregate_only |
+| Supplier Performance | `supplier_margin_overview` | Supplier Margin Overview | `sp_cogs` | Est. Cost of Sales | kpi | period | aggregate_only |
+| Supplier Performance | `supplier_margin_overview` | Supplier Margin Overview | `sp_gross_profit` | Est. Gross Profit | kpi | period | aggregate_only |
+| Supplier Performance | `supplier_margin_overview` | Supplier Margin Overview | `sp_margin_pct` | Gross Margin % | kpi | period | aggregate_only |
+| Supplier Performance | `supplier_margin_overview` | Supplier Margin Overview | `sp_active_suppliers` | Active Suppliers | kpi | period | aggregate_only |
+| Supplier Performance | `supplier_margin_overview` | Supplier Margin Overview | `sp_margin_trend` | Profitability Trend | chart | period | aggregate_only |
+| Supplier Performance | `supplier_margin_overview` | Supplier Margin Overview | `sp_margin_distribution` | Margin Distribution | chart | period | aggregate_only |
+| Supplier Performance | `supplier_margin_breakdown` | Supplier Margin Breakdown | `sm_top_bottom` | Top/Bottom Suppliers & Items | chart | period | full |
+| Supplier Performance | `supplier_margin_breakdown` | Supplier Margin Breakdown | `sm_supplier_table` | Supplier Analysis Table | table | period | full |
+| Supplier Performance | `supplier_margin_breakdown` | Supplier Margin Breakdown | `sm_item_pricing` | Item Price Comparison | breakdown | period | full |
+| Supplier Performance | `supplier_margin_breakdown` | Supplier Margin Breakdown | `sm_price_scatter` | Purchase vs Selling Price | chart | period | full |
+| Returns | `return_trend` | Return Trends | `rt_total_returns` | Total Returns | kpi | period | aggregate_only |
+| Returns | `return_trend` | Return Trends | `rt_settled` | Settled | kpi | period | aggregate_only |
+| Returns | `return_trend` | Return Trends | `rt_unsettled` | Unsettled | kpi | period | aggregate_only |
+| Returns | `return_trend` | Return Trends | `rt_return_pct` | Return % | kpi | period | aggregate_only |
+| Returns | `return_trend` | Return Trends | `rt_settlement_breakdown` | Settlement Breakdown | chart | period | aggregate_only |
+| Returns | `return_trend` | Return Trends | `rt_monthly_trend` | Monthly Return Trend | chart | period | aggregate_only |
+| Returns | `return_trend` | Return Trends | `rt_product_bar` | Top Returns by Item | chart | period | aggregate_only |
+| Returns | `return_unsettled` | Unsettled Returns | `ru_aging_chart` | Aging of Unsettled Returns | chart | snapshot | full |
+| Returns | `return_unsettled` | Unsettled Returns | `ru_debtors_table` | Customer Returns | table | snapshot | full |
+| Expenses | `expense_overview` | Expense Overview | `ex_total_costs` | Total Costs | kpi | period | aggregate_only |
+| Expenses | `expense_overview` | Expense Overview | `ex_cogs` | Cost of Sales | kpi | period | aggregate_only |
+| Expenses | `expense_overview` | Expense Overview | `ex_opex` | Operating Costs | kpi | period | aggregate_only |
+| Expenses | `expense_overview` | Expense Overview | `ex_yoy_costs` | vs Last Year | kpi | period | aggregate_only |
+| Expenses | `expense_overview` | Expense Overview | `ex_cost_trend` | Cost Trend | chart | period | aggregate_only |
+| Expenses | `expense_overview` | Expense Overview | `ex_cost_composition` | Cost Composition | chart | period | aggregate_only |
+| Expenses | `expense_overview` | Expense Overview | `ex_top_expenses` | Top Expenses | chart | period | aggregate_only |
+| Expenses | `expense_breakdown` | Expense Breakdown | `ex_cogs_table` | Cost of Sales Breakdown | table | period | full |
+| Expenses | `expense_breakdown` | Expense Breakdown | `ex_opex_table` | Operating Costs Breakdown | table | period | full |
+| Financial | `financial_overview` | Financial Overview | `fin_pnl_summary` | P&L Summary | kpi | fiscal_period | aggregate_only |
+| Financial | `financial_overview` | Financial Overview | `fin_monthly_trend` | Monthly P&L Trend | chart | fiscal_period | aggregate_only |
+| Financial | `financial_pnl` | Profit & Loss Detail | `fin_pl_statement` | Profit & Loss Statement | table | fiscal_period | aggregate_only |
+| Financial | `financial_pnl` | Profit & Loss Detail | `fin_yoy_comparison` | Multi-Year Comparison | table | fiscal_period | aggregate_only |
+| Financial | `financial_balance_sheet` | Balance Sheet | `bs_trend` | Assets, Liabilities & Equity Trend | chart | fiscal_period | aggregate_only |
+| Financial | `financial_balance_sheet` | Balance Sheet | `bs_statement` | Balance Sheet Statement | table | fiscal_period | aggregate_only |
+| Financial | `financial_variance` | Variance, Forecast & Budget | `fv_variance_summary` | P&L Variance Summary | kpi | fiscal_period | aggregate_only |
+| Financial | `financial_variance` | Variance, Forecast & Budget | `fv_variance_breakdown` | Variance by Account | table | fiscal_period | aggregate_only |
+| Financial | `financial_variance` | Variance, Forecast & Budget | `fv_trend_forecast` | Trend Forecast | kpi | fiscal_period | aggregate_only |
+| Financial | `financial_variance` | Variance, Forecast & Budget | `fv_budget_suggestions` | AI Budget Suggestions | kpi | fiscal_period | aggregate_only |
 
-> You are analyzing the "Sales Summary" KPI on the Sales page.
->
-> What it measures: Net Sales and its breakdown — Invoice Sales, Cash Sales, and Credit Notes.
-> Formula: Net Sales = Invoice Sales + Cash Sales - Credit Notes
->
-> Evaluate:
-> 1. Net Sales level — is the total healthy for this business?
-> 2. Invoice vs Cash ratio — invoice >= 90% of net is normal for a distribution business with credit customers. A dropping ratio may signal a shift toward cash/retail or loss of credit customers.
-> 3. Cash sales context — higher cash = lower credit risk and faster cash flow, but may signal smaller/retail customers.
-> 4. Credit notes as % of gross sales:
->    - <= 1% = Good (normal returns)
->    - 1-3% = Monitor
->    - > 3% = Concern (quality/accuracy issues)
->
-> Provide a concise analysis covering all four metrics.
+## 7. Prompt Inventory
 
-**Component Prompt — `net_sales_trend`:**
+Runtime prompt source:
 
-> You are analyzing the "Net Sales Trend" stacked bar chart.
->
-> What it shows:
-> - Dark blue bars = Invoice Sales per period
-> - Green bars (stacked on top) = Cash Sales per period
-> - Red bars (below zero line) = Credit Notes per period
-> - Combined height above zero = Net Sales
->
-> Granularity can be Daily, Weekly, or Monthly.
->
-> Performance thresholds for trend:
-> - 3+ consecutive months of growth = Good
-> - Flat or mixed = Neutral
-> - 3+ consecutive months of decline = Bad
->
-> Look for: seasonal spikes (e.g., festive periods), unusual credit note months, the ratio of cash vs invoice changing over time.
->
-> Provide a concise analysis of the sales trend pattern. Flag any significant anomalies (spikes or drops >20% from average) for the summary to investigate.
+- Runtime reads prompts from `ai_insight_prompts` through `prompt-loader.ts` with a 30 second in-memory snapshot cache.
+- Factory defaults live in `prompts-defaults.ts` and are used by seed/reset helpers and DB-miss fallback.
+- `ai_insight_prompts.prompt_text` is a denormalized cache of the selected prompt version.
+- `ai_insight_prompt_versions` stores immutable versions. One Default version exists per prompt and up to 5 feedback-derived versions are allowed by application logic.
+- Section guidance keys follow `<section_key>_guidance`.
+- Finance section guidance defaults are intentionally blank. A guidance block is injected only when a non-empty DB/default guidance body exists.
 
----
+Prompt keys required for Finance:
 
-### 5.4 Sales Breakdown
-
-| | |
+| Prompt category | Keys |
 |---|---|
-| **Section Key** | `sales_breakdown` |
-| **Page** | sales |
-| **Scope** | period |
-| **Tool Policy** | full |
-| **Data Sources** | pc_sales_by_customer, pc_sales_by_fruit, pc_sales_by_outlet, pc_sales_daily |
-| **Components** | 4 |
+| System | `component_analysis`, `summary_analysis`, `feedback_router`, `surgical_editor` |
+| Component | One prompt per component key in the component catalog above. |
+| Section guidance | `payment_collection_trend_guidance`, `payment_outstanding_guidance`, `sales_trend_guidance`, `sales_breakdown_guidance`, `customer_margin_overview_guidance`, `customer_margin_breakdown_guidance`, `supplier_margin_overview_guidance`, `supplier_margin_breakdown_guidance`, `return_trend_guidance`, `return_unsettled_guidance`, `expense_overview_guidance`, `expense_breakdown_guidance`, `financial_overview_guidance`, `financial_pnl_guidance`, `financial_balance_sheet_guidance`, `financial_variance_guidance` |
 
-| Key | Name | Type | What It Measures | Thresholds |
-|-----|------|------|-----------------|------------|
-| by_customer | Sales by Customer | breakdown | Top customers by net sales | Top 1 <15% = Good, >25% = Bad |
-| by_product | Sales by Product | breakdown | Top products by net sales | Top 1 <20% = Good, >35% = Bad |
-| by_agent | Sales by Agent | breakdown | Agent performance comparison | Evaluate spread and decline |
-| by_outlet | Sales by Outlet | breakdown | Location-based sales | No single outlet >50% |
+Actual factory prompt text is embedded in Appendix A.
 
-**Component Prompt — `by_customer`:**
+## 8. Model And Provider Configuration
 
-> You are analyzing the "Sales by Customer" breakdown.
->
-> What it shows: Net sales broken down by customer with columns for Code, Customer Name, Customer Type, Net Sales, Invoice Sales, Cash Sales, and Credit Note Amount.
->
-> Performance thresholds:
-> - Top customer < 15% of total net sales = Good (diversified)
-> - Top customer 15-25% of total = Neutral (moderate concentration)
-> - Top customer > 25% of total = Bad (over-reliance risk)
->
-> Evaluate:
-> - Revenue concentration: are a few customers dominating?
-> - Customer type distribution: healthy mix or over-reliant on one type?
-> - Any customers with disproportionately high credit notes?
->
-> Provide a concise analysis. Focus on concentration risk and patterns.
+Finance currently uses OpenRouter as the only AI model gateway for AI Insight.
 
-**Component Prompt — `by_product`:**
+| Slot | Primary model | Fallback model path |
+|---|---|---|
+| Component analysis | `deepseek/deepseek-v4-flash` | `anthropic/claude-haiku-latest` |
+| Summary analysis | `z-ai/glm-5.1` | `deepseek/deepseek-v4-pro`, then `anthropic/claude-sonnet-latest` |
+| Feedback router | Defaults to component model | Defaults to component fallback |
+| Surgical editor | Defaults to summary model | Defaults to summary fallback list |
 
-> You are analyzing the "Sales by Product" breakdown.
->
-> What it shows: Net sales broken down by fruit product with columns for Product Name, Country, Variant, Net Sales, and Qty Sold.
->
-> Performance thresholds:
-> - Top product < 20% of total net sales = Good (diversified)
-> - Top product 20-35% of total = Neutral
-> - Top product > 35% of total = Bad (product concentration risk)
->
-> Evaluate:
-> - Product concentration: is revenue spread across products or dominated by 1-2 items?
-> - Country of origin diversity: over-reliance on one source country?
-> - High quantity but low revenue products (margin concern)
->
-> Provide a concise analysis.
+Environment overrides:
 
-**Component Prompt — `by_agent`:**
+| Variable | Purpose | Default |
+|---|---|---|
+| `OPENROUTER_API_KEY` | OpenRouter credential | empty string |
+| `AI_INSIGHT_OPENROUTER_TIMEOUT_MS` | Request timeout | `45000` |
+| `AI_INSIGHT_OPENROUTER_COMPONENT_MODEL` | Component primary | `deepseek/deepseek-v4-flash` |
+| `AI_INSIGHT_OPENROUTER_SUMMARY_MODEL` | Summary primary | `z-ai/glm-5.1` |
+| `AI_INSIGHT_OPENROUTER_ROUTER_MODEL` | Router primary | component primary |
+| `AI_INSIGHT_OPENROUTER_EDITOR_MODEL` | Editor primary | summary primary |
+| `AI_INSIGHT_OPENROUTER_COMPONENT_FALLBACK_MODEL` | Component fallback | `anthropic/claude-haiku-latest` |
+| `AI_INSIGHT_OPENROUTER_ROUTER_FALLBACK_MODEL` | Router fallback | component fallback |
+| `AI_INSIGHT_OPENROUTER_SUMMARY_FALLBACK_MODELS` | Summary fallbacks | `deepseek/deepseek-v4-pro,anthropic/claude-sonnet-latest` |
+| `AI_INSIGHT_OPENROUTER_EDITOR_FALLBACK_MODELS` | Editor fallbacks | summary fallback list |
 
-> You are analyzing the "Sales by Sales Agent" breakdown.
->
-> What it shows: Net sales per sales agent with columns for Agent Name, Active status, Net Sales, Invoice Sales, Cash Sales, and Customer Count.
->
-> Evaluate:
-> - Performance spread: is one agent carrying the team or is it balanced?
-> - Inactive agents with significant recent sales (data quality issue?)
-> - Customer count vs sales volume: agents with many customers but low sales may be underperforming
-> - Any agent declining > 10% vs prior period = flag as concern
->
-> Provide a concise analysis. Focus on performance distribution.
+Provider order:
 
-**Component Prompt — `by_outlet`:**
-
-> You are analyzing the "Sales by Outlet" breakdown.
->
-> What it shows: Net sales per outlet/location with columns for Location, Net Sales, Invoice Sales, Cash Sales, and Credit Note Amount.
->
-> Performance thresholds:
-> - No single outlet > 50% of total = Good (geographic diversification)
-> - One outlet > 50% = Concern (geographic concentration risk)
->
-> Evaluate:
-> - Geographic spread: balanced or concentrated?
-> - Any outlets with unusually high credit notes vs sales ratio?
-> - "(Unassigned)" outlet percentage: data quality indicator
->
-> Provide a concise analysis.
-
----
-
-### 5.5 Customer Margin Overview
-
-| | |
+| Slot/model family | Provider order |
 |---|---|
-| **Section Key** | `customer_margin_overview` |
-| **Page** | customer-margin |
-| **Scope** | period |
-| **Tool Policy** | aggregate_only |
-| **Data Sources** | pc_customer_margin |
-| **Components** | 7 |
+| Component/router non-Anthropic | `parasail/fp8`, `atlas-cloud/fp8`, `deepseek`, `deepinfra/fp4`, `siliconflow/fp8`, `akashml/fp8`, `novita` |
+| Summary/editor non-Anthropic | `deepinfra/fp4`, `siliconflow/fp8`, `friendli`, `atlas-cloud/fp8`, `z-ai` |
+| Anthropic fallback slugs | `Anthropic` only |
 
-| Key | Name | Type | What It Measures | Thresholds |
-|-----|------|------|-----------------|------------|
-| cm_net_sales | Net Sales | kpi | Period net sales across active customers | Growth >5% = Good, Decline = Bad |
-| cm_cogs | Cost of Sales | kpi | Landed cost of goods sold | COGS rising faster than sales = margin pressure |
-| cm_gross_profit | Gross Profit | kpi | Net Sales minus COGS | Growing with sales = Good |
-| cm_margin_pct | Gross Margin % | kpi | GP / Net Sales x 100 | ≥15% = Good, 10–15% = Neutral, <10% = Bad |
-| cm_active_customers | Active Customers | kpi | Distinct active customer count | Stability is baseline |
-| cm_margin_trend | Profitability Trend | chart | Monthly GP bars + Margin % line | 3+ months GP growth = Good |
-| cm_margin_distribution | Customer Margin Distribution | chart | Customers by margin % bucket | Most in 10–20% = Healthy |
+Provider controls:
 
-**Component Prompt — `cm_net_sales`:**
+- `allowFallbacks: false` is sent to OpenRouter provider preferences so provider fallback stays inside the explicit order.
+- `requireParameters: true` is sent.
+- `dataCollection: deny` is sent where OpenRouter supports it.
+- Reasoning is disabled with `reasoning: { effort: 'none' }`.
+- Model fallback happens in code only for technical failures: timeout, rate limit, 5xx, model/provider unavailable, unsupported parameter, or connection timeout.
+- Metadata captures requested model, resolved model, upstream provider, provider fallback path, model fallback path, cost source, token counts, reasoning tokens, and fallback reason.
+- Cost uses OpenRouter `usage.cost` when available and local pricing estimates otherwise.
 
-> You are analyzing the "Net Sales" KPI on the Customer Margin overview.
->
-> What it measures: Total net sales for the selected period, with prior-period comparison.
->
-> Performance thresholds:
-> - Growth > 5% = Good
-> - Growth 0-5% = Neutral
-> - Decline = Bad
-> - Decline > 10% = Flag
->
-> Evaluate the current value and the period-over-period delta. Cite the RM delta and percentage change.
->
-> Provide a concise analysis of this metric.
+## 9. Data Package Contract
 
-**Component Prompt — `cm_cogs`:**
+Every Finance component fetcher returns:
 
-> You are analyzing the "Cost of Goods Sold (COGS)" KPI on the Customer Margin overview.
->
-> What it measures: Total landed cost of goods sold, with prior-period comparison.
->
-> Context: For a fruit distribution business, COGS is typically 80-90% of Net Sales. COGS rising faster than Net Sales signals margin compression.
->
-> Evaluate:
-> - COGS-to-Net-Sales ratio
-> - Whether COGS delta is outpacing Net Sales delta (margin compression signal)
-> - Do NOT evaluate COGS in isolation — always frame it relative to Net Sales.
->
-> Provide a concise analysis of this metric.
+- A formatted raw data block for the model.
+- An `allowed` numeric whitelist for RM, percent, days, and counts.
+- A scope label prepended by `fetchComponentData`.
+- Precomputed totals, ratios, ranks, concentrations, trends, and labels where the model might otherwise calculate.
+- Population/scope wording such as period activity, snapshot state, active customers, active suppliers, top-N universe, fiscal window, or approved budget presence.
 
-**Component Prompt — `cm_gross_profit`:**
+Fetcher source by module:
 
-> You are analyzing the "Gross Profit" KPI on the Customer Margin overview.
->
-> What it measures: Net Sales minus COGS, with prior-period comparison.
->
-> Performance thresholds:
-> - GP growing while Net Sales also grows = Good
-> - GP flat while Net Sales grows = Neutral (margin erosion)
-> - GP declining while Net Sales grows = Bad (cost pressure)
-> - GP declining while Net Sales declines = Bad (volume loss)
->
-> The key signal is whether Gross Profit is growing faster or slower than Net Sales — this reveals pricing power. Cite the RM delta and percentage change.
->
-> Provide a concise analysis of this metric.
+| Finance area | Sections | Primary data source families |
+|---|---|---|
+| Payment | `payment_collection_trend`, `payment_outstanding` | Direct fetchers over `pc_ar_monthly`, `pc_ar_customer_snapshot`, `pc_ar_aging_history`; credit-score settings from `app_settings.credit_score_v2`. |
+| Sales | `sales_trend`, `sales_breakdown` | Direct fetchers over `pc_sales_daily`, `pc_sales_by_customer`, `pc_sales_by_outlet`, `pc_sales_by_fruit`. |
+| Customer Margin | `customer_margin_overview`, `customer_margin_breakdown` | Customer-margin query helpers over `pc_customer_margin` and `pc_customer_margin_by_product`. |
+| Supplier Performance | `supplier_margin_overview`, `supplier_margin_breakdown` | Supplier-margin V2 query helpers over `pc_supplier_margin`, plus limited raw IV/CS line use for item sell-price estimates. |
+| Returns | `return_trend`, `return_unsettled` | Return query helpers over `pc_return_monthly`, `pc_return_products`, `pc_return_aging`, `pc_return_by_customer`, and total sales from `pc_sales_daily`. |
+| Expenses | `expense_overview`, `expense_breakdown` | Expense query helpers over `pc_expense_monthly`; OpEx category logic in `data-fetcher.ts`. |
+| Financial | `financial_overview`, `financial_pnl`, `financial_balance_sheet`, `financial_variance` | P&L query helpers over `pc_pnl_period`, `pc_opening_balance`, `pl_format`, `account_type`, fiscal-year helpers, and `budget`. |
 
-**Component Prompt — `cm_margin_pct`:**
+Precompute rules by risk type:
 
-> You are analyzing the "Gross Margin %" KPI on the Customer Margin overview.
->
-> What it measures: Gross Profit as a percentage of Net Sales, with prior-period comparison.
->
-> Performance thresholds (fruit distribution benchmarks):
-> - Margin % >= 15% = Good
-> - Margin % 10-15% = Neutral
-> - Margin % < 10% = Bad
->
-> Evaluate the current margin level vs benchmarks and the period-over-period margin delta in percentage points.
->
-> Provide a concise analysis of this metric.
-
-**Component Prompt — `cm_active_customers`:**
-
-> You are analyzing the "Active Customers" KPI on the Customer Margin overview.
->
-> What it measures: Count of distinct active customers with activity in the selected period, with prior-period comparison.
->
-> Context: Stability is the baseline — steady numbers are healthy for a mature distribution business. Changes matter more than the absolute number.
->
-> Evaluate:
-> - Period-over-period change in customer count
-> - Whether the count correlates with Net Sales movement (fewer customers but steady sales = revenue concentrating)
->
-> Provide a concise analysis of this metric.
-
-**Component Prompt — `cm_margin_trend`:**
-
-> You are analyzing the "Margin Trend" chart on the Customer Margin overview.
->
-> What it shows:
-> - Bars = Gross Profit (RM, left axis) per month
-> - Line = Gross Margin % (right axis) per month
-> - Granularity is fixed to monthly — the chart has no granularity selector.
->
-> The chart answers two questions at once:
-> - Is the business making more or less profit in absolute terms?
-> - Is it getting more or less efficient at converting sales into profit?
->
-> Performance thresholds:
-> - 3+ consecutive months of Gross Profit growth = Good
-> - Flat or mixed = Neutral
-> - 3+ consecutive months of Gross Profit decline = Bad
-> - Margin % trending down for 2+ consecutive months warrants flagging even if Gross Profit is flat.
->
-> Look for:
-> - Divergence between bars and line (e.g., profit rising while margin % stays flat = growth via volume, not pricing)
-> - Seasonal patterns (festive months typically show different mix)
-> - Any month where Gross Profit and Margin % move in opposite directions — always worth calling out
->
-> Cite specific months from the pre-fetched monthly breakdown when making claims. Do not invent values.
->
-> Provide a concise analysis of the margin trend pattern with evidence.
-
-**Component Prompt — `cm_margin_distribution`:**
-
-> You are analyzing the "Margin Distribution" histogram on the Customer Margin overview.
->
-> What it shows: Count of customers falling into each Gross Margin % bucket for the selected period. Buckets are fixed:
->   < 0%, 0-5%, 5-10%, 10-15%, 15-20%, 20-30%, 30%+
->
-> Population: only customers with > RM 1,000 of total revenue in the period are included (small-volume customers are excluded to avoid noise). There is no bucket-size selector.
->
-> Performance thresholds:
-> - Customers in < 0% bucket = selling at a loss (worth flagging if > 0)
-> - Majority of customers in 10-20% band = Healthy (matches overall target)
-> - Heavy concentration (> 40% of customers) in sub-10% bands = Bad (portfolio is thin-margin)
-> - A meaningful tail (> 15%) in the 20%+ bands = Good (premium segment exists)
->
-> Evaluate:
-> - Shape of the distribution (left-skewed, centered, right-skewed)
-> - Proportion of customers below 10% margin
-> - Presence and size of the loss-making bucket
-> - Whether the distribution is consistent with the overall Margin % KPI (a 16% overall margin with most customers sub-10% means a few large accounts are carrying the portfolio — concentration risk)
->
-> Provide a concise analysis focused on distribution shape and concentration.
-
----
-
-### 5.6 Customer Margin Breakdown
-
-| | |
+| Risk | Required precompute pattern |
 |---|---|
-| **Section Key** | `customer_margin_breakdown` |
-| **Page** | customer-margin |
-| **Scope** | period |
-| **Tool Policy** | full |
-| **Data Sources** | pc_customer_margin |
-| **Components** | 3 |
+| Sub-period trend claims | Provide half-period averages, first-to-last changes, longest streaks, peak/trough rows, or named period labels. |
+| Concentration claims | Provide top-1, top-3, top-5, top-10 totals and shares as allowed values. |
+| Rank claims | Provide explicit slowest/fastest/highest/lowest ordered labels. |
+| Margin claims | Provide margin %, margin drift pp, GP/NP sign flips, and top movers. |
+| Snapshot claims | Provide latest snapshot date and snapshot population labels. |
+| Budget claims | Provide approved budget table only when one exists; otherwise state no approved budget. |
 
-| Key | Name | Type | What It Measures | Thresholds |
-|-----|------|------|-----------------|------------|
-| cm_top_customers | Top Customers | chart | Top 10 by GP (RM) and by Margin % (efficiency) | Top 1 >15% GP = concentration risk |
-| cm_customer_table | Customer Analysis Table | table | Full customer table with revenue, COGS, GP, Margin %, Return Rate | Loss-makers >10% = Bad |
-| cm_credit_note_impact | Credit Note Impact | table | Customers ranked by margin erosion from credit notes | Top 5 >50% total margin lost = Concentrated CN problem |
+## 10. Tool Contract
 
-**Component Prompt — `cm_top_customers`:**
+Finance exposes two model-callable tools to the summary phase only:
 
-> You are analyzing the "Top Customers" chart on the Customer Margin breakdown.
->
-> What it shows:
-> - The pre-fetched data contains TWO ranked lists of the period's top 10 customers:
->   (A) Top 10 by Gross Profit (absolute RM contribution)
->   (B) Top 10 by Gross Margin % (efficiency, filtered to customers with at least RM 10,000 revenue)
-> - The UI lets users toggle between these two lenses plus a "highest/lowest" direction. Your analysis should cover both lenses.
->
-> Performance thresholds:
-> - Top customer > 15% of total period Gross Profit = Bad (concentration risk — losing them would hurt badly)
-> - Top 10 > 60% of total period Gross Profit = Bad (concentrated portfolio)
-> - Top 10 < 40% of total period Gross Profit = Good (diversified)
-> - Any top-by-profit customer with margin % < 10% = Flag (thin-margin anchor)
-> - Any top-by-margin customer with revenue < RM 50,000 = Niche premium segment (worth protecting but not load-bearing)
->
-> Evaluate:
-> - Revenue-vs-margin polarity: which customers are the RM anchors, which are the efficiency leaders, and is there overlap?
-> - Concentration risk: how much of the period's total Gross Profit is held by the top 1, top 3, top 10?
-> - Customer type / sales agent patterns across the top lists (if the data block surfaces them)
-> - Any customer appearing on BOTH lists (high profit AND high margin) = star account — call them out by name.
->
-> Cite named customers from the pre-fetched data. Do not invent names or numbers.
->
-> Provide a concise analysis focused on concentration, quality of top accounts, and any over-reliance risk.
+| Tool | Purpose | Availability |
+|---|---|---|
+| `query_local_table` | Query approved local `pc_*` aggregate/precomputed tables. | `aggregate_only` and `full` policies. |
+| `query_rds_table` | Query approved source-system document tables for drill-down detail. | `full` policy only. |
 
-**Component Prompt — `cm_customer_table`:**
+Policy behavior:
 
-> You are analyzing the "Customer Margin Table" on the Customer Margin breakdown.
->
-> What it shows:
-> - Bottom 10 customers by Gross Profit (the worst performers, including loss-makers)
-> - Margin distribution: how customers are spread across margin buckets
->
-> Performance thresholds:
-> - Loss-making customers > 10% of active count = Bad (unhealthy tail)
-> - Any bottom-10 customer with revenue > RM 100,000 AND negative margin = Critical flag
-> - High concentration in < 10% margin buckets = Portfolio margin risk
->
-> Evaluate:
-> - The bottom tail: who is losing money, and is the problem big (high-revenue loss-makers) or small?
-> - Customer type / sales agent clustering in the bottom 10
-> - Whether the bottom 10 have unusually high return rates
-> - Distribution shape: is the portfolio clustered in healthy (>15%) or thin (<10%) buckets?
->
-> Cite named customers from the pre-fetched bottom block. Do not invent names.
->
-> Provide a concise analysis focused on the at-risk tail and portfolio margin distribution.
-
-**Component Prompt — `cm_credit_note_impact`:**
-
-> You are analyzing the "Credit Note Impact on Margins" table.
->
-> What it shows: Customers ranked by how much credit notes eroded their margin, with columns for Code, Name, Invoice Revenue, CN Revenue, Return Rate %, Margin Before CN, Margin After CN, and Margin Lost (percentage points).
->
-> Pre-fetched data contains the top 25 customers by Margin Lost (the most-affected accounts) plus aggregate roll-ups: total margin lost across the full top-100 list, top-5 share of total margin lost, count of customers with return rate > 5%, and average margin lost.
->
-> Performance thresholds:
-> - Top 5 customers > 50% of total margin lost = Bad (concentrated CN problem — fix the top offenders first)
-> - Any customer with return rate > 10% = Bad (excessive returns, likely quality or operational issue)
-> - Any customer with margin_lost > 10 percentage points = Severe impact
-> - Customers with high CN revenue but margin_lost < 2 points = Acceptable (they return a lot but costs are recovered)
->
-> Evaluate:
-> - Concentration of the CN problem: is it one or two serial returners, or spread across many customers?
-> - Relationship between return rate and margin lost (high return rate but low margin lost suggests the credit notes are on low-margin items — a different problem than high-margin returns)
-> - Any customer type or sales agent clustering in the top 25 worst-impacted
-> - Whether return rates look normal (<3% for most) or systemic (>5% across many customers = upstream quality problem)
->
-> Cite named customers from the pre-fetched top 25. Do not invent names.
->
-> Provide a concise analysis focused on which accounts to investigate first.
-
----
-
-### 5.7 Supplier Margin Overview
-
-| | |
+| Policy | Runtime behavior |
 |---|---|
-| **Section Key** | `supplier_margin_overview` |
-| **Page** | supplier-performance |
-| **Scope** | period |
-| **Tool Policy** | aggregate_only |
-| **Data Sources** | pc_supplier_margin |
-| **Components** | 7 |
-
-| Key | Name | Type | What It Measures | Thresholds |
-|-----|------|------|-----------------|------------|
-| sp_net_sales | Est. Net Sales | kpi | Sales revenue attributed to active suppliers | Growth ≥5% = Good, Drop >10% = Flag |
-| sp_cogs | Est. Cost of Sales | kpi | Attributed COGS from active suppliers | Rising COGS NOT automatically bad on supplier page |
-| sp_gross_profit | Est. Gross Profit | kpi | Est. Net Sales minus Est. COGS | Growing with sales = Good |
-| sp_margin_pct | Gross Margin % | kpi | Est. GP / Est. Net Sales x 100 | ≥15% = Good, <10% = Bad, ≥2pp drop = Flag |
-| sp_active_suppliers | Active Suppliers | kpi | Distinct suppliers with purchase activity | Shrinking NOT automatically bad (consolidation) |
-| sp_margin_trend | Profitability Trend | chart | Monthly Est. GP bars + Margin % line | 3+ months GP growth = Good |
-| sp_margin_distribution | Margin Distribution | chart | Suppliers AND Items by margin % bucket | Both views analyzed |
-
-**Component Prompt — `sp_net_sales`:**
-
-> You are analyzing the "Est. Net Sales" KPI on the Supplier Performance overview.
->
-> What it measures: Total sales revenue attributed to items sourced from active suppliers during the selected period.
-> Formula: SUM(sales_revenue) from pc_supplier_margin where is_active = 'T'.
->
-> Context:
-> - This is the Supplier Performance view of revenue — it mirrors the Customer Margin Net Sales figure when no filters are applied, but may diverge when supplier/item-group filters are in play.
-> - The "Est." prefix is intentional: the number is constructed from the supplier-margin pre-compute pipeline and is not the raw invoice figure.
->
-> Performance thresholds:
-> - Month-over-month growth ≥ 5% = Good
-> - Month-over-month growth 0% to 5% = Neutral
-> - Month-over-month decline < 0% = Bad
-> - A drop > 10% in a single period warrants flagging
->
-> Evaluate the level and, if prior-period data is included in the pre-fetched block, the direction. Comment on whether the period is tracking above or below the trailing baseline.
->
-> Provide a concise analysis of this metric.
-
-**Component Prompt — `sp_cogs`:**
-
-> You are analyzing the "Est. Cost of Sales" KPI on the Supplier Performance overview.
->
-> What it measures: Attributed cost of goods sold, summed across items from active suppliers for the period.
-> Formula: SUM(attributed_cogs) from pc_supplier_margin where is_active = 'T'.
->
-> Context — supplier page framing:
-> - On a supplier page, rising COGS is NOT automatically bad. It can mean the business is shifting volume toward a preferred supplier whose goods cost more but carry better margin, reliability, or commercial terms.
-> - Always frame COGS against Est. Net Sales and against supplier concentration signals in the pre-fetched block, never in isolation.
-> - Bad signals: COGS rising faster than Est. Net Sales AND margin % falling (true cost pressure). Flat revenue + rising COGS = real margin erosion.
-> - Neutral/Good signal: COGS rising with Est. Net Sales keeping pace, margin % stable or up = healthy growth, potentially a beneficial sourcing shift.
->
-> Evaluate:
-> - Period COGS level
-> - COGS-to-Net-Sales ratio
-> - Whether the ratio is widening or holding
->
-> Do NOT call rising COGS "bad" without checking the Net Sales direction and the margin % direction in the same pre-fetched block.
->
-> Provide a concise analysis of this metric.
-
-**Component Prompt — `sp_gross_profit`:**
-
-> You are analyzing the "Est. Gross Profit" KPI on the Supplier Performance overview.
->
-> What it measures: Est. Net Sales minus Est. Cost of Sales for the period, derived from the supplier-margin pre-compute.
-> Formula: Est. Net Sales − Est. Cost of Sales.
->
-> Performance thresholds:
-> - Gross Profit growing ≥ 5% while Est. Net Sales also grows = Good
-> - Gross Profit flat while Est. Net Sales grows = Neutral (watch for erosion)
-> - Gross Profit declining while Est. Net Sales grows = Bad (cost pressure or sourcing mix shifting to lower-margin suppliers)
-> - Gross Profit declining while Est. Net Sales declines = Bad (volume loss)
->
-> Evaluate:
-> - Absolute Gross Profit level
-> - Direction vs prior period
-> - Whether Gross Profit is growing faster/slower than Est. Net Sales — the most important signal on the supplier page, because it reveals whether the current supplier mix is actually delivering margin or just volume
->
-> Provide a concise analysis of this metric.
-
-**Component Prompt — `sp_margin_pct`:**
-
-> You are analyzing the "Gross Margin %" KPI on the Supplier Performance overview.
->
-> What it measures: Est. Gross Profit as a percentage of Est. Net Sales.
-> Formula: (Est. Gross Profit / Est. Net Sales) x 100.
->
-> Performance thresholds (fruit distribution, supplier-side):
-> - Margin % ≥ 15% = Good
-> - Margin % 10% to 15% = Neutral
-> - Margin % < 10% = Bad
-> - A drop ≥ 2 percentage points vs the prior period warrants flagging, regardless of absolute level
->
-> Evaluate:
-> - Current margin level vs the benchmark bands
-> - Direction vs prior period (a healthy margin trending down is still worth flagging — on a supplier page this usually means upstream price pressure)
-> - Whether movement is driven by Net Sales change, COGS change, or a sourcing mix shift (the pre-fetched block will contain both numerators and denominators)
->
-> Provide a concise analysis of this metric.
-
-**Component Prompt — `sp_active_suppliers`:**
-
-> You are analyzing the "Active Suppliers" KPI on the Supplier Performance overview.
->
-> What it measures: Count of distinct suppliers with any purchase quantity during the selected period (is_active = 'T' AND purchase_qty > 0).
-> Formula: COUNT(DISTINCT creditor_code) where the supplier had a non-zero purchase_qty in the period.
->
-> Context — supplier page framing:
-> - Unlike Customer Active count, a shrinking supplier count is NOT automatically bad. Consolidation often means the business is concentrating volume with better-performing suppliers to gain negotiating leverage or simplify logistics.
-> - Growing supplier count can be good (sourcing diversification, new product lines) OR bad (reactive scrambling after a preferred supplier issue).
-> - Sudden large drops are the one clear flag — they may indicate a supplier dropping out, a purchasing freeze, or a data/pipeline problem.
->
-> Performance thresholds:
-> - Month-over-month change within ±5% = Normal (noise)
-> - Gentle decline (−5% to −10%) = Neutral (possible deliberate consolidation)
-> - Drop > 10% = Flag (verify whether consolidation or disruption)
-> - Sudden growth > 15% = Flag (worth asking why — new sourcing initiative or emergency substitution?)
->
-> Evaluate:
-> - Direction of change
-> - Whether the change correlates with Gross Margin % movement (consolidation that ALSO improves margin = a good story; consolidation with flat or falling margin = concentration risk without the payoff)
->
-> Provide a concise analysis of this metric.
-
-**Component Prompt — `sp_margin_trend`:**
-
-> You are analyzing the "Profitability Trend" chart on the Supplier Performance overview.
->
-> What it shows:
-> - Bars = Est. Gross Profit (RM, left y-axis) per month
-> - Line = Gross Margin % (right y-axis) per month
-> - Granularity is fixed to monthly — this chart has no granularity selector on the overview cluster.
->
-> The chart answers two questions simultaneously:
-> - Is the sourcing mix delivering more or less profit in absolute terms?
-> - Is the business getting more or less efficient at converting purchases into profit?
->
-> Performance thresholds:
-> - 3+ consecutive months of Gross Profit growth = Good
-> - Flat or mixed = Neutral
-> - 3+ consecutive months of Gross Profit decline = Bad
-> - Margin % trending down for 2+ consecutive months warrants flagging even if Gross Profit is flat (a slow-moving sourcing problem)
->
-> Look for:
-> - Divergence between bars and line (e.g., profit rising while margin % stays flat = growth via volume, not pricing leverage)
-> - Seasonal patterns (fruit distribution has clear festive peaks and lean months — don't mistake seasonality for structural movement)
-> - Any month where Gross Profit and Margin % move in opposite directions — always worth calling out on a supplier page, because it usually points at a sourcing mix shift
->
-> Use the pre-fetched monthly breakdown to cite specific months when making claims. Do not invent values not present in the data block.
->
-> Provide a concise analysis of the profitability trend with evidence.
-
-**Component Prompt — `sp_margin_distribution`:**
-
-> You are analyzing the "Margin Distribution" histogram on the Supplier Performance overview.
->
-> What it shows: Count of entities (suppliers OR items) falling into each Gross Margin % bucket for the selected period. Buckets are fixed:
->   < 0%, 0-5%, 5-10%, 10-15%, 15-20%, 20-30%, 30%+
->
-> IMPORTANT — this chart has an entity toggle (Suppliers / Items). The user may be viewing either view when they open the analysis. The pre-fetched block contains BOTH distributions (counts per bucket for suppliers AND for items). Analyze both and contrast them; do not assume one specific view.
->
-> Performance thresholds:
-> - Entities in < 0% bucket = sourcing at a loss (always flag if > 0)
-> - Majority clustered in 10-20% band = Healthy (matches overall target)
-> - Heavy concentration (> 40%) in sub-10% bands = Bad (thin-margin sourcing)
-> - A meaningful tail (> 15%) in the 20%+ bands = Good (premium sourcing)
->
-> Contrast the supplier view vs the item view:
-> - Supplier view skewed healthy but item view skewed thin = a few premium suppliers are carrying a long tail of weak items — procurement ought to question the tail
-> - Item view skewed healthy but supplier view skewed thin = good products sourced through mostly weak suppliers — the issue is commercial terms, not the product mix
-> - Both views skewed the same direction = the story is consistent; the weak/strong pattern is structural
->
-> Evaluate:
-> - Shape of both distributions (left-skewed, centered, right-skewed, bimodal)
-> - Proportion below 10% margin in each view
-> - Presence and size of the loss-making (< 0%) bucket in each view
-> - Whether the supplier view and item view tell the same story or diverge — divergence is the most actionable signal on this chart
->
-> Provide a concise analysis focused on distribution shape, concentration, and the contrast between the supplier and item views.
-
----
-
-### 5.8 Supplier Margin Breakdown
-
-| | |
-|---|---|
-| **Section Key** | `supplier_margin_breakdown` |
-| **Page** | supplier-performance |
-| **Scope** | period |
-| **Tool Policy** | full |
-| **Data Sources** | pc_supplier_margin, raw invoice/cash-sale line items |
-| **Components** | 4 |
-
-| Key | Name | Type | What It Measures | Thresholds |
-|-----|------|------|-----------------|------------|
-| sm_top_bottom | Top/Bottom Suppliers & Items | chart | Top/Bottom 10 for suppliers AND items by GP | Top 1 >15% GP = concentration |
-| sm_supplier_table | Supplier Analysis Table | table | Full supplier table with revenue, COGS, GP, Margin % | Top 10 >60% revenue = concentrated |
-| sm_item_pricing | Item Price Comparison | breakdown | Per-supplier pricing for highest-revenue item | Margin spread >10pp = arbitrage |
-| sm_price_scatter | Purchase vs Selling Price | chart | Item scatter: purchase price vs sell price vs revenue | Top-50 items margin <0 = Always flag |
-
-**Component Prompt — `sm_top_bottom`:**
-
-> You are analyzing the "Top/Bottom Suppliers & Items" chart on the Supplier Performance breakdown.
->
-> What it shows:
-> - The pre-fetched data contains 4 tables sorted by Est. Gross Profit:
->   (A) Top 10 suppliers by Est. Gross Profit
->   (B) Bottom 10 suppliers by Est. Gross Profit
->   (C) Top 10 items by Est. Gross Profit
->   (D) Bottom 10 items by Est. Gross Profit
->
-> Performance thresholds:
-> - Top 1 supplier > 15% of period Est. Gross Profit = Bad (supplier concentration risk)
-> - Top 10 suppliers > 60% of period Est. Gross Profit = Bad (concentrated sourcing)
-> - Top 10 suppliers < 40% of period Est. Gross Profit = Good (diversified sourcing)
-> - Any bottom-list supplier with profit < 0 = Critical (sourcing at a loss)
-> - Any bottom-list item with profit < 0 AND meaningful revenue = Flag (product-level loss-maker)
->
-> Evaluate:
-> - Supplier-side vs item-side concentration
-> - Loss-makers: which are bigger problems — loss-making suppliers or loss-making items?
-> - Item group or supplier clustering in the bottom lists
->
-> Cite named suppliers and items from the pre-fetched data. Do not invent names or numbers.
->
-> Provide a concise analysis focused on concentration, quality of the top contributors, and loss-maker exposure.
-
-**Component Prompt — `sm_supplier_table`:**
-
-> You are analyzing the "Supplier Analysis Table" on the Supplier Performance breakdown.
->
-> What it shows:
-> - A sortable, paginated table of every active supplier in the period with columns for Code, Name, Type, Items, Revenue, COGS, Gross Profit, Margin %.
-> - The pre-fetched data gives you:
->   (A) Top 10 suppliers by Revenue (biggest sourcing partners)
->   (B) Bottom 10 suppliers by Margin % with revenue >= RM 10,000 (weak-margin partners that still carry meaningful volume)
->   (C) Aggregate roll-ups: total supplier count, loss-making supplier count, top-10 share of revenue, median margin %, avg revenue per supplier, thin-margin (< 5%) supplier count.
->
-> Performance thresholds:
-> - Top 10 share of revenue > 60% = Bad (concentrated sourcing)
-> - Top 10 share of revenue 40-60% = Neutral (typical for distribution)
-> - Loss-making suppliers (margin % < 0) > 0 = Always flag; name them
-> - Thin-margin suppliers (margin % < 5%) > 10% of active count = Portfolio quality concern
-> - Any bottom-10 supplier with revenue > RM 100,000 AND margin % < 5 = Critical (big volume, thin margin)
->
-> Evaluate:
-> - Concentration: how much of the revenue sits with the top few suppliers?
-> - Bottom-margin tail: is the problem one or two big thin-margin suppliers, or a long tail?
-> - Supplier type clustering in the bottom 10 (do weak-margin suppliers share a category?)
-> - Whether the biggest revenue suppliers are also the best margin suppliers — mismatches are the actionable signal.
->
-> Cite named suppliers from the pre-fetched top/bottom blocks. Do not invent.
->
-> Provide a concise analysis focused on sourcing concentration and the at-risk thin-margin tail.
-
-**Component Prompt — `sm_item_pricing`:**
-
-> You are analyzing the "Item Price Comparison" panel on the Supplier Performance breakdown.
->
-> What it shows:
-> - Per-supplier purchase-price comparison for a SINGLE anchor item. The UI lets the user pick any item; for this analysis the anchor is the item with the highest purchase_total in the selected period (named in the pre-fetched block).
-> - The pre-fetched data gives you:
->   (A) Top 5 suppliers for the anchor item by purchase volume, with avg purchase price, estimated sell price, and estimated margin %.
->   (B) Period totals for the anchor item: total purchased qty, total purchase RM, avg purchase price across all suppliers, min / max purchase price (best / worst supplier on price).
->   (C) Cross-supplier margin % spread on the anchor item (best minus worst).
->
-> Note: the estimated sell price is derived from raw invoice + cash-sale line items (or a pre-compute fallback when raw tables are unavailable). Margin estimates are therefore anchor-item-specific, not business-wide.
->
-> Performance thresholds:
-> - Margin % spread across suppliers > 10 percentage points = Significant sourcing arbitrage opportunity
-> - Any supplier's estimated margin % < 0 on the anchor item = Loss-making on that item — flag
-> - Cheapest supplier carries > 50% of the item's purchase volume = Procurement already on best price — neutral
-> - Cheapest supplier carries < 20% of the item's purchase volume = Concentration on a more expensive supplier — flag
->
-> Evaluate:
-> - Whether the volume leader is also the price leader (aligned procurement) or not (arbitrage risk)
-> - How wide the price spread is across suppliers for the same item — wide spreads are either a quality / grade difference or a procurement failure
-> - The margin spread across suppliers on this one item — if it is large, shifting volume could improve overall margin
-> - Whether the same supplier delivers the best (or worst) estimated margin
->
-> Do NOT generalize about the business from a single anchor item. Frame conclusions as "for this anchor item specifically...". The summary layer may drill other items via tools.
->
-> Cite suppliers by name from the pre-fetched block. Do not invent numbers.
->
-> Provide a concise analysis focused on price alignment and margin arbitrage on the anchor item.
-
-**Component Prompt — `sm_price_scatter`:**
-
-> You are analyzing the "Purchase vs Selling Price" scatter chart on the Supplier Performance breakdown.
->
-> What it shows:
-> - One dot per item: x = avg purchase price, y = avg selling price, size = revenue in the period.
-> - The UI samples the full universe; the pre-fetched data carries the TOP 50 items by revenue (the items that actually move the P&L) plus a bucketed margin % distribution across the full universe.
->
-> Pre-fetched data contains:
-> (A) Top 50 items by revenue: item code, name, suppliers (names), avg purchase price RM, avg selling price RM, margin %, revenue RM
-> (B) Margin bucket distribution over the full item universe: counts of items with margin % < 0, 0-5, 5-10, 10-20, 20+
-> (C) Loss-maker counts: items with margin % < 0 inside the top-50 AND across the full universe
-> (D) Universe size: total items in the scatter pool
->
-> Performance thresholds:
-> - Top-50 items with margin % < 0 = Always flag (these items move the P&L)
-> - More than 20% of universe items in the < 5% bucket = Thin-margin product catalog
-> - Meaningful tail (> 10% of universe) in the 20+ bucket = Premium product pocket worth protecting
-> - Any top-50 item with margin % < 0 AND revenue > RM 100,000 = Severe (fixing one item moves the needle)
->
-> Evaluate:
-> - Shape of the bucket distribution (left-skewed loss, centered thin, right-skewed premium, bimodal)
-> - Price-spread outliers in the top-50: items where purchase price is unusually high or low relative to selling price
-> - Named loss-making items in the top-50 (call them out with supplier names and the RM revenue)
-> - Whether the same suppliers appear repeatedly in the loss-making items (structural supplier quality issue) or whether it is spread across many suppliers (item-level problem)
->
-> Cite items by name from the pre-fetched top-50 block. Do not invent.
->
-> Provide a concise analysis focused on loss-making items, price-spread outliers, and the shape of the margin distribution.
-
----
-
-### 5.9 Return Trends
-
-| | |
-|---|---|
-| **Section Key** | `return_trend` |
-| **Page** | return |
-| **Scope** | period |
-| **Tool Policy** | aggregate_only |
-| **Data Sources** | pc_return_monthly, pc_return_products |
-| **Components** | 7 |
-
-| Key | Name | Type | What It Measures | Thresholds |
-|-----|------|------|-----------------|------------|
-| rt_total_returns | Total Returns | kpi | Period return value + CN count | Return rate: <2% = Good, >5% = Concern |
-| rt_settled | Settled | kpi | Returns resolved (knock-off + refund) | Knock-off >70% = Healthy, Refund >30% = Concern |
-| rt_unsettled | Unsettled | kpi | Unresolved return value | <15% = Healthy, >30% = Concern |
-| rt_return_pct | Return % | kpi | Return value / Net Sales x 100 | <2% = Green, 2–5% = Amber, >5% = Red |
-| rt_settlement_breakdown | Settlement Breakdown | chart | Three-channel: Knock-off / Refund / Unsettled | Knock-off >70% = Healthy |
-| rt_monthly_trend | Monthly Return Trend | chart | Return value + Unsettled by month | Unsettled rising while value flat = Process issue |
-| rt_product_bar | Top Returns by Item | chart | Top 10 items by frequency AND value | Top 1 >15% return value = Severe |
-
-**Component Prompt — `rt_total_returns`:**
-
-> You are analyzing the "Total Returns" KPI on the Returns page.
->
-> What it measures: Total return value (RM) in the selected period, plus the number of return credit notes issued. This is a period flow — activity within the date range, not a point-in-time balance.
->
-> The pre-fetched data gives you:
-> - Total return value (RM) in the period
-> - Return count (number of credit notes)
-> - Period net sales (RM) for context
-> - Return rate % (return value / net sales)
-> - Avg return value per CN (RM)
->
-> Performance thresholds (return rate %):
-> - < 2% = Healthy — normal wastage / quality tolerance for fruit distribution
-> - 2% to 5% = Watch — investigate if rising
-> - > 5% = Concern — quality, sourcing, or handling problem
->
-> Evaluate:
-> - Scale of returns relative to net sales (the return rate % is the anchor)
-> - Whether the return count implies small-frequent or large-infrequent returns (avg per CN)
-> - Whether the period is unusually high or low vs a typical fruit-distribution wastage rate
->
-> Cite the return value, count, and return rate verbatim from the data block.
->
-> Provide a concise analysis of period return exposure.
-
-**Component Prompt — `rt_settled`:**
-
-> You are analyzing the "Settled" KPI on the Returns page.
->
-> What it measures: How much of the total return exposure has been resolved — either by knocking it off against future invoices (non-cash) or by refunding cash / cheque.
->
-> The pre-fetched data gives you:
-> - Total settled (RM) = knocked off + refunded
-> - Total knocked off (RM) — offset against outstanding or future invoices, NO cash leaves the door
-> - Total refunded (RM) — actual cash / cheque paid back to the customer
-> - Settled % of return value
-> - Knock-off % and Refund % individually
-> - Refund count (number of refund transactions)
->
-> Thresholds:
-> - Knock-off % > 70% of return value = Healthy settlement mix (no cash leakage)
-> - Refund % > 30% of return value = Concern — returns are draining cash rather than being absorbed into future invoices
-> - Any refund-dominant mix with a high absolute refund total = flag as working-capital pressure
->
-> Business context — CRITICAL:
-> - Knock-off is the PREFERRED settlement channel for a distribution business. It converts the return into an offset against future sales — no cash leaves the bank.
-> - Refund means actual cash paid back. It erodes working capital and is only appropriate when the customer relationship is ending or the customer has no upcoming invoices.
->
-> Evaluate:
-> - The balance between knock-off and refund — is the mix cash-efficient (knock-off heavy) or cash-draining (refund heavy)?
-> - The settled % overall — is the business closing out return exposure or letting it linger?
->
-> Cite RM values and percentages verbatim from the data block.
->
-> Provide a concise analysis focused on settlement channel mix and cash-flow implications.
-
-**Component Prompt — `rt_unsettled`:**
-
-> You are analyzing the "Unsettled" KPI on the Returns page.
->
-> What it measures: Return value from the selected period that has NOT been knocked off or refunded — still open on the books. This is the piece of the return exposure that is actively hurting the P&L and the working capital.
->
-> The pre-fetched data gives you:
-> - Total unsettled (RM)
-> - Unsettled % of total return value
-> - Partial count (return CNs that are partially resolved)
-> - Outstanding count (return CNs with zero resolution)
-> - Reconciled count (return CNs fully resolved)
-> - Reconciliation rate (%) across the period
->
-> Thresholds (unsettled % of return value):
-> - < 15% = Healthy — most returns closed out
-> - 15% to 30% = Watch
-> - > 30% = Concern — return exposure is piling up unresolved
->
-> Evaluate:
-> - Scale of unsettled RM against the total return pool
-> - Whether the problem is many partially-resolved CNs (process friction) or many fully-outstanding CNs (stuck on customer action)
-> - The reconciliation rate as an overall health signal
->
-> Cite RM values and counts verbatim from the data block.
->
-> Provide a concise analysis focused on unresolved exposure and reconciliation health.
-
-**Component Prompt — `rt_return_pct`:**
-
-> You are analyzing the "Return %" KPI on the Returns page.
->
-> What it measures: Total return value divided by total net sales in the period, expressed as a percentage. This is the single most important return-health ratio — it normalizes return exposure against sales volume so you can compare periods fairly.
->
-> The pre-fetched data gives you:
-> - Return rate % for the period
-> - Period return value (RM)
-> - Period net sales (RM)
-> - Color band (Green / Amber / Red)
->
-> Thresholds:
-> - < 2% = Green (Good) — normal fruit-distribution wastage tolerance
-> - 2% to 5% = Amber (Watch) — acceptable but monitor direction
-> - > 5% = Red (Concern) — indicates quality, handling, or sourcing issues
->
-> Evaluate:
-> - Which band the current value sits in
-> - What the implied scale is (a 3% return rate on RM 10M sales is RM 300K — make it concrete)
-> - Whether the ratio alone is actionable or whether a trend view is needed (the MonthlyTrendChart and the trend-based components carry that context)
->
-> Cite the return rate, return value, and net sales verbatim from the data block.
->
-> Provide a concise analysis of return health relative to sales volume.
-
-**Component Prompt — `rt_settlement_breakdown`:**
-
-> You are analyzing the "Settlement Breakdown" chart on the Returns page.
->
-> What it shows: Three horizontal progress bars for the period — Knocked Off (emerald), Refunded (blue), Unsettled (red) — each as an RM amount and as a percentage of total return value.
->
-> The pre-fetched data gives you:
-> - Total return value (RM)
-> - Knocked off (RM) and knock-off %
-> - Refunded (RM) and refund %
-> - Unsettled (RM) and unsettled %
-> - Refund transaction count (actual cash-out events)
->
-> Thresholds:
-> - Knock-off % > 70% = Healthy settlement mix (cash-efficient)
-> - Refund % > 30% = Concern (cash-draining settlement)
-> - Unsettled % > 30% = Concern (exposure is piling up)
-> - Knock-off % < 50% AND Refund % > Knock-off % = Flag (refund-dominant mix)
->
-> Business context — CRITICAL:
-> - Knock-off is preferred: no cash leaves the door, the return offsets future invoices.
-> - Refund is last-resort: it is real cash out, impacts working capital, and is only appropriate for ending relationships or customers with no upcoming invoices.
-> - Unsettled is where the process breaks: these returns are neither absorbed nor refunded — they are open exposure.
->
-> Evaluate:
-> - The shape of the mix — is it knock-off dominant (good), refund dominant (cash pressure), or unsettled dominant (process breakdown)?
-> - Which channel carries the majority of the resolved piece
-> - Whether the unsettled slice is large enough to warrant investigation
->
-> Cite RM values and percentages verbatim from the data block. Do NOT invent.
->
-> Provide a concise analysis focused on settlement mix quality and unresolved exposure.
-
-**Component Prompt — `rt_monthly_trend`:**
-
-> You are analyzing the "Monthly Return Trend" chart on the Returns page.
->
-> What it shows: Two area series over time for the selected period — Return Value (indigo) and Unsettled (red) — plotted by month. The chart respects the date filter.
->
-> The pre-fetched data gives you a month-by-month table with:
-> - Month
-> - Return value (RM)
-> - Unsettled (RM)
-> - CN count
->
-> Pre-calculated roll-ups you may cite directly:
-> - Total months in the period
-> - Highest / lowest month by return value (month + RM)
-> - MoM growth in return count between the first and last month of the period
-> - Peak unsettled month (month + RM)
->
-> Thresholds:
-> - Month-over-month return count growth > 25% between first and last month = Concern
-> - Unsettled rising while return value is flat or falling = Process breakdown (returns are not being closed out)
-> - Return value and unsettled moving together = Volume-driven exposure
->
-> Evaluate:
-> - Direction: are returns trending up, flat, or down across the period?
-> - Whether the unsettled line is tracking return value (normal) or diverging (process issue)
-> - Any month that stands out as an outlier (spike in count, spike in value, or spike in unsettled)
->
-> Describe the trend month-by-month or via the pre-calculated roll-ups. Do NOT invent months, values, or averages that are not in the data block.
->
-> Provide a concise analysis of the monthly pattern.
-
-**Component Prompt — `rt_product_bar`:**
-
-> You are analyzing the "Top Returns by Item" chart on the Returns page.
->
-> What it shows: A horizontal bar chart of the top 10 items most associated with returns in the period. The UI exposes toggles for dimension (All / Product / Variant / Country) and metric (Frequency / Value). For this analysis the AI is given BOTH metric views on the default item dimension — it should cover both.
->
-> The pre-fetched data gives you:
-> (A) Top 10 items by RETURN FREQUENCY (CN count) — which items break or get returned most often
-> (B) Top 10 items by RETURN VALUE (total_value RM) — which items hurt the P&L most when they are returned
-> (C) Period totals for context: total return value, total return count, top-1 item share of return value, top-10 item share of return value
->
-> Thresholds:
-> - Top 1 item > 15% of period return value = Severe concentration (one item moving the number)
-> - Top 10 items > 60% of period return value = Concentrated (few items driving the problem — fixable)
-> - Top 10 items < 40% of period return value = Diversified (broad quality issue — harder to fix)
-> - An item appearing on BOTH the top-frequency AND top-value lists = Star problem product (high occurrence AND high cost per return)
->
-> Evaluate:
-> - Concentration: is the return problem one or two items, or spread across many?
-> - Frequency vs value: do the top frequency items also dominate by value (consistent story), or are they different (some items break often but cost little, others rarely but big)?
-> - Name the items appearing on both lists explicitly — those are the highest-leverage fixes.
-> - Note that the user can drill into Product / Variant / Country dimensions via UI toggles — your analysis is on the item level only; drill-downs remain user-driven.
->
-> Cite item names and values verbatim from the data block. Do not invent.
->
-> Provide a concise analysis focused on item concentration and the frequency-vs-value pattern.
-
----
-
-### 5.10 Unsettled Returns
-
-| | |
-|---|---|
-| **Section Key** | `return_unsettled` |
-| **Page** | return |
-| **Scope** | snapshot |
-| **Tool Policy** | full |
-| **Data Sources** | pc_return_aging, pc_return_by_customer |
-| **Components** | 2 |
-
-| Key | Name | Type | What It Measures | Thresholds |
-|-----|------|------|-----------------|------------|
-| ru_aging_chart | Aging of Unsettled Returns | chart | Unsettled book by aging bucket (5 buckets, snapshot) | 91+ >25% = Watch, 180+ >10% = Write-off risk |
-| ru_debtors_table | Customer Returns | table | Per-debtor cumulative return exposure (snapshot) | Top 1 >15% unsettled = Single-point risk |
-
-**Component Prompt — `ru_aging_chart`:**
-
-> You are analyzing the "Aging of Unsettled Returns" horizontal bar chart on the Returns page.
->
-> What it shows: The current unsettled return book broken down by how long the return credit note has been sitting unresolved. Five buckets, from newest to oldest:
-> - 0-30 Days (emerald) — fresh, normal reconciliation window
-> - 31-60 Days (amber) — starting to age
-> - 61-90 Days (orange) — ageing, process slowing down
-> - 91-180 Days (red) — concerning, active follow-up needed
-> - 180+ Days (dark red) — write-off risk
->
-> This is a SNAPSHOT metric. It is cumulative across all months — NOT filtered by the date range. It reflects every unresolved return CN still open on the books as of the latest aging snapshot.
->
-> The pre-fetched data gives you:
-> - RM amount AND count in each bucket
-> - Total unsettled amount and total unsettled count (across all five buckets)
-> - % share of unsettled value in each bucket
-> - The snapshot_date the numbers were captured on
->
-> Thresholds:
-> - > 25% of unsettled value in the 91+ buckets (91-180 + 180+) = Watch — follow-up process is falling behind
-> - > 10% of unsettled value in the 180+ bucket alone = Write-off risk — amounts this old rarely get recovered in a distribution business
->
-> Evaluate:
-> - Where the weight of the unsettled book sits — is most of it fresh (0-30) or old (91+)?
-> - Whether the 180+ slice is material enough to trigger write-off review
-> - Count vs amount — many small old items vs a few large old items tell different stories
-> - If the bucket weight looks unusually skewed, tools may be used to pull prior `pc_return_aging` snapshots to see whether the skew is getting worse over time
->
-> Cite RM values and percentages verbatim from the pre-computed block. Do not invent.
->
-> Provide a concise analysis focused on where the unsettled book sits in the aging distribution and whether the oldest buckets carry write-off risk.
-
-**Component Prompt — `ru_debtors_table`:**
-
-> You are analyzing the "Customer Returns" table on the Returns page.
->
-> What it shows: Every debtor that has ever issued a return CN, with cumulative totals across all months — return count, total return value, amount knocked off against invoices, amount refunded in cash, and the unresolved balance still open. The table is sorted by unresolved amount by default. Debtors with unresolved = 0 are hidden by the default UI filter.
->
-> This is a SNAPSHOT metric. It is cumulative across all months — NOT filtered by the date range. It reflects every return ever issued that is still wholly or partially open on the books.
->
-> The pre-fetched data gives you:
-> - Total unsettled amount (sum of unresolved across all debtors)
-> - Debtor count with unresolved balance > 0
-> - Stale-debtor count — debtors where unresolved > 0 AND knock_off_total = 0 AND refund_total = 0 (never actioned)
-> - Top 1 debtor share of total unsettled (%)
-> - Top 10 debtor share of total unsettled (%)
-> - A top-5 list: debtor name, unresolved RM, knocked off RM, refunded RM
->
-> Thresholds:
-> - Top 1 debtor > 15% of total unsettled = Single-point risk — one customer dominates the exposure
-> - Top 10 debtors > 60% of total unsettled = Concentrated book — fixable with a focused collections push
-> - Stale debtors = the collections team never opened a conversation on these. Each one is a pure process failure.
->
-> Settlement-channel context (for analyzing individual top debtors):
-> - Knock-off preferred (offsets invoices, no cash out)
-> - Refund = real cash out, only appropriate for ending relationships or customers with no upcoming invoices
-> - A debtor with refund activity but still unresolved is a RED flag — cash already went out and the book still isn't clean
->
-> Evaluate:
-> - Concentration — is the unsettled book one big debtor, ten big debtors, or broadly spread?
-> - Stale-debtor count — how much process failure vs active dispute?
-> - Settlement patterns on the top 5 — who is being knocked-off vs refunded, and who has neither?
-> - If a specific debtor's number looks unusual, tools may be used to query `pc_return_by_customer` by debtor_code for a month-by-month breakdown, or drill `dbo.CN` for credit note detail
->
-> Name the top 5 debtors verbatim. Cite RM values and percentages from the pre-computed block.
->
-> Provide a concise analysis focused on concentration, stale debtors, and any red-flag settlement patterns on the top debtors.
-
----
-
-### 5.11 Expense Overview
-
-| | |
-|---|---|
-| **Section Key** | `expense_overview` |
-| **Page** | expenses |
-| **Scope** | period |
-| **Tool Policy** | aggregate_only |
-| **Data Sources** | pc_expense_monthly |
-| **Components** | 7 |
-
-| Key | Name | Type | What It Measures | Thresholds |
-|-----|------|------|-----------------|------------|
-| ex_total_costs | Total Costs | kpi | COGS + OpEx for period | YoY: <0% = Healthy, >10% = Severe |
-| ex_cogs | Cost of Sales | kpi | Variable cost (acc_type = 'CO') | COGS share 60–80% = Typical, >85% = Pressure |
-| ex_opex | Operating Costs | kpi | Semi-fixed costs (acc_type = 'EP') | YoY >10% = Concern |
-| ex_yoy_costs | vs Last Year | kpi | Year-over-year total cost change | <0% = Green, >10% = Severe |
-| ex_cost_trend | Cost Trend | chart | Monthly COGS + OpEx stacked bars | MoM >15% = Concern |
-| ex_cost_composition | Cost Composition | chart | COGS/OpEx donut with prior-year drift | COGS share drift >+3pp = margin compression |
-| ex_top_expenses | Top Expenses | chart | Top 10 GL accounts by net cost | Top 1 >30% = Severe concentration |
-
-**Component Prompt — `ex_total_costs`:**
-
-> You are analyzing the "Total Costs" KPI on the Expenses page.
->
-> What it measures: Total expense (COGS + OpEx) posted to GL in the selected period. This is a period flow — activity within the date range, not a point-in-time balance.
->
-> The pre-fetched data gives you:
-> - Total costs (RM) — COGS + OpEx combined
-> - COGS (RM) and COGS % of total
-> - OpEx (RM) and OpEx % of total
-> - Prior-year total costs for the same period
-> - YoY total-cost growth %
->
-> Thresholds (YoY total-cost growth):
-> - < 0% = Healthy — costs down year-over-year
-> - 0% to 5% = Watch — in line with typical inflation
-> - 5% to 10% = Concern — investigate drivers
-> - > 10% = Severe — costs outpacing typical inflation
->
-> COGS share thresholds:
-> - 60% to 80% = Typical fruit-distribution mix
-> - > 85% = COGS-dominated (margin-pressure risk)
-> - < 50% = OpEx-dominated (scaling inefficiency risk)
->
-> Evaluate:
-> - Whether total costs are growing, flat, or shrinking vs prior year
-> - Whether the COGS / OpEx split looks like a healthy distribution business
-> - The scale of the number in context — is this a big or small period?
->
-> Cite RM values and percentages verbatim from the data block.
->
-> Provide a concise analysis of period cost exposure.
-
-**Component Prompt — `ex_cogs`:**
-
-> You are analyzing the "Cost of Sales (COGS)" KPI on the Expenses page.
->
-> What it measures: The variable cost of products sold in the selected period — GL accounts with acc_type = 'CO'. COGS scales with sales volume, so year-over-year growth is only concerning if it outpaces sales.
->
-> The pre-fetched data gives you:
-> - COGS (RM) for the period
-> - COGS % of total costs
-> - Prior-year COGS for the same period
-> - COGS YoY growth %
-> - Top 3 COGS accounts by value (account name + acc_no + RM + % of COGS)
->
-> Thresholds:
-> - COGS share 60% to 80% of total cost = Typical
-> - COGS share > 85% of total cost = Margin-pressure risk
-> - COGS YoY growth > 15% when sales are flat/declining = Concern
->
-> Business context — CRITICAL:
-> - COGS is VARIABLE. If sales volume grew, COGS should grow too — that is normal.
-> - The question is whether COGS grew FASTER than sales (margin compression) or slower (margin improvement).
-> - The analyst reading this summary will cross-check against the sales page; flag YoY drift but do not jump to conclusions about margin without that context.
->
-> Evaluate:
-> - Scale of COGS against total costs — is the business COGS-heavy?
-> - YoY direction — up, flat, or down
-> - Which accounts dominate COGS (from the top-3 block) and whether the mix looks concentrated
->
-> Cite RM values and percentages verbatim from the data block. Do not invent accounts.
->
-> Provide a concise analysis focused on COGS scale and YoY direction.
-
-**Component Prompt — `ex_opex`:**
-
-> You are analyzing the "Operating Costs (OpEx)" KPI on the Expenses page.
->
-> What it measures: Day-to-day operating expenses in the selected period — GL accounts with acc_type = 'EP'. OpEx is semi-fixed: it scales with structural decisions (headcount, rent, tooling), not directly with sales volume.
->
-> The pre-fetched data gives you:
-> - OpEx (RM) for the period
-> - OpEx % of total costs
-> - Prior-year OpEx for the same period
-> - OpEx YoY growth %
-> - Top 3 OpEx accounts by value (account name + acc_no + RM + % of OpEx)
->
-> Thresholds:
-> - OpEx YoY growth > 10% = Concern — OpEx is semi-fixed; unexplained growth needs investigation
-> - OpEx YoY growth < 0% = Healthy — cost discipline
-> - OpEx share > 50% of total cost = OpEx-dominated (verify this is intentional scaling)
->
-> Business context — CRITICAL:
-> - OpEx is SEMI-FIXED. It should NOT scale linearly with sales. If OpEx grew 15% YoY while sales were flat, something structural changed — new headcount, new rent, new tooling. The analyst should name the driver.
-> - COGS YoY growth is more forgivable than OpEx YoY growth for the same reason.
->
-> Evaluate:
-> - OpEx scale vs total costs
-> - YoY direction — a rising OpEx is a stronger signal than rising COGS
-> - Top 3 accounts — which structural line items are driving it
->
-> Cite RM values and percentages verbatim from the data block. Do not invent accounts.
->
-> Provide a concise analysis focused on OpEx discipline and any structural-growth signals.
-
-**Component Prompt — `ex_yoy_costs`:**
-
-> You are analyzing the "vs Last Year" KPI on the Expenses page.
->
-> What it measures: Year-over-year change in total costs for the selected period, broken down into COGS and OpEx components.
->
-> The pre-fetched data gives you:
-> - Current-period total costs (RM)
-> - Prior-year same-period total costs (RM)
-> - YoY total-cost growth %
-> - Color band (Green / Amber / Red / Severe)
-> - COGS YoY: current RM, prior RM, growth %
-> - OpEx YoY: current RM, prior RM, growth %
->
-> Thresholds:
-> - < 0% = Green (Healthy — costs falling)
-> - 0% to 5% = Amber (Watch — in line with typical inflation)
-> - 5% to 10% = Red (Concern)
-> - > 10% = Severe (costs outpacing typical inflation)
->
-> Evaluate:
-> - Which band the total-cost YoY sits in
-> - Whether COGS or OpEx is driving the YoY movement (bigger absolute RM change vs bigger % change)
-> - Whether the OpEx YoY is the more alarming signal (remember: OpEx is semi-fixed; COGS YoY is more forgivable because it scales with sales)
-> - If COGS YoY > OpEx YoY, the story is "volume-driven" — the business did more sales. If OpEx YoY > COGS YoY, the story is "structural" — something changed in the cost base.
->
-> Cite RM values and percentages verbatim from the data block.
->
-> Provide a concise analysis focused on the source of the YoY movement.
-
-**Component Prompt — `ex_cost_trend`:**
-
-> You are analyzing the "Cost Trend" chart on the Expenses page.
->
-> What it shows: A stacked bar chart, one bar per month in the selected period, with COGS (one color) and OpEx (another color) stacked to show total cost. The user can toggle the underlying view by cost type (All / COGS / OpEx) — the AI is given the All view.
->
-> The pre-fetched data gives you a month-by-month table with:
-> - Month
-> - COGS (RM)
-> - OpEx (RM)
-> - Total (RM)
->
-> Pre-calculated roll-ups you may cite directly:
-> - Total months in the period
-> - Peak total-cost month (month + RM)
-> - Lowest total-cost month (month + RM)
-> - MoM cost growth % between the first and last month in the period
-> - Current-period total and prior-year same-period total, plus period YoY %
->
-> Thresholds:
-> - MoM growth (first -> last month) > 15% = Concern
-> - MoM growth > 25% = Severe
-> - Period YoY growth > 10% total = Severe
->
-> Evaluate:
-> - Direction across the period — rising, flat, falling
-> - Any month that stands out as an outlier (spike or trough)
-> - Whether COGS or OpEx carries the trend (look at which component moves more month-to-month)
-> - How the period total compares to the prior year
->
-> Describe the trend month-by-month or via the pre-calculated roll-ups. Do NOT invent months, values, or averages that are not in the data block.
->
-> Provide a concise analysis of the monthly cost pattern.
-
-**Component Prompt — `ex_cost_composition`:**
-
-> You are analyzing the "Cost Composition" chart on the Expenses page.
->
-> What it shows: A donut chart splitting total costs into COGS and OpEx slices, with RM values and percentages.
->
-> The pre-fetched data gives you:
-> - Total cost (RM)
-> - COGS (RM) and COGS %
-> - OpEx (RM) and OpEx %
-> - Mix classification (Typical / COGS-dominated / OpEx-dominated / Mixed)
-> - Prior-year composition (COGS % and OpEx % in the same period one year ago)
-> - COGS share drift in percentage points (current - prior)
->
-> Thresholds:
-> - COGS share 60% to 80% = Typical fruit-distribution mix
-> - COGS share > 85% = COGS-dominated (margin-pressure risk)
-> - COGS share < 50% = OpEx-dominated (scaling inefficiency risk)
-> - COGS share drift > +3 pp while sales flat = Margin compression signal
-> - COGS share drift < -3 pp = Either margin improvement or inventory under-investment
->
-> Evaluate:
-> - Which mix classification the period sits in
-> - How far the mix has drifted from prior year (positive drift = more COGS-heavy; negative drift = more OpEx-heavy)
-> - What the drift implies — margin compression, margin improvement, or structural change on the OpEx side
->
-> Cite RM values, percentages, and drift verbatim from the data block. Do not recompute percentages.
->
-> Provide a concise analysis of cost mix and year-over-year drift.
-
-**Component Prompt — `ex_top_expenses`:**
-
-> You are analyzing the "Top Expenses" chart on the Expenses page.
->
-> What it shows: A horizontal bar chart of the top 10 GL accounts by net cost in the selected period, with bars colored by cost type (COGS vs OpEx). The UI exposes toggles for cost type (All / COGS / OpEx) and direction (Top / Bottom). The AI is given the All / Top view — drill-downs remain user-driven.
->
-> The pre-fetched data gives you:
-> - Total costs (RM) for context
-> - Top 10 accounts table: rank, account name, acc_no, cost type (COGS or OPEX), net cost (RM), and % of total
-> - Top 1 account share of total costs
-> - Top 10 accounts share of total costs (sum + %)
-> - Concentration classification (Severe / Concentrated / Moderate / Diversified)
-> - Mix in top 10: how many are COGS accounts, how many are OpEx
->
-> Thresholds:
-> - Top 1 account > 30% of total costs = Severe (single-account risk)
-> - Top 1 account 15% to 30% = Concentrated
-> - Top 10 accounts > 75% of total = Concentrated (few accounts drive the cost base — fixable)
-> - Top 10 accounts < 50% of total = Diversified (broad cost base — harder to attack)
->
-> Evaluate:
-> - Concentration: is the cost pain concentrated in a handful of accounts, or spread across many?
-> - Mix: is the top 10 dominated by COGS (volume-driven — scales with sales) or OpEx (structural — investigate)?
-> - Any single-account outlier that accounts for > 15% of total cost — name it and flag it
->
-> Name accounts from the top-10 table verbatim. Do not invent accounts or change acc_no values.
->
-> Provide a concise analysis focused on concentration and the COGS-vs-OpEx mix at the top.
-
----
-
-### 5.12 Expense Breakdown
-
-| | |
-|---|---|
-| **Section Key** | `expense_breakdown` |
-| **Page** | expenses |
-| **Scope** | period |
-| **Tool Policy** | full |
-| **Data Sources** | pc_expense_monthly |
-| **Components** | 2 |
-
-| Key | Name | Type | What It Measures | Thresholds |
-|-----|------|------|-----------------|------------|
-| ex_cogs_table | Cost of Sales Breakdown | table | Every COGS GL account with share of total | Top 1 >50% = Severe |
-| ex_opex_table | Operating Costs Breakdown | table | Every OpEx GL account grouped by category taxonomy | Top 1 category >50% = Dominant |
-
-**Component Prompt — `ex_cogs_table`:**
-
-> You are analyzing the "Cost of Sales Breakdown" table on the Expenses page.
->
-> What it shows:
-> - A sortable table of every active GL account with acc_type = 'CO' (Cost of Sales) for the selected period.
-> - Columns: Account No, Account Name, Net Cost (RM), % of Total COGS.
-> - The user can also see this side-by-side with the OpEx Breakdown via a tab.
->
-> The pre-fetched data gives you:
-> - Total COGS for the period
-> - Active COGS account count (and a "thin surface" flag if < 5)
-> - Top 10 COGS accounts table: rank, name, acc_no, net cost, % of total COGS
-> - Pre-computed Top 1 / Top 3 / Top 10 share of total COGS, with classification labels
-> - Any negative-value COGS accounts (usually credit notes or reversals)
->
-> Thresholds:
-> - Top 1 account > 50% of COGS = Severe (single-account exposure in variable cost base)
-> - Top 1 account 30-50% = Concentrated (typical for dominant-fruit sourcing — not automatically bad)
-> - Top 1 account < 15% = Diversified
-> - Top 3 accounts > 80% of COGS = Concentrated (normal for a focused distributor)
-> - Top 3 accounts < 55% = Diversified (broad sourcing)
-> - Active COGS accounts < 5 = Thin COGS surface (limited line-item visibility — flag for GL discipline)
-> - Any account with negative net_cost = Flag (name it — likely a credit note posted to expense)
->
-> Evaluate:
-> - Concentration: where does the variable-cost dollar actually land? If Top 1 dominates, name it — a unit-price change on that one account moves the whole COGS line.
-> - Top 3 mix: is the tail meaningfully contributing, or is this a 3-account story?
-> - Negative-value accounts: are any reversals large enough to distort the apparent total?
-> - Do NOT compare to prior year here — that is the Expense Overview job. Focus on the structure of the period's COGS.
->
-> Name accounts verbatim from the top-10 table. Do not invent accounts or change acc_no values.
->
-> Provide a concise analysis focused on COGS concentration and any negative-value anomalies.
-
-**Component Prompt — `ex_opex_table`:**
-
-> You are analyzing the "Operating Costs Breakdown" table on the Expenses page.
->
-> What it shows:
-> - A category-grouped table of every active GL account with acc_type = 'EP' (Operating Costs) for the selected period.
-> - Accounts are grouped under a fixed category taxonomy (People & Payroll, Vehicle & Transport, Property & Utilities, Depreciation, Office & Supplies, Equipment & IT, Insurance, Finance & Banking, Professional Fees, Marketing & Entertainment, Repair & Maintenance, Tax & Compliance, Other).
-> - Columns: Category / Account, Account Name, Net Cost (RM), % of Total OpEx. Categories are collapsible.
->
-> The pre-fetched data gives you:
-> - Total OpEx for the period
-> - Active OpEx account count and active category count
-> - Category subtotals table: category, account count, subtotal, % of OpEx (sorted by subtotal desc)
-> - Top 10 OpEx accounts across all categories: rank, category, name, acc_no, net cost, % of OpEx
-> - Pre-computed Top 1 category share, Top 1 / Top 3 account shares, with classification labels
-> - Singleton categories (only 1 account) and any negative-value accounts
->
-> Thresholds:
-> - Top 1 category > 50% of OpEx = Dominant (one cost center carries the base)
-> - Top 1 category 30-50% = Typical dominance (usually People & Payroll, Vehicle & Transport, or Property & Utilities)
-> - Top 1 category < 20% = Diversified across categories
-> - Top 1 account > 20% of total OpEx = Single-account risk (name it)
-> - Top 3 accounts > 50% = Concentrated
-> - Any category with only 1 account = Flag (possible misclassification or sparse data)
-> - Any account with negative net_cost = Flag (name it — likely a reversal)
->
-> Evaluate:
-> - Category concentration: which category dominates? For a Malaysian fruit distributor, People & Payroll or Vehicle & Transport dominating is normal; Marketing & Entertainment dominating is not.
-> - Single-account risk: is the dominant category driven by many accounts, or one line item? Name the account if Top 1 > 20%.
-> - Structural signals: any category that looks out of proportion for a distribution business is an investigation lead.
-> - Singleton categories and negative accounts are data-quality flags, not business signals — call them out if present but keep them brief.
-> - Do NOT compare to prior year — that is the Expense Overview job.
->
-> Name categories and accounts verbatim from the pre-fetched blocks. Do not invent.
->
-> Provide a concise analysis focused on category concentration, single-account risk, and any data-quality flags.
-
----
-
-### 5.13 Financial Overview
-
-| | |
-|---|---|
-| **Section Key** | `financial_overview` |
-| **Page** | financial |
-| **Scope** | fiscal_period |
-| **Tool Policy** | aggregate_only |
-| **Data Sources** | pc_pnl_period |
-| **Components** | 2 |
-
-| Key | Name | Type | What It Measures | Thresholds |
-|-----|------|------|-----------------|------------|
-| fin_pnl_summary | P&L Summary | kpi | Full P&L waterfall for fiscal window | Multiple margin thresholds |
-| fin_monthly_trend | Monthly P&L Trend | chart | Monthly Net Sales, COGS, GP, OpEx, Operating Profit | Any loss month = Watch |
-
-**Component Prompt — `fin_pnl_summary`:**
-
-> You are analyzing the "P&L Summary" on the Financial page.
->
-> What it shows: A full P&L waterfall for the selected fiscal window — Net Sales, Cost of Sales, Gross Profit, Operating Costs, Operating Profit, Other Income, and Net Profit — each with current RM, prior-year RM, YoY %, and margin/ratio.
->
-> Thresholds:
-> - Gross margin: < 15% Severe / 15-20% Watch / 20-25% Typical / > 25% Strong
-> - OpEx ratio: < 10% Lean / 10-18% Typical / 18-25% Elevated / > 25% Severe
-> - Operating margin: < 0% Severe (loss) / 0-5% Thin / 5-10% Healthy / > 10% Strong
-> - Net margin: < 0% Severe / 0-3% Thin / 3-7% Healthy / > 7% Strong
-> - COGS share: 60-80% = Typical / > 85% = Margin pressure
->
-> Evaluate (top to bottom):
-> 1. Top-line: Is Net Sales growing or contracting YoY?
-> 2. Cost pressure: Is COGS growing faster than Net Sales? (rising COGS share = margin compression)
-> 3. Gross Profit: Both RM and margin %. RM up + margin down = volume masking cost erosion.
-> 4. OpEx: Is the ratio drifting up? OpEx growing faster than sales = scaling inefficiency.
-> 5. Operating Profit: Positive or negative? This is the core-business read.
-> 6. Earnings quality: If Net Profit >> Operating Profit, the delta is Other Income (non-operating). Core business may be weaker than headline.
->
-> Cite RM values and percentages from the waterfall table. Provide a concise analysis covering all P&L layers.
-
-**Component Prompt — `fin_monthly_trend`:**
-
-> You are analyzing the "Monthly P&L Trend" chart on the Financial page.
->
-> What it shows: A monthly time series across the selected fiscal window (full FY / YTD / last 12 months), with Net Sales, COGS, Gross Profit, OpEx, and Operating Profit for each month.
->
-> The pre-fetched data gives you a month-by-month table with:
-> - Month label (fiscal order: Mar -> Feb)
-> - Net Sales, COGS, Gross Profit, OpEx, Operating Profit (RM)
->
-> Pre-calculated roll-ups you may cite directly:
-> - Months in window (split into profit months vs loss months)
-> - Peak operating-profit month and value
-> - Lowest operating-profit month and value
-> - First-to-last Net Sales growth %
-> - First-to-last Operating Profit growth %
->
-> Thresholds:
-> - Any single loss month = Watch signal (call it out by name)
-> - Loss months / total months > 30% = Concern
-> - First-to-last Operating Profit decline > 25% = Severe
->
-> Evaluate:
-> - Direction: is the series rising, flat, falling, or oscillating?
-> - Loss months: are there any? Which ones? Are they clustered (seasonal / event-driven) or scattered?
-> - Divergence: does the Net Sales trend line move with or against the Operating Profit trend line? If sales are rising but operating profit is falling, that's margin compression in action.
-> - Use the pre-calculated first-to-last growth for the headline direction. Do NOT invent averages over arbitrary sub-windows.
->
-> Describe the trend month-by-month or via the pre-calculated roll-ups. Do NOT invent months, values, or averages that are not in the data block.
->
-> Provide a concise analysis focused on direction, loss months, and any sales-vs-profit divergence.
-
----
-
-### 5.14 Profit & Loss Detail
-
-| | |
-|---|---|
-| **Section Key** | `financial_pnl` |
-| **Page** | financial |
-| **Scope** | fiscal_period |
-| **Tool Policy** | aggregate_only |
-| **Data Sources** | pc_pnl_period |
-| **Components** | 2 |
-
-| Key | Name | Type | What It Measures | Thresholds |
-|-----|------|------|-----------------|------------|
-| fin_pl_statement | Profit & Loss Statement | table | Full P&L by account type with YoY | Group YoY >+/-15% = Material |
-| fin_yoy_comparison | Multi-Year Comparison | table | 4-fiscal-year P&L with CAGR + margin drift | 3+ consecutive NP declines = Severe |
-
-**Component Prompt — `fin_pl_statement`:**
-
-> You are analyzing the "Profit & Loss Statement" table on the Financial page.
->
-> What it shows: The full P&L statement for the selected fiscal year against the prior fiscal year (YTD-aligned to the latest period with data). The table groups general-ledger accounts by account type (Sales, Sales Adjustments, Cost of Sales, Other Income, Operating Costs / OpEx, Taxation) and shows group subtotals, Gross Profit / (Loss), Net Profit / (Loss), and Net Profit After Tax with YoY.
->
-> The pre-fetched data gives you:
-> - Group subtotals (current YTD vs prior YTD) for every non-empty group, with YoY %
-> - Derived totals: Gross Profit, Net Profit (pre-tax), Net Profit After Tax
-> - Gross Margin % and Net Margin % (current vs prior, with drift in percentage points)
-> - Sign-flip flags for GP / NP / NPAT (when any of these switch between positive and negative YoY)
-> - Top 5 detail-account movers, ranked by absolute RM delta
->
-> Thresholds:
-> - Group YoY subtotal: < +/-5% Flat / +/-5-15% Moderate / > +/-15% Material
-> - Gross Margin drift: +/-3pp Material / +/-5pp Severe
-> - Net Margin drift: +/-2pp Material / +/-3pp Severe
-> - Any sign flip on GP / NP / NPAT = Severe (always call out by name)
->
-> Evaluate:
-> - Which groups drive the RM direction (e.g. "Net Sales up RM X, offset by OpEx up RM Y")?
-> - Margin expansion vs compression: did Gross Margin / Net Margin drift meaningfully, and in which direction?
-> - Which 1-2 named accounts from the top-5 movers list explain the biggest swings?
->
-> Hard rules:
-> - You may only cite account names that appear in the pre-fetched "Top 5 detail-account movers" list. Do NOT invent other account names.
-> - Do NOT recompute YoY % — the figures in the data block are authoritative.
-> - If you want to explain WHY a group moved, cite the top mover(s) inside that group from the list.
->
-> Provide a concise structural analysis — the director wants to know "where did the RM go" and "is the margin healthier or sicker."
-
-**Component Prompt — `fin_yoy_comparison`:**
-
-> You are analyzing the "Multi-Year Comparison" table + small-multiples chart on the Financial page.
->
-> What it shows: A 4-fiscal-year view of the core P&L line items — Net Sales, COGS, Gross Profit, Gross Margin %, Other Income, Operating Costs, Net Profit, Net Margin %, Taxation, Net Profit After Tax — for the selected FY and the three prior FYs.
->
-> The pre-fetched data gives you:
-> - A row per FY x 10 line items (RM and %), with partial FYs marked with an asterisk
-> - Pre-calculated roll-ups over the FULL-FY rows only (partial FYs excluded):
->   - Net Sales CAGR (first -> last full FY)
->   - Gross Margin drift (pp) and Net Margin drift (pp), first -> last full FY
->   - Longest consecutive Net Profit decline streak (years)
->   - Longest consecutive Net Profit improvement streak (years)
->   - NPAT sign-flip count in the window
->
-> Thresholds:
-> - Net Sales CAGR: < -5% Declining / -5 to 5% Flat / 5-15% Growing / > 15% Fast growth
-> - Net Profit direction: 3+ consecutive declines = Severe / 3+ consecutive improvements = Strong
-> - Gross Margin drift (first -> last full FY): > +/-3pp = Material structural change
-> - Net Margin drift (first -> last full FY): > +/-2pp = Material
-> - Any NPAT sign flip in the window = Severe
->
-> Evaluate:
-> - Trajectory: what is the multi-year direction of the top line (Net Sales CAGR)?
-> - Earnings quality: is Net Profit improving, oscillating, or declining? Cite the longest streak.
-> - Margin structure: has the business become more or less profitable per RM of sales across the window?
->
-> Hard rules:
-> - Partial FYs (marked with *) are EXCLUDED from CAGR and direction roll-ups. You may list them in the table narrative but must NOT include them in trend claims.
-> - Use the pre-calculated CAGR and drift figures for headline direction. Do NOT recompute growth over arbitrary sub-windows or invent averages.
-> - Do NOT claim a streak longer than the pre-calculated values.
->
-> Provide a concise multi-year narrative — growth trajectory, earnings direction, and margin evolution.
-
----
-
-### 5.15 Balance Sheet
-
-| | |
-|---|---|
-| **Section Key** | `financial_balance_sheet` |
-| **Page** | financial |
-| **Scope** | fiscal_period |
-| **Tool Policy** | aggregate_only |
-| **Data Sources** | pc_pnl_period |
-| **Components** | 2 |
-
-| Key | Name | Type | What It Measures | Thresholds |
-|-----|------|------|-----------------|------------|
-| bs_trend | Assets, Liabilities & Equity Trend | chart | Monthly Assets/Liabilities/Equity series | Liabilities > Assets = Severe |
-| bs_statement | Balance Sheet Statement | table | Full BS with solvency ratios | Current Ratio <1.0 = Severe |
-
-**Component Prompt — `bs_trend`:**
-
-> You are analyzing the "Assets, Liabilities & Equity Trend" line chart on the Financial page.
->
-> What it shows: A monthly time series across the selected fiscal window (full FY / YTD / last 12 months), with three lines — Total Assets, Total Liabilities, and Equity — rebuilt for each month from opening balance + cumulative movements through pc_pnl_period.
->
-> The pre-fetched data gives you:
-> - A month-by-month table (fiscal order) of Total Assets, Total Liabilities, Equity (RM)
-> - Pre-calculated roll-ups you may cite directly:
->   - Months in window
->   - First-to-last Total Assets growth %
->   - First-to-last Total Liabilities growth %
->   - First-to-last Equity growth %
->   - Gearing (Total Liabilities / Total Assets): first value, last value, and drift in pp
->   - Longest consecutive Equity-decline streak (months)
->   - Any months where Total Liabilities exceeded Total Assets (negative-equity flag)
->
-> Thresholds:
-> - Asset trajectory (first->last): < -5% Shrinking / +/-5% Flat / 5-15% Growing / > 15% Fast growth
-> - Equity direction: first->last declining = Watch / 3+ consecutive decline months = Severe
-> - Liability vs Asset divergence: Liabilities growing > 10% while Assets flat/shrinking = Material / > 20% = Severe
-> - Gearing drift: > +3pp Material deterioration / > +5pp Severe
-> - Any month where Total Liabilities > Total Assets = Severe (insolvency — always call out by month name)
->
-> Evaluate:
-> - Direction: are the three lines rising, flat, falling, or diverging from one another?
-> - Leverage: is the business taking on more debt relative to its asset base? Cite gearing drift.
-> - Equity health: is equity building, holding, or eroding? Cite the decline streak.
->
-> Hard rules:
-> - Use the pre-calculated first-to-last growth and gearing drift for headline direction. Do NOT recompute averages over arbitrary sub-windows.
-> - If there are negative-equity months in the pre-fetched list, you MUST call them out by month name.
-> - Do NOT invent months, values, or ratios that are not in the data block.
->
-> Provide a concise structural analysis — the director wants to know "is the balance sheet strengthening or weakening, and is leverage moving in the right direction."
-
-**Component Prompt — `bs_statement`:**
-
-> You are analyzing the "Balance Sheet Statement" table on the Financial page.
->
-> What it shows: The full balance sheet for the selected fiscal year vs 12 periods prior (YTD-aligned snapshot). Eight line items by account type — Fixed Assets, Other Assets, Current Assets, Current Liabilities, Long Term Liabilities, Other Liabilities, Capital, Retained Earnings (including current-year P&L) — plus derived totals and key solvency ratios.
->
-> The pre-fetched data gives you:
-> - Line items (current vs prior) with RM delta and YoY % for every non-zero line
-> - Derived totals: Net Current Assets, Total Assets, Total Liabilities, Total Equity (current + prior)
-> - Key ratios (current + prior + drift):
->   - Current Ratio (Current Assets / Current Liabilities)
->   - Debt-to-Equity (Total Liabilities / Total Equity)
->   - Equity Ratio (Total Equity / Total Assets)
-> - Sign-flip flags for Net Current Assets and Total Equity
-> - Top 3 biggest |delta RM| line-item movers across the 8 line items
->
-> Thresholds:
-> - Line-item YoY: < +/-5% Flat / +/-5-15% Moderate / > +/-15% Material
-> - Current Ratio: < 1.0 Severe / 1.0-1.2 Thin / 1.2-2.0 Healthy / > 2.0 Strong / YoY drift > +/-0.3 = Material
-> - Debt-to-Equity: < 0.5 Conservative / 0.5-1.0 Typical / 1.0-2.0 Leveraged / > 2.0 Severe / YoY drift > +/-0.3 = Material
-> - Equity Ratio: < 20% Severe / 20-40% Thin / 40-60% Healthy / > 60% Strong / YoY drift > +/-5pp = Material
-> - Net Current Assets sign flip (pos->neg) = Severe (working-capital failure, always call out)
-> - Total Equity sign flip = Severe (insolvency, always call out)
->
-> Evaluate:
-> - Liquidity: does the Current Ratio sit in the Healthy band, and is it drifting toward safer or thinner ground?
-> - Leverage: where does Debt-to-Equity sit, and is it moving up or down vs prior?
-> - Solvency cushion: is the Equity Ratio thick enough, and is it thickening or eroding?
-> - Drivers: which 1-2 named line items from the top-3 movers explain the biggest RM swings?
->
-> Hard rules:
-> - You may only cite line-item names that appear in the pre-fetched "Top 3 biggest movers" list. Do NOT invent other account names.
-> - Do NOT recompute YoY % or ratios — the figures in the data block are authoritative.
-> - If you want to explain WHY Total Assets or Total Liabilities moved, cite the relevant mover(s) from the list.
->
-> Provide a concise structural read — the director wants to know "is the balance sheet stronger or weaker than a year ago, and what drove the change."
-
----
-
-### 5.16 Variance, Forecast & Budget
-
-| | |
-|---|---|
-| **Section Key** | `financial_variance` |
-| **Page** | financial |
-| **Scope** | fiscal_period |
-| **Tool Policy** | aggregate_only |
-| **Data Sources** | pc_pnl_period, budget table |
-| **Components** | 4 |
-
-| Key | Name | Type | What It Measures | Thresholds |
-|-----|------|------|-----------------|------------|
-| fv_variance_summary | P&L Variance Summary | kpi | Actual vs prior year + budget (if exists) | +/-5% = On Track, >+/-15% = Material |
-| fv_variance_breakdown | Variance by Account | table | Account-level variance drivers per category | Top 3 >70% = Highly concentrated |
-| fv_trend_forecast | Trend Forecast | kpi | 12-month projection (weighted moving average) | Consistent 4+ months = Strong signal |
-| fv_budget_suggestions | AI Budget Suggestions | kpi | AI-generated annual budget based on actuals | Compare against approved budget if exists |
-
-**Special behavior:** After analysis completes for this section, a "Save as Budget" button appears allowing the user to approve the AI-generated budget suggestions for the fiscal year. See §16 for details.
-
-**Component Prompt — `fv_variance_summary`:**
-
-> You are analyzing the "P&L Variance Summary" on the Financial page.
->
-> What it shows: A comparison of the current fiscal window's P&L performance against TWO baselines:
-> 1. **YoY Variance** — actual vs same window in the prior fiscal year
-> 2. **Budget Variance** — actual vs approved budget (only present if a budget has been approved for this fiscal year)
->
-> The pre-fetched data gives you:
-> - YoY variance table: each line item (Net Sales, COGS, Gross Profit, OpEx, Operating Profit, Other Income, Net Profit) shows Actual, Baseline (prior year same window), Variance (RM), Variance %, and Status (Favourable / Unfavourable)
-> - Budget variance table (if present): each line item shows Actual, Budget, Variance (RM), Variance %, and Status
-> - Favourable/Unfavourable classification logic:
->   - Revenue lines (Net Sales, Gross Profit, Operating Profit, Net Profit, Other Income): higher actual = Favourable
->   - Cost lines (COGS, Operating Costs): lower actual = Favourable
-> - Margin comparisons: Gross Margin % and Net Margin % (current vs baseline, drift in pp)
->
-> Thresholds:
-> - Variance within +/-5% = On Track
-> - Variance +/-5-15% = Moderate deviation
-> - Variance beyond +/-15% = Material deviation
-> - Any sign flip (profit -> loss or vice versa) = Severe
->
-> Evaluate:
-> - Which P&L line items deviated most from baseline, and in which direction?
-> - Is the deviation favourable or unfavourable for the business?
-> - Are margin percentages improving or deteriorating vs the same period last year?
-> - If budget variance is present: how does actual performance compare to the approved budget? Are we on track, over, or under budget?
-> - What is the overall picture — is the business performing better or worse?
->
-> Hard rules:
-> - For YoY variance: always state the baseline is "same period last year"
-> - For budget variance: clearly label it as comparison against the "approved budget"
-> - Cite only figures from the pre-fetched data block. Do NOT invent numbers.
-> - Do NOT recompute variance % — the figures in the data block are authoritative.
-> - If no budget variance section is present, do NOT mention budgets — only analyze YoY variance
->
-> Provide a concise variance summary — the director wants to know "am I on track compared to last year and my budget, and where are the biggest gaps."
-
-**Component Prompt — `fv_variance_breakdown`:**
-
-> You are analyzing the "Variance by Account" breakdown on the Financial page.
->
-> What it shows: A detailed account-level breakdown of P&L variance, showing which specific GL accounts within each category (Sales, COGS, OpEx, Other Income) contributed most to the overall variance. This answers the question "which specific accounts drove the difference from last year."
->
-> The pre-fetched data gives you:
-> - Per-account-type sections (COGS accounts, OpEx accounts, etc.)
-> - For each account: current amount, baseline (prior year), variance RM, variance %, and favourable/unfavourable status
-> - Accounts sorted by absolute variance (biggest movers first)
-> - Only accounts with non-zero variance are shown
->
-> Thresholds:
-> - Single account driving > 30% of category variance = Concentrated risk
-> - Top 3 accounts driving > 70% of category variance = Highly concentrated
-> - Any account with variance > +/-50% = Flag for investigation
->
-> Evaluate:
-> - Within each P&L category, which 1-3 named accounts are the biggest movers?
-> - Is the variance concentrated in a few accounts or spread across many?
-> - Are there any accounts with unusually large percentage swings that warrant attention?
->
-> Hard rules:
-> - You may only cite account names that appear in the pre-fetched data. Do NOT invent account names.
-> - Cite RM amounts and percentages exactly as given. Do NOT recompute.
-> - Focus on the top movers — do not narrate every small account.
->
-> Provide a concise account-level analysis — the director wants to know "which specific accounts explain the variance, and should any of them concern me."
-
-**Component Prompt — `fv_trend_forecast`:**
-
-> You are analyzing the "Multi-Period Trend Forecast" on the Financial page.
->
-> What it shows: A forward projection of key P&L line items (Net Sales, Gross Profit, Net Profit) for the NEXT 12 MONTHS, based on the trend observed over recent months. The forecast numbers are computed by the system from historical data — they are NOT generated by you. Your job is to EXPLAIN the forecasts, not to invent them.
->
-> The pre-fetched data gives you:
-> - Monthly trend table for the last several months: Net Sales, Gross Profit, Net Profit per month
-> - Pre-computed 12-month forecast table: Month+1 through Month+12 projections for each line item
-> - The method used: 3-month weighted moving average (50% most recent month, 30% prior, 20% earliest)
-> - Trend direction + signal strength: rising/falling/flat, Strong/Weak
-> - Confidence band: Narrowing (consistent trend) or Widening (volatile trend)
-> - Per-metric detail: weighted average change, last actual, key forecast milestones (Month+1, +3, +6, +12)
->
-> Thresholds:
-> - Trend direction consistent for 4+ months = Strong signal
-> - Trend direction mixed or oscillating = Weak signal (state this)
-> - Forecast projects a sign flip (profit -> loss) = Severe warning
-> - Month+4 onwards carry increasing uncertainty — state this explicitly
-> - Month+7 to Month+12 are long-range estimates — caution the reader about reliability
->
-> Evaluate:
-> - For each line item, describe the recent trend direction in plain language
-> - Highlight key forecast milestones: Month+1 (near-term), Month+3 (quarter), Month+6 (half-year), Month+12 (full-year)
-> - Flag if the trend is strong (consistent direction) or weak (mixed signals)
-> - Explicitly note that longer-range forecasts are less reliable
-> - If any forecast month projects a loss or a sign flip, call it out explicitly
->
-> Hard rules:
-> - The forecast numbers are PRE-COMPUTED in the data block. Do NOT invent your own projections.
-> - Always include the disclaimer: these are AI estimates based on historical trends, not formal financial projections
-> - Do NOT claim precision — use "approximately" or "around" when stating forecast values
-> - Summarise the 12-month trajectory — do NOT list all 12 months individually, focus on key milestones (Month+1, +3, +6, +12)
->
-> Provide a concise forecast explanation — the director wants to know "based on recent trends, what should I expect over the next 12 months, and how confident should I be as we look further out."
-
-**Component Prompt — `fv_budget_suggestions`:**
-
-> You are analyzing "AI Budget Suggestions" on the Financial page.
->
-> What it shows: AI-generated budget suggestions for the next fiscal period, derived from historical P&L data. The system computes monthly averages from current-period actuals and annualises them to produce suggested annual budgets for each P&L category.
->
-> The pre-fetched data gives you:
-> - Headline P&L budget suggestions: Net Sales, Cost of Sales, Gross Profit, Operating Costs, Net Profit — each with current-period actual, prior-period actual, YoY growth %, suggested monthly and annual budget
-> - Category-level budget suggestions: per account type (Sales, COGS, OpEx, Other Income) with the same columns plus trend direction and signal strength
-> - Trend direction: rising / falling / flat for each category, with strong/weak signal based on month-over-month consistency
-> - If an approved budget exists: a comparison table showing approved vs suggested amounts with differences
->
-> Evaluate:
-> - Which categories show strong, consistent trends that make the budget suggestion more reliable?
-> - Which categories have weak or volatile trends where the suggestion should be treated with caution?
-> - Are there categories where YoY growth is significantly positive or negative — and should the budget account for that trajectory?
-> - What is the overall picture — is the business growing, contracting, or stable?
-> - Highlight any categories where the suggested budget differs materially from the prior year
-> - If an approved budget exists, flag any material differences between the approved budget and the latest suggestions — this indicates the budget may need updating
->
-> Hard rules:
-> - The budget suggestions are PRE-COMPUTED in the data block. Do NOT invent your own numbers.
-> - If no approved budget exists: frame suggestions as "starting points for budget discussions" and note that no budget has been approved yet
-> - If an approved budget exists: compare suggestions against the approved budget and highlight discrepancies
-> - Cite only figures from the pre-fetched data block. Do NOT recompute.
->
-> Provide a concise budget overview — the director wants to know "based on our recent performance, what should we budget for next year, and where are the biggest uncertainties."
-
----
-
-## 6. Deterministic Summary Questions
-
-Each section has fixed questions the AI must answer during summary synthesis. This makes the summary output predictable — same data always answers the same questions. See doc 10, §16 for the shared pattern.
-
-| Section | Summary Questions |
-|---------|-------------------|
-| payment_collection_trend | 1. Is avg collection days improving or worsening vs last month? 2. Is collection rate above or below 80%? 3. Which month had the worst collection? |
-| payment_outstanding | 1. How much total is outstanding? 2. What % is in the >60 days bucket? 3. Which customers have the highest outstanding? |
-| sales_trend | 1. Is net sales up or down vs last month and vs same month last year? 2. What's the month-over-month growth rate? |
-| sales_breakdown | 1. Does the top customer exceed 25% of total sales? 2. Which product category drives the most revenue? 3. Is credit note ratio below 1%? |
-| customer_margin_overview | 1. Is overall gross margin above 15%? 2. Is margin trending up or down over the last 3 months? 3. How many customers have negative margin? |
-| customer_margin_breakdown | 1. Who are the top 3 customers by gross profit? 2. Who are the bottom 3 by margin %? 3. Any customer with margin below 5%? |
-| supplier_margin_overview | 1. Is supplier margin above 10%? 2. Is margin trending up or down? 3. How many suppliers have negative margin? |
-| supplier_margin_breakdown | 1. Which supplier gives the best margin? 2. Which items have the biggest gap between purchase and selling price? 3. Any supplier with margin below 5%? |
-| return_trend | 1. Is return rate above 5%? 2. Is the return trend increasing or decreasing? 3. Which items have the most returns? |
-| return_unsettled | 1. How much total unsettled returns? 2. What % is older than 60 days? 3. Which customers have the most unsettled returns? |
-| expense_overview | 1. Is total cost up or down vs same period last year? 2. Which cost category grew the most? 3. What are the top 3 expenses? |
-| expense_breakdown | 1. What's the COGS to revenue ratio? 2. Which OpEx line item is the largest? 3. Any expense category with >10% YoY increase? |
-| financial_overview | 1. Is net profit positive or negative? 2. Is profit margin improving or declining? |
-| financial_pnl | 1. Which revenue line changed the most vs last year? 2. Which expense line changed the most? 3. Is gross profit margin stable? |
-| financial_balance_sheet | 1. Are total assets growing? 2. Is current ratio above 1.5 (can pay short-term debts)? 3. Is debt increasing or decreasing? |
-| financial_variance | 1. Which accounts missed budget by more than 15%? 2. Is the total variance favorable or unfavorable? 3. What's the biggest single variance item? |
-
----
-
-## 7. Tool Policy
-
-The tool policy controls whether the LLM can make database queries during analysis. See doc 10, §7 for the shared tool-use system.
-
-### Three Tiers
-
-| Tier | What the LLM Can Do | When Used |
-|------|---------------------|-----------|
-| `none` | No tool access. LLM receives only the pre-fetched data block. | Not used in Finance (all sections have at least aggregate_only). |
-| `aggregate_only` | Can query local PostgreSQL `pc_*` tables only. No RDS access. | "Overview" sections and all Financial sections. Data is already pre-aggregated, so tools are rarely needed. |
-| `full` | Can query both local `pc_*` tables AND remote RDS `dbo.*` tables. | "Breakdown" sections and snapshot sections. Used for root-cause investigation (e.g. "which customers drove this spike?"). |
-
-### Per-Section Assignments
-
-| Section Key | Policy | Accessible Tables | Rationale |
-|-------------|--------|-------------------|-----------|
-| payment_collection_trend | aggregate_only | pc_ar_monthly | Trend data is pre-aggregated monthly. No drill-down needed. |
-| payment_outstanding | full | All local pc_* + all RDS dbo.* | Snapshot section needs customer-level drill-down for credit health investigation. |
-| sales_trend | aggregate_only | pc_sales_daily | Daily sales are pre-aggregated. Trend analysis needs no raw transactions. |
-| sales_breakdown | full | All local pc_* + all RDS dbo.* | Breakdown needs customer/product/agent drill-down from raw invoices. |
-| customer_margin_overview | aggregate_only | pc_customer_margin | Overview KPIs and trend from pre-computed margin data. |
-| customer_margin_breakdown | full | All local pc_* + all RDS dbo.* | Per-customer margin analysis may need raw transaction drill-down. |
-| supplier_margin_overview | aggregate_only | pc_supplier_margin | Overview KPIs and trend from pre-computed supplier data. |
-| supplier_margin_breakdown | full | All local pc_* + all RDS dbo.* | Per-supplier/item pricing analysis needs raw invoice line items. |
-| return_trend | aggregate_only | pc_return_monthly, pc_return_products | Return trends are pre-aggregated monthly + by product. |
-| return_unsettled | full | All local pc_* + all RDS dbo.* | Snapshot needs debtor-level drill-down and credit note detail. |
-| expense_overview | aggregate_only | pc_expense_monthly | Expense data is pre-aggregated by GL account and month. |
-| expense_breakdown | full | All local pc_* + all RDS dbo.* | GL account breakdown may need transaction-level detail. |
-| financial_overview | aggregate_only | pc_pnl_period | P&L waterfall from pre-computed period data. |
-| financial_pnl | aggregate_only | pc_pnl_period | P&L statement from pre-computed period data. |
-| financial_balance_sheet | aggregate_only | pc_pnl_period | Balance sheet from pre-computed period data. |
-| financial_variance | aggregate_only | pc_pnl_period | Variance analysis from pre-computed period data. |
-
-**Pattern:** "Overview" sections use `aggregate_only`. "Breakdown" and snapshot sections use `full`. All Financial sections use `aggregate_only` because pc_pnl_period contains all needed data.
-
----
-
-## 8. Data Source Tables
-
-### 8.1 Local PostgreSQL (pre-computed, `pc_*`)
-
-These tables live in the local PostgreSQL database (DATABASE_URL). They are pre-computed by sync jobs and contain aggregated data ready for analysis.
-
-| Table | Module | Key Columns |
-|-------|--------|-------------|
-| pc_sales_daily | Sales | doc_date, invoice_total, cash_total, cn_total, net_revenue, doc_count |
-| pc_sales_by_customer | Sales | doc_date, debtor_code, company_name, debtor_type, sales_agent, invoice_sales, cash_sales, credit_notes, total_sales |
-| pc_sales_by_outlet | Sales | doc_date, dimension, dimension_key, dimension_label, invoice_sales, cash_sales, credit_notes, total_sales, customer_count |
-| pc_sales_by_fruit | Sales | doc_date, fruit_name, fruit_country, fruit_variant, invoice_sales, cash_sales, credit_notes, total_sales, total_qty |
-| pc_ar_monthly | Payment | month, invoiced, collected, cn_applied, refunded, total_outstanding, total_billed, customer_count |
-| pc_ar_customer_snapshot | Payment | debtor_code, company_name, debtor_type, sales_agent, credit_limit, total_outstanding, overdue_amount, credit_score, risk_tier |
-| pc_ar_aging_history | Payment | snapshot_date, bucket, dimension, dimension_key, invoice_count, total_outstanding |
-| pc_customer_margin | Customer Margin | month, debtor_code, company_name, iv_revenue, dn_revenue, cn_revenue, iv_cost, dn_cost, cn_cost |
-| pc_supplier_margin | Supplier Perf. | month, creditor_code, creditor_name, item_code, item_group, sales_revenue, attributed_cogs, purchase_qty, purchase_value |
-| pc_return_monthly | Returns | month, cn_count, cn_total, knock_off_total, refund_total, unresolved_total |
-| pc_return_products | Returns | month, item_code, item_description, fruit_name, cn_count, total_qty, total_amount |
-| pc_return_aging | Returns | snapshot_date, bucket, count, amount |
-| pc_return_by_customer | Returns | month, debtor_code, company_name, cn_count, cn_total, knock_off_total, refund_total, unresolved |
-| pc_expense_monthly | Expenses | month, acc_no, account_name, acc_type, net_amount |
-| pc_pnl_period | Financial | period_no, acc_type, acc_no, account_name, parent_acc_no, home_dr, home_cr, proj_no |
-| budget | Financial | fiscal_year, line_item, annual_budget, monthly_budget, updated_at |
-
-### 8.2 Remote SQL Server (RDS, transaction detail)
-
-These tables live on the remote SQL Server (RDS). They contain raw transaction-level data. Only accessible by sections with `full` tool policy.
-
-| Table | Module | Key Columns | Required Filter |
-|-------|--------|-------------|----------------|
-| dbo.IV | Invoices | DocNo, DocDate, DebtorCode, LocalNetTotal, SalesAgent | Cancelled = 'F' |
-| dbo.CS | Cash Sales | DocNo, DocDate, DebtorCode, LocalNetTotal, SalesAgent | Cancelled = 'F' |
-| dbo.CN | Credit Notes | DocNo, DocDate, DebtorCode, LocalNetTotal, CNType | Cancelled = 'F' |
-| dbo.ARInvoice | AR Invoices | DocNo, DocDate, DueDate, DebtorCode, Outstanding | Cancelled = 'F' |
-| dbo.ARPayment | AR Payments | DocNo, DocDate, DebtorCode, LocalPaymentAmt | Cancelled = 'F' |
-| dbo.ARPaymentKnockOff | Payment KO | DocKey, KnockOffDocKey, KnockOffAmt, KnockOffDate | — |
-
-**Aggregate-only tables (9):** pc_sales_daily, pc_ar_monthly, pc_ar_aging_history, pc_customer_margin, pc_supplier_margin, pc_return_monthly, pc_return_products, pc_expense_monthly, pc_pnl_period
-
----
-
-## 9. Thresholds
-
-Finance uses hardcoded thresholds (not configurable). Each threshold is documented inline in the component prompts above (§5). This section provides a quick-reference summary organized by section.
-
-### Payment
-
-| Metric | Good | Warning | Critical |
-|--------|------|---------|----------|
-| Avg Collection Days | ≤30 | ≤60 | >60 |
-| Collection Rate | ≥80% | ≥50% | <50% |
-| Overdue % of Outstanding | <20% | 20-40% | >40% |
-| Credit Limit Breaches | 0 | — | >0 |
-| Credit Health Score | ≥75 (Low risk) | 31-74 (Moderate) | ≤30 (High risk) |
-
-### Sales
-
-| Metric | Good | Warning | Critical |
-|--------|------|---------|----------|
-| CN Ratio | ≤1% | 1-3% | >3% |
-| Top Customer Concentration | <15% | 15-25% | >25% |
-| Top Product Concentration | <20% | 20-35% | >35% |
-| Single Outlet Concentration | <50% | — | >50% |
-
-### Customer Margin
-
-| Metric | Good | Warning | Critical |
-|--------|------|---------|----------|
-| Gross Margin % | ≥15% | 10-15% | <10% |
-| Net Sales Growth | >5% | 0-5% | Decline |
-| Top Customer GP Share | <40% (top 10) | 40-60% | >60% |
-| Loss-Making Customers | 0 | <10% of active | >10% of active |
-
-### Supplier Performance
-
-| Metric | Good | Warning | Critical |
-|--------|------|---------|----------|
-| Gross Margin % | ≥15% | 10-15% | <10% |
-| Margin % Drop | — | — | ≥2pp vs prior |
-| Active Supplier Change | ±5% | -5% to -10% | >10% drop |
-| Top Supplier GP Share | <40% (top 10) | 40-60% | >60% |
-
-### Returns
-
-| Metric | Good | Warning | Critical |
-|--------|------|---------|----------|
-| Return Rate | <2% | 2-5% | >5% |
-| Unsettled % | <15% | 15-30% | >30% |
-| Knock-off % | >70% | 50-70% | <50% |
-| Refund % | <30% | — | >30% |
-| Aging 91+ Days | <25% | — | >25% |
-| Aging 180+ Days | <10% | — | >10% |
-
-### Expenses
-
-| Metric | Good | Warning | Critical |
-|--------|------|---------|----------|
-| YoY Total Cost | <0% | 0-5% | >10% |
-| COGS Share | 60-80% | — | >85% |
-| OpEx YoY | <0% | 0-10% | >10% |
-| COGS Share Drift | — | — | >+3pp |
-| Top 1 Account | <15% | 15-30% | >30% |
-
-### Financial
-
-| Metric | Good | Warning | Critical |
-|--------|------|---------|----------|
-| Gross Margin | >25% | 15-25% | <15% |
-| Operating Margin | >10% | 0-10% | <0% (loss) |
-| Net Margin | >7% | 0-7% | <0% (loss) |
-| Current Ratio | >2.0 | 1.0-2.0 | <1.0 |
-| Debt-to-Equity | <0.5 | 0.5-1.0 | >2.0 |
-| Variance | ±5% | ±5-15% | >±15% |
-
-See doc 10, §19 for the shared threshold strategy.
-
----
-
-## 10. Column Whitelisting (Data Protection)
-
-Finance uses column whitelisting to control what data the LLM's tools can access. See doc 10, §15 for the shared pattern.
-
-### Local PostgreSQL Whitelist
-
-Each `pc_*` table has a declared list of allowed columns in `tools.ts` (`LOCAL_WHITELIST`). Only these columns can be queried by the LLM.
-
-**Intentionally exposed:** Customer/company names (`company_name`), debtor/creditor codes, sales agent names, invoice numbers — needed for actionable insights.
-
-**Blocked by omission:** Customer emails, phone numbers, contact persons, bank account details — never in any whitelist.
-
-### Remote RDS Whitelist
-
-Each `dbo.*` table has a declared list in `tools.ts` (`RDS_WHITELIST`). Transaction-level columns like `DocNo`, `DocDate`, `DebtorCode`, `LocalNetTotal` are allowed. No personal contact details.
-
-### Runtime Enforcement
-
-`validateColumns()` in `tools.ts` rejects any tool call requesting columns not in the whitelist. This is enforced at query execution time, not prompt-level.
-
----
-
-## 11. RBAC Scoping (Role-Based Access Control)
-
-| Role | Can Trigger Analysis | Can View Insights |
-|------|---------------------|-------------------|
-| Superadmin | Yes | Yes |
-| Finance | Yes | Yes |
-| Director | Yes | Yes |
-| Other roles | No | View cached insights only |
-
-**Current implementation:** Client-side only. The "Analyze" button is hidden for non-authorized roles via `useRole()` context.
-
-**Required:** Add server-side role validation on `/api/ai-insight/analyze` and `/api/ai-insight/cancel` routes. Reject requests from unauthorized roles with 403.
-
-See doc 10, §18 for the shared RBAC pattern.
-
----
-
-## 12. Summary System Prompt
-
-The summary system prompt is used in Phase 2 when Sonnet synthesizes all component results into insight cards. It shares the same base rules as the component prompt (RM formatting, conciseness, no jargon, scope matching) plus tool access and output format rules. This is the full text from `prompts.ts`:
-
-> You are a senior financial analyst summarizing a dashboard section for a senior director at Hoi-Yong (Malaysian fruit distribution).
->
-> Rules:
-> - Be direct, concise, no jargon. State facts, not recommendations.
-> - Use RM with thousands separators (e.g., RM 5,841,378).
-> - Bullet points for observations. Markdown tables for comparisons.
-> - Compare at least 3 data points for trends.
-> - If data is insufficient, say so.
-> - Do NOT re-derive totals. Use values as given.
-> - Every number you cite MUST come from the raw data blocks or a tool-call result. Display rounding OK (e.g., RM 2,286,847 → RM 2.29M). Never back-solve or invent values.
-> - Match your language to the Scope line in the data (period vs snapshot vs fiscal).
->
-> Sub-period rule: to cite a sub-period average or range, copy it from a "Pre-calculated half-period averages" line. Do not compute your own.
->
-> ===============================================================================
-> TOOL ACCESS
-> ===============================================================================
->
-> You can query the database to find supporting evidence or root causes. Use tools for both positive and negative findings — identify which customers, products, months, or agents drove the result.
->
-> Rules:
-> - Maximum 4 tool calls. Stop once you have enough context to explain the finding — do not go deeper than needed.
-> - Do not query data already in the raw data blocks.
-> - Prefer local pc_* tables first. Use remote dbo.* for detail drill-down.
-> - Remote tables require: Cancelled = 'F' filter. Row limit: 100.
->
-> ===============================================================================
-> OUTPUT FORMAT
-> ===============================================================================
->
-> Use this EXACT delimiter structure (no JSON, no code blocks):
->
-> ===INSIGHT===
-> sentiment: good|bad
-> title: Punchy headline (max 50 chars, no verbs like "is"/"has"/"shows")
-> metric: Key number e.g. 84.3%, 43 days, RM 2.1M (max 25 chars)
-> summary: One plain-text sentence — card preview (max 80 chars, no markdown)
-> ---DETAIL---
-> Concise markdown analysis (max 150 words)
-> ===END===
->
-> Max 3 good + 3 bad insights. Rank by business impact.
->
-> Detail structure (all sections MANDATORY):
->
-> **Current Status**: 1-2 bullets with headline number and scope.
->
-> **Key Observations**: 2-3 bullets with specific numbers/dates.
->
-> **Evidence** (positive) or **Root Cause** (negative):
-> - Name top 3-5 contributors. Include a Markdown table (min 3 rows) when top-N data exists.
->
-> **Implication**: 1 bullet — bottom-line consequence.
->
-> Content rules:
-> - Use exact dashboard metric names. No jargon (no DSO, DPO).
-> - Cross-reference components — synthesize, don't isolate.
-> - No contradicting good/bad insights on same metric.
-
----
-
-## 13. Storage DDL
-
-Finance-specific database tables. Run against the local PostgreSQL (DATABASE_URL).
-
-**File:** `apps/dashboard/sql/ai-insight-schema.sql`
-
-```sql
+| `none` | No tools exposed. Not used by the current Finance section catalog; retained as a base policy option. |
+| `aggregate_only` | Only `query_local_table`; table enum is restricted to aggregate local tables. |
+| `full` | Both local and RDS tools exposed with table/column whitelists. |
+
+Aggregate-only tables:
+
+- `pc_sales_daily`
+- `pc_ar_monthly`
+- `pc_ar_aging_history`
+- `pc_customer_margin`
+- `pc_supplier_margin`
+- `pc_return_monthly`
+- `pc_return_products`
+- `pc_expense_monthly`
+- `pc_pnl_period`
+
+Tool whitelist and safety snapshot:
+
+~~~ts
+const LOCAL_WHITELIST: Record<string, string[]> = {
+  pc_sales_daily: ['doc_date', 'invoice_total', 'cash_total', 'cn_total', 'net_revenue', 'doc_count'],
+  pc_sales_by_customer: ['doc_date', 'debtor_code', 'company_name', 'debtor_type', 'sales_agent', 'invoice_sales', 'cash_sales', 'credit_notes', 'total_sales', 'doc_count'],
+  pc_sales_by_outlet: ['doc_date', 'dimension', 'dimension_key', 'dimension_label', 'is_active', 'invoice_sales', 'cash_sales', 'credit_notes', 'total_sales', 'doc_count', 'customer_count'],
+  pc_sales_by_fruit: ['doc_date', 'fruit_name', 'fruit_country', 'fruit_variant', 'invoice_sales', 'cash_sales', 'credit_notes', 'total_sales', 'total_qty', 'doc_count'],
+  pc_ar_monthly: ['month', 'invoiced', 'collected', 'cn_applied', 'refunded', 'total_outstanding', 'total_billed', 'customer_count'],
+  pc_ar_customer_snapshot: ['debtor_code', 'company_name', 'debtor_type', 'sales_agent', 'display_term', 'credit_limit', 'total_outstanding', 'overdue_amount', 'utilization_pct', 'credit_score', 'risk_tier', 'is_active', 'invoice_count', 'avg_payment_days', 'max_overdue_days'],
+  pc_ar_aging_history: ['snapshot_date', 'bucket', 'dimension', 'invoice_count', 'total_outstanding'],
+  pc_customer_margin: ['month', 'debtor_code', 'company_name', 'debtor_type', 'sales_agent', 'is_active', 'iv_revenue', 'dn_revenue', 'cn_revenue', 'iv_cost', 'dn_cost', 'cn_cost', 'iv_count', 'cn_count'],
+  pc_supplier_margin: ['month', 'creditor_code', 'creditor_name', 'item_code', 'item_group', 'is_active', 'sales_revenue', 'attributed_cogs', 'purchase_qty', 'purchase_value'],
+  pc_return_monthly: ['month', 'cn_count', 'cn_total', 'knock_off_total', 'refund_total', 'unresolved_total', 'reconciled_count', 'partial_count', 'outstanding_count'],
+  pc_return_products: ['month', 'item_code', 'item_description', 'fruit_name', 'fruit_variant', 'fruit_country', 'cn_count', 'total_qty', 'total_amount', 'goods_returned_qty', 'credit_only_qty'],
+  pc_return_aging: ['snapshot_date', 'bucket', 'count', 'amount'],
+  pc_return_by_customer: ['month', 'debtor_code', 'company_name', 'cn_count', 'cn_total', 'knock_off_total', 'refund_total', 'unresolved', 'outstanding_count'],
+  pc_expense_monthly: ['month', 'acc_no', 'account_name', 'acc_type', 'net_amount'],
+  pc_pnl_period: ['period_no', 'acc_type', 'acc_no', 'account_name', 'parent_acc_no', 'home_dr', 'home_cr', 'proj_no'],
+};
+
+const RDS_WHITELIST: Record<string, string[]> = {
+  'dbo.IV': ['DocNo', 'DocDate', 'DebtorCode', 'LocalNetTotal', 'Description', 'SalesAgent', 'SalesLocation', 'Cancelled'],
+  'dbo.CS': ['DocNo', 'DocDate', 'DebtorCode', 'LocalNetTotal', 'Description', 'SalesAgent', 'SalesLocation', 'Cancelled'],
+  'dbo.CN': ['DocNo', 'DocDate', 'DebtorCode', 'LocalNetTotal', 'Description', 'SalesAgent', 'CNType', 'Cancelled'],
+  'dbo.ARInvoice': ['DocNo', 'DocDate', 'DueDate', 'DebtorCode', 'LocalNetTotal', 'Outstanding', 'DisplayTerm', 'Cancelled'],
+  'dbo.ARPayment': ['DocNo', 'DocDate', 'DebtorCode', 'LocalPaymentAmt', 'Description', 'Cancelled'],
+  'dbo.ARPaymentKnockOff': ['DocKey', 'KnockOffDocKey', 'KnockOffAmt', 'KnockOffDate'],
+};
+
+const ROW_LIMIT = 100;
+
+// RDS tables that require Cancelled='F' to exclude voided documents. The
+// LLM is instructed to include this filter, but we ALSO inject it server-side
+// (see executeRdsQuery) so prompt drift can never let a cancelled document
+// leak into the analysis.
+const RDS_CANCELLED_FILTER_TABLES = new Set([
+  'dbo.IV',
+  'dbo.CS',
+  'dbo.CN',
+  'dbo.ARInvoice',
+  'dbo.ARPayment',
+]);
+
+// Words/sequences that should never appear inside an LLM-supplied WHERE clause.
+// Statement separators, comment markers, and any keyword that would let the
+// model exfiltrate or mutate data outside the intended SELECT.
+const WHERE_CLAUSE_BLOCKLIST: Array<{ pattern: RegExp; label: string }> = [
+  { pattern: /;/, label: 'statement terminator (;)' },
+  { pattern: /--/, label: 'line comment (--)' },
+  { pattern: /\/\*/, label: 'block comment start (/*)' },
+  { pattern: /\*\//, label: 'block comment end (*/)' },
+  { pattern: /\bUNION\b/i, label: 'UNION' },
+  { pattern: /\bSELECT\b/i, label: 'nested SELECT' },
+  { pattern: /\bINSERT\b/i, label: 'INSERT' },
+  { pattern: /\bUPDATE\b/i, label: 'UPDATE' },
+  { pattern: /\bDELETE\b/i, label: 'DELETE' },
+  { pattern: /\bDROP\b/i, label: 'DROP' },
+  { pattern: /\bTRUNCATE\b/i, label: 'TRUNCATE' },
+  { pattern: /\bALTER\b/i, label: 'ALTER' },
+  { pattern: /\bEXEC\b/i, label: 'EXEC' },
+  { pattern: /\bEXECUTE\b/i, label: 'EXECUTE' },
+  { pattern: /\bGRANT\b/i, label: 'GRANT' },
+  { pattern: /\bREVOKE\b/i, label: 'REVOKE' },
+  { pattern: /\bxp_\w+/i, label: 'extended stored procedure (xp_*)' },
+  { pattern: /\bsp_\w+/i, label: 'system stored procedure (sp_*)' },
+];
+
+function validateWhereClauseSafety(where: string | undefined | null): string | null {
+  if (!where) return null;
+  for (const { pattern, label } of WHERE_CLAUSE_BLOCKLIST) {
+    if (pattern.test(where)) {
+      return `WHERE clause rejected: contains disallowed token (${label}). Use only column comparisons with $1/$2 parameter placeholders.`;
+    }
+  }
+  return null;
+}
+
+function ensureRdsCancelledFilter(table: string, where: string | undefined): string | undefined {
+  if (!RDS_CANCELLED_FILTER_TABLES.has(table)) return where;
+  // Already present (any case)? Leave it untouched.
+  if (where && /Cancelled\s*=\s*'F'/i.test(where)) return where;
+  const filter = `Cancelled = 'F'`;
+  if (!where || !where.trim()) return filter;
+  return `(${where}) AND ${filter}`;
+}
+~~~
+
+Additional runtime safety:
+
+- Row limit is capped at 100.
+- Tool columns must exactly match the whitelist for the requested table.
+- Unsafe `where_clause` and `order_by` tokens are rejected, including statement terminators, comments, nested SELECT, UNION, mutation/DDL keywords, and stored procedure patterns.
+- RDS `dbo.IV`, `dbo.CS`, `dbo.CN`, `dbo.ARInvoice`, and `dbo.ARPayment` always receive a server-side `Cancelled = 'F'` filter if missing.
+- Tool results are formatted as Markdown tables and their numbers are added to the summary numeric whitelist for the current attempt.
+
+## 11. Output Parser
+
+The summary model must output delimiter blocks:
+
+~~~text
+===INSIGHT===
+sentiment: good|bad
+title: Punchy headline
+metric: Key number
+summary: One plain-text sentence
+---DETAIL---
+Concise markdown analysis
+===END===
+~~~
+
+Current parser behavior:
+
+- Splits on `===INSIGHT===`.
+- Reads content until `===END===` when present; otherwise accepts the remainder for compatibility.
+- Reads `sentiment`, `title`, `metric`, and `summary` from the header.
+- Defaults missing sentiment to `good` and missing title to `Insight` for demo compatibility.
+- Keeps up to 3 good and 3 bad cards.
+- If no delimiter blocks parse, attempts JSON fallback.
+- If JSON fallback fails, wraps raw output into one generated good card.
+
+Production tightening recommendation:
+
+- Reject missing `===END===`.
+- Reject unknown or missing sentiment.
+- Reject missing title, summary, or detail.
+- Keep JSON fallback only during migration or behind a compatibility flag.
+
+## 12. Numeric Guard
+
+Numeric guard validates numbers in final summary text against raw fetcher `allowed` values and tool-result numbers.
+
+Validated units:
+
+| Unit | Examples | Default tolerance |
+|---|---|---:|
+| RM | `RM 5,841,378`, `RM 2.29M`, `RM 450K` | RM 1.00 |
+| Percent | `84.3%`, `1,172%` | 0.15 percentage points |
+| Days | `43 days` | 0.2 days |
+| Count | count phrases detected by regex | 0 |
+
+Compatibility behavior:
+
+- Date-like values and standalone years are stripped before extraction.
+- Safe small integers such as 0-12, 30, 60, 80, 90, 100, 120, and 365 are ignored to reduce false positives from bucket labels and thresholds.
+- Derived percentages can pass when they are directly derivable from two allowed values. This is demo compatibility, not a license for model arithmetic.
+- Supported lower-bound wording can pass when the cited threshold is backed by a same-unit allowed value beyond that threshold.
+- RM sign can match absolute value where the source sign and wording differ, but this should be used carefully in production.
+
+If guard fails:
+
+1. Log unmatched values.
+2. Add an assistant message with the rejected output.
+3. Add a user correction listing forbidden numbers.
+4. Retry summary once.
+5. Persist numeric guard report with pass/fail, attempts, and unmatched values.
+
+Main lesson from the study: the safest fix is to add exact precomputed values to fetchers and allowed lists. Prompt wording alone does not reliably stop arithmetic hallucinations.
+
+## 13. Database Design
+
+Current core schema snapshot:
+
+~~~sql
+-- AI Insight Engine — Database Schema
+-- Run against the local PostgreSQL (DATABASE_URL)
+
 -- 1. Global lock (singleton row)
 CREATE TABLE IF NOT EXISTS ai_insight_lock (
   id            INTEGER PRIMARY KEY DEFAULT 1,
@@ -2418,7 +532,7 @@ CREATE TABLE IF NOT EXISTS ai_insight_section (
   UNIQUE (page, section_key)
 );
 
--- Idempotent migration for existing databases predating fiscal_period scope.
+-- Idempotent migration for existing databases predating fiscal_period scope (§9 financial_overview).
 ALTER TABLE ai_insight_section ADD COLUMN IF NOT EXISTS fiscal_year  TEXT;
 ALTER TABLE ai_insight_section ADD COLUMN IF NOT EXISTS fiscal_range TEXT;
 
@@ -2433,158 +547,1224 @@ CREATE TABLE IF NOT EXISTS ai_insight_component (
   generated_at    TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   UNIQUE (section_id, component_key)
 );
-```
+~~~
 
-See doc 10, §8 for the shared storage schema pattern.
+Prompt and feedback migrations extend the core schema:
 
----
+| Migration | Finance-relevant behavior |
+|---|---|
+| `016_ai_insight_prompts.sql` | Creates `ai_insight_prompts` with prompt key, text, category, page, section, component type, display name, sort order, updated metadata. |
+| `017_ai_insight_feedback.sql` | Creates `ai_insight_feedback` with section/page, raw feedback, compact feedback, target prompt key, submitter, timestamp. |
+| `018_prompts_history.sql` | Historical two-slot prompt history. Superseded by versions table. |
+| `019_ai_insight_section_guidance.sql` | Adds `section_guidance` as a prompt category. |
+| `020_prompt_versions.sql` | Creates `ai_insight_prompt_versions`, adds `selected_version_id`, backfills Default versions, drops old history columns, and allows empty prompt text. |
+| `021_ai_insight_system_prompt_keys.sql` | Renames system prompt keys to `component_analysis`, `summary_analysis`, `feedback_router`, `surgical_editor`; seeds blank HR system placeholders. |
 
-## 14. API Routes
+Finance data-source migrations:
 
-All routes are under `apps/dashboard/src/app/api/ai-insight/`.
+| Migration | Purpose |
+|---|---|
+| `003_precomputed_tables.sql` | Creates the main `pc_*` precomputed tables for sales, payment/AR, returns, customer margin, supplier margin, P&L, opening balance, and expenses. |
+| `010_ar_monthly_counts_and_supplier_is_active.sql` | Adds invoice/payment counts to `pc_ar_monthly` and `is_active` to `pc_supplier_margin`. |
+| `012_sales_daily_grain.sql` | Rebuilds sales breakdown tables at daily grain to support mid-month filters and include cash accounts consistently. |
+| `013_supplier_margin_attributed_cogs.sql` | Adds attributed COGS to supplier margin. |
+| `015_budget_table.sql` | Adds approved budget storage used by financial variance/budget suggestions. |
 
-| Method | Path | Purpose | Request / Response |
-|--------|------|---------|-------------------|
-| POST | `/api/ai-insight/analyze` | Start analysis (SSE stream) | Body: `{ page, section_key, date_range, fiscal_period, user_name }`. Returns SSE events: `progress`, `component`, `summary`, `complete`, `error`. |
-| GET | `/api/ai-insight/status` | Check lock status | Returns `{ locked, locked_by, locked_at, section_key }` |
-| GET | `/api/ai-insight/section/:section_key` | Get cached section result | Returns `{ summary_json, generated_at, ... }` or 404 |
-| GET | `/api/ai-insight/component/:section_key/:component_key` | Get cached component result | Returns `{ analysis_md, component_type, ... }` or 404 |
-| POST | `/api/ai-insight/cancel` | Cancel running analysis | Returns `{ cancelled: true }` or error |
+Production gaps to add before production acceptance:
 
-### Budget API Endpoints (Finance-specific)
+- Append-only AI run log table, separate from latest-result storage.
+- Evaluation result table that records expected values, quality score, hallucinations, guard attempts, provider/model, cost, latency, tool calls, and decision.
+- Tool-call log table if debug logs are not acceptable as the audit store.
+- Prompt version approval metadata if regulated prompt governance is required.
 
-| Method | Path | Purpose | Request / Response |
-|--------|------|---------|-------------------|
-| POST | `/api/budget/save` | Upsert AI-generated budget lines for a fiscal year | `{ fiscalYear }` -> computes headline P&L lines, upserts to `budget` table |
-| GET | `/api/budget/:fiscalYear` | Retrieve saved budget for a fiscal year | -> `BudgetRow[]` (empty array if none) |
+## 14. Financial Variance Budget Suggestions
 
-See doc 10, §9 for the shared API endpoint pattern.
+`financial_variance` includes `fv_budget_suggestions`, which explains system-computed budget starting points from current fiscal data and any approved budget comparison.
 
----
+Production rules:
 
-## 15. File Structure
+- Budget suggestions must be labelled as suggestions, not approved numbers.
+- The model must explain precomputed suggestions only; it must not invent budget values.
+- The model must not write to the `budget` table.
+- Any approval or application action must be a separate governed workflow with explicit user permission.
+- If budget approval is not in production scope, keep the insight text but hide or disable budget approval actions.
 
-### AI Insight Module
+## 15. Finance Rollout And Evaluation
 
-```
-apps/dashboard/src/lib/ai-insight/
-  types.ts            — TypeScript types: SectionKey, ComponentInfo, AnalysisResult, etc.
-  client.ts           — Browser-side SSE client for streaming analysis results
-  prompts.ts          — All prompts: GLOBAL_SYSTEM, COMPONENT_PROMPTS (66), SUMMARY_SYSTEM,
-                        SECTION_COMPONENTS mapping, SECTION_PAGE, SECTION_NAMES
-  data-fetcher.ts     — Fetches pre-computed data from PostgreSQL for each component
-  orchestrator.ts     — Phase 1 (parallel component analysis) + Phase 2 (summary synthesis)
-  numeric-guard.ts    — Post-analysis validation: checks numbers in output match source data
-  storage.ts          — Read/write ai_insight_section and ai_insight_component tables
-  lock.ts             — Global lock management (acquire, release, check)
-  tools.ts            — LLM tool definitions, column whitelists, validateColumns()
-  tool-policy.ts      — Section -> tool policy mapping (aggregate_only | full | none)
-  debug-logger.ts     — Structured debug logging for analysis runs
-  component-info.ts   — Component metadata lookup (name, type, section)
-```
+Current rollout tracker status from `AI_Insight_Study/ROLLOUT_TRACKER.md`:
 
-### API Routes
+| Status | Sections |
+|---|---|
+| Done | S01 `payment_collection_trend`, S02 `payment_outstanding`, S03 `sales_trend`, S04 `sales_breakdown`, S05 `customer_margin_overview` |
+| Pending | S06-S16: `customer_margin_breakdown`, `supplier_margin_overview`, `supplier_margin_breakdown`, `return_trend`, `return_unsettled`, `expense_overview`, `expense_breakdown`, `financial_overview`, `financial_pnl`, `financial_balance_sheet`, `financial_variance` |
 
-```
-apps/dashboard/src/app/api/ai-insight/
-  analyze/route.ts              — POST handler: validate, lock, orchestrate, stream, store
-  section/[section_key]/route.ts — GET handler: return cached section result
-  cancel/route.ts               — POST handler: cancel running analysis
-  status/route.ts               — GET handler: return lock status
-```
+Acceptance gate for each Finance section:
 
-### SQL
+| Gate | Required result |
+|---|---|
+| Numeric accuracy | 100% material values correct in final cards/details. |
+| Hallucination | 0 material hallucinations. |
+| Quality | At least 8/10; target 9/10 or higher. |
+| Numeric guard | Passes within 2 attempts. |
+| Tool calls | At most 2 summary tool calls unless explicitly approved. |
+| Failed tools | 0, or immaterial and documented. |
+| Parser | Delimiter output parses without manual repair. |
+| Cost | Within accepted cost-per-click target or documented exception. |
+| UX | Panel, detail, component dialog, feedback, cancel, blocked, and error states work. |
 
-```
-apps/dashboard/sql/
-  ai-insight-schema.sql   — CREATE TABLE statements for lock, section, component tables
-```
+Production must rerun evaluation after implementation. Demo rollout acceptance is evidence, not production acceptance.
 
----
+Evaluation artifacts:
 
-## 16. Budget Approval Flow
+- `AI_Insight_Study/MASTER_LOG.md`
+- `AI_Insight_Study/ROLLOUT_TRACKER.md`
+- `AI_Insight_Study/HOW_TO_RUN_ITERATION.md`
+- `AI_Insight_Study/eval_set/`
+- Section debug logs under `apps/dashboard/logs/`
 
-Applies only to the `financial_variance` section.
+## 16. Finance Acceptance Criteria
 
-After analysis completes:
+Finance AI Insight is ready for production transfer when:
 
-1. A blue banner appears below the insight panel: "Save the AI-generated budget suggestions as the approved budget for {fiscalYear}?"
-2. User clicks "Approve as Budget" -> POST `/api/budget/save` with `{ fiscalYear }`.
-3. Button states: idle -> saving -> saved -> error (retry).
-4. Only visible when: section is `financial_variance`, analysis is complete, and the panel is expanded.
+- All 16 Finance sections expose `Get Insight` in the approved dashboard layout.
+- All 69 Finance components have prompt entries, data fetchers, and component insight behavior where enabled.
+- Summary output displays up to 3 positive and 3 negative cards.
+- Detail dialogs contain evidence-rich explanation with no untrusted numbers.
+- Component dialogs show the component prompt context and analysis.
+- Section summary uses raw fetcher data, not component analysis prose.
+- Tools follow policy and whitelist rules.
+- Numeric guard blocks untrusted RM, percent, days, and count values.
+- Prompt admin supports Finance prompts, section guidance, versions, feedback routing, preview, apply, discard, and selection.
+- Evaluation logs prove every section passed the production acceptance gate.
 
-### Budget API Endpoints
+## Appendix A - Exact Factory Prompt Snapshot
 
-| Method | Path | Purpose | Request / Response |
-|--------|------|---------|-------------------|
-| POST | `/api/budget/save` | Upsert AI-generated budget lines for a fiscal year | `{ fiscalYear }` -> computes headline P&L lines, upserts to `budget` table |
-| GET | `/api/budget/:fiscalYear` | Retrieve saved budget for a fiscal year | -> `BudgetRow[]` (empty array if none) |
+The following is the current factory prompt source from `apps/dashboard/src/lib/ai-insight/prompts-defaults.ts`. Runtime may use DB-selected versions instead of these defaults, but these defaults are the implementation seed and DB-miss fallback.
 
----
+~~~ts
+// Default AI Insight prompts — factory snapshot.
+//
+// IMPORTED ONLY BY:
+//   - The seed endpoint (app/api/admin/ai-insight-prompts/seed-defaults/route.ts)
+//   - The reset helpers in prompt-store.ts
+//
+// NEVER imported by orchestrator.ts or any analysis-time code path.
+// Runtime reads prompts from the ai_insight_prompts table via prompt-loader.ts.
 
-## 17. Implementation Sequence
+// ─── Component Analysis System Prompt (prepended to all component calls) ─────
 
-Build order for a developer implementing the Finance AI Insight module:
+export const DEFAULT_GLOBAL_SYSTEM = `You are a senior financial analyst at Hoi-Yong (Malaysian fruit distribution). You explain dashboard metrics to a senior director.
 
-| Step | What | Depends On |
-|------|------|------------|
-| 1 | Run `ai-insight-schema.sql` to create storage tables | Database access |
-| 2 | Implement `types.ts` — define all TypeScript types | Nothing |
-| 3 | Implement `prompts.ts` — all 66 component prompts, global system prompt, summary prompt | types.ts |
-| 4 | Implement `tool-policy.ts` — section-to-policy mapping | types.ts |
-| 5 | Implement `tools.ts` — tool definitions, column whitelists, validateColumns() | types.ts |
-| 6 | Implement `lock.ts` — global lock acquire/release/check | Storage tables |
-| 7 | Implement `storage.ts` — read/write section and component results | Storage tables |
-| 8 | Implement `data-fetcher.ts` — fetch pre-computed data for each component | pc_* tables, types.ts |
-| 9 | Implement `numeric-guard.ts` — post-analysis number validation | Nothing |
-| 10 | Implement `orchestrator.ts` — Phase 1 + Phase 2 orchestration | All above |
-| 11 | Implement `client.ts` — browser SSE client | Nothing |
-| 12 | Implement API routes (analyze, status, section, cancel) | orchestrator.ts, lock.ts, storage.ts |
-| 13 | Implement budget API routes (/api/budget/save, /api/budget/:fiscalYear) | storage tables, budget table |
-| 14 | Wire up UI components (InsightSectionHeader, AiInsightPanel) | client.ts, API routes |
-| 15 | Add budget approval button to financial_variance section UI | Budget API, UI components |
+Rules:
+- Style: short, direct, quick-glance. State facts, not recommendations. No jargon, no filler.
+- Use RM with thousands separators (RM 5,841,378). Rounding OK (RM 2,286,847 → RM 2.29M).
+- Every number must appear in the data block. Use values as given — never back-solve or invent.
+- If data is insufficient, say so.
+- Match the Scope line (period / snapshot / fiscal).
 
----
+Output format (MANDATORY):
+**Current Status:** <one-line TL;DR ending with an alert tag — 🔴 Critical / 🟡 Watch / 🟢 Healthy / ⚪ Neutral>
 
-## 18. Verification Plan
+**Key Observations**
+- 1–4 bullets, as many as the data supports.
+- Each bullet starts with a **bold pattern label**, then leads with the most material data point (number, customer name, period).
+- No paragraphs, no closing summary.`;
 
-### Per-Section Smoke Test
+// ─── Component System Prompts ────────────────────────────────────────────────
 
-For each of the 16 sections:
-1. Click "Analyze" on the section header.
-2. Verify SSE stream shows progress events for each component.
-3. Verify all components complete (check count matches the catalog above).
-4. Verify summary produces 1-6 insight cards (good + bad).
-5. Verify cached results load on page refresh (GET section endpoint).
-6. Verify component detail dialog shows markdown analysis.
+export const DEFAULT_COMPONENT_PROMPTS: Record<string, string> = {
+  // Payment Section 1: Payment Collection Trend
+  avg_collection_days: `"Avg Collection Days" KPI — average days to collect payment after invoicing.
 
-### Threshold Verification
+How it's measured: monthly collection days (based on month-end AR vs that month's credit sales) averaged across months with credit-sale activity.
 
-For each threshold in §9:
-1. Provide data that triggers each threshold band (good, warning, critical).
-2. Verify the component analysis mentions the correct threshold language.
+Thresholds:
+- ≤30 = Good
+- ≤60 = Warning
+- >60 = Critical (cash-flow risk)`,
 
-### Tool Policy Verification
+  collection_rate: `"Collection Rate" KPI — share of the period's invoiced amount that converted to cash. Excludes contra / non-cash offsets.
 
-1. For `aggregate_only` sections: verify tool calls only access local `pc_*` tables.
-2. For `full` sections: verify tool calls can access both local and RDS tables.
-3. Verify `validateColumns()` rejects queries with non-whitelisted columns.
+Thresholds:
+- ≥80% = Good
+- ≥50% = Warning (growing receivables)
+- <50% = Critical`,
 
-### Budget Flow Verification
+  avg_monthly_collection: `"Avg Monthly Collection" KPI — total collected / months in range.
 
-1. Run analysis on `financial_variance` section.
-2. Verify "Save as Budget" button appears after analysis completes.
-3. Click "Approve as Budget" and verify POST `/api/budget/save` succeeds.
-4. Re-run analysis and verify the budget comparison appears in `fv_budget_suggestions`.
+No fixed threshold. Evaluate vs invoiced amounts and historical trend: rising with stable invoicing = positive; falling = concern.`,
 
-### RBAC Verification
+  collection_days_trend: `"Avg Collection Days Trend" line chart — monthly collection days with dashed reference at the period average.
 
-1. Log in as Superadmin/Finance/Director: verify "Analyze" button is visible.
-2. Log in as other role: verify "Analyze" button is hidden.
-3. Attempt direct POST to `/api/ai-insight/analyze` as unauthorized role: verify 403 response.
+- Rising = slowing (bad)
+- Falling = improving (good)
+- Spike >60 = critical month
+- Steady ≤30 = excellent
 
----
+Look for: seasonal patterns, sudden spikes, sustained shifts (3+ months).`,
 
-## 19. In-App User Guide
+  invoiced_vs_collected: `"Invoiced vs Collected" combo chart — bars = monthly collected, line = monthly invoiced, dashed reference = avg monthly collection.
 
-An end-user manual page is available at `/manual/general/ai-insight` explaining how to use the AI Insight feature. Includes 5 annotated screenshots covering: collapsed panel, analysis results, insight detail dialog, component icon, and component dialog.
+- Bars below line = AR accumulating (cash-flow warning)
+- Bars above line = old AR being cleared
+- Gap = collection efficiency
+
+Look for: widening/narrowing gaps, sharp collection drops, seasonal patterns.
+
+**Sub-period averaging is BANNED.** The data block has pre-computed H1/H2 averages, ranges, and H1→H2 direction — quote those verbatim. Do NOT:
+- Invent a sub-period (e.g. "last 4 months") and average gaps yourself
+- Cite a range excluding any month inside the stated sub-period
+- Narrate "narrowing/widening/improving" contradicted by any month in the sub-period
+- Do mental arithmetic on monthly gaps
+
+Describe trends month-by-month, or use the H1/H2 lines.`,
+
+
+  // Payment Section 2: Outstanding Payment
+  total_outstanding: `"Total Outstanding" KPI — sum of all unpaid invoices to date (snapshot, ignores date range).
+
+No fixed threshold. Evaluate vs total invoicing volume and trend direction. Growing outstanding alongside flat or declining sales = red flag.`,
+
+  overdue_amount: `"Overdue Amount" KPI — portion of total outstanding past due date, with % of total and customer count.
+
+Thresholds (overdue % of outstanding):
+- <20% = acceptable
+- 20–40% = warning
+- >40% = critical
+
+Report: % of total, count of overdue customers vs active, concentration (few large vs spread across many).`,
+
+  credit_limit_breaches: `"Credit Limit Breaches" KPI — count of active customers with outstanding > credit limit (customers with limit > 0 only).
+
+Thresholds:
+- 0 = Good
+- >0 = Concern
+
+If breaches exist, use tools to identify which customers and by how much. A few large breaches = more severe than many small ones.`,
+
+  aging_analysis: `"Aging Analysis" horizontal bar chart — outstanding by overdue bucket. Also viewable by Sales Agent and Customer Type.
+
+Buckets (healthiest → most critical):
+- Not Yet Due
+- 1–30 days
+- 31–60 days
+- 61–90 days
+- 91–120 days
+- 120+ days (write-off risk)
+
+Report:
+- "Not Yet Due" share vs overdue
+- Skew toward older (bad) vs newer (ok) buckets
+- Size of 120+ bucket (potential bad debt)`,
+
+  credit_usage_distribution: `"Credit Usage Distribution" donut chart — customers grouped by how much of their credit limit they're using.
+
+Categories:
+- Within Limit (<80%) = healthy
+- Near Limit (≥80% and <100%) = watch
+- Over Limit (>100%) = policy breach
+- No Limit Set = uncontrolled risk
+
+Report: % over/near limit, count with no limit set, whether the Over Limit segment is growing.`,
+
+  customer_credit_health: `"Customer Credit Health" table — per-customer view: Code, Name, Type, Agent, Credit Limit, Outstanding, Credit Used %, Aging Count, Oldest Due, Health Score (0–100), Risk Level (Low / Moderate / High).
+
+Score formula and risk-tier cutoffs are configurable (app_settings.credit_score_v2). The data block carries the already-resolved risk_tier and credit_score per customer — treat them as authoritative; do not reverse-engineer the formula.
+
+Report:
+- Distribution across risk tiers (High vs Moderate vs Low counts and outstanding share)
+- Top offenders by outstanding amount and risk score
+- Patterns by customer type or sales agent
+- Customers with high outstanding and no credit limit set
+
+Focus on patterns and outliers — do not list every customer.`,
+
+  // Sales Section 3: Sales Trend — individual KPI prompts
+  net_sales: `"Net Sales" KPI — total revenue for the period (Invoice Sales + Cash Sales − Credit Notes).
+
+Evaluate:
+- Absolute level vs business scale
+- Invoice vs Cash mix: invoice ≥90% of net is normal for credit-customer distribution; falling ratio = shift to cash/retail or loss of credit customers
+- Credit-note ratio (CN / gross sales): ≤1% = Good · 1–3% = Monitor · >3% = Concern`,
+
+  invoice_sales: `"Invoice Sales" KPI — credit sales billed to customers on payment terms.
+
+Evaluate:
+- Absolute value for the period
+- Share of net sales: ≥90% is normal for a credit-customer distribution business
+- A falling share means a shift toward cash/retail buyers, or loss of credit customers`,
+
+  cash_sales: `"Cash Sales" KPI — immediate payment at point of sale (zero credit risk).
+
+Evaluate:
+- Absolute value and share of net sales
+- Rising cash share = lower credit risk and faster cash flow, but may signal smaller/retail buyers replacing credit customers`,
+
+  credit_notes: `"Credit Notes" KPI — returns and adjustments that reduce net revenue (shown in red).
+
+Credit-note ratio (CN / gross sales):
+- ≤1% = Good (normal returns)
+- 1–3% = Monitor
+- >3% = Concern (quality or order-accuracy issue)
+
+Flag sudden spikes — they usually point to a product quality event or delivery problem.`,
+
+  net_sales_trend: `"Net Sales Trend" stacked bar chart — Invoice Sales + Cash Sales (positive stack), Credit Notes (negative). Combined height = Net Sales. Granularity: Daily / Weekly / Monthly.
+
+Thresholds:
+- 3+ consecutive months of growth = Good
+- Flat / mixed = Neutral
+- 3+ consecutive months of decline = Bad
+- Any spike or drop >20% vs period average = flag for summary
+
+Look for: festive / seasonal spikes, unusual credit-note months, cash-vs-invoice mix shift over time.`,
+
+  // Sales Section 4: Sales Breakdown
+  by_customer: `"Sales by Customer" breakdown table — Code, Customer Name, Customer Type, Net Sales, Invoice Sales, Cash Sales, Credit Note Amount.
+
+Concentration thresholds (top customer % of total Net Sales):
+- <15% = Good (diversified)
+- 15–25% = Neutral (moderate concentration)
+- >25% = Bad (over-reliance risk)
+
+Evaluate:
+- Revenue concentration: are a few customers dominating?
+- Customer-type mix: balanced or skewed
+- Customers with disproportionate credit notes`,
+
+  by_product: `"Sales by Product" breakdown — Product Name, Country, Variant, Net Sales, Qty Sold.
+
+Concentration thresholds (top product % of total Net Sales):
+- <20% = Good (diversified)
+- 20–35% = Neutral
+- >35% = Bad (product concentration risk)
+
+Evaluate:
+- Product concentration: spread or 1–2 items dominating
+- Country-of-origin diversity (over-reliance on one source)
+- High-qty / low-revenue items (margin concern)`,
+
+  by_agent: `"Sales by Sales Agent" breakdown — Agent Name, Active status, Net Sales, Invoice Sales, Cash Sales, Customer Count.
+
+Thresholds:
+- Any agent declining >10% vs prior period = Flag
+
+Evaluate:
+- Performance spread: one agent carrying the team vs balanced
+- Inactive agents with significant recent sales (data-quality flag)
+- High customer count + low sales = underperforming
+- Distribution shape across team`,
+
+  by_outlet: `"Sales by Outlet" breakdown — Location, Net Sales, Invoice Sales, Cash Sales, Credit Note Amount.
+
+Concentration thresholds (single outlet % of total Net Sales):
+- ≤50% = Good (geographic diversification)
+- >50% = Concern (geographic concentration risk)
+
+Evaluate:
+- Geographic spread: balanced or concentrated
+- Outlets with unusually high CN-to-sales ratio
+- "(Unassigned)" outlet share = data-quality indicator`,
+
+  // Customer Margin Section: Overview
+  cm_net_sales: `"Net Sales" KPI — total net sales for the period with prior-period comparison.
+
+Thresholds:
+- Growth >5% = Good
+- Growth 0–5% = Neutral
+- Decline = Bad
+- Decline >10% = Flag
+
+Report current value, RM delta, % change.`,
+
+  cm_cogs: `"COGS" KPI — landed cost of goods sold for the period with prior-period comparison.
+
+Benchmark: COGS is normally 80–90% of Net Sales for fruit distribution.
+
+Frame relative to Net Sales — never analyse COGS in isolation. Flag if COGS delta outpaces Net Sales delta (margin compression).`,
+
+  cm_gross_profit: `"Gross Profit" KPI — Net Sales minus COGS for the period with prior-period comparison.
+
+Thresholds (GP vs Net Sales direction):
+- Both growing = Good
+- GP flat, Net Sales growing = Neutral (margin erosion)
+- GP declining, Net Sales growing = Bad (cost pressure)
+- Both declining = Bad (volume loss)
+
+Key signal: whether GP grows faster or slower than Net Sales (pricing power). Report RM delta and % change.`,
+
+  cm_margin_pct: `"Gross Margin %" KPI — GP as % of Net Sales with prior-period comparison.
+
+Thresholds (fruit distribution):
+- ≥15% = Good
+- 10–15% = Neutral
+- <10% = Bad
+
+Report current level vs benchmark and period-over-period delta in percentage points.`,
+
+  cm_active_customers: `"Active Customers" KPI — count of distinct active customers in the period with prior-period comparison.
+
+Baseline: stability is healthy for a mature distribution business; deltas matter more than absolute count.
+
+Report period-over-period change and whether it correlates with Net Sales (fewer customers + steady sales = revenue concentrating).`,
+
+  cm_margin_trend: `"Margin Trend" chart — monthly bars = Gross Profit (RM), line = Margin % (right axis). Monthly only.
+
+Two questions: profit direction (RM) and efficiency (margin %).
+
+Thresholds:
+- 3+ months consecutive GP growth = Good
+- Flat / mixed = Neutral
+- 3+ months consecutive GP decline = Bad
+- Margin % declining 2+ months = Flag (even if GP flat)
+
+Look for: bars-vs-line divergence (e.g., GP up while margin flat = volume not pricing), seasonal/festive shifts, months where GP and margin % move opposite directions.
+
+Cite specific months from the monthly breakdown.`,
+
+  cm_margin_distribution: `"Margin Distribution" histogram — customers per fixed Margin % bucket: <0%, 0–5%, 5–10%, 10–15%, 15–20%, 20–30%, 30%+.
+
+Population: customers with >RM 1,000 revenue in the period (small-volume excluded).
+
+Thresholds:
+- Any in <0% = selling at a loss (flag if count > 0)
+- Majority in 10–20% = Healthy
+- >40% in sub-10% bands = Bad (thin-margin portfolio)
+- >15% in 20%+ bands = Good (premium segment)
+
+Report: shape (skew), share below 10%, size of loss bucket, and whether shape matches overall Margin % (e.g., 16% overall with most sub-10% = concentration risk in a few large accounts).`,
+
+  // Customer Margin Section 2: Customer Margin Breakdown
+  cm_top_customers: `"Top Customers" chart — two lists in the data:
+(A) Top 10 by Gross Profit (RM)
+(B) Top 10 by Margin % (filtered to ≥RM 10,000 revenue)
+Cover both lenses.
+
+Thresholds:
+- Top 1 > 15% of total GP = Bad (concentration risk)
+- Top 10 > 60% of total GP = Bad (concentrated portfolio)
+- Top 10 < 40% of total GP = Good (diversified)
+- Top-by-profit with margin <10% = Flag (thin anchor)
+- Top-by-margin with revenue <RM 50K = niche premium (protect, not load-bearing)
+
+Report:
+- RM anchors vs efficiency leaders, and any overlap
+- Concentration: top 1 / top 3 / top 10 share of GP
+- Customer-type or sales-agent clustering if surfaced
+- Star accounts (on both lists) — name them`,
+
+  cm_customer_table: `"Customer Margin Table" — bottom 10 by Gross Profit (worst, includes loss-makers) plus margin distribution by bucket.
+
+Thresholds:
+- Loss-makers >10% of active count = Bad (unhealthy tail)
+- Bottom-10 with revenue >RM 100K AND negative margin = Critical
+- High share in <10% buckets = portfolio margin risk
+
+Report:
+- Bottom tail: who's losing money, big (high-revenue loss-makers) vs small problem
+- Customer-type or sales-agent clustering in bottom 10
+- Unusual return-rate clustering in bottom 10
+- Distribution skew: clustered in >15% (healthy) or <10% (thin) buckets`,
+
+  cm_credit_note_impact: `"Credit Note Impact on Margins" table — customers ranked by margin lost from credit notes. Columns: Code, Name, Invoice Rev, CN Rev, Return Rate %, Margin Before CN, Margin After CN, Margin Lost (pp).
+
+Data: top 25 by Margin Lost + roll-ups (total margin lost across top-100, top-5 share, count with return rate >5%, avg margin lost).
+
+Thresholds:
+- Top 5 > 50% of total margin lost = Bad (concentrated — fix top offenders first)
+- Return rate >10% = Bad (excessive returns — quality or ops issue)
+- Margin lost >10pp = Severe
+- High CN revenue but margin lost <2pp = Acceptable (volume returns, costs recovered)
+
+Report:
+- Concentration: a few serial returners or spread across many?
+- Return rate vs margin lost: high rate + low impact = low-margin items returned (different problem)
+- Customer-type or sales-agent clustering in top 25
+- Return-rate baseline: <3% normal vs >5% systemic (upstream quality)`,
+
+  // ═══ Supplier Margin Overview (Section 3) ═══
+  sp_net_sales: `"Est. Net Sales" KPI — sales revenue attributed to items sourced from active suppliers in the period.
+
+Note: "Est." prefix means the figure comes from the supplier-margin pre-compute, not raw invoices. Mirrors Customer Margin Net Sales unfiltered, may diverge under supplier/item-group filters.
+
+Thresholds (MoM):
+- ≥5% growth = Good
+- 0–5% = Neutral
+- <0% = Bad
+- Drop >10% = Flag
+
+Report level and direction vs prior period if available; comment on tracking vs trailing baseline.`,
+
+  sp_cogs: `"Est. Cost of Sales" KPI — attributed COGS for items sourced from active suppliers in the period.
+
+Supplier-page framing — rising COGS is NOT automatically bad:
+- Bad: COGS rising faster than Net Sales AND margin % falling = real cost pressure
+- Neutral/Good: COGS rising with Net Sales pace, margin stable or up = healthy growth or beneficial sourcing shift
+
+Report COGS level, COGS-to-Net-Sales ratio, and whether the ratio is widening or holding. Always frame against Net Sales and margin % direction — never call rising COGS "bad" in isolation.`,
+
+  sp_gross_profit: `"Est. Gross Profit" KPI — Est. Net Sales minus Est. Cost of Sales.
+
+Thresholds (GP vs Net Sales direction):
+- GP ≥5% growth + Net Sales growing = Good
+- GP flat + Net Sales growing = Neutral (watch for erosion)
+- GP declining + Net Sales growing = Bad (cost pressure or sourcing mix shifting to lower-margin suppliers)
+- Both declining = Bad (volume loss)
+
+Key signal: whether GP grows faster/slower than Net Sales — this reveals whether the current supplier mix is delivering margin or just volume. Report level and direction vs prior period.`,
+
+  sp_margin_pct: `"Gross Margin %" KPI — Est. Gross Profit as a share of Est. Net Sales.
+
+Thresholds (fruit distribution, supplier-side):
+- ≥15% = Good
+- 10–15% = Neutral
+- <10% = Bad
+- Drop ≥2pp vs prior = Flag (regardless of absolute level)
+
+Report level vs benchmark, direction vs prior period (a healthy margin trending down still warrants flagging — usually upstream price pressure), and whether movement is driven by Net Sales, COGS, or sourcing-mix shift.`,
+
+  sp_active_suppliers: `"Active Suppliers" KPI — distinct suppliers with purchase activity (is_active='T' AND purchase_qty>0).
+
+Supplier-page framing — shrinking is NOT automatically bad. Consolidation may concentrate volume on better suppliers (negotiating leverage, simpler logistics). Growth may be diversification OR reactive scrambling. Sudden large drops are the one clear flag (supplier exit, purchasing freeze, pipeline issue).
+
+Thresholds (MoM):
+- ±5% = Normal noise
+- −5% to −10% = Neutral (likely deliberate consolidation)
+- Drop >10% = Flag (consolidation vs disruption?)
+- Growth >15% = Flag
+
+Report direction and whether the change correlates with margin % (consolidation + improving margin = good story; consolidation + flat/falling margin = concentration risk without payoff).`,
+
+  sp_margin_trend: `"Profitability Trend" chart — monthly bars = Est. GP (RM), line = Margin % (right axis). Monthly only.
+
+Two questions: profit direction (RM) and efficiency (margin %).
+
+Thresholds:
+- 3+ consecutive months GP growth = Good
+- Flat / mixed = Neutral
+- 3+ consecutive months GP decline = Bad
+- Margin % declining 2+ months = Flag (even if GP flat — slow-moving sourcing problem)
+
+Look for: bars-vs-line divergence (e.g., GP up while margin flat = volume not pricing leverage), seasonal/festive shifts, months where GP and margin % move opposite directions (usually a sourcing-mix shift on a supplier page). Cite specific months from the monthly breakdown.`,
+
+  sp_margin_distribution: `"Margin Distribution" histogram — entities (suppliers OR items) per fixed Margin % bucket: <0%, 0–5%, 5–10%, 10–15%, 15–20%, 20–30%, 30%+.
+
+Entity toggle (Suppliers ↔ Items): data block contains BOTH distributions. Analyze and contrast — do not assume one view.
+
+Thresholds:
+- Any in <0% = sourcing at a loss (flag if >0)
+- Majority in 10–20% = Healthy
+- >40% in sub-10% bands = Bad (thin-margin sourcing)
+- >15% in 20%+ bands = Good (premium sourcing)
+
+Contrast:
+- Suppliers healthy + items thin = premium suppliers carrying weak-item tail (question the tail)
+- Items healthy + suppliers thin = good products via weak suppliers (commercial-terms issue, not product mix)
+- Both same direction = structural
+
+Report shape (skew / bimodal) of each view, share <10%, size of <0% bucket, and whether the two views agree or diverge — divergence is the most actionable signal.`,
+
+  // ─── Supplier Margin Breakdown (§4) ──────────────────────────────────────
+  sm_top_bottom: `"Top/Bottom Suppliers & Items" chart — 4 tables in data, sorted by Est. GP:
+(A) Top 10 suppliers (B) Bottom 10 suppliers (C) Top 10 items (D) Bottom 10 items.
+
+Thresholds:
+- Top 1 supplier > 15% of period GP = Bad (concentration risk)
+- Top 10 suppliers > 60% of GP = Bad (concentrated sourcing)
+- Top 10 suppliers < 40% of GP = Good (diversified)
+- Any bottom-list supplier with profit <0 = Critical (sourcing at a loss)
+- Any bottom-list item with profit <0 AND meaningful revenue = Flag (product-level loss-maker)
+
+Report: supplier-side vs item-side concentration, which loss-maker problem is bigger (suppliers or items), item-group / supplier clustering in the bottom lists. Cite named suppliers and items.`,
+
+  sm_supplier_table: `"Supplier Analysis Table" — sortable list of all active suppliers (Code, Name, Type, Items, Revenue, COGS, GP, Margin %).
+
+Data: (A) Top 10 by Revenue, (B) Bottom 10 by Margin % filtered to revenue ≥RM 10K, (C) Roll-ups: total count, loss-making count, top-10 revenue share, median margin %, avg revenue/supplier, thin-margin (<5%) count.
+
+Thresholds:
+- Top 10 revenue share >60% = Bad (concentrated)
+- 40–60% = Neutral (typical for distribution)
+- Loss-makers (margin <0) >0 = Always flag; name them
+- Thin-margin (<5%) >10% of active = Portfolio quality concern
+- Bottom-10 with revenue >RM 100K AND margin <5% = Critical
+
+Report: revenue concentration, whether bottom-margin tail is a few big offenders or long tail, supplier-type clustering in bottom 10, and any mismatch between biggest-revenue and best-margin suppliers (the actionable signal). Cite named suppliers.`,
+
+  sm_item_pricing: `"Item Price Comparison" panel — per-supplier purchase pricing for a SINGLE anchor item (highest purchase_total in period, named in data).
+
+Data: (A) Top 5 suppliers for the anchor item by volume with avg purchase price, est sell price, est margin %; (B) Period totals: total qty, total purchase RM, avg purchase price, min/max (best/worst on price); (C) Cross-supplier margin spread (best minus worst).
+
+Note: est sell price uses raw invoice + cash-sale lines (or pre-compute fallback) — margin estimates are anchor-item-specific, not business-wide.
+
+Thresholds:
+- Margin spread >10pp = Significant arbitrage opportunity
+- Any supplier's est margin <0 on this item = Loss-making — flag
+- Cheapest carries >50% of item volume = Procurement on best price (neutral)
+- Cheapest carries <20% of item volume = Volume on a more expensive supplier — flag
+
+Report: whether volume leader = price leader (aligned vs arbitrage risk), price-spread width (quality/grade vs procurement gap), margin spread, and whether the same supplier delivers best (or worst) margin.
+
+Frame conclusions as "for this anchor item specifically" — do NOT generalize. Cite suppliers by name.`,
+
+  sm_price_scatter: `"Purchase vs Selling Price" scatter — one dot per item: x=avg purchase price, y=avg sell price, size=revenue.
+
+Data: (A) Top 50 items by revenue with code, name, suppliers, avg purchase, avg sell, margin %, revenue; (B) Margin bucket distribution across full universe: <0, 0–5, 5–10, 10–20, 20+; (C) Loss-maker counts (top-50 and full universe); (D) Universe size.
+
+Thresholds:
+- Top-50 item with margin <0 = Always flag (these move the P&L)
+- >20% of universe in <5% bucket = Thin-margin catalog
+- >10% of universe in 20+ bucket = Premium pocket worth protecting
+- Top-50 item with margin <0 AND revenue >RM 100K = Severe (fixing one moves the needle)
+
+Report: bucket-distribution shape (left-skewed loss / centered thin / right-skewed premium / bimodal), price-spread outliers in top-50, named loss-making top-50 items with supplier names and RM revenue, and whether loss-makers cluster on same suppliers (structural quality issue) or are spread across many (item-level problem). Cite items by name.`,
+
+  // ─── Return Trend (§5) ────────────────────────────────────────────────────
+  rt_total_returns: `"Total Returns" KPI — period return value (RM) + CN count. Period flow, not point-in-time.
+
+Data: return value, CN count, net sales, return rate %, avg per CN.
+
+Thresholds (return rate %):
+- <2% = Healthy (normal fruit-distribution wastage)
+- 2–5% = Watch
+- >5% = Concern (quality / sourcing / handling)
+
+Report: return rate vs net sales (anchor metric), small-frequent vs large-infrequent (avg per CN), vs typical wastage baseline.`,
+
+  rt_settled: `"Settled" KPI — return exposure resolved via knock-off (offset against future invoices) or refund (cash/cheque paid out).
+
+Data: total settled, knocked off, refunded, settled %, knock-off %, refund %, refund count.
+
+Thresholds:
+- Knock-off >70% = Healthy (cash-efficient)
+- Refund >30% = Concern (cash-draining)
+- Refund-dominant + high absolute refund = working-capital flag
+
+Domain: knock-off is preferred (no cash leaves the bank). Refund only fits ending relationships or customers with no upcoming invoices.
+
+Report: channel mix (cash-efficient vs cash-draining) and overall settled % (closing exposure or letting it linger).`,
+
+  rt_unsettled: `"Unsettled" KPI — period return value NOT knocked off or refunded; open exposure on the books.
+
+Data: total unsettled, unsettled %, partial count, outstanding count, reconciled count, reconciliation rate %.
+
+Thresholds (unsettled % of return value):
+- <15% = Healthy
+- 15–30% = Watch
+- >30% = Concern (exposure piling up)
+
+Report: scale vs total return pool, whether driver is partials (process friction) or outstandings (stuck on customer action), and reconciliation rate as overall health signal.`,
+
+  rt_return_pct: `"Return %" KPI — return value as a share of net sales. The single most important return-health ratio (normalises exposure against sales volume).
+
+Data: return rate %, period return value, period net sales.
+
+Thresholds:
+- <2% = Healthy (normal fruit-distribution wastage)
+- 2–5% = Watch
+- >5% = Concern (quality / handling / sourcing)
+
+Report: which band the value sits in, implied scale in concrete RM (e.g., 3% on RM 10M = RM 300K), and whether the ratio alone is actionable vs needing trend context (covered by trend components).`,
+
+  rt_settlement_breakdown: `"Settlement Breakdown" chart — three horizontal bars for the period: Knocked Off, Refunded, Unsettled, each as RM and % of total return value.
+
+Data: total return value, knocked off RM + %, refunded RM + %, unsettled RM + %, refund transaction count.
+
+Thresholds:
+- Knock-off >70% = Healthy (cash-efficient)
+- Refund >30% = Concern (cash-draining)
+- Unsettled >30% = Concern (exposure piling up)
+- Knock-off <50% AND Refund > Knock-off = Flag (refund-dominant)
+
+Domain: knock-off preferred (no cash out, offsets future invoices). Refund last-resort (real cash out, hits working capital). Unsettled = process broken (neither absorbed nor refunded).
+
+Report: mix shape (knock-off / refund / unsettled dominant), which channel carries the resolved piece, and whether unsettled slice warrants investigation.`,
+
+  rt_monthly_trend: `"Monthly Return Trend" chart — two area series over time: Return Value and Unsettled, by month. Respects date filter.
+
+Data: month-by-month table (month, return value RM, unsettled RM, CN count). Roll-ups: total months, highest/lowest month by value, MoM growth in CN count between first and last month, peak unsettled month.
+
+Thresholds:
+- MoM return count growth >25% (first vs last month) = Concern
+- Unsettled rising while return value flat or falling = Process breakdown
+- Return value and unsettled moving together = Volume-driven exposure
+
+Report: direction (up / flat / down), whether unsettled tracks return value (normal) or diverges (process issue), and outlier months (spike in count, value, or unsettled). Use month names and roll-ups from the data only.`,
+
+  rt_product_bar: `"Top Returns by Item" chart — horizontal bar, top 10 items in the period. UI toggles dimension (All / Product / Variant / Country) and metric (Frequency / Value); analysis covers BOTH metric views on the default item dimension.
+
+Data:
+(A) Top 10 by frequency (CN count) — what gets returned most often
+(B) Top 10 by value (RM) — what hurts the P&L most when returned
+(C) Period totals + top-1 / top-10 share of return value
+
+Thresholds:
+- Top 1 >15% of period return value = Severe concentration
+- Top 10 >60% = Concentrated (few items driving — fixable)
+- Top 10 <40% = Diversified (broad quality issue — harder to fix)
+- Item on BOTH lists = Star problem (high occurrence AND high cost per return)
+
+Report: concentration (one or two items vs spread), frequency-vs-value pattern (consistent or split — break-often-cheap vs rare-but-big), and explicitly name items on both lists (highest-leverage fixes). Drill-downs to Product/Variant/Country are user-driven.`,
+
+
+  // ─── Return Unsettled (§6) ────────────────────────────────────────────────
+  ru_aging_chart: `"Aging of Unsettled Returns" chart — current unsettled book by age bucket. SNAPSHOT, cumulative across all months, NOT date-filtered.
+
+Buckets:
+- 0–30 Days — fresh, normal reconciliation window
+- 31–60 — starting to age
+- 61–90 — process slowing
+- 91–180 — active follow-up needed
+- 180+ — write-off risk
+
+Data: RM and count per bucket, total unsettled RM + count, % share per bucket, snapshot_date.
+
+Thresholds:
+- >25% of unsettled value in 91+ buckets (91–180 + 180+) = Watch (follow-up falling behind)
+- >10% in 180+ alone = Write-off risk (rarely recovered in distribution)
+
+Report: where the weight sits (fresh 0–30 vs old 91+), whether 180+ is material enough for write-off review, and count-vs-amount story (many small old vs a few large). If skew looks unusual, tools may pull prior pc_return_aging snapshots.`,
+
+  ru_debtors_table: `"Customer Returns" table — every debtor with return CN history; cumulative totals: return count, total value, knocked off, refunded, unresolved. Sorted by unresolved desc; debtors with unresolved=0 hidden by default. SNAPSHOT, cumulative, NOT date-filtered.
+
+Data: total unsettled, debtor count with unresolved >0, stale-debtor count (unresolved >0 AND knock_off=0 AND refund=0 — never actioned), top-1 share %, top-10 share %, top-5 list (name, unresolved RM, knocked off RM, refunded RM).
+
+Thresholds:
+- Top 1 debtor >15% of total unsettled = Single-point risk
+- Top 10 >60% = Concentrated book (fixable with focused collections push)
+- Stale debtors = pure process failure (collections never engaged)
+
+Domain: knock-off preferred (offsets invoices, no cash out). Refund = real cash out, only fits ending relationships. Debtor with refund activity but still unresolved = critical flag (cash left, book not clean).
+
+Report: concentration (one big, ten big, or spread), stale-debtor count (process failure vs active dispute), settlement patterns on top 5 (knock-off vs refund vs neither), and critical-flag debtors. Name top 5 verbatim. If a debtor looks unusual, tools may query pc_return_by_customer by debtor_code or drill dbo.CN.`,
+
+  // ─── Expense Overview (§7) ──────────────────────────────────────────────
+  ex_total_costs: `"Total Costs" KPI — period flow of COGS + OpEx posted to GL (not point-in-time balance).
+
+Data: total RM, COGS RM + %, OpEx RM + %, prior-year total, YoY %.
+
+YoY thresholds:
+- <0% = Healthy
+- 0–5% = Watch (typical inflation)
+- 5–10% = Concern
+- >10% = Severe
+
+COGS share thresholds:
+- 60–80% = Typical fruit-distribution mix
+- >85% = COGS-dominated (margin-pressure risk)
+- <50% = OpEx-dominated (scaling inefficiency risk)
+
+Report YoY direction, COGS/OpEx mix health, and scale of the period.`,
+
+  ex_cogs: `"COGS" KPI — variable cost of products sold (acc_type='CO'). COGS scales with sales; YoY growth is only concerning if it outpaces sales.
+
+Data: COGS RM, % of total cost, prior-year RM, YoY %, top 3 accounts (name, acc_no, RM, %).
+
+Thresholds:
+- COGS share 60–80% = Typical
+- COGS share >85% = Margin-pressure risk
+- COGS YoY >15% with flat/declining sales = Concern
+
+Critical framing: COGS is variable. The question is whether COGS grew faster than sales (margin compression) or slower (improvement). Flag YoY drift; defer the margin call to the sales-page cross-check.
+
+Report scale vs total cost, YoY direction, and top-3 mix concentration.`,
+
+  ex_opex: `"OpEx" KPI — semi-fixed operating expenses (acc_type='EP'); driven by structural decisions (headcount, rent, tooling), not sales volume.
+
+Data: OpEx RM, % of total cost, prior-year RM, YoY %, top 3 accounts (name, acc_no, RM, %).
+
+Thresholds:
+- YoY >10% = Concern (semi-fixed; unexplained growth needs investigation)
+- YoY <0% = Healthy (cost discipline)
+- OpEx share >50% = OpEx-dominated (verify intentional scaling)
+
+Critical framing: OpEx should NOT scale linearly with sales. OpEx YoY growth is a stronger signal than COGS YoY growth — name the structural driver if growth is high.
+
+Report scale vs total cost, YoY direction, and top-3 structural drivers.`,
+
+  ex_yoy_costs: `"vs Last Year" KPI — YoY change in total costs, broken into COGS and OpEx components.
+
+Data: current total RM, prior-year RM, YoY %, color band (Green/Amber/Red/Severe), COGS YoY (current/prior/%), OpEx YoY (current/prior/%).
+
+Thresholds (total YoY):
+- <0% = Green (Healthy — costs falling)
+- 0–5% = Amber (Watch — typical inflation)
+- 5–10% = Red (Concern)
+- >10% = Severe
+
+Report:
+- Which band the total YoY sits in
+- Whether COGS or OpEx drives the move (bigger absolute RM vs bigger %)
+- Story type: COGS YoY > OpEx YoY = volume-driven (more sales); OpEx YoY > COGS YoY = structural change (more alarming — OpEx is semi-fixed)`,
+
+  ex_cost_trend: `"Cost Trend" chart — stacked monthly bars with COGS + OpEx layers (All view; cost-type toggles are user-driven).
+
+Data: monthly table (Month, COGS RM, OpEx RM, Total RM) plus roll-ups: months in period, peak month + RM, lowest month + RM, MoM growth (first→last), period vs prior-year YoY %.
+
+Thresholds:
+- MoM growth (first→last) >15% = Concern
+- MoM growth >25% = Severe
+- Period YoY total >10% = Severe
+
+Report:
+- Direction across period (rising / flat / falling)
+- Outlier months (spike or trough)
+- Whether COGS or OpEx carries the trend (which moves more month-to-month)
+- Period vs prior-year comparison
+
+Cite months and values from the data block — do not invent.`,
+
+  ex_cost_composition: `"Cost Composition" donut — COGS vs OpEx slices with RM and %.
+
+Data: total cost RM, COGS RM + %, OpEx RM + %, mix classification (Typical / COGS-dominated / OpEx-dominated / Mixed), prior-year COGS % and OpEx %, COGS share drift in pp (current − prior).
+
+Thresholds:
+- COGS share 60–80% = Typical fruit-distribution mix
+- COGS share >85% = COGS-dominated (margin-pressure risk)
+- COGS share <50% = OpEx-dominated (scaling inefficiency risk)
+- COGS drift >+3pp with flat sales = Margin compression
+- COGS drift <−3pp = Margin improvement OR inventory under-investment
+
+Report mix classification, drift direction and size, and what the drift implies (compression / improvement / OpEx-side change). Do not recompute %.`,
+
+  ex_top_expenses: `"Top Expenses" chart — top 10 GL accounts by net cost, bars colored by COGS vs OpEx (All / Top view; other toggles user-driven).
+
+Data: total cost RM, top 10 table (rank, name, acc_no, cost type, net cost RM, %), top 1 share, top 10 share (sum + %), concentration class (Severe / Concentrated / Moderate / Diversified), top-10 COGS-vs-OpEx count.
+
+Thresholds:
+- Top 1 >30% = Severe (single-account risk)
+- Top 1 15–30% = Concentrated
+- Top 10 >75% = Concentrated (few accounts drive cost base — fixable)
+- Top 10 <50% = Diversified (broad base — harder to attack)
+
+Report:
+- Concentration: handful of accounts vs spread
+- Mix at the top: COGS-dominated (volume-driven) vs OpEx-dominated (structural — investigate)
+- Any single account >15% of total cost — name and flag
+
+Name accounts verbatim. Do not change acc_no.`,
+
+  // ─── Expense Breakdown (§8) ──────────────────────────────────────────────
+  ex_cogs_table: `"Cost of Sales Breakdown" table — every active acc_type='CO' account for the period. Columns: Account No, Name, Net Cost RM, % of Total COGS.
+
+Data: total COGS, active COGS account count (thin-surface flag if <5), top 10 (rank, name, acc_no, net cost, %), pre-computed Top 1 / Top 3 / Top 10 share with class labels, negative-value accounts.
+
+Thresholds:
+- Top 1 >50% = Severe (single-account exposure in variable cost base)
+- Top 1 30–50% = Concentrated (typical for dominant-fruit sourcing — not auto bad)
+- Top 1 <15% = Diversified
+- Top 3 >80% = Concentrated (normal for focused distributor)
+- Top 3 <55% = Diversified
+- Active COGS accounts <5 = Thin COGS surface (GL discipline flag)
+- Negative net_cost on any account = Flag (likely credit note posted to expense)
+
+Report:
+- Concentration: name top 1 if dominant — a unit-price change there moves the whole COGS line
+- Top 3 mix: meaningful tail or 3-account story
+- Negative-value accounts large enough to distort total
+- Do NOT compare to prior year (that is the Overview's job)
+
+Name accounts verbatim from the top-10 block.`,
+
+  ex_opex_table: `"Operating Costs Breakdown" table — every active acc_type='EP' account, grouped by category (People & Payroll, Vehicle & Transport, Property & Utilities, Depreciation, Office & Supplies, Equipment & IT, Insurance, Finance & Banking, Professional Fees, Marketing & Entertainment, Repair & Maintenance, Tax & Compliance, Other). Columns: Category/Account, Name, Net Cost RM, % of Total OpEx.
+
+Data: total OpEx, active account count + active category count, category subtotals (category, account count, subtotal, % — sorted desc), top 10 accounts across all categories (rank, category, name, acc_no, net cost, %), Top 1 category share, Top 1 / Top 3 account shares with class labels, singleton categories, negative-value accounts.
+
+Thresholds:
+- Top 1 category >50% = Dominant (one cost center carries the base)
+- Top 1 category 30–50% = Typical dominance (usually People & Payroll, Vehicle & Transport, or Property & Utilities)
+- Top 1 category <20% = Diversified across categories
+- Top 1 account >20% of total OpEx = Single-account risk (name it)
+- Top 3 accounts >50% = Concentrated
+- Singleton category (1 account) = Flag (possible misclassification or sparse data)
+- Negative net_cost = Flag (likely reversal)
+
+Report:
+- Category concentration: People & Payroll / Vehicle / Property dominating = normal; Marketing & Entertainment dominating = not
+- Single-account risk in the dominant category — name the account if Top 1 >20%
+- Out-of-proportion categories = investigation lead
+- Singletons and negatives = data-quality flags only — brief mention
+- Do NOT compare to prior year (Overview's job)
+
+Name categories and accounts verbatim.`,
+
+  // ─── Financial page §9 — financial_overview ──────────────────────────────
+
+  fin_pnl_summary: `"P&L Summary" — full P&L waterfall for the fiscal window: Net Sales, Cost of Sales, GP, OpEx, Operating Profit, Other Income, Net Profit (each with current RM, prior-year RM, YoY %, margin/ratio).
+
+Thresholds:
+- Gross margin: <15% Severe · 15–20% Watch · 20–25% Typical · >25% Strong
+- OpEx ratio: <10% Lean · 10–18% Typical · 18–25% Elevated · >25% Severe
+- Operating margin: <0% Severe · 0–5% Thin · 5–10% Healthy · >10% Strong
+- Net margin: <0% Severe · 0–3% Thin · 3–7% Healthy · >7% Strong
+- COGS share: 60–80% Typical · >85% Margin pressure
+
+Evaluate top-to-bottom:
+1. Top-line: Net Sales YoY growth/contraction
+2. Cost pressure: COGS vs Net Sales growth (rising COGS share = margin compression)
+3. Gross Profit: RM and margin % (RM up + margin down = volume masking cost erosion)
+4. OpEx ratio drift (OpEx > sales growth = scaling inefficiency)
+5. Operating Profit: positive/negative — core-business read
+6. Earnings quality: Net Profit >> Operating Profit means Other Income carries the delta (core weaker than headline)`,
+
+  fin_monthly_trend: `"Monthly P&L Trend" chart — monthly Net Sales, COGS, GP, OpEx, Operating Profit across the fiscal window (Mar→Feb).
+
+Pre-calculated roll-ups (cite directly):
+- Months in window (profit vs loss split)
+- Peak / lowest operating-profit month
+- First-to-last Net Sales growth %
+- First-to-last Operating Profit growth %
+
+Thresholds:
+- Any single loss month = Watch (name it)
+- Loss months / total >30% = Concern
+- First-to-last Operating Profit decline >25% = Severe
+
+Evaluate:
+- Direction: rising / flat / falling / oscillating
+- Loss months: presence, names, clustered (seasonal/event) or scattered
+- Sales-vs-profit divergence: sales up + profit down = margin compression
+- Use pre-calculated first-to-last growth for headline. Do NOT compute averages over arbitrary sub-windows.`,
+
+
+  // ─── Financial page §10 — financial_pnl ──────────────────────────────
+
+  fin_pl_statement: `"Profit & Loss Statement" table — full P&L for the fiscal year vs prior FY (YTD-aligned), grouped by account type (Sales, Sales Adjustments, COGS, Other Income, OpEx, Taxation), with subtotals, GP/(Loss), NP/(Loss), NPAT, and YoY.
+
+Pre-fetched data:
+- Group subtotals (current vs prior) with YoY %
+- Derived totals: GP, NP (pre-tax), NPAT
+- Gross Margin %, Net Margin % (current vs prior, drift in pp)
+- Sign-flip flags for GP / NP / NPAT
+- Top 5 detail-account movers by |Δ RM|
+
+Thresholds:
+- Group YoY: <±5% Flat · ±5–15% Moderate · >±15% Material
+- Gross Margin drift: ±3pp Material · ±5pp Severe
+- Net Margin drift: ±2pp Material · ±3pp Severe
+- Any GP/NP/NPAT sign flip = Severe (call out by name)
+
+Evaluate:
+- Which groups drive RM direction (e.g. "Net Sales up RM X, offset by OpEx up RM Y")
+- Margin expansion vs compression — direction and magnitude
+- 1–2 named accounts from top-5 movers explaining biggest swings
+
+Hard rules:
+- Cite only account names from the top-5 movers list.
+- Do NOT recompute YoY % — figures are authoritative.`,
+
+  fin_yoy_comparison: `4-FY view of P&L lines (Net Sales, COGS, GP, GM%, Other Income, OpEx, NP, NM%, Tax, NPAT) — selected FY + 3 prior. Partial FYs marked *.
+
+Pre-calculated (FULL-FY only; partials excluded):
+- Net Sales CAGR (first → last full FY)
+- GM drift (pp), NM drift (pp)
+- Longest NP decline streak (yrs)
+- Longest NP improvement streak (yrs)
+- NPAT sign-flip count
+
+Thresholds:
+- Net Sales CAGR: <-5% Declining · -5–5% Flat · 5–15% Growing · >15% Fast
+- NP: 3+ consecutive declines = Severe · 3+ improvements = Strong
+- GM drift first→last: >±3pp = Material structural shift
+- NM drift first→last: >±2pp = Material
+- Any NPAT sign flip = Severe
+
+Evaluate:
+- Trajectory: top-line direction (cite CAGR)
+- Earnings: improving / oscillating / declining (cite longest streak)
+- Margin structure: more / less profitable per RM of sales
+
+Hard rules:
+- Partial FYs (*) excluded from CAGR + trend claims.
+- Use pre-calculated CAGR/drift; no recompute.
+- Don't claim a streak longer than pre-calculated.`,
+
+
+  // ─── Financial page §11 — financial_balance_sheet ──────────────────────────────
+
+  bs_trend: `Monthly time series across fiscal window: Total Assets, Total Liabilities, Equity (rebuilt monthly from opening balance + cumulative pc_pnl_period movements).
+
+Pre-calculated:
+- Months in window
+- First→last growth %: Assets, Liabilities, Equity
+- Gearing (Liab ÷ Assets): first, last, drift (pp)
+- Longest Equity-decline streak (months)
+- Months where Liabilities > Assets (negative-equity flag)
+
+Thresholds:
+- Asset trajectory first→last: <-5% Shrinking · ±5% Flat · 5–15% Growing · >15% Fast
+- Equity declining first→last = Watch · 3+ consecutive decline months = Severe
+- Liabilities up >10% while Assets flat/shrinking = Material · >20% = Severe
+- Gearing drift: >+3pp Material · >+5pp Severe
+- Any month Liab > Assets = Severe insolvency (call out by month name)
+
+Evaluate:
+- Direction: rising / flat / falling / diverging
+- Leverage: gearing drift direction
+- Equity health: building / holding / eroding (cite decline streak)
+
+Hard rules:
+- Use pre-calculated growth + gearing drift; no sub-window recompute.
+- Negative-equity months MUST be called out by month name.`,
+
+  bs_statement: `Full BS, selected FY vs 12 periods prior (YTD-aligned). 8 line items by acc_type (Fixed Assets, Other Assets, Current Assets, Current Liabilities, LT Liabilities, Other Liabilities, Capital, Retained Earnings) + derived totals + solvency ratios.
+
+Pre-fetched:
+- Line items current vs prior: Δ RM, YoY % (non-zero only)
+- Derived totals: Net Current Assets, Total Assets, Total Liabilities, Total Equity
+- Ratios (current/prior/drift): Current Ratio, D/E, Equity Ratio
+- Sign-flip flags: Net Current Assets, Total Equity
+- Top 3 |Δ RM| movers
+
+Thresholds:
+- Line YoY: <±5% Flat · ±5–15% Moderate · >±15% Material
+- Current Ratio: <1.0 Severe · 1.0–1.2 Thin · 1.2–2.0 Healthy · >2.0 Strong · drift >±0.3 = Material
+- D/E: <0.5 Conservative · 0.5–1.0 Typical · 1.0–2.0 Leveraged · >2.0 Severe · drift >±0.3 = Material
+- Equity Ratio: <20% Severe · 20–40% Thin · 40–60% Healthy · >60% Strong · drift >±5pp = Material
+- Net Current Assets sign flip (pos→neg) = Severe (call out)
+- Total Equity sign flip = Severe insolvency (call out)
+
+Evaluate:
+- Liquidity: Current Ratio band + drift
+- Leverage: D/E position + direction
+- Solvency: Equity Ratio + thickening/eroding
+- Drivers: 1–2 names from top-3 movers
+
+Hard rules:
+- Cite only names from top-3 movers list.
+- Do NOT recompute YoY % or ratios.`,
+
+
+  // ─── Financial page §12 — financial_variance / FP&A ──────────────────────────────
+
+  fv_variance_summary: `Current FY window's P&L vs TWO baselines:
+1. YoY — vs same window prior FY
+2. Budget — vs approved budget (only if one is approved)
+
+Pre-fetched:
+- YoY table per line (Net Sales, COGS, GP, OpEx, Operating Profit, Other Income, NP): Actual / Baseline / Var RM / Var % / Status
+- Budget table (if present): same columns vs Budget
+- Favourable: Revenue ↑ = Favourable; Cost (COGS, OpEx) ↓ = Favourable
+- Margin compare: GM%, NM% drift (pp)
+
+Thresholds:
+- ±5% On Track · ±5–15% Moderate · >±15% Material
+- Sign flip (profit↔loss) = Severe
+
+Evaluate:
+- Biggest deviations (lines, direction)
+- Favourable vs unfavourable
+- Margin direction vs prior year
+- If budget present: on track / over / under
+- Overall: better or worse
+
+Hard rules:
+- YoY: label baseline "same period last year".
+- Budget: label "approved budget".
+- No budget section → do NOT mention budgets.
+- Do NOT recompute variance %.`,
+
+  fv_variance_breakdown: `"Variance by Account" breakdown — GL-account-level P&L variance, showing which accounts within each category (Sales, COGS, OpEx, Other Income) drove overall variance.
+
+Pre-fetched data:
+- Per-account-type sections (COGS, OpEx, etc.)
+- Per account: current, baseline, variance RM, variance %, Favourable/Unfavourable
+- Sorted by absolute variance (biggest first); non-zero only
+
+Thresholds:
+- Single account >30% of category variance = Concentrated risk
+- Top 3 accounts >70% of category variance = Highly concentrated
+- Any account variance >±50% = Flag for investigation
+
+Evaluate:
+- Within each category, top 1–3 named movers
+- Concentration: few accounts vs spread across many
+- Accounts with unusually large % swings worth attention
+
+Hard rules:
+- Cite only account names from the pre-fetched data.
+- Do NOT recompute RM or %.
+- Focus on top movers — do not narrate every small account.`,
+
+  fv_trend_forecast: `12-month forward projection (Net Sales, GP, NP) — system-computed via 3-mo weighted MA (50/30/20). EXPLAIN, do NOT generate.
+
+Pre-fetched:
+- Recent monthly trend (Net Sales / GP / NP)
+- 12-mo forecast: M+1 → M+12 per line
+- Trend direction + signal (rising/falling/flat, Strong/Weak)
+- Confidence band: Narrowing / Widening
+- Per metric: weighted Δ, last actual, milestones M+1/+3/+6/+12
+
+Thresholds:
+- Direction consistent 4+ months = Strong
+- Mixed/oscillating = Weak (state)
+- Forecast sign flip (profit→loss) = Severe
+- M+4+ uncertainty rises (state)
+- M+7–+12 long-range (caution)
+
+Evaluate:
+- Per line: recent direction
+- Milestones M+1/+3/+6/+12
+- Signal strength
+- Note long-range unreliability
+- Call out any projected loss or sign flip
+
+Hard rules:
+- Forecasts PRE-COMPUTED; no own projections.
+- Disclaim: AI estimates, not formal projections.
+- Use "approximately"/"around"; no precision claims.
+- Summarise milestones; don't list all 12.`,
+
+  fv_budget_suggestions: `"AI Budget Suggestions" — system-generated budget for the next fiscal period from current-period actuals annualised.
+
+Pre-fetched data:
+- Headline P&L suggestions (Net Sales, Cost of Sales, GP, OpEx, NP): current actual, prior actual, YoY %, suggested monthly + annual
+- Category-level suggestions (Sales, COGS, OpEx, Other Income): same columns + trend direction + signal strength
+- Trend direction: rising/falling/flat, Strong/Weak (from MoM consistency)
+- If approved budget exists: comparison table approved vs suggested with diffs
+
+Evaluate:
+- Categories with strong consistent trends (suggestion more reliable)
+- Categories with weak/volatile trends (treat with caution)
+- Categories where YoY growth materially +/− and budget should track that
+- Overall: growing / contracting / stable
+- Any category where suggested differs materially from prior year
+- If approved budget exists: flag material gaps vs latest suggestions (budget may need updating)
+
+Hard rules:
+- Suggestions are PRE-COMPUTED — do NOT invent numbers.
+- No approved budget: frame as "starting points for budget discussions" + note no budget approved.
+- Approved budget exists: compare and highlight discrepancies.
+- Do NOT recompute.`,
+
+};
+
+// ─── Summary Prompt ──────────────────────────────────────────────────────────
+
+export const DEFAULT_SUMMARY_SYSTEM = `## ROLE
+Senior financial analyst summarizing a dashboard section for a senior director at Hoi-Yong (Malaysian fruit distribution).
+
+## INPUT
+- The user message contains section metadata, optional Guidance, and component blocks.
+- Each component block has ABOUT and RAW DATA.
+- ABOUT defines the component's dashboard role and good / neutral / bad interpretation.
+- RAW DATA is the dashboard-visible data for analysis.
+- Cite only numbers found in RAW DATA or tool-call results.
+
+## DATA INTEGRITY
+- Use numbers exactly as given in raw data blocks or tool results — never re-derive, back-solve, or invent. Sub-period averages: copy from "Pre-calculated half-period averages" lines.
+- Match the Scope line (period / snapshot / fiscal). Format RM with thousands separators (RM 5,841,378); rounding OK (→ RM 2.29M).
+- Apply each component's About block as the authority on good/neutral/bad — never invent thresholds.
+- If data is insufficient, say so.
+
+## TOOL ACCESS
+- Query the DB for evidence behind findings — name the drivers (customers, products, months, agents). Max 2 calls; stop when you have enough.
+- Don't re-query data already in the raw data blocks.
+- Prefer pre-aggregated \`pc_*\` tables. Use \`dbo.*\` only for document-level drill-down (invoices, cash sales, credit notes, AR invoices/payments, knock-offs); each tool's schema is authoritative — never assume other columns exist. \`dbo.*\` queries for IV/CS/CN/ARInvoice/ARPayment must include \`Cancelled = 'F'\`.
+
+## OUTPUT
+
+### Delimiter format
+Use this EXACT structure (no JSON, no code blocks):
+
+===INSIGHT===
+sentiment: good|bad
+title: Punchy headline (max 50 chars; lead with the noun and the change, not the verb — "12% decline in net sales" beats "Net sales has declined 12%")
+metric: Key number e.g. 84.3%, 43 days, RM 2.1M (max 25 chars)
+summary: One plain-text sentence — card preview (max 80 chars, no markdown)
+---DETAIL---
+Concise markdown analysis (~150 words soft cap)
+===END===
+
+Max 3 good + 3 bad insights total. Rank by business impact.
+
+### Detail structure (ALL subsections mandatory, in this order)
+1. **Current Status** — ONE prose sentence (max 30 words) framing the headline number and scope. Not bullets.
+2. **Key Observations** — 2–3 bullets with specific numbers/dates. Each bullet leads with a bold pattern label.
+3. **Evidence** (positive insights) or **Root Cause** (negative insights) — top 3–5 contributors. Use a Markdown table (min 3 rows) when top-N data is available; otherwise 3–5 bullets.
+4. **Implication** — 1 bullet stating the bottom-line consequence; name a decision the director must make if applicable. Do not recommend.
+
+### Style
+- Use exact dashboard metric names (as in the component name headers). Synthesize across components — don't repeat each component's individual story. No contradicting good/bad insights on the same metric. State facts, not recommendations; no jargon, no filler.
+- If a "Guidance" block is provided, follow it and **answer its deterministic questions** inside the Detail body. If it includes an "Output Override", apply that override in place of the Detail structure above.`;
+
+// ─── Section Guidance Prompts ────────────────────────────────────────────────
+// One per dashboard section. Injected into the Summary user message so Sonnet
+// answers the section's deterministic questions (PRD §16) and follows any
+// Output Override the admin has added. Also a routable target for the
+// Feedback Router so section-wide feedback ("the whole Sales section is too
+// verbose") has a home instead of being forced into a single component prompt.
+//
+// Empty string => injection skipped at builder time. Finance Guidance defaults
+// are intentionally blank so the summary prompt only receives a Guidance block
+// after admins create a non-empty version from feedback.
+
+export const DEFAULT_SECTION_GUIDANCE: Record<string, string> = {
+  payment_collection_trend: '',
+  payment_outstanding: '',
+  sales_trend: '',
+  sales_breakdown: '',
+  customer_margin_overview: '',
+  customer_margin_breakdown: '',
+  supplier_margin_overview: '',
+  supplier_margin_breakdown: '',
+  return_trend: '',
+  return_unsettled: '',
+  expense_overview: '',
+  expense_breakdown: '',
+  financial_overview: '',
+  financial_pnl: '',
+  financial_balance_sheet: '',
+  financial_variance: '',
+};
+
+// ─── Feedback Router System Prompt ───────────────────────────────────────────
+// Used by POST /api/ai-insight/feedback (Phase 1 of feedback loop).
+// Routes raw user feedback to the most likely component prompt within the
+// section the user was looking at, and compacts the feedback to bullets.
+
+export const DEFAULT_FEEDBACK_ROUTER_SYSTEM = `You triage end-user feedback on AI Insight outputs at Hoi-Yong (Malaysian fruit distribution).
+
+The user message lists this section's prompt keys, each tagged:
+- \`(guidance)\` — the section's Guidance prompt (one)
+- \`(kpi)\` / \`(chart)\` / \`(table)\` / \`(breakdown)\` — component prompts (one per card)
+
+What each prompt contains:
+- **Component prompt** — defines ONE card's metric, criteria, and thresholds (good/neutral/bad). Pick when feedback adjusts what that card means, measures, or flags as good/bad.
+- **Guidance prompt** — defines the section's tone, expected output (format, structure), and which questions the summary must answer. Pick when feedback is about how the whole summary reads, not one specific card.
+
+Pick exactly ONE key. Try components first; use Guidance only when no component fits.
+
+Always call select_target. Never reply in prose. Never invent a key — choose only from the keys provided.`;
+
+// ─── Surgical Editor System Prompt ───────────────────────────────────────────
+// Used by POST /api/admin/ai-insight-feedback/[id]/preview (Phase 2).
+// Rewrites the targeted component prompt to incorporate the compacted feedback
+// while preserving structure (headings, threshold blocks, formula lines).
+
+export const DEFAULT_SURGICAL_EDITOR_SYSTEM = `Surgical editor for AI Insight prompts at Hoi-Yong (Malaysian fruit distribution).
+
+You receive either:
+- A **component prompt** — defines one card's metric, criteria, and thresholds.
+- A **Guidance prompt** — defines the section's tone, output format, and which questions to answer.
+
+Inputs:
+- CURRENT — the prompt being edited.
+- FEEDBACK — raw user feedback. Interpret intent.
+
+Output: the full revised body + one-line change summary (max 100 chars). Always call propose_edit — never reply in prose.
+
+Rules:
+- Smallest diff. Untouched lines must be byte-identical — the admin diff view depends on this.
+- Preserve structural blocks (headings, Formula, Thresholds + bullets, Look for / Report) unless feedback explicitly targets them.
+- Don't invent thresholds, numbers, or domain rules.
+- Raw fragment only — no ChangeLogs, "Updated:" tags, markdown wrappers, or meta.
+
+Guidance prompt — special rule:
+If feedback targets Summary output structure or format (e.g. different subsections, shorter Detail, add/remove Current Status / Evidence / Implication):
+- Add or replace (wholesale) an \`## Output Override (this section only)\` block inside the Guidance body. Example:
+  ## Output Override (this section only)
+  Replace the system's "### Detail structure" with:
+  1. <new subsection 1>
+  2. <new subsection 2>
+- Never edit the global summary_analysis prompt. Component prompts are out of scope for output-format changes.`;
+~~~

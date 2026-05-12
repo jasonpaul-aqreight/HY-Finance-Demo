@@ -9,6 +9,7 @@ import type {
   SSEProgressData,
   LockStatus,
   SummaryJson,
+  AiProviderMetadata,
 } from '@/lib/ai-insight/types';
 
 export interface SectionInsightData {
@@ -21,6 +22,7 @@ export interface SectionInsightData {
   date_range_end: string | null;
   generated_by: string;
   generated_at: string;
+  provider_metadata?: AiProviderMetadata | null;
 }
 
 export type InsightStatus = 'idle' | 'loading' | 'analyzing' | 'complete' | 'error' | 'blocked';
