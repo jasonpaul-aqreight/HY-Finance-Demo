@@ -39,7 +39,7 @@ import {
 import { fyNameToNumber, fyToPeriodRange, periodLabel } from '../pnl/period-utils';
 import { getSettingsV2 } from '../payment/settings';
 import { getV2PLStatement, getMultiYearPL, getV3BSTrend, getV3BSComparison } from '../pnl/queries';
-import { getBudget } from '../budget/queries';
+import { getGlobalBudget } from '../budget/queries';
 import type {
   SectionKey,
   DateRange,
@@ -4506,81 +4506,25 @@ const fiscalPeriodFetchers: Record<string, FiscalPeriodFetcher> = {
   async fv_variance_summary(period) {
     const s = await getFiscalSlice(period);
     const c = s.current;
-    const p = s.prior;
 
     const fmtRm = (v: number) => `RM ${v.toLocaleString('en-MY')}`;
     const fmtPct = (v: number | null) => v == null ? 'n/a' : `${v.toFixed(1)}%`;
 
-    // Compute variance for each P&L line item
+    // Current actuals for the 4 input lines that have budget rows.
+    // YoY analysis intentionally excluded — that lives in the P&L panel.
     const lines = [
-      { name: 'Net Sales',        curr: c.net_sales,        base: p.net_sales,        higherIsBetter: true },
-      { name: 'Cost of Sales',    curr: c.cogs,             base: p.cogs,             higherIsBetter: false },
-      { name: 'Gross Profit',     curr: c.gross_profit,     base: p.gross_profit,     higherIsBetter: true },
-      { name: 'Operating Costs',  curr: c.expenses,         base: p.expenses,         higherIsBetter: false },
-      { name: 'Operating Profit', curr: c.operating_profit, base: p.operating_profit, higherIsBetter: true },
-      { name: 'Other Income',     curr: c.other_income,     base: p.other_income,     higherIsBetter: true },
-      { name: 'Net Profit',       curr: c.net_profit,       base: p.net_profit,       higherIsBetter: true },
+      { name: 'Net Sales',       curr: c.net_sales,    higherIsBetter: true },
+      { name: 'Cost of Sales',   curr: c.cogs,         higherIsBetter: false },
+      { name: 'Operating Costs', curr: c.expenses,     higherIsBetter: false },
+      { name: 'Other Income',    curr: c.other_income, higherIsBetter: true },
     ];
 
     const allowed: AllowedValue[] = [];
-    let table =
-      `| Line Item | Actual (${s.rangeLabel}) | Baseline (Prior Year) | Variance (RM) | Var % | Status |\n` +
-      `|-----------|-------------------------|----------------------|---------------|-------|--------|\n`;
 
-    for (const l of lines) {
-      const actual = Math.round(l.curr);
-      const baseline = Math.round(l.base);
-      const variance = actual - baseline;
-      const varPct = yoyPct(l.curr, l.base);
-      const status = variance === 0
-        ? 'On Track'
-        : l.higherIsBetter
-          ? (variance > 0 ? 'Favourable' : 'Unfavourable')
-          : (variance < 0 ? 'Favourable' : 'Unfavourable');
-
-      table += `| ${l.name} | ${fmtRm(actual)} | ${fmtRm(baseline)} | ${fmtRm(variance)} | ${fmtPct(varPct)} | ${status} |\n`;
-
-      allowed.push(rm(`${l.name.toLowerCase()} actual`, actual));
-      allowed.push(rm(`${l.name.toLowerCase()} baseline`, baseline));
-      allowed.push(rm(`${l.name.toLowerCase()} variance`, variance));
-      if (varPct != null) allowed.push(pct(`${l.name.toLowerCase()} variance pct`, varPct));
-    }
-
-    // Margin comparison
-    const gpMargin = c.net_sales > 0 ? (c.gross_profit / c.net_sales) * 100 : 0;
-    const pGpMargin = p.net_sales > 0 ? (p.gross_profit / p.net_sales) * 100 : 0;
-    const netMargin = c.net_sales > 0 ? (c.net_profit / c.net_sales) * 100 : 0;
-    const pNetMargin = p.net_sales > 0 ? (p.net_profit / p.net_sales) * 100 : 0;
-    const gpmDrift = gpMargin - pGpMargin;
-    const npmDrift = netMargin - pNetMargin;
-
-    allowed.push(pct('gross margin actual', gpMargin));
-    allowed.push(pct('gross margin baseline', pGpMargin));
-    allowed.push(pct('gross margin drift pp', gpmDrift));
-    allowed.push(pct('net margin actual', netMargin));
-    allowed.push(pct('net margin baseline', pNetMargin));
-    allowed.push(pct('net margin drift pp', npmDrift));
-
-    // Sign-flip detection
-    const signFlips: string[] = [];
-    if ((c.gross_profit >= 0) !== (p.gross_profit >= 0)) signFlips.push('Gross Profit');
-    if ((c.net_profit >= 0) !== (p.net_profit >= 0)) signFlips.push('Net Profit');
-    if ((c.operating_profit >= 0) !== (p.operating_profit >= 0)) signFlips.push('Operating Profit');
-
-    const marginBlock =
-      `\nMargin comparison:\n` +
-      `- Gross Margin: ${gpMargin.toFixed(1)}% (baseline ${pGpMargin.toFixed(1)}%) — drift ${gpmDrift.toFixed(1)}pp\n` +
-      `- Net Margin: ${netMargin.toFixed(1)}% (baseline ${pNetMargin.toFixed(1)}%) — drift ${npmDrift.toFixed(1)}pp\n`;
-
-    const signFlipBlock = signFlips.length > 0
-      ? `\n⚠ SIGN FLIPS (SEVERE): ${signFlips.join(', ')} switched between profit and loss vs baseline.\n`
-      : '';
-
-    // ── Budget variance (if approved budget exists) ────────────────────
-    const savedBudget = await getBudget(period.fiscalYear);
+    // ── Budget variance (if an approved budget baseline exists) ────────
+    const savedBudget = await getGlobalBudget();
     let budgetVarianceBlock = '';
     if (savedBudget.length > 0) {
-      // Map budget line items to current actuals
       const budgetMap = new Map(savedBudget.map(b => [b.line_item, b]));
       const budgetLines = lines.filter(l => budgetMap.has(l.name));
 
@@ -4603,24 +4547,22 @@ const fiscalPeriodFetchers: Record<string, FiscalPeriodFetcher> = {
 
           bTable += `| ${l.name} | ${fmtRm(actual)} | ${fmtRm(budgetAnnual)} | ${fmtRm(bVar)} | ${fmtPct(bVarPct)} | ${status} |\n`;
 
+          allowed.push(rm(`${l.name.toLowerCase()} actual`, actual));
           allowed.push(rm(`${l.name.toLowerCase()} budget`, budgetAnnual));
           allowed.push(rm(`${l.name.toLowerCase()} vs budget variance`, bVar));
           if (bVarPct != null) allowed.push(pct(`${l.name.toLowerCase()} vs budget variance pct`, bVarPct));
         }
 
         budgetVarianceBlock =
-          `\n--- Budget Variance (Actual vs Approved Budget) ---\n` +
-          `Budget approved on ${new Date(savedBudget[0].updated_at).toLocaleDateString()}\n\n` +
+          `\n--- Budget Variance (Actual vs Approved Budget Baseline) ---\n` +
+          `Budget last updated on ${new Date(savedBudget[0].updated_at).toLocaleDateString()}\n\n` +
           bTable + '\n';
       }
     }
 
     return {
       prompt:
-        `P&L Variance Summary for ${s.rangeLabel}.\n\n` +
-        `--- YoY Variance (Actual vs Prior Year) ---\n` +
-        `Note: "Baseline" = same fiscal window in the prior year.\n\n` +
-        table + marginBlock + signFlipBlock +
+        `P&L Variance Summary for ${s.rangeLabel}.\n` +
         budgetVarianceBlock +
         `\nThresholds:\n` +
         `- Variance within ±5% = On Track\n` +
@@ -4824,6 +4766,42 @@ const fiscalPeriodFetchers: Record<string, FiscalPeriodFetcher> = {
       (mf.signFlips.length > 0 ? ` ⚠ WARNING: sign flip projected at ${mf.signFlips.join(', ')}` : ''),
     );
 
+    // ── Projected vs Budget (if approved budget baseline exists) ────────
+    const savedBudget = await getGlobalBudget();
+    let projectedVsBudgetBlock = '';
+    if (savedBudget.length > 0) {
+      const budgetMap = new Map(savedBudget.map(b => [b.line_item, b]));
+      const rows: string[] = [];
+      for (const mf of metricForecasts) {
+        const budget = budgetMap.get(mf.name);
+        if (!budget) continue;
+        const projectedAnnual = mf.forecasts.reduce((acc, v) => acc + v, 0);
+        const budgetAnnual = budget.annual_budget;
+        const deltaRm = projectedAnnual - budgetAnnual;
+        const deltaPct = budgetAnnual !== 0 ? (deltaRm / Math.abs(budgetAnnual)) * 100 : null;
+
+        rows.push(
+          `| ${mf.name} | ${fmtRm(projectedAnnual)} | ${fmtRm(budgetAnnual)} | ${fmtRm(deltaRm)} | ${deltaPct == null ? 'n/a' : deltaPct.toFixed(1) + '%'} |`,
+        );
+
+        allowed.push(rm(`${mf.name.toLowerCase()} projected annualized`, projectedAnnual));
+        allowed.push(rm(`${mf.name.toLowerCase()} budget annual`, budgetAnnual));
+        allowed.push(rm(`${mf.name.toLowerCase()} forecast vs budget rm`, deltaRm));
+        if (deltaPct != null) {
+          allowed.push(pct(`${mf.name.toLowerCase()} forecast vs budget pct`, deltaPct));
+        }
+      }
+
+      if (rows.length > 0) {
+        projectedVsBudgetBlock =
+          `\n--- Projected vs Budget (Annualized forecast vs Approved Budget Baseline) ---\n` +
+          `Budget last updated on ${new Date(savedBudget[0].updated_at).toLocaleDateString()}\n\n` +
+          `| Line Item | Projected (annualized) | Budget (annual) | Delta RM | Delta % |\n` +
+          `|-----------|------------------------|-----------------|----------|---------|\n` +
+          rows.join('\n') + '\n';
+      }
+    }
+
     return {
       prompt:
         `Multi-Period Trend Forecast for ${s.rangeLabel} — projecting 12 months ahead based on ${s.monthly.length}-month trend.\n` +
@@ -4832,8 +4810,9 @@ const fiscalPeriodFetchers: Record<string, FiscalPeriodFetcher> = {
         `Monthly trend data:\n${table}\n` +
         `12-Month Forecast:\n${forecastTable}\n` +
         `Detail:\n` +
-        forecastSummaries.join('\n') + '\n\n' +
-        `Thresholds:\n` +
+        forecastSummaries.join('\n') + '\n' +
+        projectedVsBudgetBlock +
+        `\nThresholds:\n` +
         `- Trend consistent 4+ months = Strong signal\n` +
         `- Trend mixed / oscillating = Weak signal (state this explicitly)\n` +
         `- Forecast projects sign flip = Severe warning\n` +
@@ -4853,11 +4832,6 @@ const fiscalPeriodFetchers: Record<string, FiscalPeriodFetcher> = {
     const allowed: AllowedValue[] = [];
 
     // ── 1. Category-level budget suggestions from P&L statement ──────────
-
-    // Map acc_type to higher-is-better
-    const higherIsBetter: Record<string, boolean> = {
-      SL: true, CO: false, EP: false, OI: true,
-    };
 
     const stmtMonthCount = stmt.months.length || 1;
     const categoryRows: string[] = [];
@@ -4941,8 +4915,8 @@ const fiscalPeriodFetchers: Record<string, FiscalPeriodFetcher> = {
       allowed.push(rm(`${h.name.toLowerCase()} annual budget`, annualBudget));
     }
 
-    // ── 3. Check for saved (approved) budget ────────────────────────────
-    const savedBudget = await getBudget(period.fiscalYear);
+    // ── 3. Check for saved (approved) budget baseline ────────────────────
+    const savedBudget = await getGlobalBudget();
     let savedBudgetSection = '';
     if (savedBudget.length > 0) {
       let savedTable =
@@ -4961,8 +4935,8 @@ const fiscalPeriodFetchers: Record<string, FiscalPeriodFetcher> = {
         }
       }
       savedBudgetSection =
-        `\nApproved Budget (saved ${new Date(savedBudget[0].updated_at).toLocaleDateString()}):\n${savedTable}\n` +
-        `Note: Compare approved budget against current suggestions — if they differ materially, flag it.\n`;
+        `\nApproved Budget Baseline (last updated ${new Date(savedBudget[0].updated_at).toLocaleDateString()}):\n${savedTable}\n` +
+        `Note: Compare approved budget baseline against current suggestions — if they differ materially, flag it.\n`;
     }
 
     return {
@@ -4970,8 +4944,8 @@ const fiscalPeriodFetchers: Record<string, FiscalPeriodFetcher> = {
         `AI Budget Suggestions for ${s.rangeLabel} — based on historical P&L data.\n` +
         `Method: Monthly average of current-period actuals, annualised to 12 months. YoY growth rate and trend direction provided for context.\n` +
         (savedBudget.length > 0
-          ? `A previously approved budget exists for this fiscal year — see comparison below.\n\n`
-          : `⚠ These are AI-generated suggestions based on historical data — NOT formal budgets or targets.\n⚠ No approved budget exists yet for this fiscal year.\n\n`) +
+          ? `An approved budget baseline exists — see comparison below.\n\n`
+          : `⚠ These are AI-generated suggestions based on historical data — NOT formal budgets or targets.\n⚠ No approved budget baseline exists yet.\n\n`) +
         `Headline P&L Budget Suggestions:\n${headlineTable}\n\n` +
         `Category-Level Budget Suggestions (by account type):\n${categoryTable}\n\n` +
         savedBudgetSection +

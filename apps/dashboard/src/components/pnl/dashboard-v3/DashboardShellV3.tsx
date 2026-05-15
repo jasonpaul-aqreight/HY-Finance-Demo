@@ -51,6 +51,16 @@ export function DashboardShellV3() {
           fiscalPeriod={fiscalPeriod}
         />
 
+        {/* ═══ Section §12: Forecasting & Variance Analysis — sits directly under §9 header ═══ */}
+        <InsightSectionHeader
+          title="Forecasting & Variance Analysis"
+          subtitle={`${filters.fiscalYear} · ${filters.range.toUpperCase()}`}
+          page="financial"
+          sectionKey="financial_variance"
+          dateRange={null}
+          fiscalPeriod={fiscalPeriod}
+        />
+
         {/* Section 1: KPI Summary Cards */}
         <PLKpiCardsV3 fy={filters.fiscalYear} />
 
@@ -87,16 +97,6 @@ export function DashboardShellV3() {
           <BSTrendChartV3 fy={filters.fiscalYear} range={filters.range} />
           <BSStatementTableV3 fy={filters.fiscalYear} />
         </div>
-
-        {/* ═══ Section §12: Variance, Forecast & Budget ═══ */}
-        <InsightSectionHeader
-          title="Variance, Forecast & Budget"
-          subtitle={`${filters.fiscalYear} · ${filters.range.toUpperCase()}`}
-          page="financial"
-          sectionKey="financial_variance"
-          dateRange={null}
-          fiscalPeriod={fiscalPeriod}
-        />
       </main>
     </div>
   );

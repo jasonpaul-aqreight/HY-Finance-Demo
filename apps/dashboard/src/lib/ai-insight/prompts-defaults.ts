@@ -892,31 +892,27 @@ Hard rules:
 
   // ─── Financial page §12 — financial_variance / FP&A ──────────────────────────────
 
-  fv_variance_summary: `Current FY window's P&L vs TWO baselines:
-1. YoY — vs same window prior FY
-2. Budget — vs approved budget (only if one is approved)
+  fv_variance_summary: `Current FY window's P&L vs the approved budget baseline (global, not FY-specific).
 
 Pre-fetched:
-- YoY table per line (Net Sales, COGS, GP, OpEx, Operating Profit, Other Income, NP): Actual / Baseline / Var RM / Var % / Status
-- Budget table (if present): same columns vs Budget
+- Budget table (if present): per line — Actual / Budget / Var RM / Var % / Status — only for Net Sales, Cost of Sales, Operating Costs, Other Income
 - Favourable: Revenue ↑ = Favourable; Cost (COGS, OpEx) ↓ = Favourable
-- Margin compare: GM%, NM% drift (pp)
 
 Thresholds:
 - ±5% On Track · ±5–15% Moderate · >±15% Material
 - Sign flip (profit↔loss) = Severe
 
 Evaluate:
-- Biggest deviations (lines, direction)
+- Biggest deviations vs budget (lines, direction)
 - Favourable vs unfavourable
-- Margin direction vs prior year
-- If budget present: on track / over / under
-- Overall: better or worse
+- On track / over / under
+- Overall: ahead of plan or behind
 
 Hard rules:
-- YoY: label baseline "same period last year".
-- Budget: label "approved budget".
-- No budget section → do NOT mention budgets.
+- Label baseline "approved budget baseline" — do NOT qualify with a fiscal year.
+- Do NOT compare to prior year or any YoY baseline; YoY analysis lives in the P&L panel, not here.
+- If no budget section is present, do NOT mention budgets or variance-to-budget anywhere in the output.
+- Budget rows cover input lines only (Net Sales, Cost of Sales, Operating Costs, Other Income). Do NOT claim a Gross Profit or Net Profit budget exists.
 - Do NOT recompute variance %.`,
 
   fv_variance_breakdown: `"Variance by Account" breakdown — GL-account-level P&L variance, showing which accounts within each category (Sales, COGS, OpEx, Other Income) drove overall variance.
@@ -949,6 +945,7 @@ Pre-fetched:
 - Trend direction + signal (rising/falling/flat, Strong/Weak)
 - Confidence band: Narrowing / Widening
 - Per metric: weighted Δ, last actual, milestones M+1/+3/+6/+12
+- Projected-vs-Budget block (only when an approved budget baseline exists): per line item, the annualized 12-month projection vs the annual budget, with Delta RM and Delta %
 
 Thresholds:
 - Direction consistent 4+ months = Strong
@@ -963,20 +960,23 @@ Evaluate:
 - Signal strength
 - Note long-range unreliability
 - Call out any projected loss or sign flip
+- When the Projected-vs-Budget block is present: for each row, comment on the trend's pace relative to the budget. Use hedged language — e.g. "at current trend, projected to be X% below budget pace" — do NOT assert certainty about hitting or missing the budget.
 
 Hard rules:
 - Forecasts PRE-COMPUTED; no own projections.
 - Disclaim: AI estimates, not formal projections.
 - Use "approximately"/"around"; no precision claims.
-- Summarise milestones; don't list all 12.`,
+- Summarise milestones; don't list all 12.
+- When a Projected-vs-Budget block is provided, include a one-line forecast-vs-budget commentary per row (absolute RM gap + % of budget). Use the "approved budget baseline" label — do NOT qualify with a fiscal year.
+- When NO Projected-vs-Budget block is provided, output the pure-trend projection only and make no reference to budgets, budget pace, or variance-to-budget.`,
 
-  fv_budget_suggestions: `"AI Budget Suggestions" — system-generated budget for the next fiscal period from current-period actuals annualised.
+  fv_budget_suggestions: `"AI Budget Suggestions" — system-generated budget baseline from current-period actuals annualised.
 
 Pre-fetched data:
 - Headline P&L suggestions (Net Sales, Cost of Sales, GP, OpEx, NP): current actual, prior actual, YoY %, suggested monthly + annual
 - Category-level suggestions (Sales, COGS, OpEx, Other Income): same columns + trend direction + signal strength
 - Trend direction: rising/falling/flat, Strong/Weak (from MoM consistency)
-- If approved budget exists: comparison table approved vs suggested with diffs
+- If an approved budget baseline exists: comparison table approved vs suggested with diffs (covers Net Sales, Cost of Sales, Operating Costs, Other Income only)
 
 Evaluate:
 - Categories with strong consistent trends (suggestion more reliable)
@@ -984,12 +984,13 @@ Evaluate:
 - Categories where YoY growth materially +/− and budget should track that
 - Overall: growing / contracting / stable
 - Any category where suggested differs materially from prior year
-- If approved budget exists: flag material gaps vs latest suggestions (budget may need updating)
+- If an approved budget baseline exists: flag material gaps vs latest suggestions (baseline may need updating)
 
 Hard rules:
 - Suggestions are PRE-COMPUTED — do NOT invent numbers.
-- No approved budget: frame as "starting points for budget discussions" + note no budget approved.
-- Approved budget exists: compare and highlight discrepancies.
+- No approved budget baseline: frame as "starting points for budget discussions" + state that no baseline has been approved. Do NOT mention variance-to-budget anywhere.
+- Approved budget baseline exists: compare and highlight discrepancies — label it "approved budget baseline", do NOT qualify with a fiscal year.
+- Budget baseline covers input lines only (Net Sales, Cost of Sales, Operating Costs, Other Income). Do NOT claim a Gross Profit or Net Profit budget exists.
 - Do NOT recompute.`,
 
 };

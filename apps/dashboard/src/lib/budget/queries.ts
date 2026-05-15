@@ -1,41 +1,70 @@
 import { getPool } from '../postgres';
 
+export const ALLOWED_BUDGET_LINE_ITEMS = [
+  'Net Sales',
+  'Cost of Sales',
+  'Operating Costs',
+  'Other Income',
+] as const;
+
+export type BudgetLineItem = (typeof ALLOWED_BUDGET_LINE_ITEMS)[number];
+
 export interface BudgetRow {
   line_item: string;
-  annual_budget: number;
   monthly_budget: number;
+  annual_budget: number;
+  approved_by: string | null;
+  note: string | null;
   updated_at: string;
 }
 
-/** Get saved budget for a fiscal year. Returns empty array if none. */
-export async function getBudget(fiscalYear: string): Promise<BudgetRow[]> {
+/** Get the global budget baseline. Returns empty array if none set. */
+export async function getGlobalBudget(): Promise<BudgetRow[]> {
   const pool = getPool();
   const { rows } = await pool.query(
-    `SELECT line_item, annual_budget::float, monthly_budget::float, updated_at
-     FROM budget
-     WHERE fiscal_year = $1
-     ORDER BY id`,
-    [fiscalYear],
+    `SELECT
+       line_item,
+       monthly_budget::float,
+       annual_budget::float,
+       approved_by,
+       note,
+       updated_at
+     FROM budget_global
+     ORDER BY line_item`,
   );
   return rows;
 }
 
-/** Upsert budget lines for a fiscal year. */
-export async function saveBudget(
-  fiscalYear: string,
-  lines: { line_item: string; annual_budget: number; monthly_budget: number }[],
+/** Upsert the global budget baseline. Rejects line items outside the allowed set. */
+export async function saveGlobalBudget(
+  lines: { line_item: string; monthly_budget: number; annual_budget: number }[],
+  meta: { userName: string; note?: string | null },
 ): Promise<void> {
+  const allowed = new Set<string>(ALLOWED_BUDGET_LINE_ITEMS);
+  for (const line of lines) {
+    if (!allowed.has(line.line_item)) {
+      throw new Error(`Unsupported budget line_item: ${line.line_item}`);
+    }
+  }
+
   const pool = getPool();
   const client = await pool.connect();
+  const approvedBy = meta.userName;
+  const note = meta.note ?? null;
   try {
     await client.query('BEGIN');
     for (const line of lines) {
       await client.query(
-        `INSERT INTO budget (fiscal_year, line_item, annual_budget, monthly_budget)
-         VALUES ($1, $2, $3, $4)
-         ON CONFLICT (fiscal_year, line_item)
-         DO UPDATE SET annual_budget = $3, monthly_budget = $4, updated_at = NOW()`,
-        [fiscalYear, line.line_item, line.annual_budget, line.monthly_budget],
+        `INSERT INTO budget_global (line_item, monthly_budget, annual_budget, approved_by, note, updated_at)
+         VALUES ($1, $2, $3, $4, $5, NOW())
+         ON CONFLICT (line_item)
+         DO UPDATE SET
+           monthly_budget = $2,
+           annual_budget = $3,
+           approved_by = $4,
+           note = $5,
+           updated_at = NOW()`,
+        [line.line_item, line.monthly_budget, line.annual_budget, approvedBy, note],
       );
     }
     await client.query('COMMIT');
