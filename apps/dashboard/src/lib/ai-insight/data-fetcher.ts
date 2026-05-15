@@ -68,6 +68,90 @@ const fmtRM = (value: number): string => `RM ${value.toLocaleString('en-MY', { m
 const fmtPct1 = (value: number): string => `${value.toFixed(1)}%`;
 const fmtPct2 = (value: number): string => `${value.toFixed(2)}%`;
 
+const WEIGHTED_MA_3_MONTH_WEIGHTS = [0.5, 0.3, 0.2] as const;
+
+export function computeWeightedMA3Month(months: number[]): number {
+  const changes: number[] = [];
+  for (let i = 1; i < months.length; i++) {
+    changes.push(months[i] - months[i - 1]);
+  }
+
+  const recentChanges = changes.slice(-3);
+  if (recentChanges.length === 0) return 0;
+
+  let weightedChange = 0;
+  let weightSum = 0;
+  for (let i = 0; i < recentChanges.length; i++) {
+    const w = WEIGHTED_MA_3_MONTH_WEIGHTS[i] ?? WEIGHTED_MA_3_MONTH_WEIGHTS[WEIGHTED_MA_3_MONTH_WEIGHTS.length - 1];
+    weightedChange += recentChanges[recentChanges.length - 1 - i] * w;
+    weightSum += w;
+  }
+
+  return weightedChange / weightSum;
+}
+
+interface ForecastBackTestMetric {
+  name: string;
+  values: number[];
+}
+
+interface ForecastBackTestRow {
+  horizon: string;
+  monthsBack: number;
+  lineItem: string;
+  cutMonth: string | null;
+  predicted: number | null;
+  actual: number | null;
+  errorRm: number | null;
+  errorPct: number | null;
+}
+
+function forecastBackTest(
+  metrics: ForecastBackTestMetric[],
+  monthLabels: string[],
+  horizons: number[] = [1, 3, 6],
+): ForecastBackTestRow[] {
+  const latestIndex = monthLabels.length - 1;
+  const actualMonth = monthLabels[latestIndex] ?? null;
+
+  return horizons.flatMap((monthsBack) => {
+    const cutIndex = latestIndex - monthsBack;
+
+    return metrics.map((metric) => {
+      if (cutIndex < 2 || latestIndex < 0) {
+        return {
+          horizon: `M-${monthsBack}`,
+          monthsBack,
+          lineItem: metric.name,
+          cutMonth: null,
+          predicted: null,
+          actual: null,
+          errorRm: null,
+          errorPct: null,
+        };
+      }
+
+      const historyAtCutPoint = metric.values.slice(0, cutIndex + 1);
+      const weightedChange = computeWeightedMA3Month(historyAtCutPoint);
+      const predicted = Math.round(metric.values[cutIndex] + weightedChange * monthsBack);
+      const actual = Math.round(metric.values[latestIndex]);
+      const errorRm = predicted - actual;
+      const errorPct = actual !== 0 ? (errorRm / Math.abs(actual)) * 100 : null;
+
+      return {
+        horizon: `M-${monthsBack}`,
+        monthsBack,
+        lineItem: metric.name,
+        cutMonth: monthLabels[cutIndex] ?? actualMonth,
+        predicted,
+        actual,
+        errorRm,
+        errorPct,
+      };
+    });
+  });
+}
+
 interface SalesPeriodTotals {
   netSales: number;
   invoiceSales: number;
@@ -4684,9 +4768,8 @@ const fiscalPeriodFetchers: Record<string, FiscalPeriodFetcher> = {
     }
 
     // Compute 12-month weighted moving average forecast
-    // Weights: most recent 3 months weighted 0.5, 0.3, 0.2 (newest first)
+    // Weights: most recent 3 month-to-month changes weighted 0.5, 0.3, 0.2 (newest first)
     const FORECAST_MONTHS = 12;
-    const weights = [0.5, 0.3, 0.2];
     const metrics = [
       { name: 'Net Sales',    values: s.monthly.map(r => r.net_sales) },
       { name: 'Gross Profit', values: s.monthly.map(r => r.gross_profit) },
@@ -4703,16 +4786,7 @@ const fiscalPeriodFetchers: Record<string, FiscalPeriodFetcher> = {
         changes.push(m.values[i] - m.values[i - 1]);
       }
 
-      // Weighted average of most recent 3 changes (or fewer if not enough data)
-      const recentChanges = changes.slice(-3);
-      let weightedChange = 0;
-      let weightSum = 0;
-      for (let i = 0; i < recentChanges.length; i++) {
-        const w = weights[i] ?? weights[weights.length - 1];
-        weightedChange += recentChanges[recentChanges.length - 1 - i] * w;
-        weightSum += w;
-      }
-      weightedChange = weightedChange / weightSum;
+      const weightedChange = computeWeightedMA3Month(m.values);
 
       const lastValue = m.values[m.values.length - 1];
       const forecasts: number[] = [];
@@ -4766,6 +4840,38 @@ const fiscalPeriodFetchers: Record<string, FiscalPeriodFetcher> = {
       (mf.signFlips.length > 0 ? ` ⚠ WARNING: sign flip projected at ${mf.signFlips.join(', ')}` : ''),
     );
 
+    // ── Forecast accuracy back-test ──────────────────────────────────────
+    const backTestRows = forecastBackTest(metrics, s.monthly.map(r => r.label), [1, 3, 6]);
+    let backTestTable =
+      '| Horizon | Line Item | Cut Month | Predicted Latest Actual | Actual Latest | Error RM | Error % |\n' +
+      '|---------|-----------|-----------|-------------------------|---------------|----------|---------|\n';
+
+    for (const row of backTestRows) {
+      if (row.predicted == null || row.actual == null || row.errorRm == null) {
+        backTestTable += `| ${row.horizon} | ${row.lineItem} | n/a | n/a | n/a | n/a | n/a |\n`;
+        continue;
+      }
+
+      backTestTable +=
+        `| ${row.horizon} | ${row.lineItem} | ${row.cutMonth ?? 'n/a'} | ${fmtRm(row.predicted)} | ${fmtRm(row.actual)} | ${fmtRm(row.errorRm)} | ${row.errorPct == null ? 'n/a' : row.errorPct.toFixed(1) + '%'} |\n`;
+
+      const labelPrefix = `${row.horizon.toLowerCase()} ${row.lineItem.toLowerCase()} back-test`;
+      allowed.push(rm(`${labelPrefix} predicted`, row.predicted));
+      allowed.push(rm(`${labelPrefix} actual`, row.actual));
+      allowed.push(rm(`${labelPrefix} error rm`, row.errorRm));
+      if (row.errorPct != null) {
+        allowed.push(pct(`${labelPrefix} error pct`, row.errorPct));
+      }
+    }
+    allowed.push(pct('forecast near-term trustworthy threshold', 5));
+    allowed.push(pct('forecast material accuracy drift threshold', 15));
+
+    const forecastAccuracyBlock =
+      `\n--- Forecast Accuracy (Back-test) ---\n` +
+      `Retroactive single-point test against latest actual month (${s.monthly[s.monthly.length - 1]?.label ?? 'latest month'}). ` +
+      `Prediction uses only data available at each historical cut point; no forecast snapshots are persisted.\n\n` +
+      backTestTable + '\n';
+
     // ── Projected vs Budget (if approved budget baseline exists) ────────
     const savedBudget = await getGlobalBudget();
     let projectedVsBudgetBlock = '';
@@ -4811,6 +4917,7 @@ const fiscalPeriodFetchers: Record<string, FiscalPeriodFetcher> = {
         `12-Month Forecast:\n${forecastTable}\n` +
         `Detail:\n` +
         forecastSummaries.join('\n') + '\n' +
+        forecastAccuracyBlock +
         projectedVsBudgetBlock +
         `\nThresholds:\n` +
         `- Trend consistent 4+ months = Strong signal\n` +

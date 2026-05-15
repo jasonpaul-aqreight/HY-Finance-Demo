@@ -135,75 +135,107 @@ Follow the iteration process strictly:
 <claude-mem-context>
 # Memory Context
 
-# [Hoi-Yong_Finance] recent context, 2026-05-12 9:16am GMT+8
+# [Hoi-Yong_Finance] recent context, 2026-05-15 1:05pm GMT+8
 
 Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
 Format: ID TIME TYPE TITLE
 Fetch details: get_observations([IDs]) | Search: mem-search skill
 
-Stats: 50 obs (24,459t read) | 549,328t work | 96% savings
+Stats: 50 obs (20,778t read) | 101,820t work | 80% savings
 
-### May 10, 2026
-S568 Phase 2 of AI Insight Config Overhaul — complete and commit all backend/schema/HR scaffold work (May 10 at 11:31 AM)
-S567 Phase 2 of AI Insight Config Overhaul — complete implementation, verification, and commit/push (May 10 at 12:07 PM)
-S569 Phase 2 AI Insight Config Overhaul — pre-commit git status check confirms all changes ready to stage (May 10 at 12:12 PM)
-S570 Phase 2 AI Insight Config Overhaul — commit and push all changes to GitHub (May 10 at 12:13 PM)
-S571 BMad agent dev session initialized for Hoi-Yong_Finance project (May 10 at 12:14 PM)
-S572 UI polish pass: Amelia reviewing mockup differences against current Phase 3 implementation before making targeted component changes (May 10 at 5:33 PM)
-S573 Full-width layout + VersionPanel improvements for ai-insight-config admin page (May 10 at 5:37 PM)
-S574 BMad agent dev session started for Hoi-Yong_Finance project (May 10 at 7:56 PM)
-S576 Sales Trend AI Insight KPI cards show AnalyzeIcon but orchestrator never generates their component analysis — awaiting fix decision (May 10 at 8:02 PM)
-S575 Sales Trend AI Insight config mismatch — only 2 of 5 components shown; KPI cards have AnalyzeIcon but no orchestrator analysis (May 10 at 8:24 PM)
-3180 10:43p 🔵 S01 Playwright Eval Exposed Three Concrete AI Output Bugs
-3181 " ✅ ROLLOUT_TRACKER.md Updated with S01 Evaluation Row
-3182 10:50p 🔴 S01 Data Fetcher Fixed with Pre-computed Rank Labels and Average Gap
-3183 " ⚖️ S01 Tool Policy Changed from aggregate_only to none
-3184 " ✅ Rollout Tracker Gains Formal Quality Issue Handling Process
-3185 " 🔵 Next.js Build Fails in Sandboxed Shell Without Network Access
-3187 10:55p ⚖️ S01 Committed and Pushed; S02 Rollout Next
-3188 " 🔄 Sales Summary Fetcher Split into Four Individual Component Fetchers
-3189 10:56p 🔵 Working Tree Contains Large Uncommitted AI Insight Config Admin UI Overhaul
-3193 " ⚖️ Selective Hunk Staging Used to Isolate S01 Fixes from Sales Refactor in data-fetcher.ts
-3190 10:57p 🟣 S01 payment_collection_trend Rollout Completed — 9/10 Quality Achieved
-3191 " 🔵 data-fetcher.ts Contains Unrelated Uncommitted Sales Fetchers from Prior Session
-3192 " 🔵 git index.lock Requires Escalated Sandbox Permissions
-3194 " ✅ Hunks 1–9 Staged for S01 Commit; Hunk 10 (New Sales Fetchers) Skipped
-3195 10:58p 🔵 git restore --staged Failed Due to Index Lock from Active git add -p TTY Session
-3196 " 🔴 Accidental Sales Hunk Unstaged via git restore with Escalated Permissions
-3197 " ✅ Corrected Hunk Staging: Only S01 Hunks 1–8 Staged, Both Sales Hunks 9–10 Skipped
-3198 10:59p ✅ ROLLOUT_TRACKER.md and tool-policy.ts Staged to Complete S01 Commit Index
-3200 " 🔵 AI Insight Improvement Rollout Tracker — S03 Next in Queue
-3199 " 🔵 Staged Index Verified: data-fetcher.ts Shows 48 Insertions Confirming Sales Hunks Excluded
-3201 " 🔵 AI Insight Live Architecture and Verified Improvement State
-3202 11:01p 🔵 AI Insight Study MASTER_LOG — Iteration History, Architectural Lessons, and Pending Iter 8.1
-3203 " 🔵 S03 Sales Summary Split — Partial Implementation State Audit
-3204 " 🔵 Iter 8.1 Implementation Spec — Provider Abstraction, Tool Schema Translation, and Open Gate Items
-3205 " 🔵 Git Working Tree State Before S03 Rollout — Pre-existing Modifications Confirmed
-3206 11:02p 🔵 S03 sales_trend Codebase Audit — Tool Policy, Data Sources, and Allowed Columns
-3207 " 🔵 S03 net_sales_trend Fetcher Has Sparse Allowed Whitelist — No Pre-computed Aggregates
-3208 11:03p 🔵 sales_trend Section Already Refactored — sales_summary Split Into 4 Individual KPI Fetchers
-3209 " 🔵 Complete SECTION_COMPONENTS Mapping for All Finance AI Insight Sections
-3211 " 🔵 Sales KPI UI Components Wired to New Individual sales_trend Component Keys
-3210 11:04p 🔵 sales_trend Component Prompts Populated in Defaults with Correct Thresholds
-3212 11:18p 🔵 AI Insight Rollout Tracker State Read for S04 Resume
-3213 11:19p 🔵 AI Insight System Architecture and Handoff Context Loaded
-3215 11:20p 🔵 AI Insight Optimization MASTER_LOG Full History Loaded
-3216 " 🔵 Iter 8.1 OpenRouter/GLM-5.1 Implementation Spec and Study Stop Criteria
-3217 " 🔵 Working Tree Dirty State Before S04 Work Begins
-3218 " 🔵 S04 sales_breakdown Audit: Summary Prompt Is Empty in prompts-defaults.ts
-3214 " 🔵 S04 sales_breakdown Section Audit: Architecture and Data Sources Mapped
-3219 11:23p 🔵 S04 sales_breakdown Tool Policy Discrepancy: Code Is 'full' But Compaction Notes Say 'aggregate_only'
-3220 " 🔵 sales_breakdown Component Registry Confirmed: Four 'breakdown' Type Components
-3221 11:24p 🔵 Full Tool Policy Map for All 16 Finance Sections Confirmed
-3222 " 🔵 Section Scope Classification Map and Fetcher Routing Logic Confirmed
-3223 " 🔵 S04 Fetcher Bug: by_agent Fetcher Queries pc_sales_by_outlet Instead of an Agent Table
-3224 11:25p 🔵 S04 Fetcher Implementation Fully Audited: by_agent Uses Correct Multi-Dimension Table
-3225 " 🔵 S04 Component Prompt Thresholds Confirmed in prompts-defaults.ts
-3226 11:26p 🔵 PRD Summary Questions for All 16 Sections and Tool Policy Rationale Confirmed
-3228 " 🔵 Historical sales_breakdown Logs Confirm Recurring Summary Tool-Call Schema Failures Since April 2026
-3227 11:27p 🔵 pc_sales_daily Has Pre-computed cn_total and net_revenue for Section-Level CN Ratio
-3229 11:35p ⚖️ AI Insight Rollout Policy Correction: Section Guidance Empty by Default, Tools Must Stay
-3230 " 🟣 S04 sales_breakdown Fetchers Overhauled with Pre-calculated Diagnostics and Richer Allowed Values
+### May 15, 2026
+S719 Round 2 plan still at approval gate — session looping on plain-English summary while awaiting Aqreight's Budget Setting placement decision (May 15 at 10:54 AM)
+S720 Round 2 plan approval — data-fetcher.ts grep confirmed Budget scope; Budget Setting placement decision now fully evidence-backed (May 15 at 11:15 AM)
+S721 Round 2 plan revised — Budget Setting moves to InsightSectionHeader panel header; empty state corrected to inline banner (not blocking); Aqreight deciding before approving (May 15 at 11:16 AM)
+S722 Round 2 plan finalized — empty-state banner dropped; 3-change plan confirmed; awaiting Aqreight's approval to update plan file and call ExitPlanMode (May 15 at 11:17 AM)
+S723 Round 2 Refinement implementation — Variance/Forecast/Budget panel: Budget Setting move, panel rename, prompt tightening (May 15 at 11:19 AM)
+S724 Plan 2 research phase — PB&F methodology study requested before /financial-fpa-preview build; plan file also condensed to 105-line bullet format (May 15 at 11:27 AM)
+S725 FP&A plan file finalised + PB&F research directive issued — plan condensed, session prompts delivered, research-first approach confirmed for Plan 2 (May 15 at 11:38 AM)
+S726 FP&A AI Insight rework — plan file finalised at 105-line bullet format, PB&F research directive issued, session prompts ready for execution (May 15 at 11:38 AM)
+S727 FP&A plan file condensed and finalised — both session prompts delivered, PB&F research directive issued before Plan 2 execution (May 15 at 11:39 AM)
+4773 11:40a 🔵 budget_global Migration Drops Legacy budget Table — 4 Line Items, No FY Key, Seed from Latest FY
+4774 " 🔵 Base Tables Schema — fiscal_year Table Provides FY Date Ranges; gl_account Links P&L Accounts to AccType
+4775 11:41a 🔵 No period_no-to-Calendar Mapping Table in Schema — Resolution Handled in Application Layer
+4776 " 🔵 Dashboard lib Directory Structure — 11 Domain Modules Including ai-insight, pnl, and budget
+4777 " 🔵 lib/pnl Module Contains period-utils.ts — Period Resolution Logic Already Extracted
+4779 11:42a 🔵 period-utils.ts — Period Encoding Scheme: period_no = year * 12 + month; Fiscal Year = Mar–Feb
+4797 " 🔵 Forecasting & Variance Analysis Panel — Round 2 Rework Awaiting Verification
+4802 " 🔵 Hoi-Yong Finance Dashboard Forecasting Panel Content
+4780 " 🔵 budget/queries.ts Full API — BudgetRow Shape and saveGlobalBudget Transaction Pattern Confirmed
+4781 " 🔵 lib/pnl/queries.ts Type Interfaces — PLTrendRow and PLLineItem Are the Core Shapes for Plan 2 Components
+4782 11:43a 🔵 P&L Core Query Pattern — queryPLRaw + aggregatePL + AccType Codes Confirmed
+4783 " 🔵 Round 2 Changes Still Unstaged — Big Commit NOT Yet Made
+4784 " 🔵 Playwright Confirms Panel Footer: Feedback + Analyze Only (No Budget Setting)
+4785 " 🔵 No Forecast or Scenario Tables in Schema — Forecast is Purely Computed, No Persistence
+4786 " ✅ Root-Level Planning Docs Moved to archive/ Directory
+4788 " 🔵 PB&F Industry Research — Adaptive Planning and Anaplan Dashboard Patterns for Plan 2 Grounding
+4790 " 🔵 FP&A Dashboard UX Research — Dumbbell Charts, Color-Coded Variance Pills, Side-by-Side Budget vs Actual Are Industry Standards
+4787 " 🔵 AiInsightPanel.tsx Already Committed — No Unstaged Changes
+4789 11:44a 🔵 Production Build Passes Clean with All Round 2 Working-Tree Changes
+4791 " ✅ Round 2 + Round 1 Files Staged for Big Commit — 12 Items Indexed
+4792 " 🔵 No Cost-Centre or Department Dimension in P&L Schema — Segmentation Limited to Sales Outlet/Agent/Type
+4793 " ✅ Staged Diff Verified — 12 Files, 896 Insertions, 261 Deletions Confirmed
+4794 " 🔵 FP&A Dashboard Design Best Practices — Inverted Pyramid Model and F-Pattern Scanning Validate Plan 2 Card Order
+4795 " 🟣 Commit 0c78969 Made — Round 1 + Round 2 Variance Panel Rework Complete
+4796 11:45a 🔵 expense-categories.ts — 13 Expense Categories Mapped to GL AccNos; Used by Both Financial and Expenses Pages
+4798 " 🔵 PLTrendRow Generation Pattern — MAX(period_no) Anchor + queryPLRaw + aggregatePL Loop Confirmed in queries.ts
+4799 " 🔵 Pre-flight Confirmed: HEAD at 0c78969, Dev Server Live on Port 3000
+4800 11:46a 🔵 Rolling Forecast Research — M-3 Is Natural Confidence Boundary; Scenario Planning Not Required for Plan 2 MVP
+4801 " 🔵 AI Commentary Placement Research — Industry Tools Use Collapsible Contextual AI Companion Per Data Section
+4803 " 🔵 Executive Dashboard Anti-Patterns — "Mixing Audiences," Too Many Metrics, and Data Without Context Are Top Failure Modes
+4805 " 🔵 Session Handoff: Forecasting & Variance Analysis Panel Round 2 Rework Verification
+4804 " 🔵 Variance Analysis Industry Standard — Four Comparison Dimensions; Plan 2 Implements Two (Budget vs Actual + YoY)
+4806 11:47a 🔵 Pre-flight Confirmed: Commit 0c78969 at HEAD, Dev Server Live
+4807 " 🔵 Financial Page Panel Order Confirmed: Forecasting & Variance Analysis is Index 1
+4808 " 🔵 Financial Page DOM Confirms Round 2 UI Changes Live
+4809 11:48a 🔵 Forecasting Panel Has No Separate "Analyze" Button — Get Insight Directly Triggers Analysis
+4810 " 🔵 Forecasting Panel Get Insight Shows Chevron-Up — Panel Content Is Sibling, Not Child
+4811 " 🔵 Analyze Button Confirmed Present After Get Insight Expand
+4812 11:49a 🔵 Cached Pre-Rework Insight Displayed — Analyze Button Not Yet Clicked for Fresh Run
+4813 11:50a 🔵 Fresh Analyze Run Completed — Token Count Increased to 30,774 (AC6 FAIL)
+4814 " 🔵 Post-Rework Insight Content: YoY Language Persists, One Forecast Card Confirmed (AC1 Fail, AC3 Pass)
+4834 11:55a 🔵 Dev server restarted with nohup/disown — PID 20108 — to resolve /api/budget HTTP 000 issue
+4841 11:56a 🔵 Playwright MCP Chrome process (PID 8979) survives kill — same PIDs persist across multiple kill attempts
+4843 11:57a 🔵 nohup dev server (PID 20108) confirmed healthy — all routes serving correctly from /tmp/dashboard-dev.log
+4846 " 🔵 Section §12 renders with unexpected title "Forecasting & Variance Analysis" instead of "Variance, Forecast & Budget"
+4850 11:58a 🔵 Budget Setting button confirmed in §12 header bar — but section title is "Forecasting & Variance Analysis", not Session 2 value
+4852 11:59a 🟣 BudgetSettingDialog opens and renders "Approved Baseline" — end-to-end flow verified via Playwright
+4854 " 🟣 BudgetSettingDialog fully verified — correct 4 rows, no GP/NP, no FY selector, note field and Save button present
+4857 " 🟣 BudgetSettingDialog save flow verified end-to-end — edit input, click Save, toast "Budget baseline saved." appears
+4859 " 🔵 Dialog save reverted Net Sales to original value — native setter + input event didn't update React form state
+S728 Session 2 — Frontend variance panel rework: page reorder, BudgetBaselinePanel removal, BudgetSettingDialog creation, Budget Setting button; Playwright --headed verification and cleanup (May 15 at 12:02 PM)
+**Investigated**: - DashboardShellV3.tsx section ordering (§12 positioning relative to §9 and KPI cards)
+    - InsightSectionHeader.tsx BudgetBaselinePanel wiring (showBudgetPanel condition)
+    - BudgetBaselinePanel.tsx issues (6 breaking items: stale FY-scoped routes, wrong line items, missing source field)
+    - AiInsightPanel.tsx footer structure for Budget Setting button placement
+    - Available shadcn primitives (dialog, input, textarea)
+    - React controlled input mutation behavior in Playwright (native setter + input event vs change event)
+    - Dev server stability patterns (background task vs nohup detachment)
+    - Empty-budget edge case (dialog behavior when budget_global table is empty)
 
-Access 549k tokens of past work via get_observations([IDs]) or mem-search skill.
+**Learned**: - React controlled inputs do NOT update state when mutated via HTMLInputElement.prototype.value setter + `input` event dispatch; only `change` event or `browser_type` works
+    - nohup pattern (`nohup pnpm dev > /tmp/dashboard-dev.log 2>&1 & disown`) is required for stable dev server; background tasks prone to HTTP 000 on /api/budget route specifically
+    - The dialog correctly shows empty rows (no crash, no audit footer) when budget_global is empty — empty-budget path is clean
+    - Admin save round-trip confirmed working: value mutated in DB, persists on dialog reopen
+    - `pnpm tsc --noEmit` exits 0 with all new components
+    - Budget Setting button gating (`sectionKey === 'financial_variance'`) is correctly isolated to the Forecasting & Variance Analysis section only
+
+**Completed**: - **DashboardShellV3.tsx**: §12 ("Forecasting & Variance Analysis") repositioned to appear directly after §9 Financial Overview header, before PLKpiCardsV3 (y=403, KPI cards at y=747)
+    - **InsightSectionHeader.tsx**: BudgetBaselinePanel import, showBudgetPanel computed value, and conditional render block removed; file reduced from 92 to 77 lines
+    - **BudgetBaselinePanel.tsx**: DELETED (had 6 breaking issues with FY-scoped routes and wrong line items)
+    - **BudgetSettingDialog.tsx**: CREATED (~220 lines) — fetches GET /api/budget on open, saves via PUT /api/budget with x-user-role header, 4-item allowlist (Net Sales, Cost of Sales, Operating Costs, Other Income), note textarea, audit metadata footer, admin-only Save button, amber warning for non-admin
+    - **AiInsightPanel.tsx**: WalletCards + BudgetSettingDialog imports added; budgetSettingOpen state added; Budget Setting button in footer gated by `showBudgetSetting = sectionKey === 'financial_variance'`; BudgetSettingDialog modal wired
+    - **Playwright verification**: section order ✓, button gating ✓, dialog structure ✓ (4 rows, no FY, note+Save), admin save round-trip ✓ (DB confirmed 7000001), empty-budget path ✓
+    - **DB restored**: original seed values restored (Net Sales 6,793,349 / Cost of Sales 6,324,046 / Operating Costs 754,243 / Other Income 0)
+    - **Browser closed** (user requirement)
+    - **Dev server stopped** (PID 20108)
+    - **TSC**: exit 0
+
+**Next Steps**: Session 2 is fully complete. Per variance-panel-rework-tracker.md, the next sessions cover:
+    - Session 3: Prompt re-seed (push updated prompts-defaults.ts content into ai_insight_prompts DB table)
+    - Session 4+: Remaining PRD tasks per docs/plans/variance-panel-rework-tracker.md
+    - PRD 11 (docs/prd/11-ai-insight-finance.md) needs an update to reflect the final design (Budget Setting button in header bar rather than panel action row)
+
+
+Access 102k tokens of past work via get_observations([IDs]) or mem-search skill.
 </claude-mem-context>

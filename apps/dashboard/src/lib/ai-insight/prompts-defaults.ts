@@ -913,9 +913,10 @@ Hard rules:
 - Do NOT compare to prior year or any YoY baseline; YoY analysis lives in the P&L panel, not here.
 - If no budget section is present, do NOT mention budgets or variance-to-budget anywhere in the output.
 - Budget rows cover input lines only (Net Sales, Cost of Sales, Operating Costs, Other Income). Do NOT claim a Gross Profit or Net Profit budget exists.
-- Do NOT recompute variance %.`,
+- Do NOT recompute variance %.
+- For each Material (>±15%) or Severe (sign flip) deviation, conclude that line's commentary with ONE hedged advisory sentence — e.g. "consider reviewing OpEx pacing" or "monitor Other Income drivers". Do NOT prescribe specific actions or numbers.`,
 
-  fv_variance_breakdown: `"Variance by Account" breakdown — GL-account-level P&L variance, showing which accounts within each category (Sales, COGS, OpEx, Other Income) drove overall variance.
+  fv_variance_breakdown: `"Variance by Account" breakdown — GL-account-level YoY drill-down, complementary to the budget-variance summary above. Account-level budget variance is not available because budget is set at four P&L lines only.
 
 Pre-fetched data:
 - Per-account-type sections (COGS, OpEx, etc.)
@@ -945,6 +946,7 @@ Pre-fetched:
 - Trend direction + signal (rising/falling/flat, Strong/Weak)
 - Confidence band: Narrowing / Widening
 - Per metric: weighted Δ, last actual, milestones M+1/+3/+6/+12
+- Forecast Accuracy block (back-test) — M-1, M-3, M-6 horizons per line (Net Sales, GP, NP): predicted, actual, error RM, error %
 - Projected-vs-Budget block (only when an approved budget baseline exists): per line item, the annualized 12-month projection vs the annual budget, with Delta RM and Delta %
 
 Thresholds:
@@ -960,6 +962,7 @@ Evaluate:
 - Signal strength
 - Note long-range unreliability
 - Call out any projected loss or sign flip
+- When Forecast Accuracy block is present: characterise model credibility. Frame near-term as trustworthy if errors are under ±5%; flag deteriorating accuracy at longer horizons. Use phrases like "model has historically tracked within X%" — do NOT assert future accuracy.
 - When the Projected-vs-Budget block is present: for each row, comment on the trend's pace relative to the budget. Use hedged language — e.g. "at current trend, projected to be X% below budget pace" — do NOT assert certainty about hitting or missing the budget.
 
 Hard rules:
@@ -968,7 +971,8 @@ Hard rules:
 - Use "approximately"/"around"; no precision claims.
 - Summarise milestones; don't list all 12.
 - When a Projected-vs-Budget block is provided, include a one-line forecast-vs-budget commentary per row (absolute RM gap + % of budget). Use the "approved budget baseline" label — do NOT qualify with a fiscal year.
-- When NO Projected-vs-Budget block is provided, output the pure-trend projection only and make no reference to budgets, budget pace, or variance-to-budget.`,
+- When NO Projected-vs-Budget block is provided, output the pure-trend projection only and make no reference to budgets, budget pace, or variance-to-budget.
+- For projected sign flips and Material (>±15%) forecast-vs-budget deltas, conclude that line's commentary with ONE hedged advisory sentence — e.g. "consider reviewing OpEx pacing" or "monitor Other Income drivers". Do NOT prescribe specific actions or numbers.`,
 
   fv_budget_suggestions: `"AI Budget Suggestions" — system-generated budget baseline from current-period actuals annualised.
 
