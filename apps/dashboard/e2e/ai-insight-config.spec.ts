@@ -184,6 +184,19 @@ test.describe('AI Insight Config after feedback removal', () => {
       ru_aging_chart: 'Unsettled Returns Aging: Follow-Up Risk Rules',
       ru_debtors_table: 'Customer Returns: Debtor Concentration Rules',
     });
+
+    const customerMarginKpiTitles = Object.fromEntries(
+      ['cm_net_sales', 'cm_cogs', 'cm_margin_pct', 'cm_margin_trend'].map((key) => {
+        const prompt = body.prompts.find((candidate) => candidate.promptKey === key);
+        return [key, prompt?.thresholdPresentation?.title];
+      }),
+    );
+    expect(customerMarginKpiTitles).toEqual({
+      cm_net_sales: 'Customer Margin Net Sales: Growth and Decline Rules',
+      cm_cogs: 'Customer Margin Cost of Sales: COGS Share Rules',
+      cm_margin_pct: 'Customer Margin Percentage: Gross Margin Rules',
+      cm_margin_trend: 'Customer Margin Trend: Profitability Streak Rules',
+    });
   });
 
   test('admin config page has no feedback, version, router, editor, or guidance UI', async ({ page }) => {
@@ -402,6 +415,46 @@ test.describe('AI Insight Config after feedback removal', () => {
       });
     } finally {
       await saveThresholdValues(request, 'rt_product_bar', originals.rt_product_bar);
+    }
+  });
+
+  test('customer margin KPI metadata is business-readable and updates the prompt preview', async ({ page, request }) => {
+    const originals = {
+      cm_margin_pct: await readThresholdValues(request, 'cm_margin_pct'),
+    };
+    const nextNeutralPct = Math.max(0, Math.min(
+      originals.cm_margin_pct.good_pct - 1,
+      originals.cm_margin_pct.neutral_pct + 1,
+    ));
+
+    await setAdminRole(page);
+    await openAdminConfig(page);
+
+    try {
+      await selectPromptBySearch(page, 'Gross margin quality', 'cm_margin_pct');
+      const configPanel = page.getByTestId('configuration-panel');
+      await expect(configPanel).toContainText('Gross Margin Quality');
+      await expect(configPanel).toContainText('Bad margin');
+      await expect(configPanel).toContainText('Neutral margin');
+      await expect(configPanel).toContainText('Good margin');
+      await expect(configPanel).not.toContainText('Gross margin band');
+      await expect(configPanel).not.toContainText('Good at or above');
+      await expect(configPanel).not.toContainText('neutral_pct');
+      await expect(page.getByTestId('prompt-tree')).not.toContainText('Gross margin band');
+
+      await editPromptThreshold({
+        page,
+        request,
+        search: 'Gross margin quality',
+        promptKey: 'cm_margin_pct',
+        token: 'neutral_pct',
+        value: nextNeutralPct,
+        expectedBusinessLabel: 'Gross Margin Quality',
+        expectedConfigText: 'Bad margin',
+        expectedPromptText: `${nextNeutralPct}–${originals.cm_margin_pct.good_pct}% = Neutral`,
+      });
+    } finally {
+      await saveThresholdValues(request, 'cm_margin_pct', originals.cm_margin_pct);
     }
   });
 

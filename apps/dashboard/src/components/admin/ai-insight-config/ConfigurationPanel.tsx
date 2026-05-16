@@ -242,7 +242,7 @@ function RangeSegment({
         aria-label={token.label}
         aria-invalid={tokenError ? true : undefined}
         data-testid={`threshold-input-${token.token}`}
-        className={`mx-1 inline-flex h-7 w-20 rounded-lg border bg-background px-2 text-center font-semibold outline-none transition-colors focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-50 ${
+        className={`mx-1 inline-flex h-7 w-16 rounded-lg border bg-background px-2 text-center font-semibold outline-none transition-colors focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-50 ${
           tokenError
             ? 'border-red-600 focus-visible:ring-red-200'
             : 'border-input focus-visible:border-ring focus-visible:ring-ring/50'
@@ -276,10 +276,10 @@ function BusinessRangeTable({
       {ranges.map((range) => (
         <div
           key={`${range.label}-${range.unit}`}
-          className="grid grid-cols-[minmax(6.25rem,1fr)_9.5rem_3rem] items-center gap-2 text-sm font-medium text-foreground"
+          className="grid grid-cols-[minmax(8rem,1fr)_minmax(10rem,max-content)_auto] items-center gap-2 text-sm font-medium text-foreground"
         >
           <div className="font-semibold">{range.label}</div>
-          <div className="flex min-h-8 flex-wrap items-center justify-self-end">
+          <div className="flex min-h-8 flex-nowrap items-center justify-self-end whitespace-nowrap">
             {range.segments.map((segment, index) => (
               <RangeSegment
                 key={`${range.label}-${index}`}
@@ -293,7 +293,7 @@ function BusinessRangeTable({
               />
             ))}
           </div>
-          <div className="justify-self-end font-medium">{range.unit}</div>
+          <div className="justify-self-end whitespace-nowrap font-medium">{range.unit}</div>
         </div>
       ))}
     </div>

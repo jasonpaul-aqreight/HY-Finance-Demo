@@ -1377,6 +1377,226 @@ export const THRESHOLD_PRESENTATION: Record<string, ThresholdComponentPresentati
       },
     ],
   },
+  cm_net_sales: {
+    title: 'Customer Margin Net Sales: Growth and Decline Rules',
+    description: '',
+    appliesToPromptLabel: 'Net Sales',
+    searchAliases: ['Customer Margin net sales', 'Revenue growth', 'Sales decline', 'Customer Margin KPI'],
+    rules: [
+      {
+        id: 'sales_growth_direction',
+        title: 'Net Sales Direction',
+        settings: [
+          {
+            token: 'good_growth_pct',
+            displayLabel: 'Good growth',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'good growth limit',
+          },
+          {
+            token: 'flag_decline_pct',
+            displayLabel: 'Flagged decline',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'flagged decline limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Good growth',
+            segments: [{ text: 'Above' }, { token: 'good_growth_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Neutral growth',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'good_growth_pct' }],
+            unit: '%',
+          },
+          {
+            label: 'Bad decline',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'flag_decline_pct' }],
+            unit: '%',
+          },
+          {
+            label: 'Flagged decline',
+            segments: [{ text: 'Above' }, { token: 'flag_decline_pct', editable: true }],
+            unit: '%',
+          },
+        ],
+      },
+    ],
+  },
+  cm_cogs: {
+    title: 'Customer Margin Cost of Sales: COGS Share Rules',
+    description: '',
+    appliesToPromptLabel: 'Cost of Sales',
+    searchAliases: ['COGS share', 'Cost of Sales benchmark', 'Customer Margin KPI'],
+    rules: [
+      {
+        id: 'cogs_share_benchmark',
+        title: 'COGS Share of Net Sales',
+        settings: [
+          {
+            token: 'typical_min_pct',
+            displayLabel: 'Typical lower bound',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'lower COGS benchmark',
+          },
+          {
+            token: 'typical_max_pct',
+            displayLabel: 'Typical upper bound',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'upper COGS benchmark',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Lean COGS share',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'typical_min_pct' }],
+            unit: '%',
+          },
+          {
+            label: 'Typical range',
+            segments: [
+              { token: 'typical_min_pct', editable: true },
+              { text: '-' },
+              { token: 'typical_max_pct', editable: true },
+            ],
+            unit: '%',
+          },
+          {
+            label: 'Margin pressure',
+            segments: [{ text: 'Above' }, { token: 'typical_max_pct' }],
+            unit: '%',
+          },
+        ],
+        validationConstraints: [
+          {
+            leftToken: 'typical_min_pct',
+            relation: 'lessThan',
+            rightToken: 'typical_max_pct',
+            message: 'The upper COGS benchmark must be higher than the lower COGS benchmark.',
+          },
+        ],
+      },
+    ],
+  },
+  cm_margin_pct: {
+    title: 'Customer Margin Percentage: Gross Margin Rules',
+    description: '',
+    appliesToPromptLabel: 'Margin %',
+    searchAliases: ['Gross margin quality', 'Margin percentage', 'Customer Margin KPI'],
+    rules: [
+      {
+        id: 'gross_margin_quality',
+        title: 'Gross Margin Quality',
+        settings: [
+          {
+            token: 'good_pct',
+            displayLabel: 'Good margin',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'good margin limit',
+          },
+          {
+            token: 'neutral_pct',
+            displayLabel: 'Neutral margin',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'neutral margin limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Bad margin',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'neutral_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Neutral margin',
+            segments: [{ token: 'neutral_pct' }, { text: '-' }, { token: 'good_pct' }],
+            unit: '%',
+          },
+          {
+            label: 'Good margin',
+            segments: [{ text: 'Above' }, { token: 'good_pct', editable: true }],
+            unit: '%',
+          },
+        ],
+        validationConstraints: [
+          {
+            leftToken: 'good_pct',
+            relation: 'greaterThan',
+            rightToken: 'neutral_pct',
+            message: 'The good margin limit must be higher than the neutral margin limit.',
+          },
+        ],
+      },
+    ],
+  },
+  cm_margin_trend: {
+    title: 'Customer Margin Trend: Profitability Streak Rules',
+    description: '',
+    appliesToPromptLabel: 'Margin Trend',
+    searchAliases: ['Profitability trend', 'Gross profit streak', 'Margin decline', 'Customer Margin KPI'],
+    rules: [
+      {
+        id: 'profit_streak',
+        title: 'Gross Profit Streak',
+        settings: [
+          {
+            token: 'growth_months',
+            displayLabel: 'Good growth streak',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'good growth streak',
+          },
+          {
+            token: 'profit_decline_months',
+            displayLabel: 'Bad decline streak',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'bad decline streak',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Good growth signal',
+            segments: [{ token: 'growth_months', editable: true }, { text: 'or more' }],
+            unit: 'months',
+          },
+          {
+            label: 'Bad decline signal',
+            segments: [{ token: 'profit_decline_months', editable: true }, { text: 'or more' }],
+            unit: 'months',
+          },
+        ],
+      },
+      {
+        id: 'margin_decline',
+        title: 'Margin Percentage Decline',
+        settings: [
+          {
+            token: 'margin_decline_months',
+            displayLabel: 'Margin decline flag',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'margin decline flag',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Flag margin compression',
+            segments: [{ token: 'margin_decline_months', editable: true }, { text: 'or more' }],
+            unit: 'months',
+          },
+        ],
+      },
+    ],
+  },
   rt_total_returns: {
     title: 'Total Returns: Return Exposure Rules',
     description: '',
