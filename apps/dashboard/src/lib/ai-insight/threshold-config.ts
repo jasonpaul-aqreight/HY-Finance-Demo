@@ -1594,6 +1594,341 @@ export const THRESHOLD_PRESENTATION: Record<string, ThresholdComponentPresentati
       },
     ],
   },
+  rt_settlement_breakdown: {
+    title: 'Settlement Breakdown: Return Resolution Rules',
+    description: '',
+    appliesToPromptLabel: 'Settlement Breakdown',
+    searchAliases: ['Return settlement mix', 'Knock-off refund unsettled', 'Returns chart'],
+    rules: [
+      {
+        id: 'knock_off_share',
+        title: 'Knock-Off Settlement Share',
+        settings: [
+          {
+            token: 'knock_off_healthy_pct',
+            displayLabel: 'Cash-efficient',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'cash-efficient knock-off limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Needs more knock-off settlement',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'knock_off_healthy_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Cash-efficient',
+            segments: [{ text: 'Above' }, { token: 'knock_off_healthy_pct' }],
+            unit: '%',
+          },
+        ],
+      },
+      {
+        id: 'refund_share',
+        title: 'Refund Exposure Share',
+        settings: [
+          {
+            token: 'refund_concern_pct',
+            displayLabel: 'Cash-draining',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'cash-draining refund limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Controlled refund exposure',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'refund_concern_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Cash-draining concern',
+            segments: [{ text: 'Above' }, { token: 'refund_concern_pct' }],
+            unit: '%',
+          },
+        ],
+      },
+      {
+        id: 'unsettled_share',
+        title: 'Unsettled Return Exposure',
+        settings: [
+          {
+            token: 'unsettled_concern_pct',
+            displayLabel: 'Open exposure',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'open exposure limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Controlled open exposure',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'unsettled_concern_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Exposure piling up',
+            segments: [{ text: 'Above' }, { token: 'unsettled_concern_pct' }],
+            unit: '%',
+          },
+        ],
+      },
+      {
+        id: 'refund_dominant_mix',
+        title: 'Refund-Dominant Mix Warning',
+        settings: [
+          {
+            token: 'knock_off_low_pct',
+            displayLabel: 'Low knock-off trigger',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'low knock-off trigger',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Low knock-off trigger',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'knock_off_low_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Enough knock-off base',
+            segments: [{ text: 'Above' }, { token: 'knock_off_low_pct' }],
+            unit: '%',
+          },
+        ],
+      },
+    ],
+  },
+  rt_monthly_trend: {
+    title: 'Monthly Return Trend: Growth Warning Rules',
+    description: '',
+    appliesToPromptLabel: 'Monthly Return Trend',
+    searchAliases: ['Return count growth', 'Monthly returns', 'Returns chart'],
+    rules: [
+      {
+        id: 'return_count_growth',
+        title: 'Return Count Growth',
+        settings: [
+          {
+            token: 'mom_concern_pct',
+            displayLabel: 'Concern',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'return count growth limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Normal growth',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'mom_concern_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Concern',
+            segments: [{ text: 'Above' }, { token: 'mom_concern_pct' }],
+            unit: '%',
+          },
+        ],
+      },
+    ],
+  },
+  rt_product_bar: {
+    title: 'Top Returns by Item: Item Concentration Rules',
+    description: '',
+    appliesToPromptLabel: 'Top Returns by Item',
+    searchAliases: ['Item concentration', 'Product return concentration', 'Returns chart'],
+    rules: [
+      {
+        id: 'single_item_concentration',
+        title: 'Single Item Share',
+        settings: [
+          {
+            token: 'top_1_severe_pct',
+            displayLabel: 'Severe',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'single-item severe limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Spread across items',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'top_1_severe_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Severe single-item concentration',
+            segments: [{ text: 'Above' }, { token: 'top_1_severe_pct' }],
+            unit: '%',
+          },
+        ],
+      },
+      {
+        id: 'top_10_item_concentration',
+        title: 'Top 10 Item Share',
+        settings: [
+          {
+            token: 'top_10_diversified_pct',
+            displayLabel: 'Diversified',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'diversified item-share limit',
+          },
+          {
+            token: 'top_10_concentrated_pct',
+            displayLabel: 'Concentrated',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'concentrated item-share limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Diversified return spread',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'top_10_diversified_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Normal concentration',
+            segments: [{ token: 'top_10_diversified_pct' }, { text: '-' }, { token: 'top_10_concentrated_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Concentrated return drivers',
+            segments: [{ text: 'Above' }, { token: 'top_10_concentrated_pct' }],
+            unit: '%',
+          },
+        ],
+        validationConstraints: [
+          {
+            leftToken: 'top_10_diversified_pct',
+            relation: 'lessThan',
+            rightToken: 'top_10_concentrated_pct',
+            message: 'The concentrated item-share limit must be higher than the diversified limit.',
+          },
+        ],
+      },
+    ],
+  },
+  ru_aging_chart: {
+    title: 'Unsettled Returns Aging: Follow-Up Risk Rules',
+    description: '',
+    appliesToPromptLabel: 'Aging of Unsettled Returns',
+    searchAliases: ['Aging risk', 'Write-off risk', 'Unsettled returns chart'],
+    rules: [
+      {
+        id: 'old_unsettled_share',
+        title: 'Old Unsettled Share',
+        settings: [
+          {
+            token: 'old_91_watch_pct',
+            displayLabel: 'Follow-up watch',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'follow-up watch limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Follow-up on track',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'old_91_watch_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Follow-up watch',
+            segments: [{ text: 'Above' }, { token: 'old_91_watch_pct' }],
+            unit: '%',
+          },
+        ],
+      },
+      {
+        id: 'write_off_exposure',
+        title: 'Write-Off Exposure',
+        settings: [
+          {
+            token: 'old_180_writeoff_pct',
+            displayLabel: 'Write-off risk',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'write-off risk limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Low write-off exposure',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'old_180_writeoff_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Write-off risk',
+            segments: [{ text: 'Above' }, { token: 'old_180_writeoff_pct' }],
+            unit: '%',
+          },
+        ],
+      },
+    ],
+  },
+  ru_debtors_table: {
+    title: 'Customer Returns: Debtor Concentration Rules',
+    description: '',
+    appliesToPromptLabel: 'Customer Returns',
+    searchAliases: ['Debtor concentration', 'Customer return concentration', 'Unsettled returns table'],
+    rules: [
+      {
+        id: 'debtor_concentration',
+        title: 'Unsettled Customer Concentration',
+        settings: [
+          {
+            token: 'top_1_risk_pct',
+            displayLabel: 'Single-customer risk',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'single-customer risk limit',
+          },
+          {
+            token: 'top_10_concentrated_pct',
+            displayLabel: 'Top-10 concentration',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'top-10 concentration limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Low single-customer risk',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'top_1_risk_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Single-customer risk',
+            segments: [{ text: 'Above' }, { token: 'top_1_risk_pct' }],
+            unit: '%',
+          },
+          {
+            label: 'Manageable top-10 concentration',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'top_10_concentrated_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Concentrated unresolved book',
+            segments: [{ text: 'Above' }, { token: 'top_10_concentrated_pct' }],
+            unit: '%',
+          },
+        ],
+        validationConstraints: [
+          {
+            leftToken: 'top_1_risk_pct',
+            relation: 'lessThan',
+            rightToken: 'top_10_concentrated_pct',
+            message: 'The top-10 concentration limit must be higher than the single-customer risk limit.',
+          },
+        ],
+      },
+    ],
+  },
   bs_statement: {
     title: 'Balance Sheet Statement Rules',
     description: '',

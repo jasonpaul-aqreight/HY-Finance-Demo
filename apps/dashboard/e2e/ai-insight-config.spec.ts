@@ -170,6 +170,20 @@ test.describe('AI Insight Config after feedback removal', () => {
       rt_unsettled: 'Unsettled Returns: Open Exposure Rules',
       rt_return_pct: 'Return Percentage: Sales Quality Rules',
     });
+
+    const returnsChartTableTitles = Object.fromEntries(
+      ['rt_settlement_breakdown', 'rt_monthly_trend', 'rt_product_bar', 'ru_aging_chart', 'ru_debtors_table'].map((key) => {
+        const prompt = body.prompts.find((candidate) => candidate.promptKey === key);
+        return [key, prompt?.thresholdPresentation?.title];
+      }),
+    );
+    expect(returnsChartTableTitles).toEqual({
+      rt_settlement_breakdown: 'Settlement Breakdown: Return Resolution Rules',
+      rt_monthly_trend: 'Monthly Return Trend: Growth Warning Rules',
+      rt_product_bar: 'Top Returns by Item: Item Concentration Rules',
+      ru_aging_chart: 'Unsettled Returns Aging: Follow-Up Risk Rules',
+      ru_debtors_table: 'Customer Returns: Debtor Concentration Rules',
+    });
   });
 
   test('admin config page has no feedback, version, router, editor, or guidance UI', async ({ page }) => {
@@ -348,6 +362,46 @@ test.describe('AI Insight Config after feedback removal', () => {
       });
     } finally {
       await saveThresholdValues(request, 'rt_return_pct', originals.rt_return_pct);
+    }
+  });
+
+  test('returns chart metadata is business-readable and updates the prompt preview', async ({ page, request }) => {
+    const originals = {
+      rt_product_bar: await readThresholdValues(request, 'rt_product_bar'),
+    };
+    const nextDiversifiedPct = Math.max(0, Math.min(
+      originals.rt_product_bar.top_10_concentrated_pct - 1,
+      originals.rt_product_bar.top_10_diversified_pct + 1,
+    ));
+
+    await setAdminRole(page);
+    await openAdminConfig(page);
+
+    try {
+      await selectPromptBySearch(page, 'Item concentration', 'rt_product_bar');
+      const configPanel = page.getByTestId('configuration-panel');
+      await expect(configPanel).toContainText('Top Returns by Item: Item Concentration Rules');
+      await expect(configPanel).toContainText('Single Item Share');
+      await expect(configPanel).toContainText('Top 10 Item Share');
+      await expect(configPanel).toContainText('Diversified return spread');
+      await expect(configPanel).not.toContainText('Top 1 severe above');
+      await expect(configPanel).not.toContainText('Return concentration');
+      await expect(configPanel).not.toContainText('top_10_diversified_pct');
+      await expect(page.getByTestId('prompt-tree')).not.toContainText('Top 1 severe above');
+
+      await editPromptThreshold({
+        page,
+        request,
+        search: 'Item concentration',
+        promptKey: 'rt_product_bar',
+        token: 'top_10_diversified_pct',
+        value: nextDiversifiedPct,
+        expectedBusinessLabel: 'Top 10 Item Share',
+        expectedConfigText: 'Diversified return spread',
+        expectedPromptText: `<${nextDiversifiedPct}% = Diversified`,
+      });
+    } finally {
+      await saveThresholdValues(request, 'rt_product_bar', originals.rt_product_bar);
     }
   });
 
