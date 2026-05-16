@@ -108,8 +108,8 @@ async function assertOverridePropagation() {
   invalidateThresholdCache();
 
   const avgPrompt = await getComponentPrompt('avg_collection_days');
-  assert.equal(avgPrompt.includes('≤37 = Good'), true, 'avg_collection_days prompt should render overridden good_days');
-  assert.equal(avgPrompt.includes('≤74 = Warning'), true, 'avg_collection_days prompt should render overridden warning_days');
+  assert.equal(avgPrompt.includes('Good: 0-37 days'), true, 'avg_collection_days prompt should render overridden good_days');
+  assert.equal(avgPrompt.includes('Warning: >37 to 74 days'), true, 'avg_collection_days prompt should render overridden warning_days');
 
   const avgData = await renderThresholdText(DATA_SAMPLE_SOURCES.avg_collection_days, 'avg_collection_days');
   assert.equal(avgData.includes('37-day (Good) benchmark'), true, 'data sample should render overridden avg_collection_days good_days');
@@ -119,7 +119,8 @@ async function assertOverridePropagation() {
   assert.equal(avgInfo?.indicator?.includes('≤37 days = Good'), true, 'component info should render overridden avg_collection_days good_days');
 
   const bsPrompt = await getComponentPrompt('bs_statement');
-  assert.equal(bsPrompt.includes('1.4–2.0 Healthy'), true, 'bs_statement prompt should render overridden ratio token');
+  assert.equal(bsPrompt.includes('Full Balance Sheet Statement'), true, 'bs_statement prompt should use full Balance Sheet wording');
+  assert.equal(bsPrompt.includes('Thin: >1.0 to 1.4 ratio.'), true, 'bs_statement prompt should render overridden ratio token');
   const bsAllowed = await allowedThresholds('bs_statement');
   assert.equal(
     bsAllowed.some((entry) => entry.unit === 'ratio' && entry.value === 1.4),
@@ -128,7 +129,7 @@ async function assertOverridePropagation() {
   );
 
   const exPrompt = await getComponentPrompt('ex_top_expenses');
-  assert.equal(exPrompt.includes('Top 1 >31% = Severe'), true, 'ex_top_expenses prompt should render overridden concentration token');
+  assert.equal(exPrompt.includes('Largest account share >31% = Severe'), true, 'ex_top_expenses prompt should render overridden concentration token');
 
   delete process.env.AI_INSIGHT_THRESHOLD_TEST_OVERRIDES;
   invalidateThresholdCache();

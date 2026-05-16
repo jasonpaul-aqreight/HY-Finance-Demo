@@ -139,7 +139,7 @@ export interface SummaryJson {
 export type AllowedValueUnit = 'RM' | 'pct' | 'days' | 'count' | 'ratio';
 
 export interface AllowedValue {
-  label: string;          // human-readable description, e.g. "H1 avg neg gap"
+  label: string;          // human-readable description, e.g. "FY2025 Q1 avg gap"
   value: number;          // raw numeric value (RM = ringgit, pct = 0-100, days, count)
   tolerance?: number;     // absolute tolerance; defaults applied by guard if omitted
   unit?: AllowedValueUnit;

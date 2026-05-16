@@ -60,7 +60,7 @@ export function BreadcrumbBar({ prompt }: Props) {
     return (
       <nav
         data-testid="ai-insight-breadcrumb"
-        className="flex items-center gap-2 rounded-lg border border-border bg-background px-4 py-3 text-sm text-foreground/60"
+        className="flex items-center gap-2 rounded-lg border border-border bg-background px-4 py-3 text-sm font-medium text-foreground"
         aria-label="Prompt path"
       >
         Select a prompt from the tree
@@ -80,9 +80,9 @@ export function BreadcrumbBar({ prompt }: Props) {
         return (
           <span key={`${i}-${crumb}`} className="flex items-center gap-1.5">
             {i > 0 && (
-              <span className="text-foreground/40">/</span>
+              <span className="font-semibold text-foreground">/</span>
             )}
-            <span className={isLast ? 'font-semibold text-foreground' : 'text-foreground/70'}>
+            <span className={isLast ? 'font-semibold text-foreground' : 'font-medium text-foreground'}>
               {crumb}
             </span>
           </span>

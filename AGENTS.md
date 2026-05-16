@@ -135,13 +135,13 @@ Follow the iteration process strictly:
 <claude-mem-context>
 # Memory Context
 
-# [Hoi-Yong_Finance] recent context, 2026-05-16 6:31pm GMT+8
+# [Hoi-Yong_Finance] recent context, 2026-05-16 10:29pm GMT+8
 
 Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
 Format: ID TIME TYPE TITLE
 Fetch details: get_observations([IDs]) | Search: mem-search skill
 
-Stats: 50 obs (22,067t read) | 226,798t work | 90% savings
+Stats: 50 obs (19,310t read) | 322,465t work | 94% savings
 
 ### May 16, 2026
 S749 AI Insight Config Rework — planning session wrap-up and handoff to Amelia (BMad dev) for implementation (May 16 at 2:53 PM)
@@ -154,56 +154,56 @@ S755 Review AI Insight Configurable Thresholds plan for technical gaps, then pat
 S756 Patch the AI Insight Configurable Thresholds plan with 5 binding technical contracts identified during review (May 16 at 5:06 PM)
 S757 Approve and finalize the AI Insight Configurable Thresholds plan (Revision 2), then prepare to kick off Phase 0 implementation (May 16 at 5:08 PM)
 S758 AI Insight Configurable Thresholds plan reviewed, patched with 5 binding contracts, approved — awaiting Phase 0 kickoff decision (May 16 at 5:10 PM)
-5263 5:27p 🔵 Phase 0 Audit Found 4 DB Prompts Differing from Code Defaults
-5265 5:28p 🔵 Phase 0 Build Passes Clean — Old Feedback/Prompt Routes Still Present in Build Output
-5266 " 🔵 Phase 1 Cleanup Scope Extended — BreadcrumbBar.tsx and PromptTree.tsx Need Edits Not Listed in Plan
-5268 " 🔵 Complete Admin AI-Insight API File Inventory — 10 Files to Delete, 1 to Keep
-5269 " 🔵 Two Additional Feedback API Routes Found Outside Admin Path
-5267 5:29p 🔵 Phase 1 Execution Plan — 5 Steps, Currently Mapping References
-5270 5:30p 🔵 Complete Phase 1 Reference Map — AppSidebar Polling, PromptTree feedbackBadge, PromptConfigDashboard FeedbackList All Confirmed
-5271 " 🔵 AiInsightPanel.tsx Feedback Button Implementation — Exact Removals Mapped
-5272 " 🔵 AppSidebar.tsx Feedback Removal Scope — useSWR Import Also Removable
-5273 5:31p 🔵 prompt-loader.ts Full Implementation — DB Query Will Break After Migration 024, Fallback Chain Must Become Primary
-5274 " 🔵 prompts.ts Architecture — Thin Public API Over prompt-loader; buildSummaryUserPrompt Uses Guidance Injection
-5275 " 🔵 buildSummaryUserPrompt Guidance Injection Block — Exact Code to Remove in Phase 1
-5276 " 🔵 AiInsightPanel.tsx Complete Feedback Removal — FeedbackModal and Toast Are Standalone JSX Blocks After Footer
-5277 5:33p 🔵 PromptConfigDashboard Layout Must Be Restructured in Phase 1 — 3-Row Grid Collapses to 2
-5278 " 🔵 PromptTree.tsx Requires Extensive Restructuring in Phase 1
-5279 " 🔵 BreadcrumbBar.tsx — Small Edit Scope, Two feedback_router/surgical_editor Checks and One section_guidance Label
-5280 5:34p 🔵 PromptTextPanel.tsx Has Feedback Reference Text and Version Pill — Both Need Phase 1 Updates
-5281 5:35p 🔵 model-provider.ts and client.ts — feedback_router/surgical_editor Model Slots and Env Vars Need Phase 1 Removal
-5282 5:36p 🔄 AI Insight Feedback Loop Removed (Phase 1 Complete)
-5283 " 🔴 Toast.tsx Accidentally Deleted in Phase 1 Cleanup — Restored
-5284 " 🟣 Playwright E2E Smoke Spec for Post-Feedback AI Insight Config
-5285 5:39p 🔄 AI Insight Config Phase 2: Major Refactor In Progress
-5286 5:40p 🔵 Phase 2 Plan: Threshold Registry, DB Table, and Token Substitution Architecture
-5287 5:41p 🔵 Phases 0 and 1 Confirmed Complete; Revision 2 Binding Contracts Defined
-5288 " 🔵 Phase 3 Tokenization Scope and Golden Regression Coverage Defined
-5289 " 🔵 Plan Execution Model: One Phase Per Session with PRD Update Deferred
-5290 5:42p ✅ Phase 0 + Phase 1 Net Change: 4073 Deletions, 255 Insertions Across 38 Files
-5291 5:43p 🟣 New Files Created in Phases 0 and 1: Replacement API, Audit Artifact, Dev Overlay, Prompt Config
-5292 " 🟣 Agentation Visual Dev Overlay Added to Dashboard
-5293 " 🔵 Agentation Supports Two Modes: Browser-Local and MCP-Synced
-5294 5:44p ✅ Phase 0 and Phase 1 Changes Staged for Commit
-5298 " 🔵 Database Connection Architecture: Local Dev on Port 5433, AWS RDS for Autocount
-5301 " 🔴 threshold-config.ts: Monotonic Validation Fixed with enforceMonotonic Flag and Token Reordering
-5295 5:46p 🔵 Staged Commit Composition: 3132-Line Audit Artifact and 122-Line prompt-config.ts Are the Key Additions
-5296 5:47p ✅ Phase 0+1 Committed to main: 73a3f5f "feat(ai-insight): remove feedback loop config baseline"
-5297 " ✅ Phase 2 Execution Plan Activated with 5 Steps
-5299 5:50p 🔵 Dashboard Tech Stack: OpenRouter SDK, node-postgres, No Test Runner
-5300 " 🟣 threshold-config.ts Implemented: Full Registry, Loader, Formatter, Validator, and Save Logic
-5302 5:58p 🔴 Fixed Default Validation Failures in 5 Threshold-Config Components
-5303 " 🔵 Threshold Registry State: 56 Components, 194 Seed Rows, DB Falls Back to Defaults
-5304 " 🟣 Phase 2 Threshold API Routes Confirmed in Production Build
-5305 5:59p 🟣 Migration 025: ai_insight_thresholds Table with 194 Seed Rows
-5306 6:02p 🔵 Phase 2 AI Insight Configurable Thresholds - Uncommitted Changes Ready
-5307 " 🟣 Phase 2 AI Insight Configurable Thresholds Committed and Pushed
-5308 " 🔵 Phase 3 Plan: Tokenize Prompts + Wire Single Source of Truth
-5309 6:03p 🔵 threshold-config.ts Token Registry — Full Component Coverage
-5310 6:06p 🔵 prompts-defaults.ts Already Tokenized with {{token}} Placeholders
-5311 " 🔵 data-fetcher.ts Already Wired to classifyThresholdValue from Phase 2
-5312 " 🔵 component-info.ts Has Hardcoded Threshold Strings — Primary Phase 3 Tokenization Target
-5313 6:07p 🔵 numeric-guard.ts Live-Value Wire Already Active from Phase 2
+5383 9:20p 🔵 Threshold Tokens Appear in Three Surfaces: prompts-defaults, data-fetcher, and component-info — component-info Has Static Placeholder Fallbacks
+5384 9:21p 🔵 component-info.ts IS Dynamically Rendered via component-info-renderer.ts — Previous Static Stale Risk Assessment Was Wrong
+5385 " ⚖️ Simplify "No Threshold" Message in Prompt UI
+5386 " ⚖️ H1/H2 Terminology is Not Hoi Yong Domain Language — Needs Replacement
+5387 9:31p 🔵 Threshold Config and Prompt Defaults File Structure for AI Insight Prompts
+5388 " 🔵 AI Insight Threshold Config Has E2E Tests and JSON Snapshots
+5389 9:32p 🔵 Located Verbose "No Threshold" Message in ConfigurationPanel.tsx
+5395 " 🔵 H1/H2 Split Logic in data-fetcher.ts — Positional, Not Calendar-Based
+5397 " 🔵 H1/H2 Also Present in Docs Audit Artifact — Adds to Rename Scope
+5398 " 🟣 H1/H2 Replaced with Fiscal Quarter Groups in Invoiced vs Collected Data Fetcher
+5390 " 🔵 H1/H2 Terminology Scope — Three Files in AI Insight Pipeline
+5391 " 🔵 Current Working Tree State — AI Insight Config Feature in Progress
+5392 9:33p 🔵 ReadOnlyState Component Has Two Distinct Usage Contexts in ConfigurationPanel
+5393 " 🔴 Simplified "No Threshold" Message — Moved to Title, Body Removed
+5394 9:34p ✅ Production Build Passes After ConfigurationPanel.tsx Copy Change
+5396 9:35p 🔵 No Q1/Q2/Quarter Terminology in Payment/Collection Domain — Fiscal Year is Mar–Feb
+5404 9:38p ✅ Production Build Passes After Full H1/H2 → Fiscal Quarter Rename
+5399 9:40p 🔵 Post-Patch File Read Shows Stale Cache — Old H1/H2 Code Still Visible in Read Output
+5400 9:41p 🔵 Fiscal Quarter Patch to data-fetcher.ts May Not Have Applied — H1/H2 Still Found by rg After Patch
+5401 " 🔵 prompts-defaults.ts Still Contains H1/H2 — Not Yet Updated After data-fetcher.ts Change
+5402 " ✅ Fiscal Quarter Patch Re-Applied to data-fetcher.ts — Second Successful write_file Call
+5403 " ✅ prompts-defaults.ts Updated — H1/H2 References Replaced with Fiscal Quarter Language
+5405 9:43p 🔵 types.ts Added to Modified Files — H1/H2 Comment Likely Updated
+5406 " 🔵 Git Diff Confirms H1/H2 Rename Scope: 3 Files, 132 Insertions, 71 Deletions
+5407 " ✅ H1/H2 Terminology Fully Removed from ai-insight Source Directory
+5410 " 🔵 Hoi-Yong Finance Project Structure and AI Insight Architecture
+5408 " 🔵 Fiscal Quarter Implementation Confirmed Live in data-fetcher.ts
+5409 9:44p ⚖️ Plan Doc Formalizes H1/H2 → Fiscal Quarter Rule with Explicit Quarter Boundaries
+5411 " 🔵 Session 4 Starting Git State — Uncommitted Session 2/3 Changes Present
+5412 " ⚖️ AI Insight Config Client-Ready Threshold Settings Plan — Full Design Decisions
+5413 " 🔵 BMAD Framework Configured in Hoi-Yong Finance Project
+5414 9:45p 🔵 THRESHOLD_PRESENTATION Map State — Session 2/3 Entries Present, Sales KPIs Missing
+5415 " 🔵 Sales KPI Prompt Threshold Tokens Identified in prompts-defaults.ts
+5416 9:47p 🔵 Sales KPI Threshold Token Definitions — Exact Defaults and Structure Confirmed
+5417 " 🔵 Playwright e2e Spec Current Coverage — Session 2/3 Tests Established Patterns for Session 4
+5418 " 🔵 Playwright Test Cleanup Pattern — Finally Block Must Restore All Edited Threshold Values
+5419 " 🔵 THRESHOLD_PRESENTATION Schema Pattern — Full Structure Confirmed from Existing Entries
+5425 " 🔵 Sales KPI Fetchers Hardcode Threshold Values in Data Block Status Text
+5420 9:48p 🔵 Multi-Rule THRESHOLD_PRESENTATION Pattern — bs_statement Confirms net_sales Needs Two Rules
+5421 9:49p 🔵 Threshold Runtime Internals — Token Key Format, Validation Fallback, and Cache TTL
+5422 " 🔵 ConfigurationPanel Rendering Logic — Title Display Conditional on Multiple Rules
+5423 9:50p 🔵 PromptConfigDashboard Default Selection Logic Prioritizes Prompts With Presentation Metadata
+5424 " 🔵 Sales KPI Prompt Templates — Exact Token Injection Points and Band Labels Confirmed
+5426 9:51p 🔵 by_customer Fetcher Uses Live net_sales Credit Note Thresholds — Separate from credit_notes Component Tokens
+5427 9:52p 🔵 PromptTree Search Indexes Business Labels When Presentation Exists — Token Names Become Unsearchable
+5428 9:53p 🔵 test-thresholds.ts Scope — Sales KPI Prompts Not in Snapshot; Snapshot Safe After THRESHOLD_PRESENTATION Addition
+5429 " 🔵 Snapshot Contains No Sales KPI or Presentation Terms; Config API Route Confirmed Thin
+5430 " 🔵 Thresholds API Routes Already Return thresholdPresentation — Zero Route Changes Needed for Session 4
+5431 9:54p 🔵 prompt-config.ts Uses Generic Logic — No Hardcoded Sales KPI References
+5432 10:01p ⚖️ Sales KPI Prompt Overlap Identified — Component Insight Modal Deduplication Deferred to Separate Study
 
-Access 227k tokens of past work via get_observations([IDs]) or mem-search skill.
+Access 322k tokens of past work via get_observations([IDs]) or mem-search skill.
 </claude-mem-context>

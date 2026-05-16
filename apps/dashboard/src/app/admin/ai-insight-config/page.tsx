@@ -7,7 +7,7 @@ export default function AiInsightConfigPage() {
     <>
       <PageBanner
         title="AI Insight Config"
-        description="View the code-backed prompts that drive AI Insight analysis. Configuration editing will be added in the next phase."
+        description="Review rendered AI Insight prompts and edit the business thresholds used at runtime."
       />
       <Suspense fallback={<div className="p-8 text-foreground">Loading...</div>}>
         <PromptConfigDashboard />

@@ -13,10 +13,10 @@ its own `> Progress:` line — keep both in sync.
 - [x] **Phase 1** — Remove Feedback Loop · _date:_ 2026-05-16 · _commit:_ 73a3f5f
 - [x] **Phase 2** — Threshold Config Foundation + Inventory · _date:_ 2026-05-16 · _commit:_ 3c9dd1c
 - [x] **Phase 3** — Tokenize + Wire Single Source of Truth · _date:_ 2026-05-16 · _commit:_ cb8859b
-- [ ] **Phase 4** — Config Page UI Rebuild · _date:_ — · _commit:_ —
+- [x] **Phase 4** — Config Page UI Rebuild · _date:_ 2026-05-16 · _commit:_ pending user approval
 - [ ] **Post (deferred)** — PRD update — only when the user explicitly asks
 
-Next action: **Phase 4**.
+Next action: **Post (deferred)** — PRD update only when explicitly requested.
 
 ## Context
 
@@ -420,7 +420,7 @@ Verification:
 
 ## Phase 4 - Config Page UI Rebuild
 
-> Progress: NOT STARTED · date: — · commit: —
+> Progress: DONE · date: 2026-05-16 · commit: pending user approval
 
 Purpose: match the intended admin workflow.
 

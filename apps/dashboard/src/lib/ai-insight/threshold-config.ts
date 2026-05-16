@@ -41,7 +41,55 @@ export interface ThresholdGroupView {
   label: string;
   direction: ThresholdDirection;
   description?: string;
+  enforceMonotonic: boolean;
   tokens: ThresholdTokenView[];
+}
+
+export interface ThresholdBusinessSettingView {
+  token: string;
+  displayLabel: string;
+  sentencePrefix: string;
+  sentenceSuffix: string;
+  helpText?: string;
+  validationLabel?: string;
+}
+
+export interface ThresholdRangeSegmentView {
+  text?: string;
+  token?: string;
+  offset?: number;
+  editable?: boolean;
+}
+
+export interface ThresholdBusinessRangeView {
+  label: string;
+  segments: ThresholdRangeSegmentView[];
+  unit: string;
+}
+
+export interface ThresholdValidationConstraintView {
+  leftToken: string;
+  relation: 'greaterThan' | 'lessThan';
+  rightToken: string;
+  message: string;
+}
+
+export interface ThresholdBusinessRuleView {
+  id: string;
+  title: string;
+  description?: string;
+  settings: ThresholdBusinessSettingView[];
+  ranges?: ThresholdBusinessRangeView[];
+  derivedBands?: string[];
+  validationConstraints?: ThresholdValidationConstraintView[];
+}
+
+export interface ThresholdComponentPresentationView {
+  title: string;
+  description: string;
+  appliesToPromptLabel: string;
+  searchAliases?: string[];
+  rules: ThresholdBusinessRuleView[];
 }
 
 export interface ThresholdValidationResult {
@@ -601,6 +649,1390 @@ export const THRESHOLD_REGISTRY: ThresholdComponentDefinition[] = [
   ]),
 ];
 
+export const THRESHOLD_PRESENTATION: Record<string, ThresholdComponentPresentationView> = {
+  avg_collection_days: {
+    title: 'Average Payment Speed Rules',
+    description: '',
+    appliesToPromptLabel: 'Avg Collection Days',
+    searchAliases: ['Average collection days'],
+    rules: [
+      {
+        id: 'payment_speed',
+        title: 'Average Payment Speed Rules',
+        settings: [
+          {
+            token: 'good_days',
+            displayLabel: 'Good',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'good limit',
+          },
+          {
+            token: 'warning_days',
+            displayLabel: 'Warning',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'warning limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Good',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'good_days', editable: true }],
+            unit: 'days',
+          },
+          {
+            label: 'Warning',
+            segments: [{ token: 'good_days', offset: 1 }, { text: '-' }, { token: 'warning_days', editable: true }],
+            unit: 'days',
+          },
+          {
+            label: 'Critical',
+            segments: [{ token: 'warning_days' }, { text: '> above' }],
+            unit: 'days',
+          },
+        ],
+        validationConstraints: [
+          {
+            leftToken: 'good_days',
+            relation: 'lessThan',
+            rightToken: 'warning_days',
+            message: 'The warning limit must be higher than the good limit.',
+          },
+        ],
+      },
+    ],
+  },
+  collection_rate: {
+    title: 'Collection Rate: Cash Conversion Rules',
+    description: '',
+    appliesToPromptLabel: 'Collection Rate',
+    searchAliases: ['Cash conversion', 'Payment collection rate'],
+    rules: [
+      {
+        id: 'cash_conversion_rate',
+        title: 'Cash Conversion Rate',
+        settings: [
+          {
+            token: 'good_pct',
+            displayLabel: 'Good',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'good collection rate',
+          },
+          {
+            token: 'warning_pct',
+            displayLabel: 'Warning',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'warning collection rate',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Critical',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'warning_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Warning',
+            segments: [{ token: 'warning_pct' }, { text: '-' }, { token: 'good_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Good',
+            segments: [{ text: 'Above' }, { token: 'good_pct' }],
+            unit: '%',
+          },
+        ],
+        validationConstraints: [
+          {
+            leftToken: 'good_pct',
+            relation: 'greaterThan',
+            rightToken: 'warning_pct',
+            message: 'The good collection rate must be higher than the warning collection rate.',
+          },
+        ],
+      },
+    ],
+  },
+  collection_days_trend: {
+    title: 'Collection Trend: Delay Spike Rules',
+    description: '',
+    appliesToPromptLabel: 'Avg Collection Days Trend',
+    searchAliases: ['Collection days spike', 'Payment delay spike'],
+    rules: [
+      {
+        id: 'delay_spike',
+        title: 'Critical Delay Spike',
+        settings: [
+          {
+            token: 'critical_spike_days',
+            displayLabel: 'Critical spike',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'critical spike limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Normal movement',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'critical_spike_days', editable: true }],
+            unit: 'days',
+          },
+          {
+            label: 'Critical spike',
+            segments: [{ text: 'Above' }, { token: 'critical_spike_days' }],
+            unit: 'days',
+          },
+        ],
+      },
+    ],
+  },
+  overdue_amount: {
+    title: 'Overdue Amount: Outstanding Risk Rules',
+    description: '',
+    appliesToPromptLabel: 'Overdue Amount',
+    searchAliases: ['Overdue share', 'Outstanding risk'],
+    rules: [
+      {
+        id: 'overdue_share',
+        title: 'Overdue Share of Outstanding',
+        settings: [
+          {
+            token: 'acceptable_pct',
+            displayLabel: 'Acceptable',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'acceptable overdue limit',
+          },
+          {
+            token: 'critical_pct',
+            displayLabel: 'Critical',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'critical overdue limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Acceptable',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'acceptable_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Warning',
+            segments: [{ token: 'acceptable_pct' }, { text: '-' }, { token: 'critical_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Critical',
+            segments: [{ text: 'Above' }, { token: 'critical_pct' }],
+            unit: '%',
+          },
+        ],
+        validationConstraints: [
+          {
+            leftToken: 'acceptable_pct',
+            relation: 'lessThan',
+            rightToken: 'critical_pct',
+            message: 'The critical overdue limit must be higher than the acceptable overdue limit.',
+          },
+        ],
+      },
+    ],
+  },
+  credit_limit_breaches: {
+    title: 'Credit Limit Breaches: Policy Tolerance Rules',
+    description: '',
+    appliesToPromptLabel: 'Credit Limit Breaches',
+    searchAliases: ['Credit policy breaches', 'Limit breach tolerance'],
+    rules: [
+      {
+        id: 'breach_tolerance',
+        title: 'Allowed Credit Limit Breaches',
+        settings: [
+          {
+            token: 'good_count',
+            displayLabel: 'Good',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'allowed breach count',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Good',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'good_count', editable: true }],
+            unit: 'breaches',
+          },
+          {
+            label: 'Concern',
+            segments: [{ text: 'Above' }, { token: 'good_count' }],
+            unit: 'breaches',
+          },
+        ],
+      },
+    ],
+  },
+  aging_analysis: {
+    title: 'Aging Analysis: Bad-Debt Exposure Rules',
+    description: '',
+    appliesToPromptLabel: 'Aging Analysis',
+    searchAliases: ['120+ bucket', 'Bad debt risk'],
+    rules: [
+      {
+        id: 'old_bucket_share',
+        title: '120+ Day Outstanding Share',
+        settings: [
+          {
+            token: 'old_120_share_pct',
+            displayLabel: 'Bad-debt risk',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'bad-debt risk limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Normal exposure',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'old_120_share_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Bad-debt risk',
+            segments: [{ text: 'Above' }, { token: 'old_120_share_pct' }],
+            unit: '%',
+          },
+        ],
+      },
+    ],
+  },
+  credit_usage_distribution: {
+    title: 'Credit Usage: Limit Utilization Rules',
+    description: '',
+    appliesToPromptLabel: 'Credit Usage Distribution',
+    searchAliases: ['Credit utilization', 'Near limit', 'Over limit'],
+    rules: [
+      {
+        id: 'limit_utilization',
+        title: 'Credit Limit Utilization',
+        settings: [
+          {
+            token: 'within_limit_pct',
+            displayLabel: 'Healthy',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'healthy utilization limit',
+          },
+          {
+            token: 'over_limit_pct',
+            displayLabel: 'Policy breach',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'policy breach limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Healthy',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'within_limit_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Watch',
+            segments: [{ token: 'within_limit_pct' }, { text: '-' }, { token: 'over_limit_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Policy breach',
+            segments: [{ text: 'Above' }, { token: 'over_limit_pct' }],
+            unit: '%',
+          },
+        ],
+        validationConstraints: [
+          {
+            leftToken: 'within_limit_pct',
+            relation: 'lessThan',
+            rightToken: 'over_limit_pct',
+            message: 'The policy breach limit must be higher than the healthy utilization limit.',
+          },
+        ],
+      },
+    ],
+  },
+  net_sales: {
+    title: 'Net Sales: Revenue Mix and Return-Impact Rules',
+    description: '',
+    appliesToPromptLabel: 'Net Sales',
+    searchAliases: ['Revenue mix', 'Credit-note impact', 'Sales KPI'],
+    rules: [
+      {
+        id: 'invoice_sales_mix',
+        title: 'Invoice Sales Mix',
+        settings: [
+          {
+            token: 'invoice_share_normal_pct',
+            displayLabel: 'Normal invoice share',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'normal invoice share',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Shift to cash or retail',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'invoice_share_normal_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Normal credit-customer mix',
+            segments: [{ text: 'At least' }, { token: 'invoice_share_normal_pct' }],
+            unit: '%',
+          },
+        ],
+      },
+      {
+        id: 'credit_note_impact',
+        title: 'Credit Note Impact',
+        settings: [
+          {
+            token: 'credit_note_good_pct',
+            displayLabel: 'Good',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'good credit-note limit',
+          },
+          {
+            token: 'credit_note_monitor_pct',
+            displayLabel: 'Monitor',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'monitor credit-note limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Good',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'credit_note_good_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Monitor',
+            segments: [
+              { token: 'credit_note_good_pct', offset: 1 },
+              { text: '-' },
+              { token: 'credit_note_monitor_pct', editable: true },
+            ],
+            unit: '%',
+          },
+          {
+            label: 'Concern',
+            segments: [{ text: 'Above' }, { token: 'credit_note_monitor_pct' }],
+            unit: '%',
+          },
+        ],
+        validationConstraints: [
+          {
+            leftToken: 'credit_note_good_pct',
+            relation: 'lessThan',
+            rightToken: 'credit_note_monitor_pct',
+            message: 'The monitor limit must be higher than the good credit-note limit.',
+          },
+        ],
+      },
+    ],
+  },
+  invoice_sales: {
+    title: 'Invoice Sales: Credit-Customer Mix Rules',
+    description: '',
+    appliesToPromptLabel: 'Invoice Sales',
+    searchAliases: ['Credit sales mix', 'Credit-customer share', 'Sales KPI'],
+    rules: [
+      {
+        id: 'invoice_share',
+        title: 'Invoice Sales Share',
+        settings: [
+          {
+            token: 'normal_share_pct',
+            displayLabel: 'Normal',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'normal invoice-sales share',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Cash or retail shift',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'normal_share_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Normal credit-customer mix',
+            segments: [{ text: 'At least' }, { token: 'normal_share_pct' }],
+            unit: '%',
+          },
+        ],
+      },
+    ],
+  },
+  credit_notes: {
+    title: 'Credit Notes: Return and Adjustment Rules',
+    description: '',
+    appliesToPromptLabel: 'Credit Notes',
+    searchAliases: ['Credit-note ratio', 'Return adjustments', 'Sales KPI'],
+    rules: [
+      {
+        id: 'credit_note_ratio',
+        title: 'Credit Note Ratio',
+        settings: [
+          {
+            token: 'good_pct',
+            displayLabel: 'Good',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'good credit-note limit',
+          },
+          {
+            token: 'monitor_pct',
+            displayLabel: 'Monitor',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'monitor credit-note limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Good',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'good_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Monitor',
+            segments: [{ token: 'good_pct', offset: 1 }, { text: '-' }, { token: 'monitor_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Concern',
+            segments: [{ text: 'Above' }, { token: 'monitor_pct' }],
+            unit: '%',
+          },
+        ],
+        validationConstraints: [
+          {
+            leftToken: 'good_pct',
+            relation: 'lessThan',
+            rightToken: 'monitor_pct',
+            message: 'The monitor limit must be higher than the good credit-note limit.',
+          },
+        ],
+      },
+    ],
+  },
+  net_sales_trend: {
+    title: 'Net Sales Trend: Growth Streak and Movement Rules',
+    description: '',
+    appliesToPromptLabel: 'Net Sales Trend',
+    searchAliases: ['Sales growth streak', 'Sales spike or drop', 'Sales KPI'],
+    rules: [
+      {
+        id: 'trend_streak',
+        title: 'Growth or Decline Streak',
+        settings: [
+          {
+            token: 'consecutive_months',
+            displayLabel: 'Consecutive months',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'consecutive-month limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Good growth signal',
+            segments: [{ token: 'consecutive_months', editable: true }, { text: 'or more' }],
+            unit: 'months',
+          },
+          {
+            label: 'Bad decline signal',
+            segments: [{ token: 'consecutive_months' }, { text: 'or more' }],
+            unit: 'months',
+          },
+        ],
+      },
+      {
+        id: 'spike_or_drop',
+        title: 'Unusual Sales Movement',
+        settings: [
+          {
+            token: 'period_average_variance_pct',
+            displayLabel: 'Flag',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'sales movement flag',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Normal movement',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'period_average_variance_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Flag for summary',
+            segments: [{ text: 'Above' }, { token: 'period_average_variance_pct' }],
+            unit: '%',
+          },
+        ],
+      },
+    ],
+  },
+  by_customer: {
+    title: 'Sales by Customer: Revenue Concentration Rules',
+    description: '',
+    appliesToPromptLabel: 'By Customer',
+    searchAliases: ['Customer concentration', 'Top customer share', 'Peak-season tolerance', 'Sales breakdown'],
+    rules: [
+      {
+        id: 'customer_concentration',
+        title: 'Top Customer Share',
+        settings: [
+          {
+            token: 'good_pct',
+            displayLabel: 'Diversified',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'diversified customer-share limit',
+          },
+          {
+            token: 'neutral_pct',
+            displayLabel: 'Moderate',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'moderate customer-share limit',
+          },
+          {
+            token: 'peak_season_bad_pct',
+            displayLabel: 'Peak-season risk',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'peak-season customer-share limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Diversified customer base',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'good_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Moderate concentration',
+            segments: [{ token: 'good_pct' }, { text: '-' }, { token: 'neutral_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Normal-period over-reliance',
+            segments: [{ text: 'Above' }, { token: 'neutral_pct' }],
+            unit: '%',
+          },
+          {
+            label: 'Peak-season high-risk trigger',
+            segments: [{ text: 'Above' }, { token: 'peak_season_bad_pct', editable: true }],
+            unit: '%',
+          },
+        ],
+        validationConstraints: [
+          {
+            leftToken: 'good_pct',
+            relation: 'lessThan',
+            rightToken: 'neutral_pct',
+            message: 'The moderate customer-share limit must be higher than the diversified limit.',
+          },
+          {
+            leftToken: 'neutral_pct',
+            relation: 'lessThan',
+            rightToken: 'peak_season_bad_pct',
+            message: 'The peak-season risk limit must be higher than the normal-period over-reliance limit.',
+          },
+        ],
+      },
+    ],
+  },
+  by_product: {
+    title: 'Sales by Product: Product Concentration Rules',
+    description: '',
+    appliesToPromptLabel: 'By Product',
+    searchAliases: ['Product concentration', 'Top product share', 'Sales breakdown'],
+    rules: [
+      {
+        id: 'product_concentration',
+        title: 'Top Product Share',
+        settings: [
+          {
+            token: 'good_pct',
+            displayLabel: 'Diversified',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'diversified product-share limit',
+          },
+          {
+            token: 'neutral_pct',
+            displayLabel: 'Moderate',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'moderate product-share limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Diversified product mix',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'good_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Moderate concentration',
+            segments: [{ token: 'good_pct' }, { text: '-' }, { token: 'neutral_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Product concentration risk',
+            segments: [{ text: 'Above' }, { token: 'neutral_pct' }],
+            unit: '%',
+          },
+        ],
+        validationConstraints: [
+          {
+            leftToken: 'good_pct',
+            relation: 'lessThan',
+            rightToken: 'neutral_pct',
+            message: 'The moderate product-share limit must be higher than the diversified limit.',
+          },
+        ],
+      },
+    ],
+  },
+  by_agent: {
+    title: 'Sales by Sales Agent: Decline Review Rules',
+    description: '',
+    appliesToPromptLabel: 'By Sales Agent',
+    searchAliases: ['Agent decline', 'Sales agent performance', 'Sales breakdown'],
+    rules: [
+      {
+        id: 'agent_decline',
+        title: 'Agent Sales Decline',
+        settings: [
+          {
+            token: 'decline_flag_pct',
+            displayLabel: 'Review needed',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'agent decline review limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Normal movement',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'decline_flag_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Review needed',
+            segments: [{ text: 'Above' }, { token: 'decline_flag_pct' }],
+            unit: '%',
+          },
+        ],
+      },
+    ],
+  },
+  by_outlet: {
+    title: 'Sales by Outlet: Geographic Concentration Rules',
+    description: '',
+    appliesToPromptLabel: 'By Outlet',
+    searchAliases: ['Outlet concentration', 'Geographic concentration', 'Sales breakdown'],
+    rules: [
+      {
+        id: 'outlet_concentration',
+        title: 'Single Outlet Share',
+        settings: [
+          {
+            token: 'good_pct',
+            displayLabel: 'Diversified',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'diversified outlet-share limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Geographically diversified',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'good_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Geographic concentration risk',
+            segments: [{ text: 'Above' }, { token: 'good_pct' }],
+            unit: '%',
+          },
+        ],
+      },
+    ],
+  },
+  rt_total_returns: {
+    title: 'Total Returns: Return Exposure Rules',
+    description: '',
+    appliesToPromptLabel: 'Total Returns',
+    searchAliases: ['Return exposure', 'Return rate', 'Returns KPI'],
+    rules: [
+      {
+        id: 'return_rate',
+        title: 'Return Rate of Net Sales',
+        settings: [
+          {
+            token: 'healthy_pct',
+            displayLabel: 'Healthy',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'healthy return-rate limit',
+          },
+          {
+            token: 'concern_pct',
+            displayLabel: 'Concern',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'concern return-rate limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Healthy',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'healthy_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Watch',
+            segments: [{ token: 'healthy_pct' }, { text: '-' }, { token: 'concern_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Concern',
+            segments: [{ text: 'Above' }, { token: 'concern_pct' }],
+            unit: '%',
+          },
+        ],
+        validationConstraints: [
+          {
+            leftToken: 'healthy_pct',
+            relation: 'lessThan',
+            rightToken: 'concern_pct',
+            message: 'The concern limit must be higher than the healthy return-rate limit.',
+          },
+        ],
+      },
+    ],
+  },
+  rt_settled: {
+    title: 'Settled Returns: Resolution Mix Rules',
+    description: '',
+    appliesToPromptLabel: 'Settled',
+    searchAliases: ['Settlement mix', 'Knock-off share', 'Refund share', 'Returns KPI'],
+    rules: [
+      {
+        id: 'knock_off_share',
+        title: 'Knock-Off Settlement Share',
+        settings: [
+          {
+            token: 'knock_off_healthy_pct',
+            displayLabel: 'Cash-efficient',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'cash-efficient knock-off limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Needs more knock-off settlement',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'knock_off_healthy_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Cash-efficient',
+            segments: [{ text: 'Above' }, { token: 'knock_off_healthy_pct' }],
+            unit: '%',
+          },
+        ],
+      },
+      {
+        id: 'refund_share',
+        title: 'Refund Exposure Share',
+        settings: [
+          {
+            token: 'refund_concern_pct',
+            displayLabel: 'Cash-draining',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'cash-draining refund limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Controlled refund exposure',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'refund_concern_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Cash-draining concern',
+            segments: [{ text: 'Above' }, { token: 'refund_concern_pct' }],
+            unit: '%',
+          },
+        ],
+      },
+    ],
+  },
+  rt_unsettled: {
+    title: 'Unsettled Returns: Open Exposure Rules',
+    description: '',
+    appliesToPromptLabel: 'Unsettled',
+    searchAliases: ['Open return exposure', 'Unsettled share', 'Returns KPI'],
+    rules: [
+      {
+        id: 'unsettled_share',
+        title: 'Unsettled Share of Returns',
+        settings: [
+          {
+            token: 'healthy_pct',
+            displayLabel: 'Healthy',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'healthy unsettled-share limit',
+          },
+          {
+            token: 'concern_pct',
+            displayLabel: 'Concern',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'concern unsettled-share limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Healthy',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'healthy_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Watch',
+            segments: [{ token: 'healthy_pct' }, { text: '-' }, { token: 'concern_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Concern',
+            segments: [{ text: 'Above' }, { token: 'concern_pct' }],
+            unit: '%',
+          },
+        ],
+        validationConstraints: [
+          {
+            leftToken: 'healthy_pct',
+            relation: 'lessThan',
+            rightToken: 'concern_pct',
+            message: 'The concern limit must be higher than the healthy unsettled-share limit.',
+          },
+        ],
+      },
+    ],
+  },
+  rt_return_pct: {
+    title: 'Return Percentage: Sales Quality Rules',
+    description: '',
+    appliesToPromptLabel: 'Return %',
+    searchAliases: ['Return percentage', 'Return ratio', 'Sales quality', 'Returns KPI'],
+    rules: [
+      {
+        id: 'return_percentage',
+        title: 'Return Value as Share of Net Sales',
+        settings: [
+          {
+            token: 'healthy_pct',
+            displayLabel: 'Healthy',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'healthy return-percentage limit',
+          },
+          {
+            token: 'concern_pct',
+            displayLabel: 'Concern',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'concern return-percentage limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Healthy',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'healthy_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Watch',
+            segments: [{ token: 'healthy_pct' }, { text: '-' }, { token: 'concern_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Concern',
+            segments: [{ text: 'Above' }, { token: 'concern_pct' }],
+            unit: '%',
+          },
+        ],
+        validationConstraints: [
+          {
+            leftToken: 'healthy_pct',
+            relation: 'lessThan',
+            rightToken: 'concern_pct',
+            message: 'The concern limit must be higher than the healthy return-percentage limit.',
+          },
+        ],
+      },
+    ],
+  },
+  bs_statement: {
+    title: 'Balance Sheet Statement Rules',
+    description: '',
+    appliesToPromptLabel: 'Balance Sheet Statement',
+    rules: [
+      {
+        id: 'line_yoy_movement',
+        title: 'Line-Item YoY Movement Rules',
+        settings: [
+          {
+            token: 'flat_pct',
+            displayLabel: 'Flat',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'flat limit',
+          },
+          {
+            token: 'material_pct',
+            displayLabel: 'Material',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'material limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Flat',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'flat_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Moderate',
+            segments: [{ token: 'flat_pct', offset: 1 }, { text: '-' }, { token: 'material_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Material',
+            segments: [{ token: 'material_pct' }, { text: '> above' }],
+            unit: '%',
+          },
+        ],
+        validationConstraints: [
+          {
+            leftToken: 'flat_pct',
+            relation: 'lessThan',
+            rightToken: 'material_pct',
+            message: 'The material limit must be higher than the flat limit.',
+          },
+        ],
+      },
+      {
+        id: 'current_ratio_liquidity',
+        title: 'Balance Sheet: Current Ratio Liquidity Rules',
+        settings: [
+          {
+            token: 'healthy_below_ratio',
+            displayLabel: 'Strong',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'strong limit',
+          },
+          {
+            token: 'thin_below_ratio',
+            displayLabel: 'Healthy',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'healthy limit',
+          },
+          {
+            token: 'severe_below_ratio',
+            displayLabel: 'Severe',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'severe limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Severe',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'severe_below_ratio', editable: true }],
+            unit: 'ratio',
+          },
+          {
+            label: 'Thin',
+            segments: [
+              { token: 'severe_below_ratio', offset: 0.1 },
+              { text: '-' },
+              { token: 'thin_below_ratio', editable: true },
+            ],
+            unit: 'ratio',
+          },
+          {
+            label: 'Healthy',
+            segments: [
+              { token: 'thin_below_ratio', offset: 0.1 },
+              { text: '-' },
+              { token: 'healthy_below_ratio', editable: true },
+            ],
+            unit: 'ratio',
+          },
+          {
+            label: 'Strong',
+            segments: [{ token: 'healthy_below_ratio' }, { text: '> above' }],
+            unit: 'ratio',
+          },
+        ],
+        validationConstraints: [
+          {
+            leftToken: 'healthy_below_ratio',
+            relation: 'greaterThan',
+            rightToken: 'thin_below_ratio',
+            message: 'The strong liquidity threshold must be higher than the healthy liquidity threshold.',
+          },
+          {
+            leftToken: 'thin_below_ratio',
+            relation: 'greaterThan',
+            rightToken: 'severe_below_ratio',
+            message: 'The healthy liquidity threshold must be higher than the severe liquidity threshold.',
+          },
+        ],
+      },
+      {
+        id: 'current_ratio_drift',
+        title: 'Current Ratio Drift Rules',
+        settings: [
+          {
+            token: 'current_ratio_drift_material_ratio',
+            displayLabel: 'Material drift',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'material drift limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Normal',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'current_ratio_drift_material_ratio', editable: true }],
+            unit: 'ratio',
+          },
+          {
+            label: 'Material',
+            segments: [{ token: 'current_ratio_drift_material_ratio' }, { text: '> above' }],
+            unit: 'ratio',
+          },
+        ],
+      },
+      {
+        id: 'debt_to_equity',
+        title: 'Debt-To-Equity Rules',
+        settings: [
+          {
+            token: 'conservative_below_ratio',
+            displayLabel: 'Conservative',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'conservative limit',
+          },
+          {
+            token: 'typical_below_ratio',
+            displayLabel: 'Typical',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'typical limit',
+          },
+          {
+            token: 'leveraged_below_ratio',
+            displayLabel: 'Leveraged',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'leveraged limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Conservative',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'conservative_below_ratio', editable: true }],
+            unit: 'ratio',
+          },
+          {
+            label: 'Typical',
+            segments: [
+              { token: 'conservative_below_ratio', offset: 0.1 },
+              { text: '-' },
+              { token: 'typical_below_ratio', editable: true },
+            ],
+            unit: 'ratio',
+          },
+          {
+            label: 'Leveraged',
+            segments: [
+              { token: 'typical_below_ratio', offset: 0.1 },
+              { text: '-' },
+              { token: 'leveraged_below_ratio', editable: true },
+            ],
+            unit: 'ratio',
+          },
+          {
+            label: 'Severe',
+            segments: [{ token: 'leveraged_below_ratio' }, { text: '> above' }],
+            unit: 'ratio',
+          },
+        ],
+        validationConstraints: [
+          {
+            leftToken: 'conservative_below_ratio',
+            relation: 'lessThan',
+            rightToken: 'typical_below_ratio',
+            message: 'The typical limit must be higher than the conservative limit.',
+          },
+          {
+            leftToken: 'typical_below_ratio',
+            relation: 'lessThan',
+            rightToken: 'leveraged_below_ratio',
+            message: 'The leveraged limit must be higher than the typical limit.',
+          },
+        ],
+      },
+      {
+        id: 'debt_to_equity_drift',
+        title: 'Debt-To-Equity Drift Rules',
+        settings: [
+          {
+            token: 'debt_to_equity_drift_material_ratio',
+            displayLabel: 'Material drift',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'material drift limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Normal',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'debt_to_equity_drift_material_ratio', editable: true }],
+            unit: 'ratio',
+          },
+          {
+            label: 'Material',
+            segments: [{ token: 'debt_to_equity_drift_material_ratio' }, { text: '> above' }],
+            unit: 'ratio',
+          },
+        ],
+      },
+      {
+        id: 'equity_ratio',
+        title: 'Equity Ratio Rules',
+        settings: [
+          {
+            token: 'healthy_below_pct',
+            displayLabel: 'Strong',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'strong limit',
+          },
+          {
+            token: 'thin_below_pct',
+            displayLabel: 'Healthy',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'healthy limit',
+          },
+          {
+            token: 'severe_below_pct',
+            displayLabel: 'Severe',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'severe limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Severe',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'severe_below_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Thin',
+            segments: [{ token: 'severe_below_pct', offset: 1 }, { text: '-' }, { token: 'thin_below_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Healthy',
+            segments: [{ token: 'thin_below_pct', offset: 1 }, { text: '-' }, { token: 'healthy_below_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Strong',
+            segments: [{ token: 'healthy_below_pct' }, { text: '> above' }],
+            unit: '%',
+          },
+        ],
+        validationConstraints: [
+          {
+            leftToken: 'healthy_below_pct',
+            relation: 'greaterThan',
+            rightToken: 'thin_below_pct',
+            message: 'The strong limit must be higher than the healthy limit.',
+          },
+          {
+            leftToken: 'thin_below_pct',
+            relation: 'greaterThan',
+            rightToken: 'severe_below_pct',
+            message: 'The healthy limit must be higher than the severe limit.',
+          },
+        ],
+      },
+      {
+        id: 'equity_ratio_drift',
+        title: 'Equity Ratio Drift Rules',
+        settings: [
+          {
+            token: 'drift_material_pp',
+            displayLabel: 'Material drift',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'material drift limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Normal',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'drift_material_pp', editable: true }],
+            unit: 'pp',
+          },
+          {
+            label: 'Material',
+            segments: [{ token: 'drift_material_pp' }, { text: '> above' }],
+            unit: 'pp',
+          },
+        ],
+      },
+    ],
+  },
+  ex_top_expenses: {
+    title: 'Top Expenses: Cost Concentration Rules',
+    description: '',
+    appliesToPromptLabel: 'Top Expenses',
+    rules: [
+      {
+        id: 'single_account_concentration',
+        title: 'Largest Account Share',
+        settings: [
+          {
+            token: 'top_1_severe_pct',
+            displayLabel: 'Severe',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'severe limit',
+          },
+          {
+            token: 'top_1_concentrated_pct',
+            displayLabel: 'Concentrated',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'concentrated limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Spread',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'top_1_concentrated_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Concentrated',
+            segments: [
+              { token: 'top_1_concentrated_pct', offset: 1 },
+              { text: '-' },
+              { token: 'top_1_severe_pct', editable: true },
+            ],
+            unit: '%',
+          },
+          {
+            label: 'Severe',
+            segments: [{ token: 'top_1_severe_pct' }, { text: '> above' }],
+            unit: '%',
+          },
+        ],
+        validationConstraints: [
+          {
+            leftToken: 'top_1_severe_pct',
+            relation: 'greaterThan',
+            rightToken: 'top_1_concentrated_pct',
+            message: 'The severe limit must be higher than the concentrated limit.',
+          },
+        ],
+      },
+      {
+        id: 'top_10_concentration',
+        title: 'Top 10 Account Share',
+        settings: [
+          {
+            token: 'top_10_concentrated_pct',
+            displayLabel: 'Concentrated',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'concentrated limit',
+          },
+          {
+            token: 'top_10_diversified_pct',
+            displayLabel: 'Diversified',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'diversified limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Diversified',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'top_10_diversified_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Normal',
+            segments: [
+              { token: 'top_10_diversified_pct', offset: 1 },
+              { text: '-' },
+              { token: 'top_10_concentrated_pct', editable: true },
+            ],
+            unit: '%',
+          },
+          {
+            label: 'Concentrated',
+            segments: [{ token: 'top_10_concentrated_pct' }, { text: '> above' }],
+            unit: '%',
+          },
+        ],
+        validationConstraints: [
+          {
+            leftToken: 'top_10_concentrated_pct',
+            relation: 'greaterThan',
+            rightToken: 'top_10_diversified_pct',
+            message: 'The concentrated limit must be higher than the diversified limit.',
+          },
+        ],
+      },
+    ],
+  },
+};
+
 const componentMap = new Map(THRESHOLD_REGISTRY.map((entry) => [entry.componentKey, entry]));
 const tokenMap = new Map<string, ThresholdTokenDefinition>();
 
@@ -732,6 +2164,32 @@ export function getThresholdComponent(componentKey: string): ThresholdComponentD
   return componentMap.get(componentKey) ?? null;
 }
 
+export function getThresholdPresentation(componentKey: string): ThresholdComponentPresentationView | null {
+  return THRESHOLD_PRESENTATION[componentKey] ?? null;
+}
+
+function getPresentationSetting(
+  componentKey: string,
+  token: string,
+): ThresholdBusinessSettingView | null {
+  const presentation = getThresholdPresentation(componentKey);
+  if (!presentation) return null;
+
+  for (const rule of presentation.rules) {
+    const setting = rule.settings.find((candidate) => candidate.token === token);
+    if (setting) return setting;
+  }
+  return null;
+}
+
+function getPresentationConstraints(componentKey: string): ThresholdValidationConstraintView[] {
+  return getThresholdPresentation(componentKey)?.rules.flatMap((rule) => rule.validationConstraints ?? []) ?? [];
+}
+
+function validationLabel(componentKey: string, tokenDef: ThresholdTokenDefinition): string {
+  return getPresentationSetting(componentKey, tokenDef.token)?.validationLabel ?? tokenDef.label;
+}
+
 export function listThresholdSeedRows(): Array<{ componentKey: string; token: string; value: number }> {
   const rows: Array<{ componentKey: string; token: string; value: number }> = [];
   for (const entry of THRESHOLD_REGISTRY) {
@@ -754,6 +2212,7 @@ export async function getThresholdGroups(componentKey: string): Promise<Threshol
     label: groupDef.label,
     direction: groupDef.direction,
     description: groupDef.description,
+    enforceMonotonic: groupDef.enforceMonotonic !== false,
     tokens: groupDef.tokens.map((tokenDef) => {
       const value = current.values.get(snapshotKey(componentKey, tokenDef.token)) ?? tokenDef.defaultValue;
       return {
@@ -841,19 +2300,36 @@ export async function classifyThresholdValue(
   return { label: match.label, token: match.token, direction: groupDef.direction };
 }
 
-function validateOneToken(tokenDef: ThresholdTokenDefinition, value: unknown): string | null {
+function validateOneToken(
+  componentKey: string,
+  tokenDef: ThresholdTokenDefinition,
+  value: unknown,
+): string | null {
+  const label = validationLabel(componentKey, tokenDef);
   const num = Number(value);
-  if (!Number.isFinite(num)) return `${tokenDef.label} must be numeric.`;
+  if (!Number.isFinite(num)) return `The ${label} value must be numeric.`;
   if (tokenDef.valueType === 'int' && !Number.isInteger(num)) {
-    return `${tokenDef.label} must be a whole number.`;
+    return `The ${label} value must be a whole number.`;
   }
   if (tokenDef.unit === 'pct' && !tokenDef.allowPctAbove100 && tokenDef.min >= 0 && (num < 0 || num > 100)) {
-    return `${tokenDef.label} must be between 0 and 100%.`;
+    return `The ${label} value must be between 0 and 100%.`;
   }
   if (num < tokenDef.min || num > tokenDef.max) {
-    return `${tokenDef.label} must be between ${tokenDef.min} and ${tokenDef.max}.`;
+    return `The ${label} value must be between ${tokenDef.min} and ${tokenDef.max}.`;
   }
   return null;
+}
+
+function constraintKey(leftToken: string, rightToken: string) {
+  return `${leftToken}:${rightToken}`;
+}
+
+function relationIsValid(
+  relation: ThresholdValidationConstraintView['relation'],
+  leftValue: number,
+  rightValue: number,
+) {
+  return relation === 'greaterThan' ? leftValue > rightValue : leftValue < rightValue;
 }
 
 export async function validateThresholdValues(
@@ -866,9 +2342,18 @@ export async function validateThresholdValues(
   }
 
   const errors: string[] = [];
+  const invalidTokens = new Set<string>();
   const values: Record<string, number> = {};
   const knownTokens = new Set(entry.groups.flatMap((groupDef) => groupDef.tokens.map((tokenDef) => tokenDef.token)));
   const snapshotValues = await getSnapshot();
+  const presentationConstraints = getPresentationConstraints(componentKey);
+  const constraintByPair = new Map(
+    presentationConstraints.map((constraint) => [
+      constraintKey(constraint.leftToken, constraint.rightToken),
+      constraint,
+    ]),
+  );
+  const checkedConstraintKeys = new Set<string>();
 
   for (const token of Object.keys(incomingValues)) {
     if (!knownTokens.has(token)) errors.push(`Unknown token for ${componentKey}: ${token}`);
@@ -880,8 +2365,11 @@ export async function validateThresholdValues(
         tokenDef.token in incomingValues
           ? incomingValues[tokenDef.token]
           : snapshotValues.values.get(snapshotKey(componentKey, tokenDef.token)) ?? tokenDef.defaultValue;
-      const tokenError = validateOneToken(tokenDef, rawValue);
-      if (tokenError) errors.push(tokenError);
+      const tokenError = validateOneToken(componentKey, tokenDef, rawValue);
+      if (tokenError) {
+        errors.push(tokenError);
+        invalidTokens.add(tokenDef.token);
+      }
       values[tokenDef.token] = coerceThresholdValue(tokenDef, rawValue);
     }
   }
@@ -891,16 +2379,31 @@ export async function validateThresholdValues(
     for (let i = 0; i < groupDef.tokens.length - 1; i += 1) {
       const left = groupDef.tokens[i];
       const right = groupDef.tokens[i + 1];
+      if (invalidTokens.has(left.token) || invalidTokens.has(right.token)) continue;
       const leftValue = values[left.token];
       const rightValue = values[right.token];
-      const valid =
-        groupDef.direction === 'ascending'
-          ? leftValue > rightValue
-          : leftValue < rightValue;
+      const defaultRelation = groupDef.direction === 'ascending' ? 'greaterThan' : 'lessThan';
+      const key = constraintKey(left.token, right.token);
+      const presentationConstraint = constraintByPair.get(key);
+      const relation = presentationConstraint?.relation ?? defaultRelation;
+      const valid = relationIsValid(relation, leftValue, rightValue);
+      checkedConstraintKeys.add(key);
       if (!valid) {
-        const comparator = groupDef.direction === 'ascending' ? 'greater than' : 'less than';
-        errors.push(`${left.label} must be ${comparator} ${right.label}.`);
+        const comparator = defaultRelation === 'greaterThan' ? 'greater than' : 'less than';
+        errors.push(
+          presentationConstraint?.message ??
+            `${validationLabel(componentKey, left)} must be ${comparator} ${validationLabel(componentKey, right)}.`,
+        );
       }
+    }
+  }
+
+  for (const constraint of presentationConstraints) {
+    const key = constraintKey(constraint.leftToken, constraint.rightToken);
+    if (checkedConstraintKeys.has(key)) continue;
+    if (invalidTokens.has(constraint.leftToken) || invalidTokens.has(constraint.rightToken)) continue;
+    if (!relationIsValid(constraint.relation, values[constraint.leftToken], values[constraint.rightToken])) {
+      errors.push(constraint.message);
     }
   }
 

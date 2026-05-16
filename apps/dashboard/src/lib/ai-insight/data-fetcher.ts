@@ -585,24 +585,59 @@ const fetchers: Record<string, DataFetcher> = {
         : null;
     const worstTwoPct = worstTwoPctNum != null ? worstTwoPctNum.toFixed(1) : null;
 
-    const halfIdx = Math.floor(gapRows.length / 2);
-    const h1Rows = gapRows.slice(0, halfIdx);
-    const h2Rows = gapRows.slice(halfIdx);
     const avgOf = (rs: GapRow[]) => rs.length ? rs.reduce((s, r) => s + r.gap, 0) / rs.length : 0;
-    const h1Avg = avgOf(h1Rows);
-    const h2Avg = avgOf(h2Rows);
-    const h1Min = h1Rows.length ? h1Rows.reduce((a, b) => (a.gap < b.gap ? a : b)) : null;
-    const h1Max = h1Rows.length ? h1Rows.reduce((a, b) => (a.gap > b.gap ? a : b)) : null;
-    const h2Min = h2Rows.length ? h2Rows.reduce((a, b) => (a.gap < b.gap ? a : b)) : null;
-    const h2Max = h2Rows.length ? h2Rows.reduce((a, b) => (a.gap > b.gap ? a : b)) : null;
     const fmtSigned = (n: number) =>
       `${n >= 0 ? '+' : ''}RM ${n.toLocaleString('en-MY', { maximumFractionDigits: 0 })}`;
-    const h1MonthList = h1Rows.map(r => r.month).join(', ');
-    const h2MonthList = h2Rows.map(r => r.month).join(', ');
-    const direction =
-      h1Rows.length && h2Rows.length
-        ? (Math.abs(h2Avg) < Math.abs(h1Avg) ? 'narrowing' : Math.abs(h2Avg) > Math.abs(h1Avg) ? 'widening' : 'flat')
-        : 'n/a';
+
+    type QuarterGapGroup = {
+      key: string;
+      label: string;
+      rows: GapRow[];
+      avg: number;
+      min: GapRow | null;
+      max: GapRow | null;
+    };
+    const fiscalQuarterInfo = (month: string) => {
+      const [yearPart, monthPart] = month.split('-');
+      const year = Number(yearPart);
+      const monthNumber = Number(monthPart);
+      const fiscalYear = monthNumber >= 3 ? year + 1 : year;
+      const quarter =
+        monthNumber >= 3 && monthNumber <= 5 ? 1 :
+        monthNumber >= 6 && monthNumber <= 8 ? 2 :
+        monthNumber >= 9 && monthNumber <= 11 ? 3 :
+        4;
+      return {
+        key: `${fiscalYear}-Q${quarter}`,
+        label: `FY${fiscalYear} Q${quarter}`,
+      };
+    };
+    const quarterMap = new Map<string, { label: string; rows: GapRow[] }>();
+    for (const row of gapRows) {
+      const quarter = fiscalQuarterInfo(row.month);
+      const existing = quarterMap.get(quarter.key);
+      if (existing) {
+        existing.rows.push(row);
+      } else {
+        quarterMap.set(quarter.key, { label: quarter.label, rows: [row] });
+      }
+    }
+    const quarterGroups: QuarterGapGroup[] = Array.from(quarterMap.entries()).map(([key, group]) => ({
+      key,
+      label: group.label,
+      rows: group.rows,
+      avg: avgOf(group.rows),
+      min: group.rows.length ? group.rows.reduce((a, b) => (a.gap < b.gap ? a : b)) : null,
+      max: group.rows.length ? group.rows.reduce((a, b) => (a.gap > b.gap ? a : b)) : null,
+    }));
+    const quarterDirectionLines = quarterGroups.slice(1).map((group, index) => {
+      const prior = quarterGroups[index];
+      const direction =
+        Math.abs(group.avg) < Math.abs(prior.avg) ? 'narrowing' :
+        Math.abs(group.avg) > Math.abs(prior.avg) ? 'widening' :
+        'flat';
+      return `- Quarter direction ${prior.label} to ${group.label}: ${direction} (based on |${group.label} avg| vs |${prior.label} avg|)\n`;
+    }).join('');
 
     let table = '| Month | Invoiced | Collected | Gap |\n|-------|----------|-----------|-----|\n';
     for (const r of gapRows) {
@@ -621,14 +656,17 @@ const fetchers: Record<string, DataFetcher> = {
       (worstTwoPct ? `- Worst two months combined = ${worstTwoPct}% of the full-period negative gap\n` : '') +
       `- Period total negative gap: RM ${negSum.toLocaleString('en-MY', { minimumFractionDigits: 2 })}\n` +
       `- Full-period average gap per month: ${fmtSigned(avgGap)}/month\n` +
-      `\nPre-calculated half-period averages (use these ONLY — do NOT compute your own H1/H2/"first half"/"last 4 months" or any other sub-period averages):\n` +
-      (h1Rows.length ? `- H1 months (${h1Rows.length}): ${h1MonthList}\n` : '') +
-      (h1Rows.length ? `- H1 avg gap: ${fmtSigned(h1Avg)}/month\n` : '') +
-      (h1Min && h1Max ? `- H1 gap range: ${fmtSigned(h1Min.gap)} (${h1Min.month}) .. ${fmtSigned(h1Max.gap)} (${h1Max.month})\n` : '') +
-      (h2Rows.length ? `- H2 months (${h2Rows.length}): ${h2MonthList}\n` : '') +
-      (h2Rows.length ? `- H2 avg gap: ${fmtSigned(h2Avg)}/month\n` : '') +
-      (h2Min && h2Max ? `- H2 gap range: ${fmtSigned(h2Min.gap)} (${h2Min.month}) .. ${fmtSigned(h2Max.gap)} (${h2Max.month})\n` : '') +
-      `- H1→H2 direction: ${direction} (based on |H2 avg| vs |H1 avg|)\n`;
+      `\nPre-calculated fiscal-quarter averages (use these ONLY — do NOT compute your own quarter/"last 4 months" or any other sub-period averages):\n` +
+      quarterGroups.map((group) => {
+        const monthList = group.rows.map((row) => row.month).join(', ');
+        const rangeLine = group.min && group.max
+          ? `- ${group.label} gap range: ${fmtSigned(group.min.gap)} (${group.min.month}) .. ${fmtSigned(group.max.gap)} (${group.max.month})\n`
+          : '';
+        return `- ${group.label} months (${group.rows.length}): ${monthList}\n` +
+          `- ${group.label} avg gap: ${fmtSigned(group.avg)}/month\n` +
+          rangeLine;
+      }).join('') +
+      (quarterDirectionLines || '- Quarter direction: n/a\n');
 
     const allowed: AllowedValue[] = [];
     allowed.push(rm('total invoiced', totalInv));
@@ -645,18 +683,12 @@ const fetchers: Record<string, DataFetcher> = {
     if (best) allowed.push(rm(`best month gap (${best.month})`, best.gap));
     if (worstTwoPctNum != null) allowed.push(pct('worst two months share of negative gap', worstTwoPctNum));
     allowed.push(rm('period total negative gap', negSum));
-    if (h1Rows.length) {
-      allowed.push(rm('H1 avg gap', h1Avg));
-      allowed.push(cnt('H1 month count', h1Rows.length));
+    for (const group of quarterGroups) {
+      allowed.push(rm(`${group.label} avg gap`, group.avg));
+      allowed.push(cnt(`${group.label} month count`, group.rows.length));
+      if (group.min) allowed.push(rm(`${group.label} min gap (${group.min.month})`, group.min.gap));
+      if (group.max) allowed.push(rm(`${group.label} max gap (${group.max.month})`, group.max.gap));
     }
-    if (h2Rows.length) {
-      allowed.push(rm('H2 avg gap', h2Avg));
-      allowed.push(cnt('H2 month count', h2Rows.length));
-    }
-    if (h1Min) allowed.push(rm(`H1 min gap (${h1Min.month})`, h1Min.gap));
-    if (h1Max) allowed.push(rm(`H1 max gap (${h1Max.month})`, h1Max.gap));
-    if (h2Min) allowed.push(rm(`H2 min gap (${h2Min.month})`, h2Min.gap));
-    if (h2Max) allowed.push(rm(`H2 max gap (${h2Max.month})`, h2Max.gap));
     for (const r of gapRows) {
       allowed.push(rm(`${r.month} invoiced`, r.invoiced));
       allowed.push(rm(`${r.month} collected`, r.collected));

@@ -1,8 +1,9 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, Search } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import type { PromptRowView } from './PromptConfigDashboard';
 
@@ -34,10 +35,58 @@ const SYSTEM_PROMPT_GROUPS = {
   ],
 } as const;
 
-function groupByPage(rows: PromptRowView[]): Page[] {
+function normalize(value: string | null | undefined) {
+  return (value ?? '').toLowerCase().trim();
+}
+
+function thresholdSearchText(prompt: PromptRowView) {
+  if (prompt.thresholdPresentation) {
+    return [
+      prompt.thresholdPresentation.title,
+      prompt.thresholdPresentation.description,
+      prompt.thresholdPresentation.appliesToPromptLabel,
+      ...(prompt.thresholdPresentation.searchAliases ?? []),
+      ...prompt.thresholdPresentation.rules.flatMap((rule) => [
+        rule.title,
+        rule.description,
+        ...(rule.derivedBands ?? []),
+        ...rule.settings.flatMap((setting) => [
+          setting.displayLabel,
+          setting.sentencePrefix,
+          setting.sentenceSuffix,
+        ]),
+      ]),
+    ].join(' ');
+  }
+
+  return (prompt.thresholdGroups ?? [])
+    .flatMap((group) => [
+      group.label,
+      group.id,
+      ...group.tokens.flatMap((token) => [token.label, token.token]),
+    ])
+    .join(' ');
+}
+
+function promptMatches(row: PromptRowView, query: string) {
+  if (!query) return true;
+  const haystack = normalize([
+    row.displayName,
+    row.promptKey,
+    row.page,
+    pageLabel(row.page ?? ''),
+    row.sectionName,
+    row.sectionKey,
+    thresholdSearchText(row),
+  ].join(' '));
+  return haystack.includes(query);
+}
+
+function groupByPage(rows: PromptRowView[], query: string): Page[] {
   const byPage = new Map<string, Map<string, Section>>();
   for (const row of rows) {
     if (row.category !== 'component' || !row.page || !row.sectionKey) continue;
+    if (!promptMatches(row, query)) continue;
     if (!byPage.has(row.page)) byPage.set(row.page, new Map());
     const sectionMap = byPage.get(row.page)!;
     if (!sectionMap.has(row.sectionKey)) {
@@ -78,6 +127,8 @@ function pageLabel(page: string): string {
 }
 
 export function PromptTree({ prompts, selectedKey, onSelect }: Props) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const query = normalize(searchQuery);
   const systemPrompts = useMemo(
     () => prompts.filter((prompt) => prompt.category === 'system').sort((a, b) => a.sortOrder - b.sortOrder),
     [prompts],
@@ -87,7 +138,7 @@ export function PromptTree({ prompts, selectedKey, onSelect }: Props) {
     for (const prompt of systemPrompts) byKey.set(prompt.promptKey, prompt);
     return byKey;
   }, [systemPrompts]);
-  const pages = useMemo(() => groupByPage(prompts), [prompts]);
+  const pages = useMemo(() => groupByPage(prompts, query), [prompts, query]);
 
   const [openPages, setOpenPages] = useState<Record<string, boolean>>({});
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
@@ -96,6 +147,16 @@ export function PromptTree({ prompts, selectedKey, onSelect }: Props) {
   const [openFinance, setOpenFinance] = useState(true);
 
   const financePages = useMemo(() => pages.filter((page) => page.page !== 'hr'), [pages]);
+  const filteredSystemGroups = useMemo(() => ({
+    finance: SYSTEM_PROMPT_GROUPS.finance.filter((item) => {
+      const prompt = systemByKey.get(item.key);
+      return prompt ? promptMatches(prompt, query) || normalize(item.label).includes(query) : false;
+    }),
+    hr: SYSTEM_PROMPT_GROUPS.hr.filter((item) => {
+      const prompt = systemByKey.get(item.key);
+      return prompt ? promptMatches(prompt, query) || normalize(item.label).includes(query) : false;
+    }),
+  }), [query, systemByKey]);
 
   function renderSystemLeaf(item: { key: string; label: string }) {
     const prompt = systemByKey.get(item.key);
@@ -121,11 +182,11 @@ export function PromptTree({ prompts, selectedKey, onSelect }: Props) {
 
   function renderSections(sections: Section[]) {
     return sections.map((section) => {
-      const sectionOpen = openSections[section.sectionKey] ?? true;
+      const sectionOpen = Boolean(query) || (openSections[section.sectionKey] ?? true);
       return (
         <li key={section.sectionKey}>
           <button
-            onClick={() => toggleSection(section.sectionKey)}
+            onClick={() => toggleSection(section.sectionKey, sectionOpen)}
             className="flex w-full items-center gap-1 rounded-md px-2 py-1 text-left text-sm text-foreground hover:bg-accent"
           >
             {sectionOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
@@ -158,21 +219,35 @@ export function PromptTree({ prompts, selectedKey, onSelect }: Props) {
     });
   }
 
-  function togglePage(page: string) {
-    setOpenPages((prev) => ({ ...prev, [page]: !(prev[page] ?? false) }));
+  function togglePage(page: string, currentOpen: boolean) {
+    setOpenPages((prev) => ({ ...prev, [page]: !currentOpen }));
   }
 
-  function toggleSection(sectionKey: string) {
-    setOpenSections((prev) => ({ ...prev, [sectionKey]: !(prev[sectionKey] ?? true) }));
+  function toggleSection(sectionKey: string, currentOpen: boolean) {
+    setOpenSections((prev) => ({ ...prev, [sectionKey]: !currentOpen }));
   }
 
   return (
-    <Card data-testid="prompt-tree" className="h-full">
-      <CardContent className="h-full overflow-y-auto p-2">
+    <Card data-testid="prompt-tree" className="h-full rounded-lg">
+      <CardContent className="flex h-full min-h-0 flex-col p-2">
+        <div className="relative mb-2 shrink-0">
+          <Search className="pointer-events-none absolute left-2 top-1/2 size-4 -translate-y-1/2 text-foreground" />
+          <Input
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="Search prompts or thresholds"
+            aria-label="Search prompts or thresholds"
+            data-testid="prompt-tree-search"
+            className="pl-8"
+          />
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="px-2 pt-1 pb-1.5 text-sm font-bold text-blue-700">
           System Prompt
         </div>
         <ul className="space-y-0.5">
+          {filteredSystemGroups.finance.length > 0 && (
           <li key="__system_finance__">
             <button
               onClick={() => setOpenSystemFinance((value) => !value)}
@@ -180,16 +255,18 @@ export function PromptTree({ prompts, selectedKey, onSelect }: Props) {
               data-system-group="finance"
               className="flex w-full items-center gap-1 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent"
             >
-              {openSystemFinance ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+              {Boolean(query) || openSystemFinance ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
               <span className="font-medium truncate">Finance</span>
             </button>
-            {openSystemFinance && (
+            {(Boolean(query) || openSystemFinance) && (
               <ul className="ml-4 mt-0.5 space-y-0.5">
-                {SYSTEM_PROMPT_GROUPS.finance.map((item) => renderSystemLeaf(item))}
+                {filteredSystemGroups.finance.map((item) => renderSystemLeaf(item))}
               </ul>
             )}
           </li>
+          )}
 
+          {filteredSystemGroups.hr.length > 0 && (
           <li key="__system_hr__">
             <button
               onClick={() => setOpenSystemHr((value) => !value)}
@@ -197,15 +274,16 @@ export function PromptTree({ prompts, selectedKey, onSelect }: Props) {
               data-system-group="hr"
               className="flex w-full items-center gap-1 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent"
             >
-              {openSystemHr ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+              {Boolean(query) || openSystemHr ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
               <span className="font-medium truncate">HR</span>
             </button>
-            {openSystemHr && (
+            {(Boolean(query) || openSystemHr) && (
               <ul className="ml-4 mt-0.5 space-y-0.5">
-                {SYSTEM_PROMPT_GROUPS.hr.map((item) => renderSystemLeaf(item))}
+                {filteredSystemGroups.hr.map((item) => renderSystemLeaf(item))}
               </ul>
             )}
           </li>
+          )}
         </ul>
 
         <div className="mt-3 px-2 pb-1.5 text-sm font-bold text-blue-700">
@@ -220,17 +298,20 @@ export function PromptTree({ prompts, selectedKey, onSelect }: Props) {
                 data-page="finance"
                 className="flex w-full items-center gap-1 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent"
               >
-                {openFinance ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                {Boolean(query) || openFinance ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                 <span className="font-medium truncate">Finance</span>
               </button>
-              {openFinance && (
+              {(Boolean(query) || openFinance) && (
                 <ul className="ml-4 mt-0.5 space-y-0.5 border-l border-border pl-2">
                   {financePages.map((page) => {
-                    const pageOpen = openPages[page.page] ?? false;
+                    const selectedInPage = page.sections.some((section) =>
+                      section.components.some((component) => component.promptKey === selectedKey),
+                    );
+                    const pageOpen = Boolean(query) || (openPages[page.page] ?? selectedInPage);
                     return (
                       <li key={page.page}>
                         <button
-                          onClick={() => togglePage(page.page)}
+                          onClick={() => togglePage(page.page, pageOpen)}
                           data-testid="prompt-tree-page"
                           data-page={page.page}
                           className="flex w-full items-center gap-1 rounded-md px-2 py-1 text-left text-sm hover:bg-accent"
@@ -251,6 +332,12 @@ export function PromptTree({ prompts, selectedKey, onSelect }: Props) {
             </li>
           )}
         </ul>
+        {query && filteredSystemGroups.finance.length === 0 && filteredSystemGroups.hr.length === 0 && financePages.length === 0 && (
+          <div className="mt-3 rounded-lg border border-dashed border-slate-400 p-3 text-sm font-medium text-foreground">
+            No prompts match this search.
+          </div>
+        )}
+        </div>
       </CardContent>
     </Card>
   );

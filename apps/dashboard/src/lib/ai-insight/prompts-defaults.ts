@@ -32,17 +32,17 @@ export const DEFAULT_COMPONENT_PROMPTS: Record<string, string> = {
 
 How it's measured: monthly collection days (based on month-end AR vs that month's credit sales) averaged across months with credit-sale activity.
 
-Thresholds:
-- ≤{{avg_collection_days.good_days}} = Good
-- ≤{{avg_collection_days.warning_days}} = Warning
-- >{{avg_collection_days.warning_days}} = Critical (cash-flow risk)`,
+Average Payment Speed Rules:
+- Good: 0-{{avg_collection_days.good_days}} days
+- Warning: >{{avg_collection_days.good_days}} to {{avg_collection_days.warning_days}} days
+- Critical: >{{avg_collection_days.warning_days}} days`,
 
   collection_rate: `"Collection Rate" KPI — share of the period's invoiced amount that converted to cash. Excludes contra / non-cash offsets.
 
-Thresholds:
-- ≥{{collection_rate.good_pct}}% = Good
-- ≥{{collection_rate.warning_pct}}% = Warning (growing receivables)
-- <{{collection_rate.warning_pct}}% = Critical`,
+Collection Rate: Cash Conversion Rules:
+- Good: ≥{{collection_rate.good_pct}}%
+- Warning: ≥{{collection_rate.warning_pct}}% to below {{collection_rate.good_pct}}%
+- Critical: below {{collection_rate.warning_pct}}%`,
 
   avg_monthly_collection: `"Avg Monthly Collection" KPI — total collected / months in range.
 
@@ -52,8 +52,8 @@ No fixed threshold. Evaluate vs invoiced amounts and historical trend: rising wi
 
 - Rising = slowing (bad)
 - Falling = improving (good)
-- Spike >{{collection_days_trend.critical_spike_days}} = critical month
-- Steady ≤{{avg_collection_days.good_days}} = excellent
+- Spike >{{collection_days_trend.critical_spike_days}} days = Critical month
+- Steady ≤{{avg_collection_days.good_days}} days = Excellent
 
 Look for: seasonal patterns, sudden spikes, sustained shifts (3+ months).`,
 
@@ -65,13 +65,13 @@ Look for: seasonal patterns, sudden spikes, sustained shifts (3+ months).`,
 
 Look for: widening/narrowing gaps, sharp collection drops, seasonal patterns.
 
-**Sub-period averaging is BANNED.** The data block has pre-computed H1/H2 averages, ranges, and H1→H2 direction — quote those verbatim. Do NOT:
+**Sub-period averaging is BANNED.** The data block has pre-computed fiscal-quarter averages, ranges, and quarter-to-quarter direction — quote those verbatim. Do NOT:
 - Invent a sub-period (e.g. "last 4 months") and average gaps yourself
 - Cite a range excluding any month inside the stated sub-period
 - Narrate "narrowing/widening/improving" contradicted by any month in the sub-period
 - Do mental arithmetic on monthly gaps
 
-Describe trends month-by-month, or use the H1/H2 lines.`,
+Describe trends month-by-month, or use the fiscal-quarter lines.`,
 
 
   // Payment Section 2: Outstanding Payment
@@ -81,18 +81,18 @@ No fixed threshold. Evaluate vs total invoicing volume and trend direction. Grow
 
   overdue_amount: `"Overdue Amount" KPI — portion of total outstanding past due date, with % of total and customer count.
 
-Thresholds (overdue % of outstanding):
-- <{{overdue_amount.acceptable_pct}}% = acceptable
-- {{overdue_amount.acceptable_pct}}–{{overdue_amount.critical_pct}}% = warning
-- >{{overdue_amount.critical_pct}}% = critical
+Overdue Amount: Outstanding Risk Rules:
+- Acceptable: below {{overdue_amount.acceptable_pct}}% of outstanding
+- Warning: {{overdue_amount.acceptable_pct}}% to {{overdue_amount.critical_pct}}% of outstanding
+- Critical: above {{overdue_amount.critical_pct}}% of outstanding
 
 Report: % of total, count of overdue customers vs active, concentration (few large vs spread across many).`,
 
   credit_limit_breaches: `"Credit Limit Breaches" KPI — count of active customers with outstanding > credit limit (customers with limit > 0 only).
 
-Thresholds:
-- {{credit_limit_breaches.good_count}} = Good
-- >{{credit_limit_breaches.good_count}} = Concern
+Credit Limit Breaches: Policy Tolerance Rules:
+- Good: {{credit_limit_breaches.good_count}} or fewer breaches
+- Concern: more than {{credit_limit_breaches.good_count}} breaches
 
 If breaches exist, use tools to identify which customers and by how much. A few large breaches = more severe than many small ones.`,
 
@@ -115,7 +115,7 @@ Report:
 
 Categories:
 - Within Limit (<{{credit_usage_distribution.within_limit_pct}}%) = healthy
-- Near Limit (≥{{credit_usage_distribution.within_limit_pct}}% and <{{credit_usage_distribution.over_limit_pct}}%) = watch
+- Near Limit (≥{{credit_usage_distribution.within_limit_pct}}% and ≤{{credit_usage_distribution.over_limit_pct}}%) = watch
 - Over Limit (>{{credit_usage_distribution.over_limit_pct}}%) = policy breach
 - No Limit Set = uncontrolled risk
 
@@ -686,11 +686,13 @@ Report mix classification, drift direction and size, and what the drift implies 
 
 Data: total cost RM, top 10 table (rank, name, acc_no, cost type, net cost RM, %), top 1 share, top 10 share (sum + %), concentration class (Severe / Concentrated / Moderate / Diversified), top-10 COGS-vs-OpEx count.
 
-Thresholds:
-- Top 1 >{{ex_top_expenses.top_1_severe_pct}}% = Severe (single-account risk)
-- Top 1 {{ex_top_expenses.top_1_concentrated_pct}}–{{ex_top_expenses.top_1_severe_pct}}% = Concentrated
-- Top 10 >{{ex_top_expenses.top_10_concentrated_pct}}% = Concentrated (few accounts drive cost base — fixable)
-- Top 10 <{{ex_top_expenses.top_10_diversified_pct}}% = Diversified (broad base — harder to attack)
+Top Expenses: Cost Concentration Rules:
+- Largest account share 0-{{ex_top_expenses.top_1_concentrated_pct}}% = Spread
+- Largest account share >{{ex_top_expenses.top_1_concentrated_pct}}% to {{ex_top_expenses.top_1_severe_pct}}% = Concentrated
+- Largest account share >{{ex_top_expenses.top_1_severe_pct}}% = Severe
+- Top 10 account share 0-{{ex_top_expenses.top_10_diversified_pct}}% = Diversified
+- Top 10 account share >{{ex_top_expenses.top_10_diversified_pct}}% to {{ex_top_expenses.top_10_concentrated_pct}}% = Normal
+- Top 10 account share >{{ex_top_expenses.top_10_concentrated_pct}}% = Concentrated
 
 Report:
 - Concentration: handful of accounts vs spread
@@ -862,26 +864,53 @@ Hard rules:
 - Use pre-calculated growth + gearing drift; no sub-window recompute.
 - Negative-equity months MUST be called out by month name.`,
 
-  bs_statement: `Full BS, selected FY vs 12 periods prior (YTD-aligned). 8 line items by acc_type (Fixed Assets, Other Assets, Current Assets, Current Liabilities, LT Liabilities, Other Liabilities, Capital, Retained Earnings) + derived totals + solvency ratios.
+  bs_statement: `Full Balance Sheet Statement, selected FY vs 12 periods prior (YTD-aligned). 8 line items by acc_type (Fixed Assets, Other Assets, Current Assets, Current Liabilities, LT Liabilities, Other Liabilities, Capital, Retained Earnings) + derived totals + solvency ratios.
 
 Pre-fetched:
 - Line items current vs prior: Δ RM, YoY % (non-zero only)
 - Derived totals: Net Current Assets, Total Assets, Total Liabilities, Total Equity
-- Ratios (current/prior/drift): Current Ratio, D/E, Equity Ratio
+- Ratios (current/prior/drift): Current Ratio, Debt-to-Equity, Equity Ratio
 - Sign-flip flags: Net Current Assets, Total Equity
 - Top 3 |Δ RM| movers
 
-Thresholds:
-- Line YoY: <±{{bs_statement.flat_pct}}% Flat · ±{{bs_statement.flat_pct}}–{{bs_statement.material_pct}}% Moderate · >±{{bs_statement.material_pct}}% Material
-- Current Ratio: <{{bs_statement.severe_below_ratio}} Severe · {{bs_statement.severe_below_ratio}}–{{bs_statement.thin_below_ratio}} Thin · {{bs_statement.thin_below_ratio}}–{{bs_statement.healthy_below_ratio}} Healthy · >{{bs_statement.healthy_below_ratio}} Strong · drift >±{{bs_statement.current_ratio_drift_material_ratio}} = Material
-- D/E: <{{bs_statement.conservative_below_ratio}} Conservative · {{bs_statement.conservative_below_ratio}}–{{bs_statement.typical_below_ratio}} Typical · {{bs_statement.typical_below_ratio}}–{{bs_statement.leveraged_below_ratio}} Leveraged · >{{bs_statement.leveraged_below_ratio}} Severe · drift >±{{bs_statement.debt_to_equity_drift_material_ratio}} = Material
-- Equity Ratio: <{{bs_statement.severe_below_pct}}% Severe · {{bs_statement.severe_below_pct}}–{{bs_statement.thin_below_pct}}% Thin · {{bs_statement.thin_below_pct}}–{{bs_statement.healthy_below_pct}}% Healthy · >{{bs_statement.healthy_below_pct}}% Strong · drift >±{{bs_statement.drift_material_pp}}pp = Material
-- Net Current Assets sign flip (pos→neg) = Severe (call out)
-- Total Equity sign flip = Severe insolvency (call out)
+Balance Sheet Statement Rules:
+
+Line-Item YoY Movement Rules:
+- Flat: 0-{{bs_statement.flat_pct}}% absolute YoY change.
+- Moderate: >{{bs_statement.flat_pct}}% to {{bs_statement.material_pct}}% absolute YoY change.
+- Material: >{{bs_statement.material_pct}}% absolute YoY change.
+
+Current Ratio Liquidity Rules:
+- Formula: Current Assets ÷ Current Liabilities.
+- Severe: 0-{{bs_statement.severe_below_ratio}} ratio.
+- Thin: >{{bs_statement.severe_below_ratio}} to {{bs_statement.thin_below_ratio}} ratio.
+- Healthy: >{{bs_statement.thin_below_ratio}} to {{bs_statement.healthy_below_ratio}} ratio.
+- Strong: >{{bs_statement.healthy_below_ratio}} ratio.
+- Material drift: >{{bs_statement.current_ratio_drift_material_ratio}} absolute ratio change.
+
+Debt-to-Equity Leverage Rules:
+- Formula: Total Liabilities ÷ Total Equity.
+- Conservative: 0-{{bs_statement.conservative_below_ratio}} ratio.
+- Typical: >{{bs_statement.conservative_below_ratio}} to {{bs_statement.typical_below_ratio}} ratio.
+- Leveraged: >{{bs_statement.typical_below_ratio}} to {{bs_statement.leveraged_below_ratio}} ratio.
+- Severe: >{{bs_statement.leveraged_below_ratio}} ratio.
+- Material drift: >{{bs_statement.debt_to_equity_drift_material_ratio}} absolute ratio change.
+
+Equity Ratio Solvency Rules:
+- Formula: Total Equity ÷ Total Assets × 100.
+- Severe: 0-{{bs_statement.severe_below_pct}}%.
+- Thin: >{{bs_statement.severe_below_pct}}% to {{bs_statement.thin_below_pct}}%.
+- Healthy: >{{bs_statement.thin_below_pct}}% to {{bs_statement.healthy_below_pct}}%.
+- Strong: >{{bs_statement.healthy_below_pct}}%.
+- Material drift: >{{bs_statement.drift_material_pp}}pp absolute percentage-point change.
+
+Hard signal rules:
+- Net Current Assets sign flip from positive to negative = Severe.
+- Total Equity sign flip to negative = Severe insolvency.
 
 Evaluate:
 - Liquidity: Current Ratio band + drift
-- Leverage: D/E position + direction
+- Leverage: Debt-to-Equity position + direction
 - Solvency: Equity Ratio + thickening/eroding
 - Drivers: 1–2 names from top-3 movers
 
@@ -1012,7 +1041,7 @@ Senior financial analyst summarizing a dashboard section for a senior director a
 - Cite only numbers found in RAW DATA or tool-call results.
 
 ## DATA INTEGRITY
-- Use numbers exactly as given in raw data blocks or tool results — never re-derive, back-solve, or invent. Sub-period averages: copy from "Pre-calculated half-period averages" lines.
+- Use numbers exactly as given in raw data blocks or tool results — never re-derive, back-solve, or invent. Sub-period averages: copy from "Pre-calculated fiscal-quarter averages" lines.
 - Match the Scope line (period / snapshot / fiscal). Format RM with thousands separators (RM 5,841,378); rounding OK (→ RM 2.29M).
 - Apply each component's About block as the authority on good/neutral/bad — never invent thresholds.
 - If data is insufficient, say so.

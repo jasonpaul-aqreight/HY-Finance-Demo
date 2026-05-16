@@ -10,7 +10,9 @@ import {
 } from './prompts';
 import {
   getThresholdGroups,
+  getThresholdPresentation,
   renderThresholdText,
+  type ThresholdComponentPresentationView,
   type ThresholdGroupView,
 } from './threshold-config';
 
@@ -31,6 +33,7 @@ export interface PromptConfigRow {
   updatedAt: string;
   updatedBy: string | null;
   thresholdGroups: ThresholdGroupView[];
+  thresholdPresentation: ThresholdComponentPresentationView | null;
 }
 
 interface PromptConfigSeedRow {
@@ -49,6 +52,9 @@ async function toPromptConfigRow(row: PromptConfigSeedRow, updatedAt: string): P
   const thresholdGroups = row.category === 'component'
     ? await getThresholdGroups(row.promptKey)
     : [];
+  const thresholdPresentation = row.category === 'component'
+    ? getThresholdPresentation(row.promptKey)
+    : null;
   const renderedPromptText = row.category === 'component'
     ? await renderThresholdText(row.promptText, row.promptKey)
     : row.promptText;
@@ -59,6 +65,7 @@ async function toPromptConfigRow(row: PromptConfigSeedRow, updatedAt: string): P
     updatedAt,
     updatedBy: 'code',
     thresholdGroups,
+    thresholdPresentation,
   };
 }
 

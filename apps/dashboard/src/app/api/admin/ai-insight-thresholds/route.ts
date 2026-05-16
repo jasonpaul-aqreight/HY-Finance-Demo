@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { buildPromptConfigRows } from '@/lib/ai-insight/prompt-config';
 import {
   getThresholdGroups,
+  getThresholdPresentation,
   saveThresholdValues,
 } from '@/lib/ai-insight/threshold-config';
 
@@ -21,7 +22,11 @@ export async function GET(req: Request) {
     }
 
     const thresholdGroups = await getThresholdGroups(componentKey);
-    return NextResponse.json({ componentKey, thresholdGroups });
+    const thresholdPresentation = getThresholdPresentation(componentKey);
+    return NextResponse.json(
+      { componentKey, thresholdGroups, thresholdPresentation },
+      { headers: { 'Cache-Control': 'no-store' } },
+    );
   } catch (err) {
     console.error('ai-insight-thresholds GET error:', err);
     return NextResponse.json(
@@ -57,12 +62,16 @@ export async function PUT(req: Request) {
     const prompts = await buildPromptConfigRows();
     const prompt = prompts.find((candidate) => candidate.promptKey === componentKey) ?? null;
 
-    return NextResponse.json({
-      ok: true,
-      componentKey,
-      prompt,
-      thresholdGroups: await getThresholdGroups(componentKey),
-    });
+    return NextResponse.json(
+      {
+        ok: true,
+        componentKey,
+        prompt,
+        thresholdGroups: await getThresholdGroups(componentKey),
+        thresholdPresentation: getThresholdPresentation(componentKey),
+      },
+      { headers: { 'Cache-Control': 'no-store' } },
+    );
   } catch (err) {
     console.error('ai-insight-thresholds PUT error:', err);
     return NextResponse.json(
