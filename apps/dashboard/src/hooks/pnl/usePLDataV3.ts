@@ -76,6 +76,8 @@ export interface V3VarianceKpiTile {
   varianceRm: number | null;
   variancePct: number | null;
   yoyPct: number | null;
+  tolerancePct: number | null;
+  higherIsBetter: boolean;
   isFavourable: boolean | null;
   status: 'On Track' | 'Moderate' | 'Material' | 'Severe' | null;
 }

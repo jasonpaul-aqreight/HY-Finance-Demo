@@ -6,6 +6,11 @@ import { Card, CardContent } from '@/components/ui/card';
 import { formatRM, formatPct } from '@/lib/pnl/format';
 import { cn } from '@/lib/utils';
 import { AnalyzeIcon } from '@/components/ai-insight/AnalyzeIcon';
+import {
+  getBudgetPosition,
+  getBudgetPositionLabel,
+  isBudgetPositionFavourable,
+} from '@/lib/budget/status';
 
 interface Props {
   fy: string;
@@ -16,8 +21,9 @@ interface BudgetInfo {
   varianceRm: number | null;
   variancePct: number | null;
   yoyPct: number | null;
+  tolerancePct: number | null;
+  higherIsBetter: boolean;
   isFavourable: boolean | null;
-  onTrack: boolean | null;
 }
 
 interface KpiCardProps {
@@ -41,8 +47,16 @@ function signedPct(value: number | null): string {
   return `${sign}${formatPct(value)}`;
 }
 
-function StatusBadge({ onTrack }: { onTrack: boolean | null }) {
-  if (onTrack == null) {
+function StatusBadge({ budget }: { budget: BudgetInfo }) {
+  const position = getBudgetPosition({
+    varianceRm: budget.varianceRm,
+    variancePct: budget.variancePct,
+    tolerancePct: budget.tolerancePct,
+    higherIsBetter: budget.higherIsBetter,
+  });
+  const favourable = isBudgetPositionFavourable(position);
+
+  if (position === 'no-budget') {
     return (
       <span className="inline-flex items-center rounded-full border border-foreground/20 bg-background px-2 py-0.5 text-xs font-semibold text-foreground">
         No Budget
@@ -53,12 +67,12 @@ function StatusBadge({ onTrack }: { onTrack: boolean | null }) {
     <span
       className={cn(
         'inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold',
-        onTrack
+        favourable
           ? 'border-emerald-700 bg-emerald-50 text-emerald-900'
           : 'border-red-700 bg-red-50 text-red-900',
       )}
     >
-      {onTrack ? 'On Budget' : 'Off Budget'}
+      {getBudgetPositionLabel(position)}
     </span>
   );
 }
@@ -69,16 +83,21 @@ function KpiCard({ title, value, subtitle, valueColor, componentKey, budget }: K
     : budget.isFavourable
       ? 'text-emerald-800'
       : 'text-red-800';
+  const lastYearColor = budget?.yoyPct == null || budget.yoyPct === 0
+    ? 'text-foreground'
+    : (budget.higherIsBetter ? budget.yoyPct > 0 : budget.yoyPct < 0)
+      ? 'text-emerald-800'
+      : 'text-red-800';
 
   return (
     <Card className="rounded-xl ring-1 ring-foreground/10">
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-2">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+          <p className="text-xs font-medium text-foreground uppercase tracking-wide flex items-center gap-1">
             {title}
             {componentKey && <AnalyzeIcon sectionKey="financial_overview" componentKey={componentKey} />}
           </p>
-          {budget && <StatusBadge onTrack={budget.onTrack} />}
+          {budget && <StatusBadge budget={budget} />}
         </div>
         <p className={cn(
           'mt-1 text-2xl font-bold',
@@ -91,25 +110,26 @@ function KpiCard({ title, value, subtitle, valueColor, componentKey, budget }: K
           <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
         )}
         {budget && (
-          <>
-            <div className="mt-3 grid grid-cols-2 gap-3 text-xs">
-              <div>
-                <p className="font-semibold text-foreground">vs Budget</p>
-                <p className={cn('mt-0.5 font-semibold', varianceColor)}>
-                  {signedRm(budget.varianceRm)}
-                </p>
-              </div>
-              <div>
-                <p className="font-semibold text-foreground">Variance %</p>
-                <p className={cn('mt-0.5 font-semibold', varianceColor)}>
-                  {signedPct(budget.variancePct)}
-                </p>
-              </div>
+          <div className="mt-3 flex items-start justify-between gap-4 text-xs">
+            <div className="min-w-0 text-left">
+              <p className="whitespace-nowrap font-semibold text-foreground">vs Budget</p>
+              <p className={cn('mt-0.5 whitespace-nowrap font-semibold', varianceColor)}>
+                {signedRm(budget.varianceRm)}
+              </p>
             </div>
-            <div className="mt-2 inline-flex rounded-full border border-foreground/20 bg-background px-2 py-0.5 text-xs font-semibold text-foreground">
-              YoY {signedPct(budget.yoyPct)}
+            <div className="min-w-0 text-center">
+              <p className="whitespace-nowrap font-semibold text-foreground">Variance %</p>
+              <p className={cn('mt-0.5 whitespace-nowrap font-semibold', varianceColor)}>
+                {signedPct(budget.variancePct)}
+              </p>
             </div>
-          </>
+            <div className="min-w-0 text-right">
+              <p className="whitespace-nowrap font-semibold text-foreground">Last Year</p>
+              <p className={cn('mt-0.5 whitespace-nowrap font-semibold', lastYearColor)}>
+                {signedPct(budget.yoyPct)}
+              </p>
+            </div>
+          </div>
         )}
       </CardContent>
     </Card>
@@ -130,13 +150,13 @@ function SkeletonRow() {
 
 function tileToBudgetInfo(tile: V3VarianceKpiTile | undefined): BudgetInfo | undefined {
   if (!tile) return undefined;
-  const onTrack = tile.status == null ? null : tile.status === 'On Track';
   return {
     varianceRm: tile.varianceRm,
     variancePct: tile.variancePct,
     yoyPct: tile.yoyPct,
+    tolerancePct: tile.tolerancePct,
+    higherIsBetter: tile.higherIsBetter,
     isFavourable: tile.isFavourable,
-    onTrack,
   };
 }
 

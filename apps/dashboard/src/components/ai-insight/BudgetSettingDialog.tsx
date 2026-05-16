@@ -27,6 +27,7 @@ interface BudgetRow {
   line_item: string;
   monthly_budget: number;
   annual_budget: number;
+  tolerance_pct: number;
   approved_by: string | null;
   note: string | null;
   updated_at: string;
@@ -34,8 +35,8 @@ interface BudgetRow {
 
 interface FormLine {
   line_item: BudgetLineItem;
-  monthly_budget: string;
   annual_budget: string;
+  tolerance_pct: string;
 }
 
 interface BudgetSettingDialogProps {
@@ -48,8 +49,8 @@ interface BudgetSettingDialogProps {
 function emptyForm(): FormLine[] {
   return BUDGET_LINE_ITEMS.map((line_item) => ({
     line_item,
-    monthly_budget: '',
     annual_budget: '',
+    tolerance_pct: '5',
   }));
 }
 
@@ -59,8 +60,8 @@ function rowsToForm(rows: BudgetRow[]): FormLine[] {
     const row = byItem.get(line_item);
     return {
       line_item,
-      monthly_budget: row ? String(Math.round(row.monthly_budget)) : '',
       annual_budget: row ? String(Math.round(row.annual_budget)) : '',
+      tolerance_pct: row ? String(row.tolerance_pct ?? 5) : '5',
     };
   });
 }
@@ -131,7 +132,7 @@ export function BudgetSettingDialog({
     };
   }, [open]);
 
-  function updateLine(index: number, field: 'monthly_budget' | 'annual_budget', value: string) {
+  function updateLine(index: number, field: 'annual_budget' | 'tolerance_pct', value: string) {
     setForm((current) =>
       current.map((line, i) => (i === index ? { ...line, [field]: value } : line)),
     );
@@ -148,18 +149,20 @@ export function BudgetSettingDialog({
 
     const lines = form.map((line) => ({
       line_item: line.line_item,
-      monthly_budget: Number(line.monthly_budget),
       annual_budget: Number(line.annual_budget),
+      tolerance_pct: Number(line.tolerance_pct),
     }));
 
     if (
       lines.some(
         (line) =>
-          !Number.isFinite(line.monthly_budget) ||
-          !Number.isFinite(line.annual_budget),
+          !Number.isFinite(line.annual_budget) ||
+          !Number.isFinite(line.tolerance_pct) ||
+          line.tolerance_pct < 0 ||
+          line.tolerance_pct > 100,
       )
     ) {
-      setError('Enter valid monthly and annual budget values for every line.');
+      setError('Enter valid annual budget and tolerance values for every line.');
       return;
     }
 
@@ -193,7 +196,7 @@ export function BudgetSettingDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-2xl p-0 gap-0 overflow-hidden">
+        <DialogContent className="sm:max-w-3xl p-0 gap-0 overflow-hidden">
           <DialogHeader className="border-b px-5 py-4">
             <DialogTitle className="text-base font-semibold text-foreground">
               Budget Setting
@@ -215,12 +218,12 @@ export function BudgetSettingDialog({
             ) : (
               <>
                 <div className="overflow-x-auto rounded-md border">
-                  <table className="w-full min-w-[560px] text-sm">
+                  <table className="w-full min-w-[620px] text-sm">
                     <thead className="bg-muted/50 text-foreground">
                       <tr>
                         <th className="px-3 py-2 text-left font-semibold">Line Item</th>
-                        <th className="px-3 py-2 text-right font-semibold">Monthly Budget</th>
                         <th className="px-3 py-2 text-right font-semibold">Annual Budget</th>
+                        <th className="px-3 py-2 text-right font-semibold">Tolerance (%)</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -231,19 +234,22 @@ export function BudgetSettingDialog({
                             <Input
                               type="number"
                               inputMode="decimal"
-                              value={line.monthly_budget}
+                              value={line.annual_budget}
                               disabled={!isAdmin || saving}
-                              onChange={(event) => updateLine(index, 'monthly_budget', event.target.value)}
-                              className="text-right"
+                              onChange={(event) => updateLine(index, 'annual_budget', event.target.value)}
+                              className="text-right font-semibold"
                             />
                           </td>
                           <td className="px-3 py-2">
                             <Input
                               type="number"
                               inputMode="decimal"
-                              value={line.annual_budget}
+                              min="0"
+                              max="100"
+                              step="0.1"
+                              value={line.tolerance_pct}
                               disabled={!isAdmin || saving}
-                              onChange={(event) => updateLine(index, 'annual_budget', event.target.value)}
+                              onChange={(event) => updateLine(index, 'tolerance_pct', event.target.value)}
                               className="text-right font-semibold"
                             />
                           </td>

@@ -40,6 +40,7 @@ import { fyNameToNumber, fyToPeriodRange, periodLabel } from '../pnl/period-util
 import { getSettingsV2 } from '../payment/settings';
 import { getV2PLStatement, getMultiYearPL, getV3BSTrend, getV3BSComparison } from '../pnl/queries';
 import { getGlobalBudget } from '../budget/queries';
+import { getBudgetPosition, getBudgetPositionLabel } from '../budget/status';
 import { CATEGORY_ORDER, getExpenseCategory } from '../shared/expense-categories';
 import type {
   SectionKey,
@@ -3965,6 +3966,7 @@ export interface FpaVarianceKpiTile {
   varianceRm: number | null;
   variancePct: number | null;
   yoyPct: number | null;
+  tolerancePct: number | null;
   higherIsBetter: boolean;
   isFavourable: boolean | null;
   status: FpaStatus | null;
@@ -4018,6 +4020,7 @@ export interface FpaBudgetVsActualRow {
   varianceRm: number | null;
   variancePct: number | null;
   yoyPct: number | null;
+  tolerancePct: number | null;
   higherIsBetter: boolean;
   isFavourable: boolean | null;
   status: FpaStatus | null;
@@ -4043,6 +4046,10 @@ const FPA_LINE_META: Record<FpaLineCode, { label: string; higherIsBetter: boolea
 
 function getBudgetMap(rows: Awaited<ReturnType<typeof getGlobalBudget>>): Map<string, number> {
   return new Map(rows.map((row) => [row.line_item, row.annual_budget]));
+}
+
+function getBudgetToleranceMap(rows: Awaited<ReturnType<typeof getGlobalBudget>>): Map<string, number> {
+  return new Map(rows.map((row) => [row.line_item, row.tolerance_pct]));
 }
 
 function deriveBudgetValues(budgetRows: Awaited<ReturnType<typeof getGlobalBudget>>): Record<FpaLineCode, number | null> {
@@ -4075,13 +4082,14 @@ function getActualValues(s: FinFiscalSlice, source: 'current' | 'prior'): Record
   };
 }
 
-function calcStatus(actual: number, budget: number | null): FpaStatus | null {
+function calcStatus(actual: number, budget: number | null, tolerancePct = 5): FpaStatus | null {
   if (budget == null) return null;
   if ((budget >= 0 && actual < 0) || (budget < 0 && actual >= 0)) return 'Severe';
   if (budget === 0) return actual === 0 ? 'On Track' : 'Severe';
   const pctAbs = Math.abs(((actual - budget) / Math.abs(budget)) * 100);
-  if (pctAbs <= 5) return 'On Track';
-  if (pctAbs <= 15) return 'Moderate';
+  const tolerance = Math.max(0, tolerancePct);
+  if (pctAbs <= tolerance) return 'On Track';
+  if (pctAbs <= tolerance + 10) return 'Moderate';
   return 'Material';
 }
 
@@ -4107,9 +4115,11 @@ function buildFpaRow(
   higherIsBetter: boolean,
   rowType: FpaBudgetVsActualRow['rowType'],
   expandable: boolean,
+  tolerancePct: number | null = null,
 ): FpaBudgetVsActualRow {
   const varianceRm = budget == null ? null : actual - budget;
   const variancePct = calcVariancePct(actual, budget);
+  const effectiveTolerancePct = budget == null ? null : tolerancePct ?? 5;
   return {
     id,
     code,
@@ -4121,9 +4131,10 @@ function buildFpaRow(
     varianceRm,
     variancePct,
     yoyPct: yoyPct(actual, prior),
+    tolerancePct: effectiveTolerancePct,
     higherIsBetter,
     isFavourable: calcIsFavourable(varianceRm, higherIsBetter),
-    status: calcStatus(actual, budget),
+    status: calcStatus(actual, budget, effectiveTolerancePct ?? 5),
     expandable,
     rowType,
   };
@@ -4319,12 +4330,14 @@ export async function getVarianceKpiTiles(period: FiscalPeriod): Promise<FpaVari
   const actual = getActualValues(s, 'current');
   const prior = getActualValues(s, 'prior');
   const budget = deriveBudgetValues(budgetRows);
+  const toleranceByLine = getBudgetToleranceMap(budgetRows);
 
   return FPA_BUDGET_LINE_ORDER.map((label) => {
     const code: FpaLineCode = label === 'Net Sales' ? 'NS' : label === 'Cost of Sales' ? 'CO' : label === 'Operating Costs' ? 'EP' : 'OI';
     const meta = FPA_LINE_META[code];
     const budgetValue = budget[code];
     const varianceRm = budgetValue == null ? null : actual[code] - budgetValue;
+    const tolerancePct = budgetValue == null ? null : toleranceByLine.get(label) ?? 5;
     return {
       code,
       label: meta.label,
@@ -4333,9 +4346,10 @@ export async function getVarianceKpiTiles(period: FiscalPeriod): Promise<FpaVari
       varianceRm,
       variancePct: calcVariancePct(actual[code], budgetValue),
       yoyPct: yoyPct(actual[code], prior[code]),
+      tolerancePct,
       higherIsBetter: meta.higherIsBetter,
       isFavourable: calcIsFavourable(varianceRm, meta.higherIsBetter),
-      status: calcStatus(actual[code], budgetValue),
+      status: calcStatus(actual[code], budgetValue, tolerancePct ?? 5),
     };
   });
 }
@@ -4433,11 +4447,13 @@ export async function getBudgetVsActualRows(
     const actual = getActualValues(s, 'current');
     const prior = getActualValues(s, 'prior');
     const budget = deriveBudgetValues(budgetRows);
+    const toleranceByLine = getBudgetToleranceMap(budgetRows);
     const order: FpaLineCode[] = ['NS', 'CO', 'GP', 'EP', 'OP', 'OI', 'NP'];
     return {
       hasBudget,
       rows: order.map((code) => {
         const meta = FPA_LINE_META[code];
+        const tolerancePct = toleranceByLine.get(meta.label) ?? null;
         return buildFpaRow(
           code,
           code,
@@ -4450,6 +4466,7 @@ export async function getBudgetVsActualRows(
           meta.higherIsBetter,
           meta.rowType,
           true,
+          tolerancePct,
         );
       }),
     };
@@ -5164,8 +5181,8 @@ const fiscalPeriodFetchers: Record<string, FiscalPeriodFetcher> = {
 
       if (budgetLines.length > 0) {
         let bTable =
-          `| Line Item | Actual | Budget | Variance (RM) | Var % | Status |\n` +
-          `|-----------|--------|--------|---------------|-------|--------|\n`;
+          `| Line Item | Actual | Budget | Variance (RM) | Var % | Tolerance | Budget Position | Favourability |\n` +
+          `|-----------|--------|--------|---------------|-------|-----------|-----------------|---------------|\n`;
 
         for (const l of budgetLines) {
           const budget = budgetMap.get(l.name)!;
@@ -5173,18 +5190,26 @@ const fiscalPeriodFetchers: Record<string, FiscalPeriodFetcher> = {
           const budgetAnnual = budget.annual_budget;
           const bVar = actual - budgetAnnual;
           const bVarPct = budgetAnnual !== 0 ? ((actual - budgetAnnual) / Math.abs(budgetAnnual)) * 100 : null;
-          const status = bVar === 0
-            ? 'On Track'
+          const tolerancePct = budget.tolerance_pct ?? 5;
+          const budgetPosition = getBudgetPositionLabel(getBudgetPosition({
+            varianceRm: bVar,
+            variancePct: bVarPct,
+            tolerancePct,
+            higherIsBetter: l.higherIsBetter,
+          }));
+          const favourability = bVar === 0
+            ? 'Neutral'
             : l.higherIsBetter
               ? (bVar > 0 ? 'Favourable' : 'Unfavourable')
               : (bVar < 0 ? 'Favourable' : 'Unfavourable');
 
-          bTable += `| ${l.name} | ${fmtRm(actual)} | ${fmtRm(budgetAnnual)} | ${fmtRm(bVar)} | ${fmtPct(bVarPct)} | ${status} |\n`;
+          bTable += `| ${l.name} | ${fmtRm(actual)} | ${fmtRm(budgetAnnual)} | ${fmtRm(bVar)} | ${fmtPct(bVarPct)} | ${fmtPct(tolerancePct)} | ${budgetPosition} | ${favourability} |\n`;
 
           allowed.push(rm(`${l.name.toLowerCase()} actual`, actual));
           allowed.push(rm(`${l.name.toLowerCase()} budget`, budgetAnnual));
           allowed.push(rm(`${l.name.toLowerCase()} vs budget variance`, bVar));
           if (bVarPct != null) allowed.push(pct(`${l.name.toLowerCase()} vs budget variance pct`, bVarPct));
+          allowed.push(pct(`${l.name.toLowerCase()} budget tolerance`, tolerancePct));
         }
 
         budgetVarianceBlock =
@@ -5199,9 +5224,9 @@ const fiscalPeriodFetchers: Record<string, FiscalPeriodFetcher> = {
         `P&L Variance Summary for ${s.rangeLabel}.\n` +
         budgetVarianceBlock +
         `\nThresholds:\n` +
-        `- Variance within ±5% = On Track\n` +
-        `- Variance ±5–15% = Moderate deviation\n` +
-        `- Variance beyond ±15% = Material deviation\n` +
+        `- Use each line's saved Budget Position and Tolerance columns; do not assume a fixed tolerance.\n` +
+        `- On Budget means actual is within that line's tolerance.\n` +
+        `- Above Target/Below Target applies to Net Sales; Over Budget/Under Budget applies to cost lines.\n` +
         `- Any sign flip = Severe\n`,
       allowed,
     };

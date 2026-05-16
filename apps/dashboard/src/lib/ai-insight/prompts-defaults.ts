@@ -895,11 +895,12 @@ Hard rules:
   fv_variance_summary: `Current FY window's P&L vs the approved budget baseline (global, not FY-specific).
 
 Pre-fetched:
-- Budget table (if present): per line — Actual / Budget / Var RM / Var % / Status — only for Net Sales, Cost of Sales, Operating Costs, Other Income
+- Budget table (if present): per line — Actual / Budget / Var RM / Var % / Tolerance / Budget Position / Favourability — only for Net Sales, Cost of Sales, Operating Costs
 - Favourable: Revenue ↑ = Favourable; Cost (COGS, OpEx) ↓ = Favourable
 
 Thresholds:
-- ±5% On Track · ±5–15% Moderate · >±15% Material
+- Use each line's saved tolerance. On Budget means actual is within that line's tolerance.
+- Above Target / Below Target applies to Net Sales. Over Budget / Under Budget applies to cost lines.
 - Sign flip (profit↔loss) = Severe
 
 Evaluate:
@@ -912,9 +913,9 @@ Hard rules:
 - Label baseline "approved budget baseline" — do NOT qualify with a fiscal year.
 - Do NOT compare to prior year or any YoY baseline; YoY analysis lives in the P&L panel, not here.
 - If no budget section is present, do NOT mention budgets or variance-to-budget anywhere in the output.
-- Budget rows cover input lines only (Net Sales, Cost of Sales, Operating Costs, Other Income). Do NOT claim a Gross Profit or Net Profit budget exists.
+- Budget rows cover input lines only (Net Sales, Cost of Sales, Operating Costs). Do NOT claim a Gross Profit or Net Profit budget exists.
 - Do NOT recompute variance %.
-- For each Material (>±15%) or Severe (sign flip) deviation, conclude that line's commentary with ONE hedged advisory sentence — e.g. "consider reviewing OpEx pacing" or "monitor Other Income drivers". Do NOT prescribe specific actions or numbers.`,
+- For each line outside tolerance or Severe (sign flip) deviation, conclude that line's commentary with ONE hedged advisory sentence — e.g. "consider reviewing OpEx pacing". Do NOT prescribe specific actions or numbers.`,
 
   fv_variance_breakdown: `"Variance by Account" breakdown — GL-account-level YoY drill-down, complementary to the budget-variance summary above. Account-level budget variance is not available because budget is set at four P&L lines only.
 

@@ -25,7 +25,7 @@ export async function PUT(req: Request) {
 
     const body = await req.json();
     const { lines, userName, note } = body as {
-      lines?: { line_item: string; annual_budget: number; monthly_budget: number }[];
+      lines?: { line_item: string; annual_budget: number; tolerance_pct?: number }[];
       userName?: string;
       note?: string | null;
     };
@@ -37,7 +37,8 @@ export async function PUT(req: Request) {
     const cleanLines = lines.map((line) => ({
       line_item: String(line.line_item || '').trim(),
       annual_budget: Number(line.annual_budget),
-      monthly_budget: Number(line.monthly_budget),
+      monthly_budget: Number(line.annual_budget) / 12,
+      tolerance_pct: Number(line.tolerance_pct ?? 5),
     }));
 
     if (
@@ -45,10 +46,13 @@ export async function PUT(req: Request) {
         (line) =>
           !line.line_item ||
           !Number.isFinite(line.annual_budget) ||
-          !Number.isFinite(line.monthly_budget),
+          !Number.isFinite(line.monthly_budget) ||
+          !Number.isFinite(line.tolerance_pct) ||
+          line.tolerance_pct < 0 ||
+          line.tolerance_pct > 100,
       )
     ) {
-      return NextResponse.json({ error: 'Invalid budget line values' }, { status: 400 });
+      return NextResponse.json({ error: 'Enter annual budget and tolerance values between 0 and 100.' }, { status: 400 });
     }
 
     await saveGlobalBudget(cleanLines, {
