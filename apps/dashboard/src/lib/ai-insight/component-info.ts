@@ -12,21 +12,21 @@ export interface ComponentInfo {
   about?: string;
 }
 
-export const COMPONENT_INFO: Record<string, ComponentInfo> = {
+export const COMPONENT_INFO_SOURCE: Record<string, ComponentInfo> = {
   // ═══ Payment Collection Trend ═══
   avg_collection_days: {
     name: 'Avg Collection Days',
     whatItMeasures: 'The average number of days it takes to collect payment after invoicing.',
     formula: '(AR Outstanding at month-end ÷ Monthly Credit Sales) × Days in that month. KPI shows the average across all valid months.',
-    indicator: '≤30 days = Good (green)\n≤60 days = Warning (yellow)\n>60 days = Critical (red)',
-    about: 'Average Collection Days measures how many days, on average, it takes to collect payment after making a sale. It\'s a cash flow efficiency metric.\n\nCollection Days = (Accounts Receivable / Total Invoice Sales) × Number of Days\n\n≤30 days = Good · ≤60 days = Warning · >60 days = Critical',
+    indicator: '≤{{avg_collection_days.good_days}} days = Good (green)\n≤{{avg_collection_days.warning_days}} days = Warning (yellow)\n>{{avg_collection_days.warning_days}} days = Critical (red)',
+    about: 'Average Collection Days measures how many days, on average, it takes to collect payment after making a sale. It\'s a cash flow efficiency metric.\n\nCollection Days = (Accounts Receivable / Total Invoice Sales) × Number of Days\n\n≤{{avg_collection_days.good_days}} days = Good · ≤{{avg_collection_days.warning_days}} days = Warning · >{{avg_collection_days.warning_days}} days = Critical',
   },
   collection_rate: {
     name: 'Collection Rate',
     whatItMeasures: 'The percentage of invoiced amount that was actually collected as cash payment in the selected period.',
     formula: '(Total Collected ÷ Total Invoiced) × 100',
-    indicator: '≥80% = Good (green)\n≥50% = Warning (yellow)\n<50% = Critical (red)',
-    about: 'Collection Rate measures how much of the invoiced amount has been collected in cash payments during the selected period. A rate above 100% means you\'re collecting more than you\'re billing (clearing older debts).\n\nNote: Offsets between amounts owed and owing are not included as they are non-cash.\n\nCollection Rate = (Total Collected ÷ Total Invoiced) × 100\n\n≥80% = Good · ≥50% = Warning · <50% = Critical',
+    indicator: '≥{{collection_rate.good_pct}}% = Good (green)\n≥{{collection_rate.warning_pct}}% = Warning (yellow)\n<{{collection_rate.warning_pct}}% = Critical (red)',
+    about: 'Collection Rate measures how much of the invoiced amount has been collected in cash payments during the selected period. A rate above 100% means you\'re collecting more than you\'re billing (clearing older debts).\n\nNote: Offsets between amounts owed and owing are not included as they are non-cash.\n\nCollection Rate = (Total Collected ÷ Total Invoiced) × 100\n\n≥{{collection_rate.good_pct}}% = Good · ≥{{collection_rate.warning_pct}}% = Warning · <{{collection_rate.warning_pct}}% = Critical',
   },
   avg_monthly_collection: {
     name: 'Avg Monthly Collection',
@@ -38,8 +38,8 @@ export const COMPONENT_INFO: Record<string, ComponentInfo> = {
   collection_days_trend: {
     name: 'Avg Collection Days Trend',
     whatItMeasures: 'Monthly collection days plotted over time with a reference line at the period average.',
-    indicator: 'Rising trend = collection slowing (bad)\nFalling trend = collection improving (good)\nSpikes above 60 days = critical months',
-    about: 'This line chart plots the monthly collection days over time with a dashed reference line at the period average.\n\nRising trend = collection is slowing down (bad)\nFalling trend = collection is improving (good)\nSpikes above 60 days = critical months to investigate',
+    indicator: 'Rising trend = collection slowing (bad)\nFalling trend = collection improving (good)\nSpikes above {{collection_days_trend.critical_spike_days}} days = critical months',
+    about: 'This line chart plots the monthly collection days over time with a dashed reference line at the period average.\n\nRising trend = collection is slowing down (bad)\nFalling trend = collection is improving (good)\nSpikes above {{collection_days_trend.critical_spike_days}} days = critical months to investigate',
   },
   invoiced_vs_collected: {
     name: 'Invoiced vs Collected',
@@ -58,8 +58,8 @@ export const COMPONENT_INFO: Record<string, ComponentInfo> = {
   overdue_amount: {
     name: 'Overdue Amount',
     whatItMeasures: 'The portion of total outstanding that is past its due date. Shown with the percentage of total and count of affected customers.',
-    indicator: '<20% of total = Acceptable\n>40% of total = Critical',
-    about: 'Total outstanding amount on invoices that have passed their due date. The overdue percentage shows how much of the total outstanding is past due.\n\n<20% of total = Acceptable · >40% of total = Critical',
+    indicator: '<{{overdue_amount.acceptable_pct}}% of total = Acceptable\n>{{overdue_amount.critical_pct}}% of total = Critical',
+    about: 'Total outstanding amount on invoices that have passed their due date. The overdue percentage shows how much of the total outstanding is past due.\n\n<{{overdue_amount.acceptable_pct}}% of total = Acceptable · >{{overdue_amount.critical_pct}}% of total = Critical',
   },
   credit_limit_breaches: {
     name: 'Credit Limit Breaches',
@@ -182,7 +182,7 @@ export const COMPONENT_INFO: Record<string, ComponentInfo> = {
   cm_margin_distribution: {
     name: 'Customer Margin Distribution',
     whatItMeasures: 'How many customers fall into each Gross Margin % bucket for the period.',
-    indicator: 'Most customers in the 10–20% band = Healthy · Over 40% below 10% = Bad · Any customer < 0% = selling at a loss',
+    indicator: 'Most customers in the 10–20% band = Healthy · Over {{cm_margin_distribution.sub_10_bad_pct}}% below 10% = Bad · Any customer < 0% = selling at a loss',
     about: 'A histogram showing how your customer base is spread across margin bands. Buckets are fixed:\n\n< 0% · 0–5% · 5–10% · 10–15% · 15–20% · 20–30% · 30%+\n\nOnly customers with more than RM 1,000 of revenue in the period are included (small-volume customers are excluded to avoid noise).\n\nA healthy portfolio concentrates in the 10–20% bands with a small tail at 20%+. Heavy weight in the sub-10% bands signals a thin-margin portfolio. Any customers below 0% are selling at a loss and need investigation.',
   },
 
@@ -405,8 +405,8 @@ export const COMPONENT_INFO: Record<string, ComponentInfo> = {
   ex_top_expenses: {
     name: 'Top Expenses',
     whatItMeasures: 'Top 10 GL accounts by net cost in the period, with bars coloured by cost type (COGS / OpEx). User can toggle cost type and top/bottom direction.',
-    indicator: 'Top 1 > 30% = Severe concentration · 15–30% = Concentrated · Top 10 > 75% = Concentrated · < 50% = Diversified',
-    about: 'This chart shows where the expense dollars actually land. Each bar is one GL account, coloured by whether it is COGS (variable) or OpEx (semi-fixed).\n\nWatch for two things:\n\n• Concentration: if one account carries > 30% of total cost, that is single-account risk — a price change, a vendor change, or a category shift in that one line moves the entire cost base. If the top 10 accounts sum to > 75%, the cost base is concentrated enough that a procurement or discipline initiative can meaningfully move the number.\n• Mix: a top 10 dominated by COGS is the normal distribution picture (inventory, freight, handling). A top 10 dominated by OpEx means structural costs are the biggest movers — usually salaries, rent, or vehicle costs — and the fix is strategic, not operational.\n\nThe Cost Type toggle (All / COGS / OpEx) and Top/Bottom toggle drive the chart locally — the AI analysis is on the default All / Top view, and drill-downs remain user-driven.',
+    indicator: 'Top 1 > {{ex_top_expenses.top_1_severe_pct}}% = Severe concentration · {{ex_top_expenses.top_1_concentrated_pct}}–{{ex_top_expenses.top_1_severe_pct}}% = Concentrated · Top 10 > {{ex_top_expenses.top_10_concentrated_pct}}% = Concentrated · < {{ex_top_expenses.top_10_diversified_pct}}% = Diversified',
+    about: 'This chart shows where the expense dollars actually land. Each bar is one GL account, coloured by whether it is COGS (variable) or OpEx (semi-fixed).\n\nWatch for two things:\n\n• Concentration: if one account carries > {{ex_top_expenses.top_1_severe_pct}}% of total cost, that is single-account risk — a price change, a vendor change, or a category shift in that one line moves the entire cost base. If the top 10 accounts sum to > {{ex_top_expenses.top_10_concentrated_pct}}%, the cost base is concentrated enough that a procurement or discipline initiative can meaningfully move the number.\n• Mix: a top 10 dominated by COGS is the normal distribution picture (inventory, freight, handling). A top 10 dominated by OpEx means structural costs are the biggest movers — usually salaries, rent, or vehicle costs — and the fix is strategic, not operational.\n\nThe Cost Type toggle (All / COGS / OpEx) and Top/Bottom toggle drive the chart locally — the AI analysis is on the default All / Top view, and drill-downs remain user-driven.',
   },
 
   // ─── Financial page §9 — financial_overview ──────────────────────────────
@@ -524,7 +524,50 @@ export const COMPONENT_INFO: Record<string, ComponentInfo> = {
     name: 'Balance Sheet Statement',
     whatItMeasures: 'The full balance sheet for the selected fiscal year vs 12 periods prior (YTD-aligned), with all 8 line items by account type, derived totals (Net Current Assets, Total Assets, Total Liabilities, Total Equity), and solvency ratios (Current Ratio, Debt-to-Equity, Equity Ratio).',
     formula: 'Line items from pc_pnl_period (opening balance + cumulative movements to period_to). Current Ratio = Current Assets ÷ Current Liabilities. Debt-to-Equity = Total Liabilities ÷ Total Equity. Equity Ratio = Total Equity ÷ Total Assets × 100',
-    indicator: 'Current Ratio < 1.0 Severe / > 2.0 Strong · Debt-to-Equity > 2.0 Severe / < 0.5 Conservative · Equity Ratio < 20% Severe / > 60% Strong · Any Net Current Assets sign flip = Severe · Any Total Equity sign flip = Severe (insolvency)',
-    about: 'This is the balance sheet in full detail — every line item against the same YTD window a year ago, so the comparison is apples-to-apples. Read it in two passes.\n\n• Line-by-line direction: which of the 8 accounts moved the most in RM terms? The AI analysis is constrained to the top-3 biggest movers by absolute delta — small line-level noise is deliberately excluded to keep the narrative focused.\n• Ratios are the real story: the RM numbers tell you WHAT changed, but the three ratios tell you WHETHER the change is healthy.\n\nCurrent Ratio is the short-term liquidity test — can the business pay what it owes this year out of what it can convert to cash this year? Below 1.0 is a hard warning.\n\nDebt-to-Equity is the structural leverage test — how much of the business is financed by outsiders versus owners? Above 2.0 means creditors have more claim on the business than owners do.\n\nEquity Ratio is the solvency cushion — how much of the asset base is genuinely owned versus pledged against liabilities? Below 20% is dangerously thin.\n\nThe two sign flips (Net Current Assets going negative, or Total Equity going negative) are hard severe-level signals that must always be called out explicitly.',
+    indicator: 'Current Ratio < {{bs_statement.severe_below_ratio}} Severe / > {{bs_statement.healthy_below_ratio}} Strong · Debt-to-Equity > {{bs_statement.leveraged_below_ratio}} Severe / < {{bs_statement.conservative_below_ratio}} Conservative · Equity Ratio < {{bs_statement.severe_below_pct}}% Severe / > {{bs_statement.healthy_below_pct}}% Strong · Any Net Current Assets sign flip = Severe · Any Total Equity sign flip = Severe (insolvency)',
+    about: 'This is the balance sheet in full detail — every line item against the same YTD window a year ago, so the comparison is apples-to-apples. Read it in two passes.\n\n• Line-by-line direction: which of the 8 accounts moved the most in RM terms? The AI analysis is constrained to the top-3 biggest movers by absolute delta — small line-level noise is deliberately excluded to keep the narrative focused.\n• Ratios are the real story: the RM numbers tell you WHAT changed, but the three ratios tell you WHETHER the change is healthy.\n\nCurrent Ratio is the short-term liquidity test — can the business pay what it owes this year out of what it can convert to cash this year? Below {{bs_statement.severe_below_ratio}} is a hard warning.\n\nDebt-to-Equity is the structural leverage test — how much of the business is financed by outsiders versus owners? Above {{bs_statement.leveraged_below_ratio}} means creditors have more claim on the business than owners do.\n\nEquity Ratio is the solvency cushion — how much of the asset base is genuinely owned versus pledged against liabilities? Below {{bs_statement.severe_below_pct}}% is dangerously thin.\n\nThe two sign flips (Net Current Assets going negative, or Total Equity going negative) are hard severe-level signals that must always be called out explicitly.',
   },
 };
+
+const DEFAULT_COMPONENT_INFO_TOKEN_VALUES: Record<string, string> = {
+  '{{avg_collection_days.good_days}}': '30',
+  '{{avg_collection_days.warning_days}}': '60',
+  '{{collection_rate.good_pct}}': '80',
+  '{{collection_rate.warning_pct}}': '50',
+  '{{collection_days_trend.critical_spike_days}}': '60',
+  '{{overdue_amount.acceptable_pct}}': '20',
+  '{{overdue_amount.critical_pct}}': '40',
+  '{{cm_margin_distribution.sub_10_bad_pct}}': '40',
+  '{{ex_top_expenses.top_1_severe_pct}}': '30',
+  '{{ex_top_expenses.top_1_concentrated_pct}}': '15',
+  '{{ex_top_expenses.top_10_concentrated_pct}}': '75',
+  '{{ex_top_expenses.top_10_diversified_pct}}': '50',
+  '{{bs_statement.severe_below_ratio}}': '1.0',
+  '{{bs_statement.healthy_below_ratio}}': '2.0',
+  '{{bs_statement.leveraged_below_ratio}}': '2.0',
+  '{{bs_statement.conservative_below_ratio}}': '0.5',
+  '{{bs_statement.severe_below_pct}}': '20',
+  '{{bs_statement.healthy_below_pct}}': '60',
+};
+
+function renderDefaultThresholdText(text: string): string {
+  let rendered = text;
+  for (const [token, value] of Object.entries(DEFAULT_COMPONENT_INFO_TOKEN_VALUES)) {
+    rendered = rendered.replaceAll(token, value);
+  }
+  return rendered;
+}
+
+function renderDefaultComponentInfo(info: ComponentInfo): ComponentInfo {
+  return {
+    ...info,
+    whatItMeasures: renderDefaultThresholdText(info.whatItMeasures),
+    formula: info.formula ? renderDefaultThresholdText(info.formula) : undefined,
+    indicator: info.indicator ? renderDefaultThresholdText(info.indicator) : undefined,
+    about: info.about ? renderDefaultThresholdText(info.about) : undefined,
+  };
+}
+
+export const COMPONENT_INFO: Record<string, ComponentInfo> = Object.fromEntries(
+  Object.entries(COMPONENT_INFO_SOURCE).map(([key, info]) => [key, renderDefaultComponentInfo(info)]),
+);

@@ -7,6 +7,7 @@ import { ScrollPreserver } from "@/components/layout/ScrollPreserver";
 import { SWRProvider } from "@/components/layout/SWRProvider";
 import { RoleProvider } from "@/components/layout/RoleProvider";
 import { DataFreshnessIndicator } from "@/components/layout/DataFreshnessIndicator";
+import { AgentationDevOverlay } from "@/components/dev/AgentationDevOverlay";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -51,6 +52,7 @@ export default function RootLayout({
           </TooltipProvider>
           </RoleProvider>
         </SWRProvider>
+        <AgentationDevOverlay />
       </body>
     </html>
   );

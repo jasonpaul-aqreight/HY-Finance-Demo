@@ -135,13 +135,13 @@ Follow the iteration process strictly:
 <claude-mem-context>
 # Memory Context
 
-# [Hoi-Yong_Finance] recent context, 2026-05-16 5:41pm GMT+8
+# [Hoi-Yong_Finance] recent context, 2026-05-16 6:31pm GMT+8
 
 Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
 Format: ID TIME TYPE TITLE
 Fetch details: get_observations([IDs]) | Search: mem-search skill
 
-Stats: 50 obs (21,982t read) | 252,786t work | 91% savings
+Stats: 50 obs (22,067t read) | 226,798t work | 90% savings
 
 ### May 16, 2026
 S749 AI Insight Config Rework — planning session wrap-up and handoff to Amelia (BMad dev) for implementation (May 16 at 2:53 PM)
@@ -154,33 +154,7 @@ S755 Review AI Insight Configurable Thresholds plan for technical gaps, then pat
 S756 Patch the AI Insight Configurable Thresholds plan with 5 binding technical contracts identified during review (May 16 at 5:06 PM)
 S757 Approve and finalize the AI Insight Configurable Thresholds plan (Revision 2), then prepare to kick off Phase 0 implementation (May 16 at 5:08 PM)
 S758 AI Insight Configurable Thresholds plan reviewed, patched with 5 binding contracts, approved — awaiting Phase 0 kickoff decision (May 16 at 5:10 PM)
-5237 5:16p 🔵 Additional Feedback Loop Files Inventoried for Phase 1 Deletion
-5238 " 🔵 AI Insight Schema SQL File Exists in Dashboard
-5240 5:17p 🔵 PromptTree Gracefully Handles Missing Prompts — Feedback Router/Surgical Editor Will Auto-Drop
-5244 5:18p 🔵 Current /api/admin/ai-insight-prompts Route: DB Dependencies for Phase 0 Replacement
-5241 " 🟣 New /api/admin/ai-insight-config Endpoint Returns Prompts with thresholdGroups
-5242 " 🔵 Next.js Dev Server Binds IPv6-Only — curl localhost Fails, 127.0.0.1 Succeeds
-5243 " 🔵 Next.js 16.1.7 Production Build Passes Clean — 59 Static Pages, All AI-Insight Routes Dynamic
-5245 5:19p 🔵 prompts.ts Contains Full Component/Section Registry for Phase 0 Config API Construction
-5246 5:20p 🔵 prompts-defaults.ts: Hardcoded Threshold Values Identified as Phase 2 Tokenization Targets
-5247 5:21p 🔵 prompt-store.ts: Full DB Schema and Key Routing Logic for Phase 0 Audit
-5248 " 🔵 DEFAULT_SECTION_GUIDANCE All Empty: Phase 1 Guidance Removal Is Runtime No-Op for Finance
-5251 5:23p 🔵 AI Insight Config Configurable Thresholds Plan — Phase Structure
-5249 " 🔵 prompt-loader.ts: Cache Architecture and Throw-on-Miss Behavior for Phase 1 Safety
-5250 " 🔵 Two-Pool DB Architecture: ai_insight_thresholds Will Use Local Pool
-5252 " 🔵 Phase 0 Partial Implementation Already in Working Tree
-5253 5:24p 🔵 bmad-quick-dev Skill Uses Step-File Architecture Workflow
-5255 " ⚖️ AI Insight Threshold Config Architecture — Key Decisions and Binding Contracts
-5254 " 🔵 Phase 0 Complete Pending Commit Approval — Phase 1 Is Next Action
-5256 5:25p 🔵 Phase 1 Exact File Deletion List and Phase 0 Detailed Verification
-5257 " 🔵 Dashboard Tech Stack — No Jest/Vitest Confirms Standalone tsx Test Approach
-5258 " 🔵 Phase 0 Audit Artifact Exists in docs/plans/artifacts/
-5259 5:26p 🔵 Phase 0 Replacement API Route File Confirmed Present
-5260 " ✅ PromptConfigDashboard.tsx Switched to New Config API in Phase 0
-5261 " 🟣 GET /api/admin/ai-insight-config Route Implemented Using Code Constants
-5262 5:27p 🔵 prompt-config.ts Still Includes feedback_router and surgical_editor Prompt Rows
-5263 " 🔵 Phase 0 Audit Found 4 DB Prompts Differing from Code Defaults
-5264 " 🔵 Phase 0 Modified File Scope — 6 Files Changed, AGENTS.md Significantly Rewritten
+5263 5:27p 🔵 Phase 0 Audit Found 4 DB Prompts Differing from Code Defaults
 5265 5:28p 🔵 Phase 0 Build Passes Clean — Old Feedback/Prompt Routes Still Present in Build Output
 5266 " 🔵 Phase 1 Cleanup Scope Extended — BreadcrumbBar.tsx and PromptTree.tsx Need Edits Not Listed in Plan
 5268 " 🔵 Complete Admin AI-Insight API File Inventory — 10 Files to Delete, 1 to Keep
@@ -204,6 +178,32 @@ S758 AI Insight Configurable Thresholds plan reviewed, patched with 5 binding co
 5285 5:39p 🔄 AI Insight Config Phase 2: Major Refactor In Progress
 5286 5:40p 🔵 Phase 2 Plan: Threshold Registry, DB Table, and Token Substitution Architecture
 5287 5:41p 🔵 Phases 0 and 1 Confirmed Complete; Revision 2 Binding Contracts Defined
+5288 " 🔵 Phase 3 Tokenization Scope and Golden Regression Coverage Defined
+5289 " 🔵 Plan Execution Model: One Phase Per Session with PRD Update Deferred
+5290 5:42p ✅ Phase 0 + Phase 1 Net Change: 4073 Deletions, 255 Insertions Across 38 Files
+5291 5:43p 🟣 New Files Created in Phases 0 and 1: Replacement API, Audit Artifact, Dev Overlay, Prompt Config
+5292 " 🟣 Agentation Visual Dev Overlay Added to Dashboard
+5293 " 🔵 Agentation Supports Two Modes: Browser-Local and MCP-Synced
+5294 5:44p ✅ Phase 0 and Phase 1 Changes Staged for Commit
+5298 " 🔵 Database Connection Architecture: Local Dev on Port 5433, AWS RDS for Autocount
+5301 " 🔴 threshold-config.ts: Monotonic Validation Fixed with enforceMonotonic Flag and Token Reordering
+5295 5:46p 🔵 Staged Commit Composition: 3132-Line Audit Artifact and 122-Line prompt-config.ts Are the Key Additions
+5296 5:47p ✅ Phase 0+1 Committed to main: 73a3f5f "feat(ai-insight): remove feedback loop config baseline"
+5297 " ✅ Phase 2 Execution Plan Activated with 5 Steps
+5299 5:50p 🔵 Dashboard Tech Stack: OpenRouter SDK, node-postgres, No Test Runner
+5300 " 🟣 threshold-config.ts Implemented: Full Registry, Loader, Formatter, Validator, and Save Logic
+5302 5:58p 🔴 Fixed Default Validation Failures in 5 Threshold-Config Components
+5303 " 🔵 Threshold Registry State: 56 Components, 194 Seed Rows, DB Falls Back to Defaults
+5304 " 🟣 Phase 2 Threshold API Routes Confirmed in Production Build
+5305 5:59p 🟣 Migration 025: ai_insight_thresholds Table with 194 Seed Rows
+5306 6:02p 🔵 Phase 2 AI Insight Configurable Thresholds - Uncommitted Changes Ready
+5307 " 🟣 Phase 2 AI Insight Configurable Thresholds Committed and Pushed
+5308 " 🔵 Phase 3 Plan: Tokenize Prompts + Wire Single Source of Truth
+5309 6:03p 🔵 threshold-config.ts Token Registry — Full Component Coverage
+5310 6:06p 🔵 prompts-defaults.ts Already Tokenized with {{token}} Placeholders
+5311 " 🔵 data-fetcher.ts Already Wired to classifyThresholdValue from Phase 2
+5312 " 🔵 component-info.ts Has Hardcoded Threshold Strings — Primary Phase 3 Tokenization Target
+5313 6:07p 🔵 numeric-guard.ts Live-Value Wire Already Active from Phase 2
 
-Access 253k tokens of past work via get_observations([IDs]) or mem-search skill.
+Access 227k tokens of past work via get_observations([IDs]) or mem-search skill.
 </claude-mem-context>

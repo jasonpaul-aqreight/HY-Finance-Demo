@@ -9,6 +9,7 @@ import {
   DEFAULT_GLOBAL_SYSTEM,
   DEFAULT_SUMMARY_SYSTEM,
 } from './prompts-defaults';
+import { renderThresholdText } from './threshold-config';
 
 export async function getGlobalSystemPrompt(): Promise<string> {
   return DEFAULT_GLOBAL_SYSTEM;
@@ -21,5 +22,5 @@ export async function getSummarySystemPrompt(): Promise<string> {
 export async function getComponentPrompt(componentKey: string): Promise<string> {
   const prompt = DEFAULT_COMPONENT_PROMPTS[componentKey];
   if (!prompt) throw new Error(`No prompt defined for component: ${componentKey}`);
-  return prompt;
+  return renderThresholdText(prompt, componentKey);
 }

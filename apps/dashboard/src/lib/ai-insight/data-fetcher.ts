@@ -50,6 +50,11 @@ import type {
   AllowedValue,
   FetcherResult,
 } from './types';
+import {
+  allowedThresholds,
+  getThresholdValues,
+  renderThresholdText,
+} from './threshold-config';
 
 // Convert YYYY-MM-DD to YYYY-MM to match pc_ar_monthly.month column format
 function toMonth(date: string): string {
@@ -62,6 +67,7 @@ const rm = (label: string, value: number): AllowedValue => ({ label, value, unit
 const pct = (label: string, value: number): AllowedValue => ({ label, value, unit: 'pct' });
 const days = (label: string, value: number): AllowedValue => ({ label, value, unit: 'days' });
 const cnt = (label: string, value: number): AllowedValue => ({ label, value, unit: 'count' });
+const ratio = (label: string, value: number): AllowedValue => ({ label, value, unit: 'ratio' });
 
 const pctOf = (num: number, denom: number): number => (denom !== 0 ? (num / denom) * 100 : 0);
 const round1 = (value: number): number => Number(value.toFixed(1));
@@ -341,6 +347,9 @@ type DataFetcher = (dateRange: DateRange | null) => Promise<FetcherResult>;
 const fetchers: Record<string, DataFetcher> = {
   // Payment Section 1
   async avg_collection_days(dr) {
+    const thresholdValues = await getThresholdValues('avg_collection_days');
+    const goodDays = thresholdValues.good_days ?? 30;
+    const warningDays = thresholdValues.warning_days ?? 60;
     const pool = getPool();
     const startMonth = toMonth(dr!.start);
     const endMonth = toMonth(dr!.end);
@@ -364,10 +373,10 @@ const fetchers: Record<string, DataFetcher> = {
       : '--';
 
     const avgNum = parseFloat(avg);
-    const color = isNaN(avgNum) ? 'No data' : avgNum <= 30 ? 'Green (Good)' : avgNum <= 60 ? 'Yellow (Warning)' : 'Red (Critical)';
+    const color = isNaN(avgNum) ? 'No data' : avgNum <= goodDays ? 'Green (Good)' : avgNum <= warningDays ? 'Yellow (Warning)' : 'Red (Critical)';
 
-    const daysAboveGood = isNaN(avgNum) ? null : +(avgNum - 30).toFixed(1);
-    const daysAboveWarning = isNaN(avgNum) ? null : +(avgNum - 60).toFixed(1);
+    const daysAboveGood = isNaN(avgNum) ? null : +(avgNum - goodDays).toFixed(1);
+    const daysAboveWarning = isNaN(avgNum) ? null : +(avgNum - warningDays).toFixed(1);
     const cdValues = valid.map((r: { collection_days: number }) => Number(r.collection_days));
     const minCd = cdValues.length ? Math.min(...cdValues) : null;
     const maxCd = cdValues.length ? Math.max(...cdValues) : null;
@@ -387,8 +396,8 @@ const fetchers: Record<string, DataFetcher> = {
       }))
       .sort((a, b) => a.value - b.value)
       .slice(0, 3);
-    const monthsAbove60 = cdValues.filter((d: number) => d > 60).length;
-    const monthsAbove30 = cdValues.filter((d: number) => d > 30).length;
+    const monthsAboveWarning = cdValues.filter((d: number) => d > warningDays).length;
+    const monthsAboveGood = cdValues.filter((d: number) => d > goodDays).length;
 
     let table = '| Month | Collection Days |\n|-------|----------------|\n';
     for (const r of rows) {
@@ -397,8 +406,8 @@ const fetchers: Record<string, DataFetcher> = {
     const preCalc =
       `Pre-calculated gaps (use these values directly — do not recompute):\n` +
       `- Period average: ${avg} days\n` +
-      (daysAboveGood !== null ? `- Days above 30-day (Good) benchmark: ${daysAboveGood > 0 ? '+' : ''}${daysAboveGood} days\n` : '') +
-      (daysAboveWarning !== null ? `- Days above 60-day (Warning) benchmark: ${daysAboveWarning > 0 ? '+' : ''}${daysAboveWarning} days\n` : '') +
+      (daysAboveGood !== null ? `- Days above {{avg_collection_days.good_days}}-day (Good) benchmark: ${daysAboveGood > 0 ? '+' : ''}${daysAboveGood} days\n` : '') +
+      (daysAboveWarning !== null ? `- Days above {{avg_collection_days.warning_days}}-day (Warning) benchmark: ${daysAboveWarning > 0 ? '+' : ''}${daysAboveWarning} days\n` : '') +
       (minRow ? `- Best month: ${minRow.month} at ${minCd} days\n` : '') +
       (maxRow ? `- Worst month: ${maxRow.month} at ${maxCd} days\n` : '') +
       (rankedSlowest.length
@@ -407,21 +416,19 @@ const fetchers: Record<string, DataFetcher> = {
       (rankedFastest.length
         ? `- Fastest collection-days months in order: ${rankedFastest.map(r => `${r.month} at ${r.value} days`).join('; ')}\n`
         : '') +
-      `- Months above 30-day benchmark: ${monthsAbove30} of ${cdValues.length}\n` +
-      `- Months above 60-day benchmark: ${monthsAbove60} of ${cdValues.length}\n`;
+      `- Months above {{avg_collection_days.good_days}}-day benchmark: ${monthsAboveGood} of ${cdValues.length}\n` +
+      `- Months above {{avg_collection_days.warning_days}}-day benchmark: ${monthsAboveWarning} of ${cdValues.length}\n`;
 
     const allowed: AllowedValue[] = [];
-    allowed.push(days('30-day benchmark', 30));
-    allowed.push(days('60-day benchmark', 60));
     if (!isNaN(avgNum)) allowed.push(days('period avg collection days', avgNum));
-    if (daysAboveGood !== null) allowed.push(days('days above 30-day benchmark', daysAboveGood));
-    if (daysAboveWarning !== null) allowed.push(days('days above 60-day benchmark', daysAboveWarning));
+    if (daysAboveGood !== null) allowed.push(days('days above good benchmark', daysAboveGood));
+    if (daysAboveWarning !== null) allowed.push(days('days above warning benchmark', daysAboveWarning));
     if (minCd !== null) allowed.push(days('best month days', minCd));
     if (maxCd !== null) allowed.push(days('worst month days', maxCd));
     for (const r of rankedSlowest) allowed.push(days(`slowest collection-days month ${r.month}`, r.value));
     for (const r of rankedFastest) allowed.push(days(`fastest collection-days month ${r.month}`, r.value));
-    allowed.push(cnt('months above 30-day benchmark', monthsAbove30));
-    allowed.push(cnt('months above 60-day benchmark', monthsAbove60));
+    allowed.push(cnt('months above good benchmark', monthsAboveGood));
+    allowed.push(cnt('months above warning benchmark', monthsAboveWarning));
     allowed.push(cnt('total months in period', cdValues.length));
     for (const r of rows) {
       if (r.collection_days != null) allowed.push(days(`${r.month} collection days`, Number(r.collection_days)));
@@ -434,6 +441,9 @@ const fetchers: Record<string, DataFetcher> = {
   },
 
   async collection_rate(dr) {
+    const thresholdValues = await getThresholdValues('collection_rate');
+    const goodPct = thresholdValues.good_pct ?? 80;
+    const warningPct = thresholdValues.warning_pct ?? 50;
     const pool = getPool();
     const { rows } = await pool.query(
       `SELECT COALESCE(SUM(collected), 0) AS total_collected,
@@ -446,12 +456,10 @@ const fetchers: Record<string, DataFetcher> = {
     const total_invoiced = Number(rows[0].total_invoiced);
     const rate = total_invoiced > 0 ? ((total_collected / total_invoiced) * 100).toFixed(1) : '--';
     const rateNum = parseFloat(rate);
-    const color = isNaN(rateNum) ? 'No data' : rateNum >= 80 ? 'Green (Good)' : rateNum >= 50 ? 'Yellow (Warning)' : 'Red (Critical)';
+    const color = isNaN(rateNum) ? 'No data' : rateNum >= goodPct ? 'Green (Good)' : rateNum >= warningPct ? 'Yellow (Warning)' : 'Red (Critical)';
 
     const allowed: AllowedValue[] = [
       pct('collection rate', isNaN(rateNum) ? 0 : rateNum),
-      pct('good threshold', 80),
-      pct('warning threshold', 50),
       rm('total collected', total_collected),
       rm('total invoiced', total_invoiced),
     ];
@@ -1298,6 +1306,12 @@ const fetchers: Record<string, DataFetcher> = {
 
   // Sales Section 4: Breakdown
   async by_customer(dr) {
+    const thresholdValues = await getThresholdValues('by_customer');
+    const goodPct = thresholdValues.good_pct ?? 15;
+    const neutralPct = thresholdValues.neutral_pct ?? 25;
+    const creditNoteValues = await getThresholdValues('net_sales');
+    const creditNoteGoodPct = creditNoteValues.credit_note_good_pct ?? 1;
+    const creditNoteMonitorPct = creditNoteValues.credit_note_monitor_pct ?? 3;
     const pool = getPool();
     const { rows } = await pool.query(
       `SELECT debtor_code, company_name, debtor_type,
@@ -1414,16 +1428,16 @@ const fetchers: Record<string, DataFetcher> = {
 
     const topCustomer = rows[0];
     const topCustomerShare = topCustomer ? pctOf(Number(topCustomer.net_sales), totalNet) : 0;
-    const topCustomerStatus = topCustomerShare > 25
-      ? 'Bad: above the >25% over-reliance threshold'
-      : topCustomerShare >= 15
-        ? 'Neutral: within the 15-25% moderate concentration band'
-        : 'Good: below the <15% diversified threshold';
-    const cnStatus = totalCnRatio <= 1
-      ? 'Good: at or below the <=1% normal-returns threshold'
-      : totalCnRatio <= 3
-        ? 'Monitor: above the <=1% good threshold and below the >3% concern threshold'
-        : 'Concern: above the >3% quality/order-accuracy threshold';
+    const topCustomerStatus = topCustomerShare > neutralPct
+      ? `Bad: above the >${neutralPct}% over-reliance threshold`
+      : topCustomerShare >= goodPct
+        ? `Neutral: within the ${goodPct}-${neutralPct}% moderate concentration band`
+        : `Good: below the <${goodPct}% diversified threshold`;
+    const cnStatus = totalCnRatio <= creditNoteGoodPct
+      ? `Good: at or below the <=${creditNoteGoodPct}% normal-returns threshold`
+      : totalCnRatio <= creditNoteMonitorPct
+        ? `Monitor: above the <=${creditNoteGoodPct}% good threshold and below the >${creditNoteMonitorPct}% concern threshold`
+        : `Concern: above the >${creditNoteMonitorPct}% quality/order-accuracy threshold`;
 
     return {
       prompt:
@@ -1432,7 +1446,7 @@ const fetchers: Record<string, DataFetcher> = {
         `Active customers in period: ${customerCount}\n` +
         `Credit-note ratio: ${fmtPct2(totalCnRatio)} of gross sales (${cnStatus})\n\n` +
         `Pre-calculated customer diagnostics:\n` +
-        `- Does the top customer exceed 25% of total sales? ${topCustomerShare > 25 ? 'Yes' : 'No'} — ${topCustomer ? topCustomer.company_name : 'n/a'} is ${fmtPct1(topCustomerShare)}. ${topCustomerStatus}.\n` +
+        `- Does the top customer exceed {{by_customer.neutral_pct}}% of total sales? ${topCustomerShare > neutralPct ? 'Yes' : 'No'} — ${topCustomer ? topCustomer.company_name : 'n/a'} is ${fmtPct1(topCustomerShare)}. ${topCustomerStatus}.\n` +
         `- Top 5 customers: ${fmtPct1(top5Share)} of total revenue\n` +
         `- Top 10 customers: ${fmtPct1(top10Share)} of total revenue\n` +
         `- Use these diagnostics for customer concentration and credit-note claims. Do not recompute shares or ratios.\n\n` +
@@ -1447,6 +1461,9 @@ const fetchers: Record<string, DataFetcher> = {
   },
 
   async by_product(dr) {
+    const thresholdValues = await getThresholdValues('by_product');
+    const goodPct = thresholdValues.good_pct ?? 20;
+    const neutralPct = thresholdValues.neutral_pct ?? 35;
     const pool = getPool();
     const { rows } = await pool.query(
       `SELECT fruit_name, fruit_country, fruit_variant,
@@ -1545,11 +1562,11 @@ const fetchers: Record<string, DataFetcher> = {
 
     const topProduct = rows[0];
     const topProductShare = topProduct ? pctOf(Number(topProduct.net_sales), totalNet) : 0;
-    const topProductStatus = topProductShare > 35
-      ? 'Bad: above the >35% product concentration threshold'
-      : topProductShare >= 20
-        ? 'Neutral: within the 20-35% concentration band'
-        : 'Good: below the <20% diversified threshold';
+    const topProductStatus = topProductShare > neutralPct
+      ? `Bad: above the >${neutralPct}% product concentration threshold`
+      : topProductShare >= goodPct
+        ? `Neutral: within the ${goodPct}-${neutralPct}% concentration band`
+        : `Good: below the <${goodPct}% diversified threshold`;
     const topCategory = categories[0];
 
     return {
@@ -1697,6 +1714,8 @@ const fetchers: Record<string, DataFetcher> = {
   },
 
   async by_outlet(dr) {
+    const thresholdValues = await getThresholdValues('by_outlet');
+    const goodPct = thresholdValues.good_pct ?? 50;
     const pool = getPool();
     const { rows } = await pool.query(
       `SELECT COALESCE(NULLIF(dimension_key, ''), '(Unassigned)') AS outlet,
@@ -1717,9 +1736,9 @@ const fetchers: Record<string, DataFetcher> = {
     const totalCnRatio = round2(pctOf(totalCreditNotes, gross));
     const topOutlet = rows[0];
     const topOutletShare = topOutlet ? pctOf(Number(topOutlet.net_sales), total) : 0;
-    const topOutletStatus = topOutletShare > 50
-      ? 'Concern: above the >50% geographic concentration threshold'
-      : 'Good: at or below the <=50% geographic diversification threshold';
+    const topOutletStatus = topOutletShare > goodPct
+      ? `Concern: above the >${goodPct}% geographic concentration threshold`
+      : `Good: at or below the <=${goodPct}% geographic diversification threshold`;
 
     const allowed: AllowedValue[] = [
       rm('total net sales', total),
@@ -1752,7 +1771,7 @@ const fetchers: Record<string, DataFetcher> = {
         `Total net sales: ${fmtRM(total)}\n` +
         `Credit-note ratio: ${fmtPct2(totalCnRatio)} of gross sales\n\n` +
         `Pre-calculated outlet diagnostics:\n` +
-        `- Does one outlet exceed 50% of total sales? ${topOutletShare > 50 ? 'Yes' : 'No'} — ${topOutlet ? topOutlet.outlet : 'n/a'} is ${fmtPct1(topOutletShare)}. ${topOutletStatus}.\n` +
+        `- Does one outlet exceed {{by_outlet.good_pct}}% of total sales? ${topOutletShare > goodPct ? 'Yes' : 'No'} — ${topOutlet ? topOutlet.outlet : 'n/a'} is ${fmtPct1(topOutletShare)}. ${topOutletStatus}.\n` +
         `- Use these diagnostics for geographic concentration and outlet credit-note claims. Do not recompute shares or ratios.\n\n` +
         `${table}\n` +
         `Optional Summary tool column mapping:\n` +
@@ -2895,7 +2914,7 @@ const fetchers: Record<string, DataFetcher> = {
         `Period net sales (for context): RM ${o.total_sales.toLocaleString('en-MY')}\n` +
         `Return rate %: ${o.return_rate_pct.toFixed(2)}%\n` +
         `Avg return value per CN: RM ${Math.round(avgPerCn).toLocaleString('en-MY')}\n` +
-        `Return rate threshold: < 2% Healthy · 2-5% Watch · > 5% Concern`,
+        `Return rate threshold: < {{rt_total_returns.healthy_pct}}% Healthy · {{rt_total_returns.healthy_pct}}-{{rt_total_returns.concern_pct}}% Watch · > {{rt_total_returns.concern_pct}}% Concern`,
       allowed: [
         rm('total return value', o.total_return_value),
         cnt('return count', o.return_count),
@@ -2920,7 +2939,7 @@ const fetchers: Record<string, DataFetcher> = {
         `- Knocked off (offset against invoices, NO cash leaves door): RM ${o.total_knocked_off.toLocaleString('en-MY')} (${r.knock_off_pct.toFixed(1)}%)\n` +
         `- Refunded (cash/cheque out the door): RM ${o.total_refunded.toLocaleString('en-MY')} (${r.refund_pct.toFixed(1)}%)\n` +
         `Refund transaction count: ${r.refund_count}\n\n` +
-        `Thresholds: Knock-off % > 70% = Healthy · Refund % > 30% = Concern (cash leakage)\n` +
+        `Thresholds: Knock-off % > {{rt_settled.knock_off_healthy_pct}}% = Healthy · Refund % > {{rt_settled.refund_concern_pct}}% = Concern (cash leakage)\n` +
         `Business context: Knock-off is the PREFERRED settlement channel for a distribution business — it offsets future invoices with no cash out. Refund means actual cash paid back and erodes working capital.`,
       allowed: [
         rm('total return value', o.total_return_value),
@@ -2950,7 +2969,7 @@ const fetchers: Record<string, DataFetcher> = {
         `- Outstanding (zero resolution) CNs: ${o.outstanding_count}\n` +
         `- Total return CNs: ${o.return_count}\n` +
         `- Reconciliation rate: ${o.reconciliation_rate.toFixed(1)}%\n\n` +
-        `Thresholds (unsettled % of return value): < 15% Healthy · 15-30% Watch · > 30% Concern`,
+        `Thresholds (unsettled % of return value): < {{rt_unsettled.healthy_pct}}% Healthy · {{rt_unsettled.healthy_pct}}-{{rt_unsettled.concern_pct}}% Watch · > {{rt_unsettled.concern_pct}}% Concern`,
       allowed: [
         rm('total unsettled', o.total_unresolved),
         pct('unsettled pct', unsettledPct),
@@ -2977,7 +2996,7 @@ const fetchers: Record<string, DataFetcher> = {
         `Color band: ${color}\n` +
         `Period return value: RM ${o.total_return_value.toLocaleString('en-MY')}\n` +
         `Period net sales: RM ${o.total_sales.toLocaleString('en-MY')}\n\n` +
-        `Thresholds: < 2% Green (Good) · 2-5% Amber (Watch) · > 5% Red (Concern)`,
+        `Thresholds: < {{rt_return_pct.healthy_pct}}% Green (Good) · {{rt_return_pct.healthy_pct}}-{{rt_return_pct.concern_pct}}% Amber (Watch) · > {{rt_return_pct.concern_pct}}% Red (Concern)`,
       allowed: [
         pct('return rate pct', o.return_rate_pct),
         rm('period return value', o.total_return_value),
@@ -3000,9 +3019,9 @@ const fetchers: Record<string, DataFetcher> = {
         `- Unsettled: RM ${r.total_unresolved.toLocaleString('en-MY')} (${r.unresolved_pct.toFixed(1)}%)\n` +
         `- Refund transaction count: ${r.refund_count}\n\n` +
         `Thresholds:\n` +
-        `- Knock-off % > 70% = Healthy (cash-efficient)\n` +
-        `- Refund % > 30% = Concern (cash-draining)\n` +
-        `- Unsettled % > 30% = Concern (exposure piling up)\n\n` +
+        `- Knock-off % > {{rt_settlement_breakdown.knock_off_healthy_pct}}% = Healthy (cash-efficient)\n` +
+        `- Refund % > {{rt_settlement_breakdown.refund_concern_pct}}% = Concern (cash-draining)\n` +
+        `- Unsettled % > {{rt_settlement_breakdown.unsettled_concern_pct}}% = Concern (exposure piling up)\n\n` +
         `Business context: Knock-off is preferred (offsets future invoices, no cash out). Refund is cash out the door — working-capital impact.`,
       allowed: [
         rm('total return value', r.total_return_value),
@@ -3123,7 +3142,7 @@ const fetchers: Record<string, DataFetcher> = {
       `- Top 1 item share of return value: ${top1Share.toFixed(1)}%\n` +
       `- Top 10 items share of return value: ${top10Share.toFixed(1)}% (sum RM ${top10ValueSum.toLocaleString('en-MY')})\n` +
       `- Items appearing on BOTH top-frequency AND top-value lists: ${overlap.length > 0 ? overlap.join(', ') : 'none'}\n\n` +
-      `Thresholds: Top-1 > 15% severe · Top-10 > 60% concentrated · Top-10 < 40% diversified\n\n`;
+      `Thresholds: Top-1 > {{rt_product_bar.top_1_severe_pct}}% severe · Top-10 > {{rt_product_bar.top_10_concentrated_pct}}% concentrated · Top-10 < {{rt_product_bar.top_10_diversified_pct}}% diversified\n\n`;
 
     return {
       prompt:
@@ -3188,7 +3207,7 @@ const fetchers: Record<string, DataFetcher> = {
       `- Total unsettled count: ${totalCnt}\n` +
       `- 91+ buckets combined share of unsettled value: ${share91Plus.toFixed(1)}%\n` +
       `- 180+ bucket share of unsettled value: ${share180.toFixed(1)}%\n\n` +
-      `Thresholds: 91+ combined > 25% = Watch · 180+ alone > 10% = Write-off risk\n\n`;
+      `Thresholds: 91+ combined > {{ru_aging_chart.old_91_watch_pct}}% = Watch · 180+ alone > {{ru_aging_chart.old_180_writeoff_pct}}% = Write-off risk\n\n`;
 
     const table =
       `Aging distribution:\n` +
@@ -3251,7 +3270,7 @@ const fetchers: Record<string, DataFetcher> = {
       `- Stale debtors (unresolved > 0 AND no knock-off AND no refund): ${staleCount}\n` +
       `- Top 1 debtor share: ${top1Share.toFixed(1)}%\n` +
       `- Top 10 debtor share: ${top10Share.toFixed(1)}% (sum RM ${top10Sum.toLocaleString('en-MY')})\n\n` +
-      `Thresholds: Top-1 > 15% = Single-point risk · Top-10 > 60% = Concentrated\n\n`;
+      `Thresholds: Top-1 > {{ru_debtors_table.top_1_risk_pct}}% = Single-point risk · Top-10 > {{ru_debtors_table.top_10_concentrated_pct}}% = Concentrated\n\n`;
 
     const table =
       `Top 5 debtors by unresolved:\n` +
@@ -3285,8 +3304,8 @@ const fetchers: Record<string, DataFetcher> = {
         `- Operating Costs (OpEx): RM ${Math.round(k.current.opex).toLocaleString('en-MY')} (${opexPct.toFixed(1)}% of total)\n` +
         `Prior-year total costs (same period): RM ${Math.round(k.previous.total_costs).toLocaleString('en-MY')}\n` +
         `YoY total-cost growth: ${yoy.toFixed(1)}% — ${yoyLabel}\n\n` +
-        `Thresholds (YoY total-cost growth): < 0% Healthy · 0-5% Watch · 5-10% Concern · > 10% Severe\n` +
-        `COGS share thresholds: 60-80% Typical · > 85% COGS-dominated · < 50% OpEx-dominated`,
+        `Thresholds (YoY total-cost growth): < {{ex_total_costs.healthy_below_pct}}% Healthy · {{ex_total_costs.healthy_below_pct}}-{{ex_total_costs.watch_pct}}% Watch · {{ex_total_costs.watch_pct}}-{{ex_total_costs.concern_pct}}% Concern · > {{ex_total_costs.concern_pct}}% Severe\n` +
+        `COGS share thresholds: {{ex_total_costs.cogs_typical_min_pct}}-{{ex_total_costs.cogs_typical_max_pct}}% Typical · > {{ex_total_costs.cogs_dominated_pct}}% COGS-dominated · < {{ex_total_costs.opex_dominated_pct}}% OpEx-dominated`,
       allowed: [
         rm('total costs', Math.round(total)),
         rm('cogs', Math.round(k.current.cogs)),
@@ -3333,8 +3352,8 @@ const fetchers: Record<string, DataFetcher> = {
         `Prior-year COGS: RM ${Math.round(k.previous.cogs).toLocaleString('en-MY')}\n` +
         `COGS YoY growth: ${cogsYoy.toFixed(1)}% — ${cogsYoyLabel}\n\n` +
         (top3Block ? `Top 3 COGS accounts:\n${top3Block}\n` : '') +
-        `Thresholds: COGS share 60-80% Typical · > 85% margin-pressure risk\n` +
-        `Business context: COGS is variable — YoY growth is acceptable if sales volume also grew. Flag COGS YoY > 15% if sales are flat or declining.`,
+        `Thresholds: COGS share {{ex_cogs.typical_min_pct}}-{{ex_cogs.typical_max_pct}}% Typical · > {{ex_cogs.margin_pressure_pct}}% margin-pressure risk\n` +
+        `Business context: COGS is variable — YoY growth is acceptable if sales volume also grew. Flag COGS YoY > {{ex_cogs.concern_pct}}% if sales are flat or declining.`,
       allowed,
     };
   },
@@ -3373,7 +3392,7 @@ const fetchers: Record<string, DataFetcher> = {
         `Prior-year OpEx: RM ${Math.round(k.previous.opex).toLocaleString('en-MY')}\n` +
         `OpEx YoY growth: ${opexYoy.toFixed(1)}% — ${opexYoyLabel}\n\n` +
         (top3Block ? `Top 3 OpEx accounts:\n${top3Block}\n` : '') +
-        `Thresholds: OpEx YoY > 10% Concern (semi-fixed; should grow slower than revenue)\n` +
+        `Thresholds: OpEx YoY > {{ex_opex.concern_pct}}% Concern (semi-fixed; should grow slower than revenue)\n` +
         `Business context: OpEx is semi-fixed and scales only with structural decisions (headcount, rent, tooling). Unexplained OpEx jumps warrant investigation.`,
       allowed,
     };
@@ -3404,8 +3423,8 @@ const fetchers: Record<string, DataFetcher> = {
         `Cost-type breakdown of YoY:\n` +
         `- COGS: RM ${Math.round(k.current.cogs).toLocaleString('en-MY')} vs RM ${Math.round(k.previous.cogs).toLocaleString('en-MY')} (YoY ${cogsYoy.toFixed(1)}%)\n` +
         `- OpEx: RM ${Math.round(k.current.opex).toLocaleString('en-MY')} vs RM ${Math.round(k.previous.opex).toLocaleString('en-MY')} (YoY ${opexYoy.toFixed(1)}%)\n\n` +
-        `Thresholds: < 0% Healthy · 0-5% Watch · 5-10% Concern · > 10% Severe\n` +
-        `Business context: OpEx YoY > 10% is the more worrying signal because OpEx is semi-fixed. COGS YoY growth is acceptable if sales volume grew proportionally.`,
+        `Thresholds: < {{ex_yoy_costs.healthy_below_pct}}% Healthy · {{ex_yoy_costs.healthy_below_pct}}-{{ex_yoy_costs.watch_pct}}% Watch · {{ex_yoy_costs.watch_pct}}-{{ex_yoy_costs.concern_pct}}% Concern · > {{ex_yoy_costs.concern_pct}}% Severe\n` +
+        `Business context: OpEx YoY > {{ex_opex.concern_pct}}% is the more worrying signal because OpEx is semi-fixed. COGS YoY growth is acceptable if sales volume grew proportionally.`,
       allowed: [
         rm('current total costs', Math.round(k.current.total_costs)),
         rm('prior total costs', Math.round(k.previous.total_costs)),
@@ -3472,7 +3491,7 @@ const fetchers: Record<string, DataFetcher> = {
       `- Current-period total: RM ${Math.round(currTotal).toLocaleString('en-MY')}\n` +
       `- Prior-year same-period total: RM ${Math.round(priorTotal).toLocaleString('en-MY')}\n` +
       `- Period YoY growth: ${periodYoy.toFixed(1)}%\n\n` +
-      `Thresholds (MoM first-to-last): > 15% Concern · > 25% Severe\n\n`;
+      `Thresholds (MoM first-to-last): > {{ex_cost_trend.mom_concern_pct}}% Concern · > {{ex_cost_trend.mom_severe_pct}}% Severe\n\n`;
 
     return {
       prompt: `${preCalc}Monthly cost trend:\n${table}`,
@@ -3481,6 +3500,11 @@ const fetchers: Record<string, DataFetcher> = {
   },
 
   async ex_cost_composition(dr) {
+    const thresholdValues = await getThresholdValues('ex_cost_composition');
+    const typicalMinPct = thresholdValues.typical_min_pct ?? 60;
+    const typicalMaxPct = thresholdValues.typical_max_pct ?? 80;
+    const cogsDominatedPct = thresholdValues.cogs_dominated_pct ?? 85;
+    const opexDominatedPct = thresholdValues.opex_dominated_pct ?? 50;
     const comp = await getCostCompositionV2(dr!.start, dr!.end);
     const k = await getCostKpisV2(dr!.start, dr!.end);
 
@@ -3496,9 +3520,9 @@ const fetchers: Record<string, DataFetcher> = {
     const cogsDrift = cogsPct - priorCogsPct;
 
     const mixLabel =
-      cogsPct >= 85 ? 'COGS-dominated (margin-pressure risk)' :
-      cogsPct < 50 ? 'OpEx-dominated (scaling inefficiency risk)' :
-      cogsPct >= 60 && cogsPct <= 80 ? 'Typical fruit-distribution mix' :
+      cogsPct >= cogsDominatedPct ? 'COGS-dominated (margin-pressure risk)' :
+      cogsPct < opexDominatedPct ? 'OpEx-dominated (scaling inefficiency risk)' :
+      cogsPct >= typicalMinPct && cogsPct <= typicalMaxPct ? 'Typical fruit-distribution mix' :
       'Mixed';
 
     const preCalc =
@@ -3510,7 +3534,7 @@ const fetchers: Record<string, DataFetcher> = {
       `- Mix classification: ${mixLabel}\n` +
       `- Prior-year composition: COGS ${priorCogsPct.toFixed(1)}% · OpEx ${priorOpexPct.toFixed(1)}%\n` +
       `- COGS share drift (pp, current − prior): ${cogsDrift.toFixed(1)} pp\n\n` +
-      `Thresholds: 60-80% COGS = Typical · > 85% COGS-dominated · < 50% OpEx-dominated\n` +
+      `Thresholds: {{ex_cost_composition.typical_min_pct}}-{{ex_cost_composition.typical_max_pct}}% COGS = Typical · > {{ex_cost_composition.cogs_dominated_pct}}% COGS-dominated · < {{ex_cost_composition.opex_dominated_pct}}% OpEx-dominated\n` +
       `Business context: A rising COGS share (positive drift) combined with flat sales indicates margin compression. A falling COGS share (negative drift) can mean either margin improvement OR under-investment in inventory.`;
 
     return {
@@ -3529,6 +3553,11 @@ const fetchers: Record<string, DataFetcher> = {
   },
 
   async ex_top_expenses(dr) {
+    const thresholdValues = await getThresholdValues('ex_top_expenses');
+    const top1SeverePct = thresholdValues.top_1_severe_pct ?? 30;
+    const top1ConcentratedPct = thresholdValues.top_1_concentrated_pct ?? 15;
+    const top10ConcentratedPct = thresholdValues.top_10_concentrated_pct ?? 75;
+    const top10DiversifiedPct = thresholdValues.top_10_diversified_pct ?? 50;
     const rows = await getTopExpensesByType(dr!.start, dr!.end, 'all', 'desc');
     const k = await getCostKpisV2(dr!.start, dr!.end);
     const total = k.current.total_costs;
@@ -3557,10 +3586,10 @@ const fetchers: Record<string, DataFetcher> = {
     const opexInTop10 = rows.slice(0, 10).filter(r => r.cost_type === 'OPEX').length;
 
     const concentrationLabel =
-      top1Share > 30 ? 'Severe (single-account risk)' :
-      top1Share > 15 ? 'Concentrated' :
-      top10Share > 75 ? 'Concentrated (top 10 > 75%)' :
-      top10Share < 50 ? 'Diversified' :
+      top1Share > top1SeverePct ? 'Severe (single-account risk)' :
+      top1Share > top1ConcentratedPct ? 'Concentrated' :
+      top10Share > top10ConcentratedPct ? `Concentrated (top 10 > ${top10ConcentratedPct}%)` :
+      top10Share < top10DiversifiedPct ? 'Diversified' :
       'Moderate';
 
     allowed.push(pct('top 1 account share', top1Share));
@@ -3577,7 +3606,7 @@ const fetchers: Record<string, DataFetcher> = {
       `- Top 10 accounts share: ${top10Share.toFixed(1)}% (sum RM ${Math.round(top10Sum).toLocaleString('en-MY')})\n` +
       `- Concentration: ${concentrationLabel}\n` +
       `- Mix in top 10: ${cogsInTop10} COGS · ${opexInTop10} OpEx\n\n` +
-      `Thresholds: Top 1 > 30% Severe · 15-30% Concentrated · < 15% Diversified · Top 10 > 75% Concentrated · < 50% Diversified\n\n`;
+      `Thresholds: Top 1 > {{ex_top_expenses.top_1_severe_pct}}% Severe · {{ex_top_expenses.top_1_concentrated_pct}}-{{ex_top_expenses.top_1_severe_pct}}% Concentrated · < {{ex_top_expenses.top_1_concentrated_pct}}% Diversified · Top 10 > {{ex_top_expenses.top_10_concentrated_pct}}% Concentrated · < {{ex_top_expenses.top_10_diversified_pct}}% Diversified\n\n`;
 
     return {
       prompt: preCalc + 'Top 10 expense accounts (all cost types, descending):\n' + table,
@@ -3586,6 +3615,13 @@ const fetchers: Record<string, DataFetcher> = {
   },
 
   async ex_cogs_table(dr) {
+    const thresholdValues = await getThresholdValues('ex_cogs_table');
+    const top1SeverePct = thresholdValues.top_1_severe_pct ?? 50;
+    const top1ConcentratedPct = thresholdValues.top_1_concentrated_pct ?? 30;
+    const top1DiversifiedPct = thresholdValues.top_1_diversified_pct ?? 15;
+    const top3ConcentratedPct = thresholdValues.top_3_concentrated_pct ?? 80;
+    const top3DiversifiedPct = thresholdValues.top_3_diversified_pct ?? 55;
+    const thinAccountCount = thresholdValues.thin_account_count ?? 5;
     const rows = await getCogsBreakdown(dr!.start, dr!.end);
     if (rows.length === 0) {
       return { prompt: `No COGS (acc_type = 'CO') postings in ${dr!.start} to ${dr!.end}.`, allowed: [] };
@@ -3604,15 +3640,15 @@ const fetchers: Record<string, DataFetcher> = {
     const top10Share = total > 0 ? (top10Sum / total) * 100 : 0;
 
     const top1Label =
-      top1Share > 50 ? 'Severe (single-account exposure)' :
-      top1Share >= 30 ? 'Concentrated (dominant-fruit sourcing)' :
-      top1Share < 15 ? 'Diversified' :
+      top1Share > top1SeverePct ? 'Severe (single-account exposure)' :
+      top1Share >= top1ConcentratedPct ? 'Concentrated (dominant-fruit sourcing)' :
+      top1Share < top1DiversifiedPct ? 'Diversified' :
       'Moderate';
     const top3Label =
-      top3Share > 80 ? 'Concentrated top 3' :
-      top3Share < 55 ? 'Diversified top 3' :
+      top3Share > top3ConcentratedPct ? 'Concentrated top 3' :
+      top3Share < top3DiversifiedPct ? 'Diversified top 3' :
       'Moderate top 3';
-    const surfaceLabel = positive.length < 5 ? 'Thin COGS surface (< 5 accounts)' : `${positive.length} active COGS accounts`;
+    const surfaceLabel = positive.length < thinAccountCount ? `Thin COGS surface (< ${thinAccountCount} accounts)` : `${positive.length} active COGS accounts`;
 
     const allowed: AllowedValue[] = [
       rm('total cogs', Math.round(total)),
@@ -3655,7 +3691,7 @@ const fetchers: Record<string, DataFetcher> = {
       `- Top 10 accounts share: ${top10Share.toFixed(1)}% (sum RM ${Math.round(top10Sum).toLocaleString('en-MY')})\n` +
       `- Negative-value accounts: ${negatives.length}\n\n` +
       `Thresholds:\n` +
-      `- Top 1 > 50% = Severe · 30-50% = Concentrated · < 15% = Diversified\n` +
+      `- Top 1 > {{ex_cogs_table.top_1_severe_pct}}% = Severe · {{ex_cogs_table.top_1_concentrated_pct}}-{{ex_cogs_table.top_1_severe_pct}}% = Concentrated · < {{ex_cogs_table.top_1_diversified_pct}}% = Diversified\n` +
       `- Top 3 > 80% = Concentrated · < 55% = Diversified\n` +
       `- Account count < 5 = Thin COGS surface\n` +
       `- Any negative net_cost account = Flag (credit note / reversal)\n\n`;
@@ -3667,6 +3703,12 @@ const fetchers: Record<string, DataFetcher> = {
   },
 
   async ex_opex_table(dr) {
+    const thresholdValues = await getThresholdValues('ex_opex_table');
+    const topCategoryDominantPct = thresholdValues.top_category_dominant_pct ?? 50;
+    const topCategoryTypicalPct = thresholdValues.top_category_typical_pct ?? 30;
+    const topCategoryDiversifiedPct = thresholdValues.top_category_diversified_pct ?? 20;
+    const top1AccountRiskPct = thresholdValues.top_1_account_risk_pct ?? 20;
+    const top3AccountsConcentratedPct = thresholdValues.top_3_accounts_concentrated_pct ?? 50;
     const rows = await getOpexBreakdown(dr!.start, dr!.end);
     if (rows.length === 0) {
       return { prompt: `No OpEx (acc_type = 'EP') postings in ${dr!.start} to ${dr!.end}.`, allowed: [] };
@@ -3691,9 +3733,9 @@ const fetchers: Record<string, DataFetcher> = {
     const topCat = categories[0];
     const topCatShare = total > 0 ? (topCat.subtotal / total) * 100 : 0;
     const topCatLabel =
-      topCatShare > 50 ? 'Dominant category (one cost center carries the base)' :
-      topCatShare >= 30 ? 'Typical dominance (usually staff or rent)' :
-      topCatShare < 20 ? 'Diversified across categories' :
+      topCatShare > topCategoryDominantPct ? 'Dominant category (one cost center carries the base)' :
+      topCatShare >= topCategoryTypicalPct ? 'Typical dominance (usually staff or rent)' :
+      topCatShare < topCategoryDiversifiedPct ? 'Diversified across categories' :
       'Moderate';
 
     // Top 10 accounts across all categories
@@ -3703,8 +3745,8 @@ const fetchers: Record<string, DataFetcher> = {
     const top3AcctSum = sortedAccounts.slice(0, 3).reduce((s, r) => s + r.net_cost, 0);
     const top3AcctShare = total > 0 ? (top3AcctSum / total) * 100 : 0;
     const acctLabel =
-      top1AcctShare > 20 ? 'Single-account risk (name it)' :
-      top3AcctShare > 50 ? 'Concentrated top 3 accounts' :
+      top1AcctShare > top1AccountRiskPct ? 'Single-account risk (name it)' :
+      top3AcctShare > top3AccountsConcentratedPct ? 'Concentrated top 3 accounts' :
       'Spread across accounts';
 
     const singletonCats = categories.filter(c => c.accountCount === 1);
@@ -3769,9 +3811,9 @@ const fetchers: Record<string, DataFetcher> = {
       `- Singleton categories: ${singletonCats.length}\n` +
       `- Negative-value accounts: ${negatives.length}\n\n` +
       `Thresholds:\n` +
-      `- Top 1 category > 50% = Dominant · 30-50% = Typical · < 20% = Diversified\n` +
-      `- Top 1 account > 20% of OpEx = Single-account risk\n` +
-      `- Top 3 accounts > 50% = Concentrated\n` +
+      `- Top 1 category > {{ex_opex_table.top_category_dominant_pct}}% = Dominant · {{ex_opex_table.top_category_typical_pct}}-{{ex_opex_table.top_category_dominant_pct}}% = Typical · < {{ex_opex_table.top_category_diversified_pct}}% = Diversified\n` +
+      `- Top 1 account > {{ex_opex_table.top_1_account_risk_pct}}% of OpEx = Single-account risk\n` +
+      `- Top 3 accounts > {{ex_opex_table.top_3_accounts_concentrated_pct}}% = Concentrated\n` +
       `- Category with only 1 account = Flag\n` +
       `- Any negative net_cost account = Flag\n\n`;
 
@@ -4515,15 +4557,6 @@ export async function getFpaDataAsOf(): Promise<FpaDataAsOf> {
   return { completedAt: rows[0]?.completed_at ?? null };
 }
 
-function yoyLabel(pctVal: number | null, higherIsBetter: boolean): string {
-  if (pctVal == null) return 'No prior-year data';
-  const good = higherIsBetter ? pctVal >= 0 : pctVal <= 0;
-  const mag = Math.abs(pctVal);
-  if (mag < 2) return good ? 'Flat (healthy)' : 'Flat (watch)';
-  if (good) return mag > 10 ? 'Strong favourable' : 'Favourable';
-  return mag > 10 ? 'Severe unfavourable' : 'Unfavourable';
-}
-
 // ─── Fiscal-period fetchers (Financial page §9 — financial_overview) ────────
 
 type FiscalPeriodFetcher = (period: FiscalPeriod) => Promise<FetcherResult>;
@@ -4672,8 +4705,8 @@ const fiscalPeriodFetchers: Record<string, FiscalPeriodFetcher> = {
       `- First-to-last operating-profit growth: ${opGrowth.toFixed(1)}%\n\n` +
       `Thresholds:\n` +
       `- Any single loss month = Watch signal\n` +
-      `- Loss months ÷ window > 30% = Concern\n` +
-      `- First-to-last operating profit decline > 25% = Severe\n\n`;
+      `- Loss months ÷ window > {{fin_monthly_trend.concern_pct}}% = Concern\n` +
+      `- First-to-last operating profit decline > {{fin_monthly_trend.severe_pct}}% = Severe\n\n`;
 
     return {
       prompt: preCalc + 'Monthly P&L trend (fiscal order):\n' + table,
@@ -4788,9 +4821,9 @@ const fiscalPeriodFetchers: Record<string, FiscalPeriodFetcher> = {
       (signFlips.length > 0 ? `⚠ SIGN FLIPS (SEVERE — call out explicitly): ${signFlips.join(', ')}\n\n` : '') +
       `Top 5 detail-account movers by |Δ RM| (use these — do not invent others):\n${moverLines.join('\n')}\n\n` +
       `Thresholds:\n` +
-      `- Group YoY subtotal: < ±5% Flat · ±5-15% Moderate · > ±15% Material\n` +
-      `- Gross Margin drift: ±3pp Material · ±5pp Severe\n` +
-      `- Net Margin drift: ±2pp Material · ±3pp Severe\n` +
+      `- Group YoY subtotal: < ±{{fin_pl_statement.flat_pct}}% Flat · ±{{fin_pl_statement.flat_pct}}-{{fin_pl_statement.material_pct}}% Moderate · > ±{{fin_pl_statement.material_pct}}% Material\n` +
+      `- Gross Margin drift: ±{{fin_pl_statement.gross_material_pp}}pp Material · ±{{fin_pl_statement.gross_severe_pp}}pp Severe\n` +
+      `- Net Margin drift: ±{{fin_pl_statement.net_material_pp}}pp Material · ±{{fin_pl_statement.net_severe_pp}}pp Severe\n` +
       `- Any sign flip on GP/NP/NPAT = Severe (always called out)\n\n` +
       `Focus on structure: which groups carry the RM direction, whether margin expanded or compressed, and which 1-2 named accounts are the biggest drivers. Do NOT invent account names beyond the top-5 movers list.`;
 
@@ -4905,10 +4938,10 @@ const fiscalPeriodFetchers: Record<string, FiscalPeriodFetcher> = {
         ? `\nPre-calculated roll-ups (cite these directly — do not recompute):\n${preCalcLines.join('\n')}\n`
         : '') +
       `\nThresholds:\n` +
-      `- Net Sales CAGR: < -5% Declining · -5 to 5% Flat · 5-15% Growing · > 15% Fast growth\n` +
-      `- Net Profit direction: 3+ consecutive declines = Severe · 3+ consecutive improvements = Strong\n` +
-      `- Gross Margin drift (first→last full FY): > ±3pp = Material structural change\n` +
-      `- Net Margin drift (first→last full FY): > ±2pp = Material\n` +
+      `- Net Sales CAGR: < {{fin_yoy_comparison.declining_below_pct}}% Declining · {{fin_yoy_comparison.declining_below_pct}} to {{fin_yoy_comparison.flat_upper_pct}}% Flat · {{fin_yoy_comparison.flat_upper_pct}}-{{fin_yoy_comparison.growing_upper_pct}}% Growing · > {{fin_yoy_comparison.growing_upper_pct}}% Fast growth\n` +
+      `- Net Profit direction: {{fin_yoy_comparison.streak_years}}+ consecutive declines = Severe · {{fin_yoy_comparison.streak_years}}+ consecutive improvements = Strong\n` +
+      `- Gross Margin drift (first→last full FY): > ±{{fin_yoy_comparison.gross_material_pp}}pp = Material structural change\n` +
+      `- Net Margin drift (first→last full FY): > ±{{fin_yoy_comparison.net_material_pp}}pp = Material\n` +
       `- Any NPAT sign flip = Severe\n\n` +
       `Evaluate:\n` +
       `- Trajectory: is the business growing, flat, or shrinking on Net Sales?\n` +
@@ -5001,10 +5034,10 @@ const fiscalPeriodFetchers: Record<string, FiscalPeriodFetcher> = {
         ? `- ⚠ NEGATIVE EQUITY MONTHS (SEVERE — Liabilities > Assets): ${negEquityMonths.join(', ')}\n`
         : `- Negative equity months: none\n`) +
       `\nThresholds:\n` +
-      `- Asset trajectory (first→last): < -5% Shrinking · ±5% Flat · 5-15% Growing · > 15% Fast growth\n` +
-      `- Equity direction: first→last declining = Watch · 3+ consecutive decline months = Severe\n` +
-      `- Liability vs Asset divergence: Liabilities growing > 10% while Assets flat/shrinking = Material · > 20% = Severe\n` +
-      `- Gearing drift: > +3pp Material deterioration · > +5pp Severe\n` +
+      `- Asset trajectory (first→last): < {{bs_trend.shrinking_below_pct}}% Shrinking · ±{{bs_trend.flat_upper_pct}}% Flat · {{bs_trend.flat_upper_pct}}-{{bs_trend.growing_upper_pct}}% Growing · > {{bs_trend.growing_upper_pct}}% Fast growth\n` +
+      `- Equity direction: first→last declining = Watch · {{bs_trend.severe_months}}+ consecutive decline months = Severe\n` +
+      `- Liability vs Asset divergence: Liabilities growing > {{bs_trend.material_pct}}% while Assets flat/shrinking = Material · > {{bs_trend.severe_pct}}% = Severe\n` +
+      `- Gearing drift: > +{{bs_trend.material_pp}}pp Material deterioration · > +{{bs_trend.severe_pp}}pp Severe\n` +
       `- Any month where Total Liabilities > Total Assets = Severe (insolvency — always call out by month)\n\n` +
       `Evaluate:\n` +
       `- Direction: are Total Assets, Total Liabilities, and Equity rising, flat, falling, or diverging?\n` +
@@ -5097,12 +5130,18 @@ const fiscalPeriodFetchers: Record<string, FiscalPeriodFetcher> = {
     allowed.push(rm('total liabilities prior', Math.round(totalLiabPrior)));
     allowed.push(rm('total equity current', Math.round(totalEquityCurr)));
     allowed.push(rm('total equity prior', Math.round(totalEquityPrior)));
-    allowed.push(pct('current ratio current', currRatioCurr));
-    allowed.push(pct('current ratio prior', currRatioPrior));
-    allowed.push(pct('debt to equity current', deCurr));
-    allowed.push(pct('debt to equity prior', dePrior));
+    const currRatioDrift = currRatioCurr - currRatioPrior;
+    const deDrift = deCurr - dePrior;
+    const eqRatioDrift = eqRatioCurr - eqRatioPrior;
+    allowed.push(ratio('current ratio current', currRatioCurr));
+    allowed.push(ratio('current ratio prior', currRatioPrior));
+    allowed.push(ratio('current ratio drift', currRatioDrift));
+    allowed.push(ratio('debt to equity current', deCurr));
+    allowed.push(ratio('debt to equity prior', dePrior));
+    allowed.push(ratio('debt to equity drift', deDrift));
     allowed.push(pct('equity ratio current', eqRatioCurr));
     allowed.push(pct('equity ratio prior', eqRatioPrior));
+    allowed.push(pct('equity ratio drift', eqRatioDrift));
 
     // Sign-flip flags
     const signFlips: string[] = [];
@@ -5132,16 +5171,16 @@ const fiscalPeriodFetchers: Record<string, FiscalPeriodFetcher> = {
       `- Total Liabilities: RM ${Math.round(totalLiabCurr).toLocaleString('en-MY')} vs prior RM ${Math.round(totalLiabPrior).toLocaleString('en-MY')}\n` +
       `- Total Equity: RM ${Math.round(totalEquityCurr).toLocaleString('en-MY')} vs prior RM ${Math.round(totalEquityPrior).toLocaleString('en-MY')}\n\n` +
       `Key ratios:\n` +
-      `- Current Ratio (Current Assets ÷ Current Liabilities): ${currRatioCurr.toFixed(2)} vs prior ${currRatioPrior.toFixed(2)} (drift ${(currRatioCurr - currRatioPrior).toFixed(2)})\n` +
-      `- Debt-to-Equity (Total Liabilities ÷ Total Equity): ${deCurr.toFixed(2)} vs prior ${dePrior.toFixed(2)} (drift ${(deCurr - dePrior).toFixed(2)})\n` +
-      `- Equity Ratio (Total Equity ÷ Total Assets): ${eqRatioCurr.toFixed(1)}% vs prior ${eqRatioPrior.toFixed(1)}% (drift ${(eqRatioCurr - eqRatioPrior).toFixed(1)}pp)\n\n` +
+      `- Current Ratio (Current Assets ÷ Current Liabilities): ${currRatioCurr.toFixed(2)} vs prior ${currRatioPrior.toFixed(2)} (drift ${currRatioDrift.toFixed(2)})\n` +
+      `- Debt-to-Equity (Total Liabilities ÷ Total Equity): ${deCurr.toFixed(2)} vs prior ${dePrior.toFixed(2)} (drift ${deDrift.toFixed(2)})\n` +
+      `- Equity Ratio (Total Equity ÷ Total Assets): ${eqRatioCurr.toFixed(1)}% vs prior ${eqRatioPrior.toFixed(1)}% (drift ${eqRatioDrift.toFixed(1)}pp)\n\n` +
       (signFlips.length > 0 ? `⚠ SIGN FLIPS (SEVERE — call out explicitly): ${signFlips.join(', ')}\n\n` : '') +
       `Top 3 biggest |Δ RM| movers across the 8 line items (use these — do not invent others):\n${moverLines.join('\n') || '- (no movement)'}\n\n` +
       `Thresholds:\n` +
-      `- Line-item YoY: < ±5% Flat · ±5-15% Moderate · > ±15% Material\n` +
-      `- Current Ratio: < 1.0 Severe · 1.0-1.2 Thin · 1.2-2.0 Healthy · > 2.0 Strong · YoY drift > ±0.3 = Material\n` +
-      `- Debt-to-Equity: < 0.5 Conservative · 0.5-1.0 Typical · 1.0-2.0 Leveraged · > 2.0 Severe · YoY drift > ±0.3 = Material\n` +
-      `- Equity Ratio: < 20% Severe · 20-40% Thin · 40-60% Healthy · > 60% Strong · YoY drift > ±5pp = Material\n` +
+      `- Line-item YoY: < ±{{bs_statement.flat_pct}}% Flat · ±{{bs_statement.flat_pct}}-{{bs_statement.material_pct}}% Moderate · > ±{{bs_statement.material_pct}}% Material\n` +
+      `- Current Ratio: < {{bs_statement.severe_below_ratio}} Severe · {{bs_statement.severe_below_ratio}}-{{bs_statement.thin_below_ratio}} Thin · {{bs_statement.thin_below_ratio}}-{{bs_statement.healthy_below_ratio}} Healthy · > {{bs_statement.healthy_below_ratio}} Strong · YoY drift > ±{{bs_statement.current_ratio_drift_material_ratio}} = Material\n` +
+      `- Debt-to-Equity: < {{bs_statement.conservative_below_ratio}} Conservative · {{bs_statement.conservative_below_ratio}}-{{bs_statement.typical_below_ratio}} Typical · {{bs_statement.typical_below_ratio}}-{{bs_statement.leveraged_below_ratio}} Leveraged · > {{bs_statement.leveraged_below_ratio}} Severe · YoY drift > ±{{bs_statement.debt_to_equity_drift_material_ratio}} = Material\n` +
+      `- Equity Ratio: < {{bs_statement.severe_below_pct}}% Severe · {{bs_statement.severe_below_pct}}-{{bs_statement.thin_below_pct}}% Thin · {{bs_statement.thin_below_pct}}-{{bs_statement.healthy_below_pct}}% Healthy · > {{bs_statement.healthy_below_pct}}% Strong · YoY drift > ±{{bs_statement.drift_material_pp}}pp = Material\n` +
       `- Net Current Assets sign flip (pos→neg) = Severe (working-capital failure)\n` +
       `- Total Equity sign flip = Severe (insolvency)\n\n` +
       `Hard rules:\n` +
@@ -5736,7 +5775,9 @@ export async function fetchComponentData(
     }
 
     const scopeLabel = await buildScopeLabel(scope, dateRange, sectionKey, fiscalPeriod);
-    return { prompt: `${scopeLabel}\n\n${fetched.prompt}`, allowed: fetched.allowed };
+    const renderedPrompt = await renderThresholdText(`${scopeLabel}\n\n${fetched.prompt}`, componentKey);
+    const thresholdAllowed = await allowedThresholds(componentKey);
+    return { prompt: renderedPrompt, allowed: [...fetched.allowed, ...thresholdAllowed] };
   } catch (err) {
     console.error(`Data fetch error for ${componentKey}:`, err);
     return {

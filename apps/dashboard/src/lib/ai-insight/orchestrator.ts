@@ -325,7 +325,7 @@ async function runSummaryAnalysis(
     // ground truth pulled live from the DB and the LLM is allowed to cite it.
     // Tool results return bare numeric tokens (no RM/%/days suffix) so we use
     // the permissive extractor and register each value under all four units.
-    const trUnits: AllowedValueUnit[] = ['RM', 'pct', 'days', 'count'];
+    const trUnits: AllowedValueUnit[] = ['RM', 'pct', 'days', 'count', 'ratio'];
     for (const trText of loopResult.toolResultTexts) {
       for (const v of extractToolResultNumbers(trText)) {
         for (const u of trUnits) {

@@ -6,9 +6,8 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from '@/components/ui/dialog';
-import { COMPONENT_INFO } from '@/lib/ai-insight/component-info';
+import { COMPONENT_INFO, type ComponentInfo } from '@/lib/ai-insight/component-info';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { BookOpen, BrainCircuit, Loader2 } from 'lucide-react';
 import type { SectionKey } from '@/lib/ai-insight/types';
@@ -21,11 +20,14 @@ interface ComponentInsightDialogProps {
 }
 
 interface ComponentData {
-  analysis_md: string;
-  generated_by: string;
+  exists?: boolean;
+  analysis_md?: string;
+  generated_by?: string;
   generated_at?: string;
   date_range_start?: string;
   date_range_end?: string;
+  componentInfo?: ComponentInfo | null;
+  requestKey: string;
 }
 
 export function ComponentInsightDialog({
@@ -34,25 +36,31 @@ export function ComponentInsightDialog({
   sectionKey,
   componentKey,
 }: ComponentInsightDialogProps) {
-  const [loading, setLoading] = useState(false);
   const [componentData, setComponentData] = useState<ComponentData | null>(null);
+  const requestKey = `${sectionKey}/${componentKey}`;
+  const loading = open && componentData?.requestKey !== requestKey;
 
-  const info = COMPONENT_INFO[componentKey];
+  const info = (!loading ? componentData?.componentInfo : null) ?? COMPONENT_INFO[componentKey];
 
   useEffect(() => {
     if (!open) return;
-    setLoading(true);
+    let cancelled = false;
+
     fetch(`/api/ai-insight/component/${sectionKey}/${componentKey}`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        setComponentData(data);
-        setLoading(false);
+        if (cancelled) return;
+        setComponentData({ ...(data ?? { exists: false }), requestKey });
       })
       .catch(() => {
-        setComponentData(null);
-        setLoading(false);
+        if (cancelled) return;
+        setComponentData({ exists: false, requestKey });
       });
-  }, [open, sectionKey, componentKey]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, sectionKey, componentKey, requestKey]);
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -95,10 +103,10 @@ export function ComponentInsightDialog({
                 <span className="text-sm">Loading analysis...</span>
               </div>
             )}
-            {!loading && componentData?.analysis_md && (
+            {!loading && componentData?.exists !== false && componentData?.analysis_md && (
               <MarkdownRenderer content={componentData.analysis_md} />
             )}
-            {!loading && !componentData && (
+            {!loading && (!componentData || componentData.exists === false || !componentData.analysis_md) && (
               <p className="text-sm text-foreground/60 py-2">
                 No analysis available. Run &quot;Analyze&quot; from the section panel.
               </p>

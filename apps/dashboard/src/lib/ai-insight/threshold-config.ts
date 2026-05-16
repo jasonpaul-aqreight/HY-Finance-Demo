@@ -657,6 +657,11 @@ function defaultSnapshot(): ThresholdSnapshot {
 async function loadSnapshot(): Promise<ThresholdSnapshot> {
   const base = defaultSnapshot();
 
+  if (process.env.AI_INSIGHT_THRESHOLDS_USE_DEFAULTS === '1') {
+    applyTestOverrides(base);
+    return base;
+  }
+
   try {
     const pool = getPool();
     const { rows } = await pool.query<{
@@ -683,7 +688,27 @@ async function loadSnapshot(): Promise<ThresholdSnapshot> {
     }
   }
 
+  applyTestOverrides(base);
   return base;
+}
+
+function applyTestOverrides(base: ThresholdSnapshot) {
+  if (process.env.NODE_ENV !== 'test' && process.env.AI_INSIGHT_THRESHOLDS_USE_DEFAULTS !== '1') return;
+  const raw = process.env.AI_INSIGHT_THRESHOLD_TEST_OVERRIDES;
+  if (!raw) return;
+
+  try {
+    const parsed = JSON.parse(raw) as Record<string, Record<string, unknown>>;
+    for (const [componentKey, tokenValues] of Object.entries(parsed)) {
+      for (const [token, rawValue] of Object.entries(tokenValues ?? {})) {
+        const tokenDef = tokenMap.get(snapshotKey(componentKey, token));
+        if (!tokenDef) continue;
+        base.values.set(snapshotKey(componentKey, token), coerceThresholdValue(tokenDef, rawValue));
+      }
+    }
+  } catch (err) {
+    console.warn('Ignoring invalid AI_INSIGHT_THRESHOLD_TEST_OVERRIDES:', err);
+  }
 }
 
 async function getSnapshot(): Promise<ThresholdSnapshot> {
@@ -740,19 +765,33 @@ export async function getThresholdGroups(componentKey: string): Promise<Threshol
   }));
 }
 
-export async function renderThresholdText(text: string, componentKey: string): Promise<string> {
+export async function getThresholdValues(componentKey: string): Promise<Record<string, number>> {
   const entry = componentMap.get(componentKey);
-  if (!entry) return text;
+  if (!entry) return {};
 
   const current = await getSnapshot();
-  let rendered = text;
+  const values: Record<string, number> = {};
   for (const groupDef of entry.groups) {
     for (const tokenDef of groupDef.tokens) {
-      const value = current.values.get(snapshotKey(componentKey, tokenDef.token)) ?? tokenDef.defaultValue;
-      rendered = rendered.replaceAll(
-        `{{${componentKey}.${tokenDef.token}}}`,
-        formatThresholdValue(tokenDef, value),
-      );
+      values[tokenDef.token] = current.values.get(snapshotKey(componentKey, tokenDef.token)) ?? tokenDef.defaultValue;
+    }
+  }
+  return values;
+}
+
+export async function renderThresholdText(text: string, componentKey: string): Promise<string> {
+  void componentKey;
+  const current = await getSnapshot();
+  let rendered = text;
+  for (const entry of THRESHOLD_REGISTRY) {
+    for (const groupDef of entry.groups) {
+      for (const tokenDef of groupDef.tokens) {
+        const value = current.values.get(snapshotKey(entry.componentKey, tokenDef.token)) ?? tokenDef.defaultValue;
+        rendered = rendered.replaceAll(
+          `{{${entry.componentKey}.${tokenDef.token}}}`,
+          formatThresholdValue(tokenDef, value),
+        );
+      }
     }
   }
   return rendered;

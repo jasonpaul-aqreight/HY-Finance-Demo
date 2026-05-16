@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server';
+import { getRenderedComponentInfo } from '@/lib/ai-insight/component-info-renderer';
 import { getComponentInsight } from '@/lib/ai-insight/storage';
 
 export async function GET(
@@ -6,14 +7,18 @@ export async function GET(
   { params }: { params: Promise<{ section_key: string; component_key: string }> },
 ) {
   const { section_key, component_key } = await params;
-  const insight = await getComponentInsight(section_key, component_key);
+  const [insight, componentInfo] = await Promise.all([
+    getComponentInsight(section_key, component_key),
+    getRenderedComponentInfo(component_key),
+  ]);
 
   if (!insight) {
-    return Response.json({ exists: false }, { status: 404 });
+    return Response.json({ exists: false, componentInfo });
   }
 
   return Response.json({
     exists: true,
+    componentInfo,
     ...insight,
   });
 }
