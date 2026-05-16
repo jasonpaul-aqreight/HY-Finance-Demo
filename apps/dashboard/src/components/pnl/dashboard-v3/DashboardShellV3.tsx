@@ -1,7 +1,12 @@
 'use client';
 
+import { useState } from 'react';
+import { WalletCards } from 'lucide-react';
 import { useDashboardFiltersV3 } from '@/hooks/pnl/useDashboardFiltersV3';
 import { useV3Monthly } from '@/hooks/pnl/usePLDataV3';
+import { useRole } from '@/components/layout/RoleProvider';
+import { Button } from '@/components/ui/button';
+import { BudgetSettingDialog } from '@/components/ai-insight/BudgetSettingDialog';
 import { FilterBarV3 } from './FilterBarV3';
 import { PLKpiCardsV3 } from './PLKpiCardsV3';
 import { MonthlyPLTrendV3 } from './MonthlyPLTrendV3';
@@ -15,6 +20,8 @@ import type { FiscalPeriod } from '@/lib/ai-insight/types';
 export function DashboardShellV3() {
   const { filters, setFilters } = useDashboardFiltersV3();
   const { data: monthlyData } = useV3Monthly(filters.fiscalYear ?? '', filters.range);
+  const { isAdmin } = useRole();
+  const [budgetSettingOpen, setBudgetSettingOpen] = useState(false);
 
   if (!filters.fiscalYear) {
     return (
@@ -35,10 +42,32 @@ export function DashboardShellV3() {
     <div className="min-h-screen bg-background">
       {/* Filter bar — not sticky, matches finalize pattern */}
       <div className="border-b bg-card px-6 py-3">
-        <div className="max-w-[1600px] mx-auto">
-          <FilterBarV3 filters={filters} onFilterChange={setFilters} latestMonth={latestMonth} />
+        <div className="max-w-[1600px] mx-auto flex items-center gap-3">
+          <div className="flex-1">
+            <FilterBarV3 filters={filters} onFilterChange={setFilters} latestMonth={latestMonth} />
+          </div>
+          {isAdmin && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setBudgetSettingOpen(true)}
+              className="text-xs"
+            >
+              <WalletCards className="mr-1.5 h-3.5 w-3.5" />
+              Budget Setting
+            </Button>
+          )}
         </div>
       </div>
+
+      {isAdmin && (
+        <BudgetSettingDialog
+          open={budgetSettingOpen}
+          onOpenChange={setBudgetSettingOpen}
+          isAdmin={isAdmin}
+          userName="Admin"
+        />
+      )}
 
       <main className="max-w-[1600px] mx-auto px-6 py-6 space-y-6">
         {/* ═══ Section §9: Financial Overview — KPI summary + trend ═══ */}
@@ -62,7 +91,7 @@ export function DashboardShellV3() {
         />
 
         {/* Section 1: KPI Summary Cards */}
-        <PLKpiCardsV3 fy={filters.fiscalYear} />
+        <PLKpiCardsV3 fy={filters.fiscalYear} range={filters.range} />
 
         {/* Section 2: Monthly P&L Trend */}
         <MonthlyPLTrendV3 fy={filters.fiscalYear} range={filters.range} />

@@ -66,6 +66,31 @@ export function useV3BSTrend(fy: string, range = 'fy') {
   );
 }
 
+export type V3VarianceKpiCode = 'NS' | 'CO' | 'EP';
+
+export interface V3VarianceKpiTile {
+  code: V3VarianceKpiCode;
+  label: string;
+  actual: number;
+  budget: number | null;
+  varianceRm: number | null;
+  variancePct: number | null;
+  yoyPct: number | null;
+  isFavourable: boolean | null;
+  status: 'On Track' | 'Moderate' | 'Material' | 'Severe' | null;
+}
+
+export interface V3VarianceKpiResponse {
+  tiles: V3VarianceKpiTile[];
+}
+
+export function useV3VarianceKpi(fy: string, range = 'fy') {
+  return useSWR<V3VarianceKpiResponse>(
+    fy ? `/api/pnl/v3/variance-kpi?${buildParams(fy, { range })}` : null,
+    fetcher
+  );
+}
+
 export interface MultiYearPLRow {
   fy: string;
   fyNumber: number;

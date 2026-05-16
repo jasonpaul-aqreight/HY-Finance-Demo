@@ -1,10 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronDown, ChevronUp, WalletCards } from 'lucide-react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { AiInsightPanel } from './AiInsightPanel';
-import { BudgetSettingDialog } from './BudgetSettingDialog';
 import { useInsightAnalysis } from '@/hooks/ai-insight/useInsightAnalysis';
 import { useRole } from '@/components/layout/RoleProvider';
 import type { SectionKey, PageKey, DateRange, FiscalPeriod } from '@/lib/ai-insight/types';
@@ -29,10 +28,8 @@ export function InsightSectionHeader({
   userName = 'User',
 }: InsightSectionHeaderProps) {
   const [expanded, setExpanded] = useState(false);
-  const [budgetSettingOpen, setBudgetSettingOpen] = useState(false);
   const { isAdmin } = useRole();
   const insight = useInsightAnalysis(page, sectionKey);
-  const showBudgetSetting = sectionKey === 'financial_variance' && isAdmin;
 
   const handleAnalyze = () => {
     insight.analyze(dateRange, userName, fiscalPeriod);
@@ -47,17 +44,6 @@ export function InsightSectionHeader({
           {subtitle && <span className="text-xs font-medium text-foreground/50">{subtitle}</span>}
         </div>
         <div className="flex items-center gap-2">
-          {showBudgetSetting && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setBudgetSettingOpen(true)}
-              className="text-xs"
-            >
-              <WalletCards className="mr-1.5 h-3.5 w-3.5" />
-              Budget Setting
-            </Button>
-          )}
           <Button
             variant="ghost"
             size="sm"
@@ -84,16 +70,6 @@ export function InsightSectionHeader({
           sectionKey={sectionKey}
           sectionName={title}
           page={page}
-          userName={userName}
-        />
-      )}
-
-      {/* Budget Setting modal — financial_variance section only, admin-only */}
-      {showBudgetSetting && (
-        <BudgetSettingDialog
-          open={budgetSettingOpen}
-          onOpenChange={setBudgetSettingOpen}
-          isAdmin={isAdmin}
           userName={userName}
         />
       )}

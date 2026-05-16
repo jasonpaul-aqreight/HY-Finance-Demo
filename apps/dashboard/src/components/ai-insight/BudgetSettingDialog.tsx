@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import {
   Dialog,
@@ -17,8 +17,9 @@ const BUDGET_LINE_ITEMS = [
   'Net Sales',
   'Cost of Sales',
   'Operating Costs',
-  'Other Income',
 ] as const;
+
+const NOTE_WORD_LIMIT = 50;
 
 type BudgetLineItem = (typeof BUDGET_LINE_ITEMS)[number];
 
@@ -64,6 +65,29 @@ function rowsToForm(rows: BudgetRow[]): FormLine[] {
   });
 }
 
+function countWords(text: string): number {
+  const trimmed = text.trim();
+  if (!trimmed) return 0;
+  return trimmed.split(/\s+/).length;
+}
+
+function clampToWordLimit(text: string, limit: number): string {
+  const words = text.split(/(\s+)/);
+  let count = 0;
+  const out: string[] = [];
+  for (const token of words) {
+    if (/^\s+$/.test(token)) {
+      out.push(token);
+      continue;
+    }
+    if (token.length === 0) continue;
+    if (count >= limit) break;
+    out.push(token);
+    count++;
+  }
+  return out.join('');
+}
+
 export function BudgetSettingDialog({
   open,
   onOpenChange,
@@ -92,7 +116,8 @@ export function BudgetSettingDialog({
         const budget: BudgetRow[] = json.budget ?? [];
         setRows(budget);
         setForm(rowsToForm(budget));
-        setNote(budget[0]?.note ?? '');
+        const initialNote = budget[0]?.note ?? '';
+        setNote(clampToWordLimit(initialNote, NOTE_WORD_LIMIT));
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load budget');
@@ -111,6 +136,12 @@ export function BudgetSettingDialog({
       current.map((line, i) => (i === index ? { ...line, [field]: value } : line)),
     );
   }
+
+  function updateNote(value: string) {
+    setNote(clampToWordLimit(value, NOTE_WORD_LIMIT));
+  }
+
+  const noteWordCount = useMemo(() => countWords(note), [note]);
 
   async function handleSave() {
     if (!isAdmin) return;
@@ -148,7 +179,7 @@ export function BudgetSettingDialog({
       const next: BudgetRow[] = json.budget ?? [];
       setRows(next);
       setForm(rowsToForm(next));
-      setNote(next[0]?.note ?? '');
+      setNote(clampToWordLimit(next[0]?.note ?? '', NOTE_WORD_LIMIT));
       setToast('Budget baseline saved.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save budget baseline');
@@ -165,7 +196,7 @@ export function BudgetSettingDialog({
         <DialogContent className="sm:max-w-2xl p-0 gap-0 overflow-hidden">
           <DialogHeader className="border-b px-5 py-4">
             <DialogTitle className="text-base font-semibold text-foreground">
-              Budget Setting — Approved Baseline
+              Budget Setting
             </DialogTitle>
           </DialogHeader>
 
@@ -223,45 +254,48 @@ export function BudgetSettingDialog({
                 </div>
 
                 <div className="space-y-1">
-                  <label htmlFor="budget-note" className="text-sm font-semibold text-foreground">
-                    Note (optional)
-                  </label>
+                  <div className="flex items-baseline justify-between">
+                    <label htmlFor="budget-note" className="text-sm font-semibold text-foreground">
+                      Note (optional)
+                    </label>
+                    <span
+                      className={`text-xs font-medium ${noteWordCount >= NOTE_WORD_LIMIT ? 'text-red-700' : 'text-foreground/70'}`}
+                    >
+                      {noteWordCount} / {NOTE_WORD_LIMIT} words
+                    </span>
+                  </div>
                   <Textarea
                     id="budget-note"
                     value={note}
-                    onChange={(event) => setNote(event.target.value)}
+                    onChange={(event) => updateNote(event.target.value)}
                     disabled={!isAdmin || saving}
                     placeholder="Add context for this baseline (e.g. board-approved FY27 target)"
-                    rows={2}
+                    rows={4}
+                    className="min-h-[110px]"
                   />
                 </div>
-
-                {meta && (
-                  <p className="text-xs text-foreground">
-                    Last updated by{' '}
-                    <span className="font-semibold">{meta.approved_by || 'Admin'}</span> on{' '}
-                    <span className="font-semibold">{new Date(meta.updated_at).toLocaleString()}</span>
-                  </p>
-                )}
               </>
             )}
           </div>
 
-          <div className="flex items-center justify-between border-t bg-background px-5 py-3">
-            <div className="min-h-5">
-              {error && <p className="text-sm font-medium text-red-700">{error}</p>}
+          <div className="flex items-center justify-between gap-3 border-t bg-background px-5 py-3">
+            <div className="text-xs text-foreground/80">
+              {error ? (
+                <span className="font-medium text-red-700">{error}</span>
+              ) : meta ? (
+                <>
+                  Last updated by{' '}
+                  <span className="font-semibold">{meta.approved_by || 'Admin'}</span> on{' '}
+                  <span className="font-semibold">{new Date(meta.updated_at).toLocaleString()}</span>
+                </>
+              ) : null}
             </div>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
-                Close
+            {isAdmin && (
+              <Button onClick={handleSave} disabled={saving || loading}>
+                {saving && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+                Save
               </Button>
-              {isAdmin && (
-                <Button onClick={handleSave} disabled={saving || loading}>
-                  {saving && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
-                  Save
-                </Button>
-              )}
-            </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>

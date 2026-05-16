@@ -4,7 +4,6 @@ export const ALLOWED_BUDGET_LINE_ITEMS = [
   'Net Sales',
   'Cost of Sales',
   'Operating Costs',
-  'Other Income',
 ] as const;
 
 export type BudgetLineItem = (typeof ALLOWED_BUDGET_LINE_ITEMS)[number];

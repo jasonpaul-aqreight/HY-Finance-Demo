@@ -40,6 +40,7 @@ import { fyNameToNumber, fyToPeriodRange, periodLabel } from '../pnl/period-util
 import { getSettingsV2 } from '../payment/settings';
 import { getV2PLStatement, getMultiYearPL, getV3BSTrend, getV3BSComparison } from '../pnl/queries';
 import { getGlobalBudget } from '../budget/queries';
+import { CATEGORY_ORDER, getExpenseCategory } from '../shared/expense-categories';
 import type {
   SectionKey,
   DateRange,
@@ -3947,6 +3948,556 @@ function yoyPct(curr: number, prior: number): number | null {
   return ((curr - prior) / Math.abs(prior)) * 100;
 }
 
+type FpaLineCode = 'NS' | 'CO' | 'GP' | 'EP' | 'OP' | 'OI' | 'NP';
+type FpaStatus = 'On Track' | 'Moderate' | 'Material' | 'Severe';
+
+export interface FpaBudgetSnapshot {
+  hasBudget: boolean;
+  rows: Awaited<ReturnType<typeof getGlobalBudget>>;
+  updatedAt: string | null;
+}
+
+export interface FpaVarianceKpiTile {
+  code: FpaLineCode;
+  label: string;
+  actual: number;
+  budget: number | null;
+  varianceRm: number | null;
+  variancePct: number | null;
+  yoyPct: number | null;
+  higherIsBetter: boolean;
+  isFavourable: boolean | null;
+  status: FpaStatus | null;
+}
+
+export interface FpaBridgePoint {
+  label: string;
+  amount: number;
+  start: number;
+  end: number;
+  range: [number, number];
+  kind: 'terminal' | 'step';
+  isFavourable: boolean | null;
+  pctOfTotalVariance: number | null;
+}
+
+export interface FpaVarianceBridgeSeries {
+  mode: 'budget' | 'yoy';
+  baselineLabel: string;
+  actualLabel: string;
+  totalVariance: number;
+  points: FpaBridgePoint[];
+}
+
+export interface FpaForecastPoint {
+  label: string;
+  period: number;
+  phase: 'actual' | 'forecast';
+  netSalesActual: number | null;
+  grossProfitActual: number | null;
+  netProfitActual: number | null;
+  netSalesForecast: number | null;
+  grossProfitForecast: number | null;
+  netProfitForecast: number | null;
+}
+
+export interface FpaForecastSeries {
+  points: FpaForecastPoint[];
+  budgetReference: number | null;
+  m3AccuracyPct: number | null;
+}
+
+export interface FpaBudgetVsActualRow {
+  id: string;
+  code: FpaLineCode | string;
+  label: string;
+  level: 0 | 1 | 2;
+  parent: string | null;
+  actual: number;
+  budget: number | null;
+  varianceRm: number | null;
+  variancePct: number | null;
+  yoyPct: number | null;
+  higherIsBetter: boolean;
+  isFavourable: boolean | null;
+  status: FpaStatus | null;
+  expandable: boolean;
+  rowType: 'detail' | 'subtotal' | 'total' | 'grandtotal';
+}
+
+export interface FpaDataAsOf {
+  completedAt: string | null;
+}
+
+const FPA_BUDGET_LINE_ORDER = ['Net Sales', 'Cost of Sales', 'Operating Costs'] as const;
+
+const FPA_LINE_META: Record<FpaLineCode, { label: string; higherIsBetter: boolean; rowType: FpaBudgetVsActualRow['rowType'] }> = {
+  NS: { label: 'Net Sales', higherIsBetter: true, rowType: 'subtotal' },
+  CO: { label: 'Cost of Sales', higherIsBetter: false, rowType: 'detail' },
+  GP: { label: 'Gross Profit', higherIsBetter: true, rowType: 'total' },
+  EP: { label: 'Operating Costs', higherIsBetter: false, rowType: 'detail' },
+  OP: { label: 'Operating Profit', higherIsBetter: true, rowType: 'total' },
+  OI: { label: 'Other Income', higherIsBetter: true, rowType: 'detail' },
+  NP: { label: 'Net Profit', higherIsBetter: true, rowType: 'grandtotal' },
+};
+
+function getBudgetMap(rows: Awaited<ReturnType<typeof getGlobalBudget>>): Map<string, number> {
+  return new Map(rows.map((row) => [row.line_item, row.annual_budget]));
+}
+
+function deriveBudgetValues(budgetRows: Awaited<ReturnType<typeof getGlobalBudget>>): Record<FpaLineCode, number | null> {
+  if (budgetRows.length === 0) {
+    return { NS: null, CO: null, GP: null, EP: null, OP: null, OI: null, NP: null };
+  }
+
+  const budget = getBudgetMap(budgetRows);
+  const ns = budget.get('Net Sales') ?? 0;
+  const co = budget.get('Cost of Sales') ?? 0;
+  const ep = budget.get('Operating Costs') ?? 0;
+  const oi = budget.get('Other Income') ?? 0;
+  const gp = ns - co;
+  const op = gp - ep;
+  const np = op + oi;
+
+  return { NS: ns, CO: co, GP: gp, EP: ep, OP: op, OI: oi, NP: np };
+}
+
+function getActualValues(s: FinFiscalSlice, source: 'current' | 'prior'): Record<FpaLineCode, number> {
+  const row = s[source];
+  return {
+    NS: row.net_sales,
+    CO: row.cogs,
+    GP: row.gross_profit,
+    EP: row.expenses,
+    OP: row.operating_profit,
+    OI: row.other_income,
+    NP: row.net_profit,
+  };
+}
+
+function calcStatus(actual: number, budget: number | null): FpaStatus | null {
+  if (budget == null) return null;
+  if ((budget >= 0 && actual < 0) || (budget < 0 && actual >= 0)) return 'Severe';
+  if (budget === 0) return actual === 0 ? 'On Track' : 'Severe';
+  const pctAbs = Math.abs(((actual - budget) / Math.abs(budget)) * 100);
+  if (pctAbs <= 5) return 'On Track';
+  if (pctAbs <= 15) return 'Moderate';
+  return 'Material';
+}
+
+function calcVariancePct(actual: number, budget: number | null): number | null {
+  if (budget == null || budget === 0) return null;
+  return ((actual - budget) / Math.abs(budget)) * 100;
+}
+
+function calcIsFavourable(varianceRm: number | null, higherIsBetter: boolean): boolean | null {
+  if (varianceRm == null || varianceRm === 0) return null;
+  return higherIsBetter ? varianceRm > 0 : varianceRm < 0;
+}
+
+function buildFpaRow(
+  id: string,
+  code: FpaLineCode | string,
+  label: string,
+  level: 0 | 1 | 2,
+  parent: string | null,
+  actual: number,
+  budget: number | null,
+  prior: number,
+  higherIsBetter: boolean,
+  rowType: FpaBudgetVsActualRow['rowType'],
+  expandable: boolean,
+): FpaBudgetVsActualRow {
+  const varianceRm = budget == null ? null : actual - budget;
+  const variancePct = calcVariancePct(actual, budget);
+  return {
+    id,
+    code,
+    label,
+    level,
+    parent,
+    actual,
+    budget,
+    varianceRm,
+    variancePct,
+    yoyPct: yoyPct(actual, prior),
+    higherIsBetter,
+    isFavourable: calcIsFavourable(varianceRm, higherIsBetter),
+    status: calcStatus(actual, budget),
+    expandable,
+    rowType,
+  };
+}
+
+function buildForecastPoints(s: FinFiscalSlice): FpaForecastSeries {
+  const actualMonths = s.monthly.slice(-12);
+  const metrics = [
+    { key: 'netSales' as const, name: 'Net Sales', values: s.monthly.map((r) => r.net_sales) },
+    { key: 'grossProfit' as const, name: 'Gross Profit', values: s.monthly.map((r) => r.gross_profit) },
+    { key: 'netProfit' as const, name: 'Net Profit', values: s.monthly.map((r) => r.net_profit) },
+  ];
+
+  const last = s.monthly[s.monthly.length - 1];
+  const forecastValues = metrics.map((metric) => {
+    const weightedChange = computeWeightedMA3Month(metric.values);
+    const lastValue = metric.values[metric.values.length - 1] ?? 0;
+    return {
+      key: metric.key,
+      values: Array.from({ length: 12 }, (_, index) => Math.round(lastValue + weightedChange * (index + 1))),
+    };
+  });
+
+  const actualPoints: FpaForecastPoint[] = actualMonths.map((month) => ({
+    label: month.label,
+    period: month.period,
+    phase: 'actual',
+    netSalesActual: month.net_sales,
+    grossProfitActual: month.gross_profit,
+    netProfitActual: month.net_profit,
+    netSalesForecast: null,
+    grossProfitForecast: null,
+    netProfitForecast: null,
+  }));
+
+  const forecastPoints: FpaForecastPoint[] = Array.from({ length: 12 }, (_, index) => {
+    const period = (last?.period ?? s.periodTo) + index + 1;
+    const netSales = forecastValues.find((metric) => metric.key === 'netSales')?.values[index] ?? null;
+    const grossProfit = forecastValues.find((metric) => metric.key === 'grossProfit')?.values[index] ?? null;
+    const netProfit = forecastValues.find((metric) => metric.key === 'netProfit')?.values[index] ?? null;
+    return {
+      label: periodLabel(period),
+      period,
+      phase: 'forecast',
+      netSalesActual: null,
+      grossProfitActual: null,
+      netProfitActual: null,
+      netSalesForecast: netSales,
+      grossProfitForecast: grossProfit,
+      netProfitForecast: netProfit,
+    };
+  });
+
+  const backTestRows = forecastBackTest(metrics, s.monthly.map((r) => r.label), [3]);
+  const m3Errors = backTestRows
+    .map((row) => (row.errorPct == null ? null : Math.abs(row.errorPct)))
+    .filter((value): value is number => value != null && Number.isFinite(value));
+
+  return {
+    points: [...actualPoints, ...forecastPoints],
+    budgetReference: null,
+    m3AccuracyPct: m3Errors.length > 0 ? m3Errors.reduce((sum, value) => sum + value, 0) / m3Errors.length : null,
+  };
+}
+
+async function getAccountRowsForLine(
+  s: FinFiscalSlice,
+  lineCode: FpaLineCode,
+): Promise<FpaBudgetVsActualRow[]> {
+  const accTypesByLine: Partial<Record<FpaLineCode, string[]>> = {
+    NS: ['SL', 'SA'],
+    CO: ['CO'],
+    GP: ['SL', 'SA', 'CO'],
+    EP: ['EP'],
+    OP: ['SL', 'SA', 'CO', 'EP'],
+    OI: ['OI'],
+    NP: ['SL', 'SA', 'CO', 'EP', 'OI'],
+  };
+  const accTypes = accTypesByLine[lineCode] ?? [];
+  if (accTypes.length === 0) return [];
+
+  const fyNum = fyNameToNumber(s.fyLabel);
+  const priorWindow = resolveFiscalWindow(fyNum - 1, s.rangeLabel.startsWith('last 12') ? 'last12' : s.rangeLabel.includes('year-to-date') ? 'ytd' : 'fy', s.periodTo);
+  const pool = getPool();
+  const typeParams = accTypes.map((_, index) => `$${index + 5}`).join(',');
+  const { rows } = await pool.query(
+    `SELECT
+       COALESCE(pp.parent_acc_no, pp.acc_no) AS accno,
+       COALESCE((SELECT ga.description FROM gl_account ga WHERE ga.accno = pp.parent_acc_no), pp.account_name) AS account_name,
+       pp.acc_type,
+       SUM(CASE WHEN pp.period_no BETWEEN $1 AND $2 THEN
+         CASE WHEN plf.creditaspositive = 'T' THEN pp.home_cr - pp.home_dr ELSE pp.home_dr - pp.home_cr END
+       ELSE 0 END)::float AS actual,
+       SUM(CASE WHEN pp.period_no BETWEEN $3 AND $4 THEN
+         CASE WHEN plf.creditaspositive = 'T' THEN pp.home_cr - pp.home_dr ELSE pp.home_dr - pp.home_cr END
+       ELSE 0 END)::float AS prior
+     FROM pc_pnl_period pp
+     JOIN pl_format plf ON pp.acc_type = plf.acctype
+     WHERE pp.acc_type IN (${typeParams})
+       AND pp.period_no BETWEEN $3 AND $2
+     GROUP BY COALESCE(pp.parent_acc_no, pp.acc_no), pp.parent_acc_no, pp.account_name, pp.acc_type
+     HAVING SUM(ABS(pp.home_dr) + ABS(pp.home_cr)) <> 0
+     ORDER BY accno`,
+    [s.periodFrom, s.periodTo, priorWindow.periodFrom, priorWindow.periodTo, ...accTypes],
+  );
+
+  const meta = FPA_LINE_META[lineCode];
+  return (rows as { accno: string; account_name: string; acc_type: string; actual: number; prior: number }[])
+    .map((row) => buildFpaRow(
+      `${lineCode}:${row.accno}`,
+      row.accno,
+      row.account_name,
+      1,
+      lineCode,
+      Number(row.actual),
+      null,
+      Number(row.prior),
+      meta.higherIsBetter,
+      'detail',
+      false,
+    ));
+}
+
+async function getExpenseCategoryRows(s: FinFiscalSlice): Promise<FpaBudgetVsActualRow[]> {
+  const accountRows = await getExpenseAccountRows(s);
+  return CATEGORY_ORDER.map((category) => {
+    const rows = accountRows.filter((row) => row.category === category);
+    const actual = rows.reduce((sum, row) => sum + row.actual, 0);
+    const prior = rows.reduce((sum, row) => sum + row.prior, 0);
+    return buildFpaRow(
+      `EP:${category}`,
+      category,
+      category,
+      1,
+      'EP',
+      actual,
+      null,
+      prior,
+      false,
+      'detail',
+      rows.length > 0,
+    );
+  }).filter((row) => row.actual !== 0 || row.yoyPct != null);
+}
+
+async function getExpenseAccountRows(s: FinFiscalSlice): Promise<Array<{ accno: string; accountName: string; parentAccNo: string | null; category: string; actual: number; prior: number }>> {
+  const fyNum = fyNameToNumber(s.fyLabel);
+  const priorWindow = resolveFiscalWindow(fyNum - 1, s.rangeLabel.startsWith('last 12') ? 'last12' : s.rangeLabel.includes('year-to-date') ? 'ytd' : 'fy', s.periodTo);
+  const pool = getPool();
+  const { rows } = await pool.query(
+    `SELECT
+       pp.acc_no AS accno,
+       pp.account_name,
+       pp.parent_acc_no,
+       SUM(CASE WHEN pp.period_no BETWEEN $1 AND $2 THEN
+         CASE WHEN plf.creditaspositive = 'T' THEN pp.home_cr - pp.home_dr ELSE pp.home_dr - pp.home_cr END
+       ELSE 0 END)::float AS actual,
+       SUM(CASE WHEN pp.period_no BETWEEN $3 AND $4 THEN
+         CASE WHEN plf.creditaspositive = 'T' THEN pp.home_cr - pp.home_dr ELSE pp.home_dr - pp.home_cr END
+       ELSE 0 END)::float AS prior
+     FROM pc_pnl_period pp
+     JOIN pl_format plf ON pp.acc_type = plf.acctype
+     WHERE pp.acc_type = 'EP'
+       AND pp.period_no BETWEEN $3 AND $2
+     GROUP BY pp.acc_no, pp.account_name, pp.parent_acc_no
+     HAVING SUM(ABS(pp.home_dr) + ABS(pp.home_cr)) <> 0
+     ORDER BY pp.acc_no`,
+    [s.periodFrom, s.periodTo, priorWindow.periodFrom, priorWindow.periodTo],
+  );
+
+  return (rows as { accno: string; account_name: string; parent_acc_no: string | null; actual: number; prior: number }[])
+    .map((row) => ({
+      accno: row.accno,
+      accountName: row.account_name,
+      parentAccNo: row.parent_acc_no,
+      category: getExpenseCategory(row.parent_acc_no ?? row.accno),
+      actual: Number(row.actual),
+      prior: Number(row.prior),
+    }));
+}
+
+export async function getBudgetBaselineSnapshot(): Promise<FpaBudgetSnapshot> {
+  const rows = await getGlobalBudget();
+  return {
+    hasBudget: rows.length > 0,
+    rows,
+    updatedAt: rows[0]?.updated_at ?? null,
+  };
+}
+
+export async function getVarianceKpiTiles(period: FiscalPeriod): Promise<FpaVarianceKpiTile[]> {
+  const [s, budgetRows] = await Promise.all([getFiscalSlice(period), getGlobalBudget()]);
+  const actual = getActualValues(s, 'current');
+  const prior = getActualValues(s, 'prior');
+  const budget = deriveBudgetValues(budgetRows);
+
+  return FPA_BUDGET_LINE_ORDER.map((label) => {
+    const code: FpaLineCode = label === 'Net Sales' ? 'NS' : label === 'Cost of Sales' ? 'CO' : label === 'Operating Costs' ? 'EP' : 'OI';
+    const meta = FPA_LINE_META[code];
+    const budgetValue = budget[code];
+    const varianceRm = budgetValue == null ? null : actual[code] - budgetValue;
+    return {
+      code,
+      label: meta.label,
+      actual: actual[code],
+      budget: budgetValue,
+      varianceRm,
+      variancePct: calcVariancePct(actual[code], budgetValue),
+      yoyPct: yoyPct(actual[code], prior[code]),
+      higherIsBetter: meta.higherIsBetter,
+      isFavourable: calcIsFavourable(varianceRm, meta.higherIsBetter),
+      status: calcStatus(actual[code], budgetValue),
+    };
+  });
+}
+
+export async function getVarianceBridgeSeries(period: FiscalPeriod): Promise<FpaVarianceBridgeSeries> {
+  const [s, budgetRows] = await Promise.all([getFiscalSlice(period), getGlobalBudget()]);
+  const actual = getActualValues(s, 'current');
+  const prior = getActualValues(s, 'prior');
+  const budget = deriveBudgetValues(budgetRows);
+  const hasBudget = budgetRows.length > 0;
+
+  const baseline = hasBudget ? budget : prior;
+  const baselineNp = baseline.NP ?? 0;
+  const actualNp = actual.NP;
+  const steps = [
+    { label: 'Net Sales', amount: actual.NS - (baseline.NS ?? 0), higherIsBetter: true },
+    { label: 'Cost of Sales', amount: (baseline.CO ?? 0) - actual.CO, higherIsBetter: true },
+    { label: 'Operating Costs', amount: (baseline.EP ?? 0) - actual.EP, higherIsBetter: true },
+    { label: 'Other Income', amount: actual.OI - (baseline.OI ?? 0), higherIsBetter: true },
+  ];
+
+  let running = baselineNp;
+  const totalVariance = actualNp - baselineNp;
+  const points: FpaBridgePoint[] = [
+    {
+      label: hasBudget ? 'Budget NP' : 'Prior NP',
+      amount: baselineNp,
+      start: 0,
+      end: baselineNp,
+      range: [Math.min(0, baselineNp), Math.max(0, baselineNp)],
+      kind: 'terminal',
+      isFavourable: null,
+      pctOfTotalVariance: null,
+    },
+  ];
+
+  for (const step of steps) {
+    const start = running;
+    running += step.amount;
+    points.push({
+      label: step.label,
+      amount: step.amount,
+      start,
+      end: running,
+      range: [Math.min(start, running), Math.max(start, running)],
+      kind: 'step',
+      isFavourable: step.amount === 0 ? null : step.amount > 0,
+      pctOfTotalVariance: totalVariance === 0 ? null : (Math.abs(step.amount) / Math.abs(totalVariance)) * 100,
+    });
+  }
+
+  points.push({
+    label: 'Actual NP',
+    amount: actualNp,
+    start: 0,
+    end: actualNp,
+    range: [Math.min(0, actualNp), Math.max(0, actualNp)],
+    kind: 'terminal',
+    isFavourable: null,
+    pctOfTotalVariance: null,
+  });
+
+  return {
+    mode: hasBudget ? 'budget' : 'yoy',
+    baselineLabel: hasBudget ? 'Budget NP' : 'Prior NP',
+    actualLabel: 'Actual NP',
+    totalVariance,
+    points,
+  };
+}
+
+export async function getForecastSeries(period: FiscalPeriod): Promise<FpaForecastSeries> {
+  const [s, budgetRows] = await Promise.all([getFiscalSlice(period), getGlobalBudget()]);
+  if (s.monthly.length < 3) {
+    return { points: [], budgetReference: null, m3AccuracyPct: null };
+  }
+
+  const series = buildForecastPoints(s);
+  const netSalesMonthlyBudget = budgetRows.find((row) => row.line_item === 'Net Sales')?.monthly_budget ?? null;
+  return {
+    ...series,
+    budgetReference: netSalesMonthlyBudget,
+  };
+}
+
+export async function getBudgetVsActualRows(
+  period: FiscalPeriod,
+  level: 0 | 1 | 2,
+  parent?: string | null,
+): Promise<{ hasBudget: boolean; rows: FpaBudgetVsActualRow[] }> {
+  const [s, budgetRows] = await Promise.all([getFiscalSlice(period), getGlobalBudget()]);
+  const hasBudget = budgetRows.length > 0;
+
+  if (level === 0) {
+    const actual = getActualValues(s, 'current');
+    const prior = getActualValues(s, 'prior');
+    const budget = deriveBudgetValues(budgetRows);
+    const order: FpaLineCode[] = ['NS', 'CO', 'GP', 'EP', 'OP', 'OI', 'NP'];
+    return {
+      hasBudget,
+      rows: order.map((code) => {
+        const meta = FPA_LINE_META[code];
+        return buildFpaRow(
+          code,
+          code,
+          meta.label,
+          0,
+          null,
+          actual[code],
+          budget[code],
+          prior[code],
+          meta.higherIsBetter,
+          meta.rowType,
+          true,
+        );
+      }),
+    };
+  }
+
+  if (!parent) return { hasBudget, rows: [] };
+
+  if (level === 1) {
+    if (parent === 'EP') {
+      return { hasBudget, rows: await getExpenseCategoryRows(s) };
+    }
+    return { hasBudget, rows: await getAccountRowsForLine(s, parent as FpaLineCode) };
+  }
+
+  if (parent.startsWith('EP:')) {
+    const category = parent.slice(3);
+    const accounts = (await getExpenseAccountRows(s)).filter((row) => row.category === category);
+    return {
+      hasBudget,
+      rows: accounts.map((row) => buildFpaRow(
+        `EP:${category}:${row.accno}`,
+        row.accno,
+        row.accountName,
+        2,
+        parent,
+        row.actual,
+        null,
+        row.prior,
+        false,
+        'detail',
+        false,
+      )),
+    };
+  }
+
+  return { hasBudget, rows: [] };
+}
+
+export async function getFpaDataAsOf(): Promise<FpaDataAsOf> {
+  const pool = getPool();
+  const { rows } = await pool.query(
+    `SELECT MAX(completed_at) AS completed_at
+       FROM sync_job
+      WHERE status = 'completed'`,
+  );
+  return { completedAt: rows[0]?.completed_at ?? null };
+}
+
 function yoyLabel(pctVal: number | null, higherIsBetter: boolean): string {
   if (pctVal == null) return 'No prior-year data';
   const good = higherIsBetter ? pctVal >= 0 : pctVal <= 0;
@@ -4600,7 +5151,6 @@ const fiscalPeriodFetchers: Record<string, FiscalPeriodFetcher> = {
       { name: 'Net Sales',       curr: c.net_sales,    higherIsBetter: true },
       { name: 'Cost of Sales',   curr: c.cogs,         higherIsBetter: false },
       { name: 'Operating Costs', curr: c.expenses,     higherIsBetter: false },
-      { name: 'Other Income',    curr: c.other_income, higherIsBetter: true },
     ];
 
     const allowed: AllowedValue[] = [];
