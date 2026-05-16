@@ -21,7 +21,27 @@ export interface PromptRowView {
   sortOrder: number;
   updatedAt: string;
   updatedBy: string | null;
-  thresholdGroups?: [];
+  thresholdGroups?: ThresholdGroupView[];
+}
+
+export interface ThresholdTokenView {
+  token: string;
+  label: string;
+  unit: 'days' | 'pct' | 'RM' | 'count' | 'ratio';
+  valueType: 'int' | `decimal(${number})`;
+  value: number;
+  formattedValue: string;
+  min: number;
+  max: number;
+  description?: string;
+}
+
+export interface ThresholdGroupView {
+  id: string;
+  label: string;
+  direction: 'ascending' | 'descending';
+  description?: string;
+  tokens: ThresholdTokenView[];
 }
 
 const fetcher = async (url: string) => {

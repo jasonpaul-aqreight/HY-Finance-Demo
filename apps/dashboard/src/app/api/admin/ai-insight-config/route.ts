@@ -5,9 +5,10 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
+    const prompts = await buildPromptConfigRows();
     return NextResponse.json({
-      prompts: buildPromptConfigRows(),
-      thresholdGroups: [],
+      prompts,
+      thresholdGroups: prompts.flatMap((prompt) => prompt.thresholdGroups),
     });
   } catch (err) {
     console.error('ai-insight-config GET error:', err);

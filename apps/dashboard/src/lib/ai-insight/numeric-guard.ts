@@ -6,6 +6,7 @@ const DEFAULT_TOLERANCE: Record<AllowedValueUnit, number> = {
   pct: 0.1,     // ± 0.1 percentage points
   days: 0.1,    // ± 0.1 days
   count: 0.5,   // counts must round to integer
+  ratio: 0.01,  // ratio values such as current ratio / debt-to-equity
 };
 
 // Numbers that are dates / years and should never be flagged.
@@ -79,6 +80,12 @@ const NUMBER_PATTERNS: { unit: AllowedValueUnit; regex: RegExp; parse: (m: RegEx
     unit: 'days',
     regex: /(-?\d{1,3}(?:,\d{3})+(?:\.\d+)?|-?\d+(?:\.\d+)?)\s*days?\b/gi,
     parse: (m) => parseFloat(m[1].replace(/,/g, '')),
+  },
+  // Current Ratio 1.2, debt-to-equity ratio 0.8, D/E 2.1
+  {
+    unit: 'ratio',
+    regex: /\b(?:current\s+ratio|debt[-\s]to[-\s]equity(?:\s+ratio)?|d\/e)\D{0,20}(-?\d+(?:\.\d+)?)/gi,
+    parse: (m) => parseFloat(m[1]),
   },
   // bare integer counts: "29 customers", "12 of 12 months", "top 5", "3,376 invoices"
   {

@@ -136,7 +136,7 @@ export interface SummaryJson {
   providerMeta?: AiProviderMetadata;
 }
 
-export type AllowedValueUnit = 'RM' | 'pct' | 'days' | 'count';
+export type AllowedValueUnit = 'RM' | 'pct' | 'days' | 'count' | 'ratio';
 
 export interface AllowedValue {
   label: string;          // human-readable description, e.g. "H1 avg neg gap"

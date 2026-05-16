@@ -8,6 +8,11 @@ import {
   SECTION_NAMES,
   SECTION_PAGE,
 } from './prompts';
+import {
+  getThresholdGroups,
+  renderThresholdText,
+  type ThresholdGroupView,
+} from './threshold-config';
 
 export type PromptConfigCategory = 'system' | 'component';
 export type PromptConfigComponentType = 'kpi' | 'chart' | 'table' | 'breakdown';
@@ -25,7 +30,7 @@ export interface PromptConfigRow {
   sortOrder: number;
   updatedAt: string;
   updatedBy: string | null;
-  thresholdGroups: [];
+  thresholdGroups: ThresholdGroupView[];
 }
 
 interface PromptConfigSeedRow {
@@ -40,17 +45,24 @@ interface PromptConfigSeedRow {
   sortOrder: number;
 }
 
-function toPromptConfigRow(row: PromptConfigSeedRow, updatedAt: string): PromptConfigRow {
+async function toPromptConfigRow(row: PromptConfigSeedRow, updatedAt: string): Promise<PromptConfigRow> {
+  const thresholdGroups = row.category === 'component'
+    ? await getThresholdGroups(row.promptKey)
+    : [];
+  const renderedPromptText = row.category === 'component'
+    ? await renderThresholdText(row.promptText, row.promptKey)
+    : row.promptText;
+
   return {
     ...row,
-    renderedPromptText: row.promptText,
+    renderedPromptText,
     updatedAt,
     updatedBy: 'code',
-    thresholdGroups: [],
+    thresholdGroups,
   };
 }
 
-export function buildPromptConfigRows(): PromptConfigRow[] {
+export async function buildPromptConfigRows(): Promise<PromptConfigRow[]> {
   const updatedAt = new Date().toISOString();
   const rows: PromptConfigSeedRow[] = [
     {
@@ -118,5 +130,5 @@ export function buildPromptConfigRows(): PromptConfigRow[] {
     });
   }
 
-  return rows.map((row) => toPromptConfigRow(row, updatedAt));
+  return Promise.all(rows.map((row) => toPromptConfigRow(row, updatedAt)));
 }

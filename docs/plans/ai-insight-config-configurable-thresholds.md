@@ -9,14 +9,14 @@ Single source of truth for cross-session status. On finishing a phase, the execu
 agent flips `[ ]` → `[x]` and fills the date + commit hash. Each phase below also has
 its own `> Progress:` line — keep both in sync.
 
-- [x] **Phase 0** — Audit + Safe Replacement Baseline · _date:_ 2026-05-16 · _commit:_ pending user approval
-- [x] **Phase 1** — Remove Feedback Loop · _date:_ 2026-05-16 · _commit:_ pending user approval
-- [ ] **Phase 2** — Threshold Config Foundation + Inventory · _date:_ — · _commit:_ —
+- [x] **Phase 0** — Audit + Safe Replacement Baseline · _date:_ 2026-05-16 · _commit:_ 73a3f5f
+- [x] **Phase 1** — Remove Feedback Loop · _date:_ 2026-05-16 · _commit:_ 73a3f5f
+- [x] **Phase 2** — Threshold Config Foundation + Inventory · _date:_ 2026-05-16 · _commit:_ pending user approval
 - [ ] **Phase 3** — Tokenize + Wire Single Source of Truth · _date:_ — · _commit:_ —
 - [ ] **Phase 4** — Config Page UI Rebuild · _date:_ — · _commit:_ —
 - [ ] **Post (deferred)** — PRD update — only when the user explicitly asks
 
-Next action: **Phase 2**.
+Next action: **Phase 3**.
 
 ## Context
 
@@ -308,7 +308,7 @@ Verification:
 
 ## Phase 2 - Threshold Config Foundation + Complete Inventory
 
-> Progress: NOT STARTED · date: — · commit: —
+> Progress: DONE · date: 2026-05-16 · commit: pending user approval
 
 Purpose: create the registry/table/API and prove validation works before tokenizing prompts.
 

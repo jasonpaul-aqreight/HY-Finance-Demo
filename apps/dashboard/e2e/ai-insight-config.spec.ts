@@ -23,7 +23,12 @@ test.describe('AI Insight Config after feedback removal', () => {
     expect(res.status()).toBe(200);
 
     const body = await res.json() as {
-      prompts: Array<{ promptKey: string; category: string; renderedPromptText: string }>;
+      prompts: Array<{
+        promptKey: string;
+        category: string;
+        renderedPromptText: string;
+        thresholdGroups?: Array<{ id: string; direction: 'ascending' | 'descending' }>;
+      }>;
     };
     const keys = body.prompts.map((prompt) => prompt.promptKey);
 
@@ -36,6 +41,12 @@ test.describe('AI Insight Config after feedback removal', () => {
 
     const categories = new Set(body.prompts.map((prompt) => prompt.category));
     expect([...categories].sort()).toEqual(['component', 'system']);
+
+    const avgCollectionDays = body.prompts.find((prompt) => prompt.promptKey === 'avg_collection_days');
+    expect(avgCollectionDays?.thresholdGroups?.[0]).toMatchObject({
+      id: 'collection_days_band',
+      direction: 'descending',
+    });
   });
 
   test('admin config page has no feedback, version, router, editor, or guidance UI', async ({ page }) => {
