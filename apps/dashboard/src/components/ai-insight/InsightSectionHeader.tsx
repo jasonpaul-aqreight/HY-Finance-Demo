@@ -67,10 +67,6 @@ export function InsightSectionHeader({
           onAnalyze={handleAnalyze}
           onCancel={insight.cancel}
           isAdmin={isAdmin}
-          sectionKey={sectionKey}
-          sectionName={title}
-          page={page}
-          userName={userName}
         />
       )}
     </div>

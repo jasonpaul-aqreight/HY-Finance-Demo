@@ -13,17 +13,11 @@ function pageLabel(page: string | null): string {
 }
 
 function systemDisplayName(prompt: PromptRowView): string {
-  if (prompt.promptKey === 'component_analysis' || prompt.promptKey === 'global_system') {
+  if (prompt.promptKey === 'component_analysis') {
     return 'Component Analysis';
   }
-  if (prompt.promptKey === 'summary_analysis' || prompt.promptKey === 'summary_system') {
+  if (prompt.promptKey === 'summary_analysis') {
     return 'Summary Analysis';
-  }
-  if (prompt.promptKey === 'feedback_router' || prompt.promptKey === 'feedback_router_system') {
-    return 'Feedback Router';
-  }
-  if (prompt.promptKey === 'surgical_editor' || prompt.promptKey === 'surgical_editor_system') {
-    return 'Surgical Editor';
   }
   return prompt.displayName;
 }
@@ -34,9 +28,7 @@ function buildCrumbs(prompt: PromptRowView): string[] {
     if (
       prompt.page === 'finance' ||
       prompt.promptKey === 'component_analysis' ||
-      prompt.promptKey === 'summary_analysis' ||
-      prompt.promptKey === 'global_system' ||
-      prompt.promptKey === 'summary_system'
+      prompt.promptKey === 'summary_analysis'
     ) {
       return ['System Prompt', 'Finance', displayName];
     }
@@ -47,8 +39,7 @@ function buildCrumbs(prompt: PromptRowView): string[] {
   }
 
   const isHr = prompt.page === 'hr';
-  const tail =
-    prompt.category === 'section_guidance' ? 'Guidance' : prompt.displayName;
+  const tail = prompt.displayName;
   const sectionName = prompt.sectionName ?? prompt.sectionKey ?? '';
 
   if (isHr) {

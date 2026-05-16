@@ -3,7 +3,6 @@ import {
   getGlobalSystemPrompt as loaderGlobalSystemPrompt,
   getSummarySystemPrompt as loaderSummarySystemPrompt,
   getComponentPrompt,
-  getSectionGuidance,
 } from './prompt-loader';
 
 
@@ -197,9 +196,8 @@ export async function buildSummaryUserPrompt(params: {
 
   // Per-component blocks: About (the component prompt — describes the card and
   // is authoritative on good/neutral/bad thresholds for this metric) + Raw
-  // Data (live values). About is loaded from the DB-backed prompt store; the
-  // same source Haiku sees during component analysis, so Sonnet gets identical
-  // guidance.
+  // Data (live values). About is loaded from the code-backed runtime prompt
+  // source, so component and summary analysis receive identical guidance.
   const componentBlocks = await Promise.all(
     params.componentResults.map(async (c, i) => {
       const about = await getComponentPrompt(c.key);
@@ -216,25 +214,12 @@ ${c.rawData}`;
   );
   const components = componentBlocks.join('\n\n');
 
-  // Guidance — section-scoped tone, expected output, and any deterministic
-  // questions or output overrides. Null when no guidance exists, in which
-  // case the block is omitted entirely.
-  const guidance = await getSectionGuidance(params.sectionKey);
-  const guidanceBlock = guidance
-    ? `Guidance:
-"""
-${guidance}
-"""
-
-`
-    : '';
-
   return `Section: ${sectionName}
 Page: ${pageName}
 ${dateInfo}
 Generated: ${now}
 
-${guidanceBlock}---
+---
 
 Tool budget for this run: at most 2 tool calls. Use the RAW DATA first; call a
 tool only when a specific driver is not already named in the raw data blocks.

@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import useSWR from 'swr';
 import {
   TrendingUp,
   CreditCard,
@@ -19,7 +18,6 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSidebar } from './SidebarProvider';
-import { useRole } from './RoleProvider';
 import {
   Tooltip,
   TooltipContent,
@@ -45,30 +43,9 @@ const adminItems = [
   { href: '/admin/ai-insight-config', label: 'AI Insight Config', icon: Sparkles },
 ];
 
-interface FeedbackRow {
-  id: number;
-  targetPromptKey: string;
-}
-
-const feedbackFetcher = async (url: string): Promise<{ feedback: FeedbackRow[] }> => {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Request failed: ${res.status}`);
-  return res.json();
-};
-
 export function AppSidebar() {
   const pathname = usePathname();
   const { collapsed, toggle } = useSidebar();
-  const { isAdmin } = useRole();
-
-  // Total pending feedback count (admin-only). Refresh every 30s so the badge
-  // tracks new submissions without manual reload. Skipped when not admin.
-  const { data: feedbackData } = useSWR<{ feedback: FeedbackRow[] }>(
-    isAdmin ? '/api/admin/ai-insight-feedback' : null,
-    feedbackFetcher,
-    { refreshInterval: 30_000, revalidateOnFocus: false },
-  );
-  const totalFeedback = feedbackData?.feedback.length ?? 0;
 
   return (
     <aside
@@ -184,10 +161,6 @@ export function AppSidebar() {
             {adminItems.map((item) => {
               const isActive = pathname.startsWith(item.href);
               const Icon = item.icon;
-              const showBadge =
-                isAdmin &&
-                item.href === '/admin/ai-insight-config' &&
-                totalFeedback > 0;
 
               const link = (
                 <Link
@@ -202,18 +175,6 @@ export function AppSidebar() {
                 >
                   <Icon size={18} className="shrink-0" />
                   {!collapsed && <span className="truncate">{item.label}</span>}
-                  {showBadge && (
-                    <span
-                      className={cn(
-                        collapsed
-                          ? 'absolute right-1 top-1 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-blue-600 px-1 text-[10px] font-bold text-white'
-                          : 'ml-auto inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-blue-600 px-1.5 text-[11px] font-bold text-white'
-                      )}
-                      title={`${totalFeedback} pending feedback`}
-                    >
-                      {totalFeedback}
-                    </span>
-                  )}
                 </Link>
               );
 

@@ -18,9 +18,8 @@ export function PromptTextPanel({ prompt }: Props) {
     );
   }
 
-  const text = prompt.promptText ?? '';
+  const text = prompt.renderedPromptText ?? prompt.promptText ?? '';
   const trimmed = text.trim();
-  const versionLabel = prompt.selectedVersionLabel ?? 'Default';
 
   return (
     <div
@@ -31,17 +30,6 @@ export function PromptTextPanel({ prompt }: Props) {
         <div className="text-sm font-semibold text-foreground">
           Prompt Text
         </div>
-        <span
-          data-testid="selected-version-pill"
-          className={
-            versionLabel === 'Default'
-              ? 'inline-flex items-center rounded-full border border-amber-400 bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-900'
-              : 'inline-flex items-center rounded-full border border-blue-300 bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-900'
-          }
-          title="Currently selected version"
-        >
-          {versionLabel}
-        </span>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
         {trimmed.length === 0 ? (
@@ -49,8 +37,7 @@ export function PromptTextPanel({ prompt }: Props) {
             data-testid="prompt-text-empty"
             className="text-sm italic text-foreground/60"
           >
-            This prompt is empty. Submit feedback from the user-facing AI insight panel
-            to populate it.
+            This prompt is empty.
           </div>
         ) : (
           <pre

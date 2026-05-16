@@ -17,26 +17,11 @@ export const OPENROUTER_COMPONENT_MODEL =
 export const OPENROUTER_SUMMARY_MODEL =
   process.env.AI_INSIGHT_OPENROUTER_SUMMARY_MODEL || 'deepseek/deepseek-v4-pro';
 
-export const OPENROUTER_ROUTER_MODEL =
-  process.env.AI_INSIGHT_OPENROUTER_ROUTER_MODEL || OPENROUTER_COMPONENT_MODEL;
-
-export const OPENROUTER_EDITOR_MODEL =
-  process.env.AI_INSIGHT_OPENROUTER_EDITOR_MODEL || OPENROUTER_SUMMARY_MODEL;
-
 export const OPENROUTER_COMPONENT_FALLBACK_MODEL =
   process.env.AI_INSIGHT_OPENROUTER_COMPONENT_FALLBACK_MODEL || 'deepseek/deepseek-v4-pro';
 
-export const OPENROUTER_ROUTER_FALLBACK_MODEL =
-  process.env.AI_INSIGHT_OPENROUTER_ROUTER_FALLBACK_MODEL || OPENROUTER_COMPONENT_FALLBACK_MODEL;
-
 export const OPENROUTER_SUMMARY_FALLBACK_MODELS =
   (process.env.AI_INSIGHT_OPENROUTER_SUMMARY_FALLBACK_MODELS || 'z-ai/glm-5.1')
-    .split(',')
-    .map((model) => model.trim())
-    .filter(Boolean);
-
-export const OPENROUTER_EDITOR_FALLBACK_MODELS =
-  (process.env.AI_INSIGHT_OPENROUTER_EDITOR_FALLBACK_MODELS || OPENROUTER_SUMMARY_FALLBACK_MODELS.join(','))
     .split(',')
     .map((model) => model.trim())
     .filter(Boolean);

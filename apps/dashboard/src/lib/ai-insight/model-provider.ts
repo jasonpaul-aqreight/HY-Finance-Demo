@@ -2,10 +2,6 @@ import {
   OPENROUTER_API_KEY,
   OPENROUTER_COMPONENT_FALLBACK_MODEL,
   OPENROUTER_COMPONENT_MODEL,
-  OPENROUTER_EDITOR_FALLBACK_MODELS,
-  OPENROUTER_EDITOR_MODEL,
-  OPENROUTER_ROUTER_FALLBACK_MODEL,
-  OPENROUTER_ROUTER_MODEL,
   OPENROUTER_SUMMARY_FALLBACK_MODELS,
   OPENROUTER_SUMMARY_MODEL,
   OPENROUTER_TIMEOUT_MS,
@@ -29,7 +25,7 @@ import type {
   ProviderPreferences,
 } from '@openrouter/sdk/models';
 
-export type AiModelSlot = 'component' | 'summary' | 'feedback_router' | 'surgical_editor';
+export type AiModelSlot = 'component' | 'summary';
 export type { AiTextBlock, AiToolUseBlock };
 export type AiContentBlock = AiTextBlock | AiToolUseBlock;
 
@@ -389,10 +385,6 @@ function openRouterModelsForSlot(slot: AiModelSlot): string[] {
   switch (slot) {
     case 'component':
       return [OPENROUTER_COMPONENT_MODEL, OPENROUTER_COMPONENT_FALLBACK_MODEL];
-    case 'feedback_router':
-      return [OPENROUTER_ROUTER_MODEL, OPENROUTER_ROUTER_FALLBACK_MODEL];
-    case 'surgical_editor':
-      return [OPENROUTER_EDITOR_MODEL, ...OPENROUTER_EDITOR_FALLBACK_MODELS];
     case 'summary':
     default:
       return [OPENROUTER_SUMMARY_MODEL, ...OPENROUTER_SUMMARY_FALLBACK_MODELS];
@@ -400,7 +392,7 @@ function openRouterModelsForSlot(slot: AiModelSlot): string[] {
 }
 
 function openRouterProviderForSlot(slot: AiModelSlot): ProviderPreferences {
-  if (slot === 'summary' || slot === 'surgical_editor') {
+  if (slot === 'summary') {
     return baseProviderPreference(SUMMARY_PROVIDER_ORDER);
   }
 

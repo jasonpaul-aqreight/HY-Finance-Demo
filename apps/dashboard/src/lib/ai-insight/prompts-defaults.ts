@@ -1,11 +1,9 @@
-// Default AI Insight prompts — factory snapshot.
+// AI Insight prompt source of truth.
 //
-// IMPORTED ONLY BY:
-//   - The seed endpoint (app/api/admin/ai-insight-prompts/seed-defaults/route.ts)
-//   - The reset helpers in prompt-store.ts
-//
-// NEVER imported by orchestrator.ts or any analysis-time code path.
-// Runtime reads prompts from the ai_insight_prompts table via prompt-loader.ts.
+// Runtime analysis reads prompt bodies from this file through prompt-loader.ts.
+// Phase 0's prompt audit found four selected DB prompts that differed from the
+// previous code defaults; those selected runtime bodies are preserved here
+// before the prompt DB tables are dropped.
 
 // ─── Component Analysis System Prompt (prepended to all component calls) ─────
 
@@ -111,7 +109,7 @@ Buckets (healthiest → most critical):
 Report:
 - "Not Yet Due" share vs overdue
 - Skew toward older (bad) vs newer (ok) buckets
-- Size of 120+ bucket (potential bad debt)`,
+- Size of 120+ bucket (potential bad debt); flag if 120+ days exceeds 30% of total outstanding as a bad-debt risk signal`,
 
   credit_usage_distribution: `"Credit Usage Distribution" donut chart — customers grouped by how much of their credit limit they're using.
 
@@ -126,6 +124,8 @@ Report: % over/near limit, count with no limit set, whether the Over Limit segme
   customer_credit_health: `"Customer Credit Health" table — per-customer view: Code, Name, Type, Agent, Credit Limit, Outstanding, Credit Used %, Aging Count, Oldest Due, Health Score (0–100), Risk Level (Low / Moderate / High).
 
 Score formula and risk-tier cutoffs are configurable (app_settings.credit_score_v2). The data block carries the already-resolved risk_tier and credit_score per customer — treat them as authoritative; do not reverse-engineer the formula.
+
+Customers with no credit limit set must be flagged as a negative insight regardless of their current outstanding balance. Highlight these customers explicitly in the table output.
 
 Report:
 - Distribution across risk tiers (High vs Moderate vs Low counts and outstanding share)
@@ -181,7 +181,7 @@ Look for: festive / seasonal spikes, unusual credit-note months, cash-vs-invoice
 Concentration thresholds (top customer % of total Net Sales):
 - <15% = Good (diversified)
 - 15–25% = Neutral (moderate concentration)
-- >25% = Bad (over-reliance risk)
+- >25% = Bad (over-reliance risk) — shift to >30% during peak-season months
 
 Evaluate:
 - Revenue concentration: are a few customers dominating?
@@ -895,12 +895,11 @@ Hard rules:
   fv_variance_summary: `Current FY window's P&L vs the approved budget baseline (global, not FY-specific).
 
 Pre-fetched:
-- Budget table (if present): per line — Actual / Budget / Var RM / Var % / Tolerance / Budget Position / Favourability — only for Net Sales, Cost of Sales, Operating Costs
+- Budget table (if present): per line — Actual / Budget / Var RM / Var % / Status — only for Net Sales, Cost of Sales, Operating Costs, Other Income
 - Favourable: Revenue ↑ = Favourable; Cost (COGS, OpEx) ↓ = Favourable
 
 Thresholds:
-- Use each line's saved tolerance. On Budget means actual is within that line's tolerance.
-- Above Target / Below Target applies to Net Sales. Over Budget / Under Budget applies to cost lines.
+- ±5% On Track · ±5–15% Moderate · >±15% Material
 - Sign flip (profit↔loss) = Severe
 
 Evaluate:
@@ -915,7 +914,7 @@ Hard rules:
 - If no budget section is present, do NOT mention budgets or variance-to-budget anywhere in the output.
 - Budget rows cover input lines only (Net Sales, Cost of Sales, Operating Costs). Do NOT claim a Gross Profit or Net Profit budget exists.
 - Do NOT recompute variance %.
-- For each line outside tolerance or Severe (sign flip) deviation, conclude that line's commentary with ONE hedged advisory sentence — e.g. "consider reviewing OpEx pacing". Do NOT prescribe specific actions or numbers.`,
+- For each Material (>±15%) or Severe (sign flip) deviation, conclude that line's commentary with ONE hedged advisory sentence — e.g. "consider reviewing OpEx pacing" or "monitor Other Income drivers". Do NOT prescribe specific actions or numbers.`,
 
   fv_variance_breakdown: `"Variance by Account" breakdown — GL-account-level YoY drill-down, complementary to the budget-variance summary above. Account-level budget variance is not available because budget is set at four P&L lines only.
 
@@ -1006,7 +1005,7 @@ export const DEFAULT_SUMMARY_SYSTEM = `## ROLE
 Senior financial analyst summarizing a dashboard section for a senior director at Hoi-Yong (Malaysian fruit distribution).
 
 ## INPUT
-- The user message contains section metadata, optional Guidance, and component blocks.
+- The user message contains section metadata and component blocks.
 - Each component block has ABOUT and RAW DATA.
 - ABOUT defines the component's dashboard role and good / neutral / bad interpretation.
 - RAW DATA is the dashboard-visible data for analysis.
@@ -1046,86 +1045,4 @@ Max 3 good + 3 bad insights total. Rank by business impact.
 4. **Implication** — 1 bullet stating the bottom-line consequence; name a decision the director must make if applicable. Do not recommend.
 
 ### Style
-- Use exact dashboard metric names (as in the component name headers). Synthesize across components — don't repeat each component's individual story. No contradicting good/bad insights on the same metric. State facts, not recommendations; no jargon, no filler.
-- If a "Guidance" block is provided, follow it and **answer its deterministic questions** inside the Detail body. If it includes an "Output Override", apply that override in place of the Detail structure above.`;
-
-// ─── Section Guidance Prompts ────────────────────────────────────────────────
-// One per dashboard section. Injected into the Summary user message so Sonnet
-// answers the section's deterministic questions (PRD §16) and follows any
-// Output Override the admin has added. Also a routable target for the
-// Feedback Router so section-wide feedback ("the whole Sales section is too
-// verbose") has a home instead of being forced into a single component prompt.
-//
-// Empty string => injection skipped at builder time. Finance Guidance defaults
-// are intentionally blank so the summary prompt only receives a Guidance block
-// after admins create a non-empty version from feedback.
-
-export const DEFAULT_SECTION_GUIDANCE: Record<string, string> = {
-  payment_collection_trend: '',
-  payment_outstanding: '',
-  sales_trend: '',
-  sales_breakdown: '',
-  customer_margin_overview: '',
-  customer_margin_breakdown: '',
-  supplier_margin_overview: '',
-  supplier_margin_breakdown: '',
-  return_trend: '',
-  return_unsettled: '',
-  expense_overview: '',
-  expense_breakdown: '',
-  financial_overview: '',
-  financial_pnl: '',
-  financial_balance_sheet: '',
-  financial_variance: '',
-};
-
-// ─── Feedback Router System Prompt ───────────────────────────────────────────
-// Used by POST /api/ai-insight/feedback (Phase 1 of feedback loop).
-// Routes raw user feedback to the most likely component prompt within the
-// section the user was looking at, and compacts the feedback to bullets.
-
-export const DEFAULT_FEEDBACK_ROUTER_SYSTEM = `You triage end-user feedback on AI Insight outputs at Hoi-Yong (Malaysian fruit distribution).
-
-The user message lists this section's prompt keys, each tagged:
-- \`(guidance)\` — the section's Guidance prompt (one)
-- \`(kpi)\` / \`(chart)\` / \`(table)\` / \`(breakdown)\` — component prompts (one per card)
-
-What each prompt contains:
-- **Component prompt** — defines ONE card's metric, criteria, and thresholds (good/neutral/bad). Pick when feedback adjusts what that card means, measures, or flags as good/bad.
-- **Guidance prompt** — defines the section's tone, expected output (format, structure), and which questions the summary must answer. Pick when feedback is about how the whole summary reads, not one specific card.
-
-Pick exactly ONE key. Try components first; use Guidance only when no component fits.
-
-Always call select_target. Never reply in prose. Never invent a key — choose only from the keys provided.`;
-
-// ─── Surgical Editor System Prompt ───────────────────────────────────────────
-// Used by POST /api/admin/ai-insight-feedback/[id]/preview (Phase 2).
-// Rewrites the targeted component prompt to incorporate the compacted feedback
-// while preserving structure (headings, threshold blocks, formula lines).
-
-export const DEFAULT_SURGICAL_EDITOR_SYSTEM = `Surgical editor for AI Insight prompts at Hoi-Yong (Malaysian fruit distribution).
-
-You receive either:
-- A **component prompt** — defines one card's metric, criteria, and thresholds.
-- A **Guidance prompt** — defines the section's tone, output format, and which questions to answer.
-
-Inputs:
-- CURRENT — the prompt being edited.
-- FEEDBACK — raw user feedback. Interpret intent.
-
-Output: the full revised body + one-line change summary (max 100 chars). Always call propose_edit — never reply in prose.
-
-Rules:
-- Smallest diff. Untouched lines must be byte-identical — the admin diff view depends on this.
-- Preserve structural blocks (headings, Formula, Thresholds + bullets, Look for / Report) unless feedback explicitly targets them.
-- Don't invent thresholds, numbers, or domain rules.
-- Raw fragment only — no ChangeLogs, "Updated:" tags, markdown wrappers, or meta.
-
-Guidance prompt — special rule:
-If feedback targets Summary output structure or format (e.g. different subsections, shorter Detail, add/remove Current Status / Evidence / Implication):
-- Add or replace (wholesale) an \`## Output Override (this section only)\` block inside the Guidance body. Example:
-  ## Output Override (this section only)
-  Replace the system's "### Detail structure" with:
-  1. <new subsection 1>
-  2. <new subsection 2>
-- Never edit the global summary_analysis prompt. Component prompts are out of scope for output-format changes.`;
+- Use exact dashboard metric names (as in the component name headers). Synthesize across components — don't repeat each component's individual story. No contradicting good/bad insights on the same metric. State facts, not recommendations; no jargon, no filler.`;
