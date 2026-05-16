@@ -11,7 +11,7 @@ its own `> Progress:` line — keep both in sync.
 
 - [x] **Phase 0** — Audit + Safe Replacement Baseline · _date:_ 2026-05-16 · _commit:_ 73a3f5f
 - [x] **Phase 1** — Remove Feedback Loop · _date:_ 2026-05-16 · _commit:_ 73a3f5f
-- [x] **Phase 2** — Threshold Config Foundation + Inventory · _date:_ 2026-05-16 · _commit:_ pending user approval
+- [x] **Phase 2** — Threshold Config Foundation + Inventory · _date:_ 2026-05-16 · _commit:_ 3c9dd1c
 - [ ] **Phase 3** — Tokenize + Wire Single Source of Truth · _date:_ — · _commit:_ —
 - [ ] **Phase 4** — Config Page UI Rebuild · _date:_ — · _commit:_ —
 - [ ] **Post (deferred)** — PRD update — only when the user explicitly asks
@@ -242,7 +242,7 @@ These may appear on the AI Insight Config page as read-only prompt text or futur
 
 ## Phase 0 - Audit + Safe Replacement Baseline
 
-> Progress: DONE · date: 2026-05-16 · commit: pending user approval
+> Progress: DONE · date: 2026-05-16 · commit: 73a3f5f
 
 Purpose: prevent accidental data loss or a broken config page.
 
@@ -263,7 +263,7 @@ Verification:
 
 ## Phase 1 - Remove Feedback Loop
 
-> Progress: DONE · date: 2026-05-16 · commit: pending user approval
+> Progress: DONE · date: 2026-05-16 · commit: 73a3f5f
 
 Purpose: delete the confusing workflow without breaking AI Insight analysis.
 
@@ -308,7 +308,7 @@ Verification:
 
 ## Phase 2 - Threshold Config Foundation + Complete Inventory
 
-> Progress: DONE · date: 2026-05-16 · commit: pending user approval
+> Progress: DONE · date: 2026-05-16 · commit: 3c9dd1c
 
 Purpose: create the registry/table/API and prove validation works before tokenizing prompts.
 
