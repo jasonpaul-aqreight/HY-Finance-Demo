@@ -12,7 +12,7 @@ its own `> Progress:` line — keep both in sync.
 - [x] **Phase 0** — Audit + Safe Replacement Baseline · _date:_ 2026-05-16 · _commit:_ 73a3f5f
 - [x] **Phase 1** — Remove Feedback Loop · _date:_ 2026-05-16 · _commit:_ 73a3f5f
 - [x] **Phase 2** — Threshold Config Foundation + Inventory · _date:_ 2026-05-16 · _commit:_ 3c9dd1c
-- [x] **Phase 3** — Tokenize + Wire Single Source of Truth · _date:_ 2026-05-16 · _commit:_ pending user approval
+- [x] **Phase 3** — Tokenize + Wire Single Source of Truth · _date:_ 2026-05-16 · _commit:_ cb8859b
 - [ ] **Phase 4** — Config Page UI Rebuild · _date:_ — · _commit:_ —
 - [ ] **Post (deferred)** — PRD update — only when the user explicitly asks
 
@@ -361,7 +361,7 @@ Verification:
 
 ## Phase 3 - Tokenize + Wire Single Source Of Truth
 
-> Progress: DONE · date: 2026-05-16 · commit: pending user approval
+> Progress: DONE · date: 2026-05-16 · commit: cb8859b
 
 Purpose: make default behavior unchanged while making values live.
 
