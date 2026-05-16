@@ -63,7 +63,6 @@ export interface AiModelRequest {
   tools?: AiTool[];
   toolChoice?: AiToolChoice;
   abortSignal?: AbortSignal;
-  cacheSystem?: boolean;
 }
 
 interface AttemptContext {
@@ -101,8 +100,6 @@ const SUMMARY_PROVIDER_ORDER = [
   'atlas-cloud/fp8',
   'z-ai',
 ];
-
-const ANTHROPIC_PROVIDER_ORDER = ['Anthropic'];
 
 export async function callAiModel(request: AiModelRequest): Promise<AiModelResponse> {
   const models = openRouterModelsForSlot(request.slot);
@@ -183,7 +180,7 @@ async function callOpenRouterModel(
   }
 
   const client = getOpenRouterClient();
-  const provider = openRouterProviderForSlot(request.slot, attempt.requestedModel);
+  const provider = openRouterProviderForSlot(request.slot);
   let response: ChatResult;
 
   try {
@@ -402,11 +399,7 @@ function openRouterModelsForSlot(slot: AiModelSlot): string[] {
   }
 }
 
-function openRouterProviderForSlot(slot: AiModelSlot, model: string): ProviderPreferences {
-  if (model.startsWith('anthropic/')) {
-    return baseProviderPreference(ANTHROPIC_PROVIDER_ORDER);
-  }
-
+function openRouterProviderForSlot(slot: AiModelSlot): ProviderPreferences {
   if (slot === 'summary' || slot === 'surgical_editor') {
     return baseProviderPreference(SUMMARY_PROVIDER_ORDER);
   }

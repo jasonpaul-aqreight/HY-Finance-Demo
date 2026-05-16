@@ -15,7 +15,7 @@ export const OPENROUTER_COMPONENT_MODEL =
   process.env.AI_INSIGHT_OPENROUTER_COMPONENT_MODEL || 'deepseek/deepseek-v4-flash';
 
 export const OPENROUTER_SUMMARY_MODEL =
-  process.env.AI_INSIGHT_OPENROUTER_SUMMARY_MODEL || 'z-ai/glm-5.1';
+  process.env.AI_INSIGHT_OPENROUTER_SUMMARY_MODEL || 'deepseek/deepseek-v4-pro';
 
 export const OPENROUTER_ROUTER_MODEL =
   process.env.AI_INSIGHT_OPENROUTER_ROUTER_MODEL || OPENROUTER_COMPONENT_MODEL;
@@ -24,13 +24,13 @@ export const OPENROUTER_EDITOR_MODEL =
   process.env.AI_INSIGHT_OPENROUTER_EDITOR_MODEL || OPENROUTER_SUMMARY_MODEL;
 
 export const OPENROUTER_COMPONENT_FALLBACK_MODEL =
-  process.env.AI_INSIGHT_OPENROUTER_COMPONENT_FALLBACK_MODEL || 'anthropic/claude-haiku-latest';
+  process.env.AI_INSIGHT_OPENROUTER_COMPONENT_FALLBACK_MODEL || 'deepseek/deepseek-v4-pro';
 
 export const OPENROUTER_ROUTER_FALLBACK_MODEL =
   process.env.AI_INSIGHT_OPENROUTER_ROUTER_FALLBACK_MODEL || OPENROUTER_COMPONENT_FALLBACK_MODEL;
 
 export const OPENROUTER_SUMMARY_FALLBACK_MODELS =
-  (process.env.AI_INSIGHT_OPENROUTER_SUMMARY_FALLBACK_MODELS || 'deepseek/deepseek-v4-pro,anthropic/claude-sonnet-latest')
+  (process.env.AI_INSIGHT_OPENROUTER_SUMMARY_FALLBACK_MODELS || 'z-ai/glm-5.1')
     .split(',')
     .map((model) => model.trim())
     .filter(Boolean);
@@ -59,13 +59,8 @@ export function getOpenRouterClient(): OpenRouter {
 
 // Pricing per million tokens by model family
 const PRICING: Record<string, { input: number; output: number }> = {
-  'claude-haiku-4-5-20251001': { input: 0.80, output: 4.00 },
-  'claude-sonnet-4-5-20250514': { input: 3.00, output: 15.00 },
-  'claude-sonnet-4-6': { input: 3.00, output: 15.00 },
-  'anthropic/claude-haiku-latest': { input: 0.80, output: 4.00 },
-  'anthropic/claude-sonnet-latest': { input: 3.00, output: 15.00 },
   'deepseek/deepseek-v4-flash': { input: 0.14, output: 0.28 },
-  'deepseek/deepseek-v4-pro': { input: 1.00, output: 3.00 },
+  'deepseek/deepseek-v4-pro': { input: 0.435, output: 0.87 },
   'z-ai/glm-5.1': { input: 1.05, output: 3.50 },
 };
 

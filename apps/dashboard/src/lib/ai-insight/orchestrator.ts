@@ -44,11 +44,6 @@ const MAX_COST_PER_SECTION = 0.50;
 const MAX_RUNTIME_MS = 5 * 60 * 1000; // 5 minutes
 const SUMMARY_MAX_TOKENS = 4096; // Summary needs more tokens for tool reasoning + formatted output
 
-// Validation Study toggle: when "1", strip cache_control markers so baseline runs
-// produce a true pre-Iter-5 measurement. Default (unset/0) keeps caching ON.
-const VALIDATION_BASELINE = process.env.AI_INSIGHT_VALIDATION_BASELINE === '1';
-const CACHE_SYSTEM = !VALIDATION_BASELINE;
-
 export interface ProgressCallback {
   (component: string, status: 'analyzing' | 'complete' | 'error', message?: string): void;
 }
@@ -209,7 +204,6 @@ async function analyzeComponent(
     system: systemPrompt,
     messages: [{ role: 'user', content: userPrompt }],
     abortSignal,
-    cacheSystem: CACHE_SYSTEM,
   });
 
   const inputTokens = response.usage.inputTokens;
@@ -418,7 +412,6 @@ async function runSummaryAgentLoop(p: AgentLoopParams): Promise<AgentLoopResult>
       ...(includeTools ? { tools: p.sectionTools } : {}),
       messages: p.messages,
       abortSignal: p.abortSignal,
-      cacheSystem: CACHE_SYSTEM,
     });
 
     inputTokens += response.usage.inputTokens;
