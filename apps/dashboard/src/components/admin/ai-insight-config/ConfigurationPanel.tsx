@@ -48,6 +48,12 @@ function inputStep(token: ThresholdTokenView) {
   return 1 / 10 ** precisionFromType(token.valueType);
 }
 
+function inputWidth(token: ThresholdTokenView) {
+  if (token.unit === 'RM') return 'w-24';
+  if (token.unit === 'ratio') return 'w-20';
+  return 'w-16';
+}
+
 function settingMap(presentation: ThresholdComponentPresentationView | null | undefined) {
   const map = new Map<string, ThresholdBusinessSettingView>();
   for (const rule of presentation?.rules ?? []) {
@@ -242,7 +248,7 @@ function RangeSegment({
         aria-label={token.label}
         aria-invalid={tokenError ? true : undefined}
         data-testid={`threshold-input-${token.token}`}
-        className={`mx-1 inline-flex h-7 w-16 rounded-lg border bg-background px-2 text-center font-semibold outline-none transition-colors focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-50 ${
+        className={`mx-1 inline-flex h-7 ${inputWidth(token)} rounded-lg border bg-background px-2 text-center font-semibold outline-none transition-colors focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-50 ${
           tokenError
             ? 'border-red-600 focus-visible:ring-red-200'
             : 'border-input focus-visible:border-ring focus-visible:ring-ring/50'

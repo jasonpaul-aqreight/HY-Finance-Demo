@@ -1597,6 +1597,597 @@ export const THRESHOLD_PRESENTATION: Record<string, ThresholdComponentPresentati
       },
     ],
   },
+  cm_margin_distribution: {
+    title: 'Customer Margin Distribution: Portfolio Margin Shape Rules',
+    description: '',
+    appliesToPromptLabel: 'Margin Distribution',
+    searchAliases: ['Customer margin distribution', 'Portfolio margin shape', 'Thin-margin portfolio', 'Customer Margin chart'],
+    rules: [
+      {
+        id: 'thin_margin_share',
+        title: 'Thin-Margin Customer Share',
+        settings: [
+          {
+            token: 'sub_10_bad_pct',
+            displayLabel: 'Bad',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'thin-margin customer-share limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Controlled thin-margin exposure',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'sub_10_bad_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Thin-margin portfolio',
+            segments: [{ text: 'Above' }, { token: 'sub_10_bad_pct' }],
+            unit: '%',
+          },
+        ],
+      },
+      {
+        id: 'premium_margin_share',
+        title: 'Premium-Margin Customer Share',
+        settings: [
+          {
+            token: 'premium_good_pct',
+            displayLabel: 'Good',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'premium-margin customer-share limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Standard margin mix',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'premium_good_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Premium segment',
+            segments: [{ text: 'Above' }, { token: 'premium_good_pct' }],
+            unit: '%',
+          },
+        ],
+      },
+    ],
+  },
+  cm_top_customers: {
+    title: 'Top Customers: Profit Concentration and Anchor Quality Rules',
+    description: '',
+    appliesToPromptLabel: 'Top Customers',
+    searchAliases: ['Top customers', 'Gross profit concentration', 'Anchor account margin', 'Customer Margin chart'],
+    rules: [
+      {
+        id: 'top_customer_concentration',
+        title: 'Top Customer Share',
+        settings: [
+          {
+            token: 'top_1_bad_pct',
+            displayLabel: 'Concentration risk',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'top customer concentration limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Balanced profit base',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'top_1_bad_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Single-customer concentration risk',
+            segments: [{ text: 'Above' }, { token: 'top_1_bad_pct' }],
+            unit: '%',
+          },
+        ],
+      },
+      {
+        id: 'top_10_profit_concentration',
+        title: 'Top 10 Customer Share',
+        settings: [
+          {
+            token: 'top_10_good_pct',
+            displayLabel: 'Diversified',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'diversified top-10 customer-share limit',
+          },
+          {
+            token: 'top_10_bad_pct',
+            displayLabel: 'Concentrated',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'concentrated top-10 customer-share limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Diversified profit spread',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'top_10_good_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Normal concentration',
+            segments: [{ token: 'top_10_good_pct' }, { text: '-' }, { token: 'top_10_bad_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Concentrated profit base',
+            segments: [{ text: 'Above' }, { token: 'top_10_bad_pct' }],
+            unit: '%',
+          },
+        ],
+        validationConstraints: [
+          {
+            leftToken: 'top_10_good_pct',
+            relation: 'lessThan',
+            rightToken: 'top_10_bad_pct',
+            message: 'The concentrated top-10 customer-share limit must be higher than the diversified limit.',
+          },
+        ],
+      },
+      {
+        id: 'anchor_margin_quality',
+        title: 'Anchor Account Margin Quality',
+        settings: [
+          {
+            token: 'thin_margin_pct',
+            displayLabel: 'Thin anchor',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'thin anchor margin limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Thin anchor flag',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'thin_margin_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Acceptable anchor margin',
+            segments: [{ text: 'Above' }, { token: 'thin_margin_pct' }],
+            unit: '%',
+          },
+        ],
+      },
+    ],
+  },
+  cm_customer_table: {
+    title: 'Customer Margin Table: At-Risk Customer Rules',
+    description: '',
+    appliesToPromptLabel: 'Customer Margin Table',
+    searchAliases: ['Customer margin table', 'Loss-making customers', 'Thin-margin bucket', 'Customer Margin table'],
+    rules: [
+      {
+        id: 'loss_making_tail',
+        title: 'Loss-Making Customer Share',
+        settings: [
+          {
+            token: 'loss_makers_bad_pct',
+            displayLabel: 'Bad',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'loss-making customer-share limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Controlled loss-making tail',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'loss_makers_bad_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Unhealthy loss-making tail',
+            segments: [{ text: 'Above' }, { token: 'loss_makers_bad_pct' }],
+            unit: '%',
+          },
+        ],
+      },
+      {
+        id: 'critical_loss_maker_revenue',
+        title: 'High-Revenue Loss-Maker Trigger',
+        settings: [
+          {
+            token: 'critical_revenue_rm',
+            displayLabel: 'Critical',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'critical loss-maker revenue limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Small loss-maker exposure',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'critical_revenue_rm', editable: true }],
+            unit: 'RM',
+          },
+          {
+            label: 'Critical high-revenue loss-maker',
+            segments: [{ text: 'Above' }, { token: 'critical_revenue_rm' }],
+            unit: 'RM',
+          },
+        ],
+      },
+      {
+        id: 'thin_margin_bucket',
+        title: 'Thin-Margin Bucket',
+        settings: [
+          {
+            token: 'thin_bucket_pct',
+            displayLabel: 'Thin',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'thin-margin bucket limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Thin margin bucket',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'thin_bucket_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Healthier margin bucket',
+            segments: [{ text: 'Above' }, { token: 'thin_bucket_pct' }],
+            unit: '%',
+          },
+        ],
+      },
+    ],
+  },
+  cm_credit_note_impact: {
+    title: 'Credit Note Impact: Margin Erosion Rules',
+    description: '',
+    appliesToPromptLabel: 'Credit Note Impact',
+    searchAliases: ['Credit note impact', 'Margin lost', 'Return rate baseline', 'Customer Margin table'],
+    rules: [
+      {
+        id: 'margin_loss_concentration',
+        title: 'Top 5 Margin-Loss Concentration',
+        settings: [
+          {
+            token: 'top_5_margin_lost_bad_pct',
+            displayLabel: 'Bad',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'top-5 margin-loss concentration limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Spread across customers',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'top_5_margin_lost_bad_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Concentrated margin-loss problem',
+            segments: [{ text: 'Above' }, { token: 'top_5_margin_lost_bad_pct' }],
+            unit: '%',
+          },
+        ],
+      },
+      {
+        id: 'return_rate_quality',
+        title: 'Return Rate Quality',
+        settings: [
+          {
+            token: 'normal_return_rate_pct',
+            displayLabel: 'Normal',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'normal return-rate limit',
+          },
+          {
+            token: 'systemic_return_rate_pct',
+            displayLabel: 'Systemic',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'systemic return-rate limit',
+          },
+          {
+            token: 'return_rate_bad_pct',
+            displayLabel: 'Bad',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'bad return-rate limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Normal return rate',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'normal_return_rate_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Watch return rate',
+            segments: [{ token: 'normal_return_rate_pct' }, { text: '-' }, { token: 'systemic_return_rate_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Systemic quality signal',
+            segments: [{ token: 'systemic_return_rate_pct' }, { text: '-' }, { token: 'return_rate_bad_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Excessive returns',
+            segments: [{ text: 'Above' }, { token: 'return_rate_bad_pct' }],
+            unit: '%',
+          },
+        ],
+        validationConstraints: [
+          {
+            leftToken: 'normal_return_rate_pct',
+            relation: 'lessThan',
+            rightToken: 'systemic_return_rate_pct',
+            message: 'The systemic return-rate limit must be higher than the normal return-rate limit.',
+          },
+          {
+            leftToken: 'systemic_return_rate_pct',
+            relation: 'lessThan',
+            rightToken: 'return_rate_bad_pct',
+            message: 'The bad return-rate limit must be higher than the systemic return-rate limit.',
+          },
+        ],
+      },
+      {
+        id: 'margin_lost_severity',
+        title: 'Margin Lost Severity',
+        settings: [
+          {
+            token: 'acceptable_margin_lost_pp',
+            displayLabel: 'Acceptable',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'acceptable margin-lost limit',
+          },
+          {
+            token: 'margin_lost_severe_pp',
+            displayLabel: 'Severe',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'severe margin-lost limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Acceptable margin erosion',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'acceptable_margin_lost_pp', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Margin erosion watch',
+            segments: [{ token: 'acceptable_margin_lost_pp' }, { text: '-' }, { token: 'margin_lost_severe_pp', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Severe margin erosion',
+            segments: [{ text: 'Above' }, { token: 'margin_lost_severe_pp' }],
+            unit: '%',
+          },
+        ],
+        validationConstraints: [
+          {
+            leftToken: 'acceptable_margin_lost_pp',
+            relation: 'lessThan',
+            rightToken: 'margin_lost_severe_pp',
+            message: 'The severe margin-lost limit must be higher than the acceptable margin-lost limit.',
+          },
+        ],
+      },
+    ],
+  },
+  sp_net_sales: {
+    title: 'Supplier Net Sales: Growth and Decline Rules',
+    description: '',
+    appliesToPromptLabel: 'Est. Net Sales',
+    searchAliases: ['Supplier net sales', 'Supplier revenue growth', 'Supplier KPI'],
+    rules: [
+      {
+        id: 'net_sales_direction',
+        title: 'Net Sales Direction',
+        settings: [
+          {
+            token: 'good_growth_pct',
+            displayLabel: 'Good growth',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'good growth limit',
+          },
+          {
+            token: 'flag_drop_pct',
+            displayLabel: 'Flagged drop',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'flagged drop limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Good growth',
+            segments: [{ text: 'Above' }, { token: 'good_growth_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Neutral growth',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'good_growth_pct' }],
+            unit: '%',
+          },
+          {
+            label: 'Normal decline',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'flag_drop_pct' }],
+            unit: '%',
+          },
+          {
+            label: 'Flagged decline',
+            segments: [{ text: 'Above' }, { token: 'flag_drop_pct', editable: true }],
+            unit: '%',
+          },
+        ],
+      },
+    ],
+  },
+  sp_margin_pct: {
+    title: 'Supplier Margin Percentage: Gross Margin Rules',
+    description: '',
+    appliesToPromptLabel: 'Gross Margin %',
+    searchAliases: ['Supplier gross margin', 'Supplier margin quality', 'Supplier KPI'],
+    rules: [
+      {
+        id: 'gross_margin_quality',
+        title: 'Gross Margin Quality',
+        settings: [
+          {
+            token: 'neutral_pct',
+            displayLabel: 'Neutral margin',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'neutral margin limit',
+          },
+          {
+            token: 'good_pct',
+            displayLabel: 'Good margin',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'good margin limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Bad margin',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'neutral_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Neutral margin',
+            segments: [{ token: 'neutral_pct' }, { text: '-' }, { token: 'good_pct' }],
+            unit: '%',
+          },
+          {
+            label: 'Good margin',
+            segments: [{ text: 'Above' }, { token: 'good_pct', editable: true }],
+            unit: '%',
+          },
+        ],
+        validationConstraints: [
+          {
+            leftToken: 'neutral_pct',
+            relation: 'lessThan',
+            rightToken: 'good_pct',
+            message: 'The good margin limit must be higher than the neutral margin limit.',
+          },
+        ],
+      },
+      {
+        id: 'margin_decline',
+        title: 'Margin Percentage Decline',
+        settings: [
+          {
+            token: 'investigate_drop_pp',
+            displayLabel: 'Investigation flag',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'margin decline flag',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Normal movement',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'investigate_drop_pp', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Investigation flag',
+            segments: [{ text: 'Above' }, { token: 'investigate_drop_pp' }],
+            unit: '%',
+          },
+        ],
+      },
+    ],
+  },
+  sp_active_suppliers: {
+    title: 'Active Suppliers: Supplier Base Movement Rules',
+    description: '',
+    appliesToPromptLabel: 'Active Suppliers',
+    searchAliases: ['Active suppliers', 'Supplier count movement', 'Supplier KPI'],
+    rules: [
+      {
+        id: 'supplier_count_drop',
+        title: 'Supplier Count Drop',
+        settings: [
+          {
+            token: 'normal_change_pct',
+            displayLabel: 'Normal movement',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'normal movement limit',
+          },
+          {
+            token: 'drop_flag_pct',
+            displayLabel: 'Drop flag',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'drop flag limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Normal movement',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'normal_change_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Consolidation watch',
+            segments: [{ token: 'normal_change_pct' }, { text: '-' }, { token: 'drop_flag_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Supplier disruption flag',
+            segments: [{ text: 'Above' }, { token: 'drop_flag_pct' }],
+            unit: '%',
+          },
+        ],
+        validationConstraints: [
+          {
+            leftToken: 'normal_change_pct',
+            relation: 'lessThan',
+            rightToken: 'drop_flag_pct',
+            message: 'The drop flag limit must be higher than the normal movement limit.',
+          },
+        ],
+      },
+      {
+        id: 'supplier_count_growth',
+        title: 'Supplier Count Growth',
+        settings: [
+          {
+            token: 'growth_flag_pct',
+            displayLabel: 'Growth flag',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'growth flag limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Normal growth or diversification',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'growth_flag_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Supplier growth flag',
+            segments: [{ text: 'Above' }, { token: 'growth_flag_pct' }],
+            unit: '%',
+          },
+        ],
+      },
+    ],
+  },
   rt_total_returns: {
     title: 'Total Returns: Return Exposure Rules',
     description: '',

@@ -2259,8 +2259,8 @@ const fetchers: Record<string, DataFetcher> = {
     const totalIvRevenue = sortedByLost.reduce((s, r) => s + Number(r.iv_revenue), 0);
 
     const allowed: AllowedValue[] = [
-      pct('total margin lost (sum pp)', totalMarginLost),
-      pct('top 5 margin lost (sum pp)', top5Lost),
+      pct('total margin lost pct', totalMarginLost),
+      pct('top 5 margin lost pct', top5Lost),
       pct('top 5 share of margin lost', top5Share),
       cnt('customers with return rate above 5', highReturnCount),
       pct('avg margin lost', avgMarginLost),
@@ -2270,7 +2270,7 @@ const fetchers: Record<string, DataFetcher> = {
     ];
 
     let table =
-      '| # | Code | Customer | IV Revenue | CN Revenue | Return % | Margin Before | Margin After | Margin Lost (pp) |\n' +
+      '| # | Code | Customer | IV Revenue | CN Revenue | Return % | Margin Before | Margin After | Margin Lost % |\n' +
       '|---|------|----------|------------|------------|---------:|--------------:|-------------:|-----------------:|\n';
     top25.forEach((r, i) => {
       const iv = Number(r.iv_revenue);
@@ -2295,10 +2295,10 @@ const fetchers: Record<string, DataFetcher> = {
       `Population: customers with credit notes during ${dr!.start} to ${dr!.end} (up to 100 rows ranked by impact).\n\n` +
       `Pre-calculated roll-ups (use these values directly — do not recompute):\n` +
       `- Customers in impact universe: ${universeSize}\n` +
-      `- Total margin lost (sum of percentage-point drops): ${totalMarginLost.toFixed(2)} pp\n` +
+      `- Total margin lost % across customers: ${totalMarginLost.toFixed(2)}%\n` +
       `- Top 5 customers share of total margin lost: ${top5Share.toFixed(2)}%\n` +
       `- Customers with return rate > 5%: ${highReturnCount}\n` +
-      `- Avg margin lost per customer in universe: ${avgMarginLost.toFixed(2)} pp\n` +
+      `- Avg margin lost % per customer in universe: ${avgMarginLost.toFixed(2)}%\n` +
       `- Total invoice revenue across universe: RM ${totalIvRevenue.toLocaleString('en-MY')}\n` +
       `- Total credit note revenue across universe: RM ${totalCnRevenue.toLocaleString('en-MY')}\n`;
 

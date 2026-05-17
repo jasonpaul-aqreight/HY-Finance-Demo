@@ -197,6 +197,31 @@ test.describe('AI Insight Config after feedback removal', () => {
       cm_margin_pct: 'Customer Margin Percentage: Gross Margin Rules',
       cm_margin_trend: 'Customer Margin Trend: Profitability Streak Rules',
     });
+
+    const customerMarginChartTableTitles = Object.fromEntries(
+      ['cm_margin_distribution', 'cm_top_customers', 'cm_customer_table', 'cm_credit_note_impact'].map((key) => {
+        const prompt = body.prompts.find((candidate) => candidate.promptKey === key);
+        return [key, prompt?.thresholdPresentation?.title];
+      }),
+    );
+    expect(customerMarginChartTableTitles).toEqual({
+      cm_margin_distribution: 'Customer Margin Distribution: Portfolio Margin Shape Rules',
+      cm_top_customers: 'Top Customers: Profit Concentration and Anchor Quality Rules',
+      cm_customer_table: 'Customer Margin Table: At-Risk Customer Rules',
+      cm_credit_note_impact: 'Credit Note Impact: Margin Erosion Rules',
+    });
+
+    const supplierKpiTitles = Object.fromEntries(
+      ['sp_net_sales', 'sp_margin_pct', 'sp_active_suppliers'].map((key) => {
+        const prompt = body.prompts.find((candidate) => candidate.promptKey === key);
+        return [key, prompt?.thresholdPresentation?.title];
+      }),
+    );
+    expect(supplierKpiTitles).toEqual({
+      sp_net_sales: 'Supplier Net Sales: Growth and Decline Rules',
+      sp_margin_pct: 'Supplier Margin Percentage: Gross Margin Rules',
+      sp_active_suppliers: 'Active Suppliers: Supplier Base Movement Rules',
+    });
   });
 
   test('admin config page has no feedback, version, router, editor, or guidance UI', async ({ page }) => {
@@ -455,6 +480,87 @@ test.describe('AI Insight Config after feedback removal', () => {
       });
     } finally {
       await saveThresholdValues(request, 'cm_margin_pct', originals.cm_margin_pct);
+    }
+  });
+
+  test('customer margin chart metadata is business-readable and updates the prompt preview', async ({ page, request }) => {
+    const originals = {
+      cm_margin_distribution: await readThresholdValues(request, 'cm_margin_distribution'),
+    };
+    const nextSubTenPct = originals.cm_margin_distribution.sub_10_bad_pct >= 100
+      ? originals.cm_margin_distribution.sub_10_bad_pct - 1
+      : originals.cm_margin_distribution.sub_10_bad_pct + 1;
+
+    await setAdminRole(page);
+    await openAdminConfig(page);
+
+    try {
+      await selectPromptBySearch(page, 'Portfolio margin shape', 'cm_margin_distribution');
+      const configPanel = page.getByTestId('configuration-panel');
+      await expect(configPanel).toContainText('Customer Margin Distribution: Portfolio Margin Shape Rules');
+      await expect(configPanel).toContainText('Thin-Margin Customer Share');
+      await expect(configPanel).toContainText('Premium-Margin Customer Share');
+      await expect(configPanel).toContainText('Controlled thin-margin exposure');
+      await expect(configPanel).not.toContainText('Portfolio shape');
+      await expect(configPanel).not.toContainText('Bad if sub-10% share above');
+      await expect(configPanel).not.toContainText('sub_10_bad_pct');
+      await expect(page.getByTestId('prompt-tree')).not.toContainText('Bad if sub-10% share above');
+
+      await editPromptThreshold({
+        page,
+        request,
+        search: 'Portfolio margin shape',
+        promptKey: 'cm_margin_distribution',
+        token: 'sub_10_bad_pct',
+        value: nextSubTenPct,
+        expectedBusinessLabel: 'Thin-Margin Customer Share',
+        expectedConfigText: 'Thin-margin portfolio',
+        expectedPromptText: `>${nextSubTenPct}% in sub-10% bands = Bad`,
+      });
+    } finally {
+      await saveThresholdValues(request, 'cm_margin_distribution', originals.cm_margin_distribution);
+    }
+  });
+
+  test('supplier KPI metadata is business-readable and updates the prompt preview', async ({ page, request }) => {
+    const originals = {
+      sp_margin_pct: await readThresholdValues(request, 'sp_margin_pct'),
+    };
+    const nextNeutralPct = Math.max(0, Math.min(
+      originals.sp_margin_pct.good_pct - 1,
+      originals.sp_margin_pct.neutral_pct + 1,
+    ));
+
+    await setAdminRole(page);
+    await openAdminConfig(page);
+
+    try {
+      await selectPromptBySearch(page, 'Supplier margin quality', 'sp_margin_pct');
+      const configPanel = page.getByTestId('configuration-panel');
+      await expect(configPanel).toContainText('Supplier Margin Percentage: Gross Margin Rules');
+      await expect(configPanel).toContainText('Gross Margin Quality');
+      await expect(configPanel).toContainText('Margin Percentage Decline');
+      await expect(configPanel).toContainText('Investigation flag');
+      await expect(configPanel).not.toContainText('Gross margin band');
+      await expect(configPanel).not.toContainText('Good at or above');
+      await expect(configPanel).not.toContainText('investigate_drop_pp');
+      await expect(page.getByTestId('prompt-tree')).not.toContainText('Gross margin band');
+      await expect(page.getByTestId('prompt-text-body')).toContainText(`Drop ≥${originals.sp_margin_pct.investigate_drop_pp}% vs prior`);
+      await expect(page.getByTestId('prompt-text-body')).not.toContainText('pp vs prior');
+
+      await editPromptThreshold({
+        page,
+        request,
+        search: 'Supplier margin quality',
+        promptKey: 'sp_margin_pct',
+        token: 'neutral_pct',
+        value: nextNeutralPct,
+        expectedBusinessLabel: 'Gross Margin Quality',
+        expectedConfigText: 'Bad margin',
+        expectedPromptText: `${nextNeutralPct}–${originals.sp_margin_pct.good_pct}% = Neutral`,
+      });
+    } finally {
+      await saveThresholdValues(request, 'sp_margin_pct', originals.sp_margin_pct);
     }
   });
 

@@ -313,7 +313,7 @@ Report:
 
 Thresholds:
 - Loss-makers >{{cm_customer_table.loss_makers_bad_pct}}% of active count = Bad (unhealthy tail)
-- Bottom-10 with revenue >RM 100K AND negative margin = Critical
+- Bottom-10 with revenue >RM {{cm_customer_table.critical_revenue_rm}} AND negative margin = Critical
 - High share in <{{cm_customer_table.thin_bucket_pct}}% buckets = portfolio margin risk
 
 Report:
@@ -322,15 +322,15 @@ Report:
 - Unusual return-rate clustering in bottom 10
 - Distribution skew: clustered in >15% (healthy) or <10% (thin) buckets`,
 
-  cm_credit_note_impact: `"Credit Note Impact on Margins" table — customers ranked by margin lost from credit notes. Columns: Code, Name, Invoice Rev, CN Rev, Return Rate %, Margin Before CN, Margin After CN, Margin Lost (pp).
+  cm_credit_note_impact: `"Credit Note Impact on Margins" table — customers ranked by margin lost from credit notes. Columns: Code, Name, Invoice Rev, CN Rev, Return Rate %, Margin Before CN, Margin After CN, Margin Lost %.
 
 Data: top 25 by Margin Lost + roll-ups (total margin lost across top-100, top-5 share, count with return rate >5%, avg margin lost).
 
 Thresholds:
 - Top 5 > {{cm_credit_note_impact.top_5_margin_lost_bad_pct}}% of total margin lost = Bad (concentrated — fix top offenders first)
 - Return rate >{{cm_credit_note_impact.return_rate_bad_pct}}% = Bad (excessive returns — quality or ops issue)
-- Margin lost >{{cm_credit_note_impact.margin_lost_severe_pp}}pp = Severe
-- High CN revenue but margin lost <{{cm_credit_note_impact.acceptable_margin_lost_pp}}pp = Acceptable (volume returns, costs recovered)
+- Margin lost >{{cm_credit_note_impact.margin_lost_severe_pp}}% = Severe
+- High CN revenue but margin lost <{{cm_credit_note_impact.acceptable_margin_lost_pp}}% = Acceptable (volume returns, costs recovered)
 
 Report:
 - Concentration: a few serial returners or spread across many?
@@ -375,7 +375,7 @@ Thresholds (fruit distribution, supplier-side):
 - ≥{{sp_margin_pct.good_pct}}% = Good
 - {{sp_margin_pct.neutral_pct}}–{{sp_margin_pct.good_pct}}% = Neutral
 - <{{sp_margin_pct.neutral_pct}}% = Bad
-- Drop ≥{{sp_margin_pct.investigate_drop_pp}}pp vs prior = Flag (regardless of absolute level)
+- Drop ≥{{sp_margin_pct.investigate_drop_pp}}% vs prior = Flag (regardless of absolute level)
 
 Report level vs benchmark, direction vs prior period (a healthy margin trending down still warrants flagging — usually upstream price pressure), and whether movement is driven by Net Sales, COGS, or sourcing-mix shift.`,
 
