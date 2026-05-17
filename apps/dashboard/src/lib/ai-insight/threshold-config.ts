@@ -4579,6 +4579,497 @@ export const THRESHOLD_PRESENTATION: Record<string, ThresholdComponentPresentati
       },
     ],
   },
+  fin_pl_statement: {
+    title: 'Profit & Loss Statement: Group Movement and Margin Drift Rules',
+    description: '',
+    appliesToPromptLabel: 'Profit & Loss Statement',
+    searchAliases: [
+      'P&L group movement',
+      'Profit and Loss movement',
+      'Margin drift rules',
+      'Financial P&L statement',
+    ],
+    rules: [
+      {
+        id: 'group_yoy_movement',
+        title: 'Account Group Movement',
+        settings: [
+          {
+            token: 'flat_pct',
+            displayLabel: 'Flat movement',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'flat movement limit',
+          },
+          {
+            token: 'material_pct',
+            displayLabel: 'Material movement',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'material movement limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Flat movement',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'flat_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Moderate movement',
+            segments: [{ token: 'flat_pct' }, { text: '-' }, { token: 'material_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Material movement',
+            segments: [{ text: 'Above' }, { token: 'material_pct' }],
+            unit: '%',
+          },
+        ],
+        validationConstraints: [
+          {
+            leftToken: 'flat_pct',
+            relation: 'lessThan',
+            rightToken: 'material_pct',
+            message: 'The material movement limit must be higher than the flat movement limit.',
+          },
+        ],
+      },
+      {
+        id: 'gross_margin_drift',
+        title: 'Gross Margin Drift',
+        settings: [
+          {
+            token: 'gross_material_pp',
+            displayLabel: 'Material gross-margin drift',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'material gross-margin drift limit',
+          },
+          {
+            token: 'gross_severe_pp',
+            displayLabel: 'Severe gross-margin drift',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'severe gross-margin drift limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Normal gross-margin drift',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'gross_material_pp', editable: true }],
+            unit: 'pp',
+          },
+          {
+            label: 'Material gross-margin shift',
+            segments: [{ token: 'gross_material_pp' }, { text: '-' }, { token: 'gross_severe_pp', editable: true }],
+            unit: 'pp',
+          },
+          {
+            label: 'Severe gross-margin shift',
+            segments: [{ text: 'Above' }, { token: 'gross_severe_pp' }],
+            unit: 'pp',
+          },
+        ],
+        validationConstraints: [
+          {
+            leftToken: 'gross_material_pp',
+            relation: 'lessThan',
+            rightToken: 'gross_severe_pp',
+            message: 'The severe gross-margin drift limit must be higher than the material limit.',
+          },
+        ],
+      },
+      {
+        id: 'net_margin_drift',
+        title: 'Net Margin Drift',
+        settings: [
+          {
+            token: 'net_material_pp',
+            displayLabel: 'Material net-margin drift',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'material net-margin drift limit',
+          },
+          {
+            token: 'net_severe_pp',
+            displayLabel: 'Severe net-margin drift',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'severe net-margin drift limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Normal net-margin drift',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'net_material_pp', editable: true }],
+            unit: 'pp',
+          },
+          {
+            label: 'Material net-margin shift',
+            segments: [{ token: 'net_material_pp' }, { text: '-' }, { token: 'net_severe_pp', editable: true }],
+            unit: 'pp',
+          },
+          {
+            label: 'Severe net-margin shift',
+            segments: [{ text: 'Above' }, { token: 'net_severe_pp' }],
+            unit: 'pp',
+          },
+        ],
+        validationConstraints: [
+          {
+            leftToken: 'net_material_pp',
+            relation: 'lessThan',
+            rightToken: 'net_severe_pp',
+            message: 'The severe net-margin drift limit must be higher than the material limit.',
+          },
+        ],
+      },
+    ],
+  },
+  fin_yoy_comparison: {
+    title: 'Multi-Year Comparison: Sales Growth and Profit Trend Rules',
+    description: '',
+    appliesToPromptLabel: 'Multi-Year Comparison',
+    searchAliases: [
+      'Revenue CAGR',
+      'Profit streak',
+      'Four-year P&L trend',
+      'Multi-year profitability',
+    ],
+    rules: [
+      {
+        id: 'net_sales_growth_trend',
+        title: 'Net Sales Growth Trend',
+        settings: [
+          {
+            token: 'growing_upper_pct',
+            displayLabel: 'Fast growth',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'fast sales-growth limit',
+          },
+          {
+            token: 'flat_upper_pct',
+            displayLabel: 'Flat sales movement',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'flat sales-growth limit',
+          },
+          {
+            token: 'declining_below_pct',
+            displayLabel: 'Declining sales',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'sales-decline limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Declining sales trend',
+            segments: [{ text: 'Under' }, { token: 'declining_below_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Flat sales trend',
+            segments: [{ token: 'declining_below_pct' }, { text: '-' }, { token: 'flat_upper_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Growing sales trend',
+            segments: [{ token: 'flat_upper_pct' }, { text: '-' }, { token: 'growing_upper_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Fast sales growth',
+            segments: [{ text: 'Above' }, { token: 'growing_upper_pct' }],
+            unit: '%',
+          },
+        ],
+        validationConstraints: [
+          {
+            leftToken: 'growing_upper_pct',
+            relation: 'greaterThan',
+            rightToken: 'flat_upper_pct',
+            message: 'The fast sales-growth limit must be higher than the flat sales-growth limit.',
+          },
+          {
+            leftToken: 'flat_upper_pct',
+            relation: 'greaterThan',
+            rightToken: 'declining_below_pct',
+            message: 'The flat sales-growth limit must be higher than the decline limit.',
+          },
+        ],
+      },
+      {
+        id: 'net_profit_streak',
+        title: 'Net Profit Streak',
+        settings: [
+          {
+            token: 'streak_years',
+            displayLabel: 'Decision streak',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'profit-streak year limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Tracked movement streak',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'streak_years', offset: -1 }],
+            unit: 'years',
+          },
+          {
+            label: 'Severe decline or strong improvement',
+            segments: [{ token: 'streak_years', editable: true }, { text: '+ consecutive years' }],
+            unit: '',
+          },
+        ],
+      },
+      {
+        id: 'gross_margin_structural_shift',
+        title: 'Gross Margin Structural Shift',
+        settings: [
+          {
+            token: 'gross_material_pp',
+            displayLabel: 'Material gross-margin shift',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'material gross-margin shift limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Normal gross-margin movement',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'gross_material_pp', editable: true }],
+            unit: 'pp',
+          },
+          {
+            label: 'Material gross-margin shift',
+            segments: [{ text: 'Above' }, { token: 'gross_material_pp' }],
+            unit: 'pp',
+          },
+        ],
+      },
+      {
+        id: 'net_margin_structural_shift',
+        title: 'Net Margin Structural Shift',
+        settings: [
+          {
+            token: 'net_material_pp',
+            displayLabel: 'Material net-margin shift',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'material net-margin shift limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Normal net-margin movement',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'net_material_pp', editable: true }],
+            unit: 'pp',
+          },
+          {
+            label: 'Material net-margin shift',
+            segments: [{ text: 'Above' }, { token: 'net_material_pp' }],
+            unit: 'pp',
+          },
+        ],
+      },
+    ],
+  },
+  bs_trend: {
+    title: 'Balance Sheet Trend: Asset, Liability, and Equity Rules',
+    description: '',
+    appliesToPromptLabel: 'Assets, Liabilities & Equity Trend',
+    searchAliases: [
+      'Balance sheet trend',
+      'Asset trajectory',
+      'Liability divergence',
+      'Gearing drift',
+      'Equity decline streak',
+    ],
+    rules: [
+      {
+        id: 'asset_growth_trajectory',
+        title: 'Asset Growth Trajectory',
+        settings: [
+          {
+            token: 'growing_upper_pct',
+            displayLabel: 'Fast asset growth',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'fast asset-growth limit',
+          },
+          {
+            token: 'flat_upper_pct',
+            displayLabel: 'Flat asset movement',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'flat asset-growth limit',
+          },
+          {
+            token: 'shrinking_below_pct',
+            displayLabel: 'Shrinking asset base',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'asset-shrinkage limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Shrinking asset base',
+            segments: [{ text: 'Under' }, { token: 'shrinking_below_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Flat asset base',
+            segments: [{ token: 'shrinking_below_pct' }, { text: '-' }, { token: 'flat_upper_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Growing asset base',
+            segments: [{ token: 'flat_upper_pct' }, { text: '-' }, { token: 'growing_upper_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Fast asset growth',
+            segments: [{ text: 'Above' }, { token: 'growing_upper_pct' }],
+            unit: '%',
+          },
+        ],
+        validationConstraints: [
+          {
+            leftToken: 'growing_upper_pct',
+            relation: 'greaterThan',
+            rightToken: 'flat_upper_pct',
+            message: 'The fast asset-growth limit must be higher than the flat asset-growth limit.',
+          },
+          {
+            leftToken: 'flat_upper_pct',
+            relation: 'greaterThan',
+            rightToken: 'shrinking_below_pct',
+            message: 'The flat asset-growth limit must be higher than the shrinkage limit.',
+          },
+        ],
+      },
+      {
+        id: 'equity_decline_streak',
+        title: 'Equity Decline Streak',
+        settings: [
+          {
+            token: 'severe_months',
+            displayLabel: 'Severe equity decline streak',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'severe equity-decline streak',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Monitored decline streak',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'severe_months', offset: -1 }],
+            unit: 'months',
+          },
+          {
+            label: 'Severe equity erosion',
+            segments: [{ token: 'severe_months', editable: true }, { text: '+ consecutive months' }],
+            unit: '',
+          },
+        ],
+      },
+      {
+        id: 'liability_growth_divergence',
+        title: 'Liability Growth Divergence',
+        settings: [
+          {
+            token: 'material_pct',
+            displayLabel: 'Material liability growth',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'material liability-growth limit',
+          },
+          {
+            token: 'severe_pct',
+            displayLabel: 'Severe liability growth',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'severe liability-growth limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Normal divergence',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'material_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Material divergence',
+            segments: [{ token: 'material_pct' }, { text: '-' }, { token: 'severe_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Severe divergence',
+            segments: [{ text: 'Above' }, { token: 'severe_pct' }],
+            unit: '%',
+          },
+        ],
+        validationConstraints: [
+          {
+            leftToken: 'material_pct',
+            relation: 'lessThan',
+            rightToken: 'severe_pct',
+            message: 'The severe liability-growth limit must be higher than the material limit.',
+          },
+        ],
+      },
+      {
+        id: 'gearing_drift',
+        title: 'Gearing Drift',
+        settings: [
+          {
+            token: 'material_pp',
+            displayLabel: 'Material gearing drift',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'material gearing-drift limit',
+          },
+          {
+            token: 'severe_pp',
+            displayLabel: 'Severe gearing drift',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'severe gearing-drift limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Normal gearing drift',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'material_pp', editable: true }],
+            unit: 'pp',
+          },
+          {
+            label: 'Material gearing drift',
+            segments: [{ token: 'material_pp' }, { text: '-' }, { token: 'severe_pp', editable: true }],
+            unit: 'pp',
+          },
+          {
+            label: 'Severe gearing drift',
+            segments: [{ text: 'Above' }, { token: 'severe_pp' }],
+            unit: 'pp',
+          },
+        ],
+        validationConstraints: [
+          {
+            leftToken: 'material_pp',
+            relation: 'lessThan',
+            rightToken: 'severe_pp',
+            message: 'The severe gearing-drift limit must be higher than the material limit.',
+          },
+        ],
+      },
+    ],
+  },
   fin_pnl_summary: {
     title: 'P&L Summary: Profitability and Cost Structure Rules',
     description: '',

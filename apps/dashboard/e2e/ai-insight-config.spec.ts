@@ -231,6 +231,18 @@ test.describe('AI Insight Config after feedback removal', () => {
       fin_monthly_trend: 'Monthly P&L Trend: Loss and Profit-Decline Rules',
     });
 
+    const financialDetailTitles = Object.fromEntries(
+      ['fin_pl_statement', 'fin_yoy_comparison', 'bs_trend'].map((key) => {
+        const prompt = body.prompts.find((candidate) => candidate.promptKey === key);
+        return [key, prompt?.thresholdPresentation?.title];
+      }),
+    );
+    expect(financialDetailTitles).toEqual({
+      fin_pl_statement: 'Profit & Loss Statement: Group Movement and Margin Drift Rules',
+      fin_yoy_comparison: 'Multi-Year Comparison: Sales Growth and Profit Trend Rules',
+      bs_trend: 'Balance Sheet Trend: Asset, Liability, and Equity Rules',
+    });
+
     const customerMarginKpiTitles = Object.fromEntries(
       ['cm_net_sales', 'cm_cogs', 'cm_margin_pct', 'cm_margin_trend'].map((key) => {
         const prompt = body.prompts.find((candidate) => candidate.promptKey === key);
@@ -818,6 +830,106 @@ test.describe('AI Insight Config after feedback removal', () => {
     } finally {
       await saveThresholdValues(request, 'fin_pnl_summary', originals.fin_pnl_summary);
       await saveThresholdValues(request, 'fin_monthly_trend', originals.fin_monthly_trend);
+    }
+  });
+
+  test('financial detail metadata is business-readable and updates the prompt preview', async ({ page, request }) => {
+    const originals = {
+      fin_pl_statement: await readThresholdValues(request, 'fin_pl_statement'),
+      fin_yoy_comparison: await readThresholdValues(request, 'fin_yoy_comparison'),
+      bs_trend: await readThresholdValues(request, 'bs_trend'),
+    };
+    const nextPlMaterialPct = originals.fin_pl_statement.material_pct >= 100
+      ? Math.max(originals.fin_pl_statement.flat_pct + 1, originals.fin_pl_statement.material_pct - 1)
+      : originals.fin_pl_statement.material_pct + 1;
+    const nextYoyGrowingPct = originals.fin_yoy_comparison.growing_upper_pct >= 100
+      ? Math.max(originals.fin_yoy_comparison.flat_upper_pct + 1, originals.fin_yoy_comparison.growing_upper_pct - 1)
+      : originals.fin_yoy_comparison.growing_upper_pct + 1;
+    const nextGearingSeverePp = originals.bs_trend.severe_pp >= 100
+      ? Math.max(originals.bs_trend.material_pp + 1, originals.bs_trend.severe_pp - 1)
+      : originals.bs_trend.severe_pp + 1;
+
+    await setAdminRole(page);
+    await openAdminConfig(page);
+
+    try {
+      await selectPromptBySearch(page, 'Margin drift rules', 'fin_pl_statement');
+      let configPanel = page.getByTestId('configuration-panel');
+      await expect(configPanel).toContainText('Profit & Loss Statement: Group Movement and Margin Drift Rules');
+      await expect(configPanel).toContainText('Account Group Movement');
+      await expect(configPanel).toContainText('Gross Margin Drift');
+      await expect(configPanel).toContainText('Net Margin Drift');
+      await expect(configPanel).toContainText('Material movement');
+      await expect(configPanel).toContainText('Severe net-margin shift');
+      await expect(configPanel).not.toContainText('Group YoY');
+      await expect(configPanel).not.toContainText('Gross margin material above');
+      await expect(configPanel).not.toContainText('gross_material_pp');
+      await expect(page.getByTestId('prompt-tree')).not.toContainText('Gross margin severe above');
+
+      await selectPromptBySearch(page, 'Profit streak', 'fin_yoy_comparison');
+      configPanel = page.getByTestId('configuration-panel');
+      await expect(configPanel).toContainText('Multi-Year Comparison: Sales Growth and Profit Trend Rules');
+      await expect(configPanel).toContainText('Net Sales Growth Trend');
+      await expect(configPanel).toContainText('Net Profit Streak');
+      await expect(configPanel).toContainText('Gross Margin Structural Shift');
+      await expect(configPanel).toContainText('Fast sales growth');
+      await expect(configPanel).toContainText('Severe decline or strong improvement');
+      await expect(configPanel).not.toContainText('Growing upper bound');
+      await expect(configPanel).not.toContainText('Consecutive years threshold');
+      await expect(configPanel).not.toContainText('growing_upper_pct');
+      await expect(page.getByTestId('prompt-tree')).not.toContainText('Consecutive years threshold');
+
+      await selectPromptBySearch(page, 'Gearing drift', 'bs_trend');
+      configPanel = page.getByTestId('configuration-panel');
+      await expect(configPanel).toContainText('Balance Sheet Trend: Asset, Liability, and Equity Rules');
+      await expect(configPanel).toContainText('Asset Growth Trajectory');
+      await expect(configPanel).toContainText('Equity Decline Streak');
+      await expect(configPanel).toContainText('Liability Growth Divergence');
+      await expect(configPanel).toContainText('Severe gearing drift');
+      await expect(configPanel).not.toContainText('Asset trajectory');
+      await expect(configPanel).not.toContainText('Growing upper bound');
+      await expect(configPanel).not.toContainText('severe_pp');
+      await expect(page.getByTestId('prompt-tree')).not.toContainText('Severe consecutive months');
+
+      await editPromptThreshold({
+        page,
+        request,
+        search: 'Margin drift rules',
+        promptKey: 'fin_pl_statement',
+        token: 'material_pct',
+        value: nextPlMaterialPct,
+        expectedBusinessLabel: 'Account Group Movement',
+        expectedConfigText: 'Material movement',
+        expectedPromptText: `>±${nextPlMaterialPct}% Material`,
+      });
+
+      await editPromptThreshold({
+        page,
+        request,
+        search: 'Revenue CAGR',
+        promptKey: 'fin_yoy_comparison',
+        token: 'growing_upper_pct',
+        value: nextYoyGrowingPct,
+        expectedBusinessLabel: 'Net Sales Growth Trend',
+        expectedConfigText: 'Fast sales growth',
+        expectedPromptText: `>${nextYoyGrowingPct}% Fast`,
+      });
+
+      await editPromptThreshold({
+        page,
+        request,
+        search: 'Gearing drift',
+        promptKey: 'bs_trend',
+        token: 'severe_pp',
+        value: nextGearingSeverePp,
+        expectedBusinessLabel: 'Gearing Drift',
+        expectedConfigText: 'Severe gearing drift',
+        expectedPromptText: `>+${nextGearingSeverePp}pp Severe`,
+      });
+    } finally {
+      await saveThresholdValues(request, 'fin_pl_statement', originals.fin_pl_statement);
+      await saveThresholdValues(request, 'fin_yoy_comparison', originals.fin_yoy_comparison);
+      await saveThresholdValues(request, 'bs_trend', originals.bs_trend);
     }
   });
 
