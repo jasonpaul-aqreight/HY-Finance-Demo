@@ -4579,6 +4579,403 @@ export const THRESHOLD_PRESENTATION: Record<string, ThresholdComponentPresentati
       },
     ],
   },
+  fin_pnl_summary: {
+    title: 'P&L Summary: Profitability and Cost Structure Rules',
+    description: '',
+    appliesToPromptLabel: 'P&L Summary',
+    searchAliases: [
+      'Financial overview',
+      'Gross margin quality',
+      'Operating margin quality',
+      'Net margin quality',
+      'Cost of sales share',
+    ],
+    rules: [
+      {
+        id: 'gross_margin_quality',
+        title: 'Gross Margin Quality',
+        settings: [
+          {
+            token: 'gross_typical_below_pct',
+            displayLabel: 'Typical gross margin',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'typical gross-margin limit',
+          },
+          {
+            token: 'gross_watch_below_pct',
+            displayLabel: 'Watch gross margin',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'watch gross-margin limit',
+          },
+          {
+            token: 'gross_severe_below_pct',
+            displayLabel: 'Severe gross margin',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'severe gross-margin limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Severe margin pressure',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'gross_severe_below_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Watch margin pressure',
+            segments: [{ token: 'gross_severe_below_pct' }, { text: '-' }, { token: 'gross_watch_below_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Typical gross margin',
+            segments: [{ token: 'gross_watch_below_pct' }, { text: '-' }, { token: 'gross_typical_below_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Strong gross margin',
+            segments: [{ text: 'Above' }, { token: 'gross_typical_below_pct' }],
+            unit: '%',
+          },
+        ],
+        validationConstraints: [
+          {
+            leftToken: 'gross_typical_below_pct',
+            relation: 'greaterThan',
+            rightToken: 'gross_watch_below_pct',
+            message: 'The typical gross-margin limit must be higher than the watch limit.',
+          },
+          {
+            leftToken: 'gross_watch_below_pct',
+            relation: 'greaterThan',
+            rightToken: 'gross_severe_below_pct',
+            message: 'The watch gross-margin limit must be higher than the severe limit.',
+          },
+        ],
+      },
+      {
+        id: 'operating_cost_ratio',
+        title: 'Operating Cost Ratio',
+        settings: [
+          {
+            token: 'opex_lean_below_pct',
+            displayLabel: 'Lean operating cost base',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'lean operating-cost limit',
+          },
+          {
+            token: 'opex_typical_below_pct',
+            displayLabel: 'Typical operating cost base',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'typical operating-cost limit',
+          },
+          {
+            token: 'opex_elevated_below_pct',
+            displayLabel: 'Elevated operating cost base',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'elevated operating-cost limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Lean operating cost base',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'opex_lean_below_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Typical operating cost load',
+            segments: [{ token: 'opex_lean_below_pct' }, { text: '-' }, { token: 'opex_typical_below_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Elevated operating cost load',
+            segments: [{ token: 'opex_typical_below_pct' }, { text: '-' }, { token: 'opex_elevated_below_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Severe cost drag',
+            segments: [{ text: 'Above' }, { token: 'opex_elevated_below_pct' }],
+            unit: '%',
+          },
+        ],
+        validationConstraints: [
+          {
+            leftToken: 'opex_lean_below_pct',
+            relation: 'lessThan',
+            rightToken: 'opex_typical_below_pct',
+            message: 'The typical operating-cost limit must be higher than the lean limit.',
+          },
+          {
+            leftToken: 'opex_typical_below_pct',
+            relation: 'lessThan',
+            rightToken: 'opex_elevated_below_pct',
+            message: 'The elevated operating-cost limit must be higher than the typical limit.',
+          },
+        ],
+      },
+      {
+        id: 'operating_margin_quality',
+        title: 'Operating Margin Quality',
+        settings: [
+          {
+            token: 'operating_healthy_below_pct',
+            displayLabel: 'Healthy operating margin',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'healthy operating-margin limit',
+          },
+          {
+            token: 'operating_thin_below_pct',
+            displayLabel: 'Thin operating margin',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'thin operating-margin limit',
+          },
+          {
+            token: 'operating_severe_below_pct',
+            displayLabel: 'Severe operating margin',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'severe operating-margin limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Severe operating loss',
+            segments: [{ text: 'Under' }, { token: 'operating_severe_below_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Thin operating margin',
+            segments: [{ token: 'operating_severe_below_pct' }, { text: '-' }, { token: 'operating_thin_below_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Healthy operating margin',
+            segments: [{ token: 'operating_thin_below_pct' }, { text: '-' }, { token: 'operating_healthy_below_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Strong operating margin',
+            segments: [{ text: 'Above' }, { token: 'operating_healthy_below_pct' }],
+            unit: '%',
+          },
+        ],
+        validationConstraints: [
+          {
+            leftToken: 'operating_healthy_below_pct',
+            relation: 'greaterThan',
+            rightToken: 'operating_thin_below_pct',
+            message: 'The healthy operating-margin limit must be higher than the thin limit.',
+          },
+          {
+            leftToken: 'operating_thin_below_pct',
+            relation: 'greaterThan',
+            rightToken: 'operating_severe_below_pct',
+            message: 'The thin operating-margin limit must be higher than the severe limit.',
+          },
+        ],
+      },
+      {
+        id: 'net_margin_quality',
+        title: 'Net Margin Quality',
+        settings: [
+          {
+            token: 'net_healthy_below_pct',
+            displayLabel: 'Healthy net margin',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'healthy net-margin limit',
+          },
+          {
+            token: 'net_thin_below_pct',
+            displayLabel: 'Thin net margin',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'thin net-margin limit',
+          },
+          {
+            token: 'net_severe_below_pct',
+            displayLabel: 'Severe net margin',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'severe net-margin limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Severe net-profit risk',
+            segments: [{ text: 'Under' }, { token: 'net_severe_below_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Thin net margin',
+            segments: [{ token: 'net_severe_below_pct' }, { text: '-' }, { token: 'net_thin_below_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Healthy net margin',
+            segments: [{ token: 'net_thin_below_pct' }, { text: '-' }, { token: 'net_healthy_below_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Strong net margin',
+            segments: [{ text: 'Above' }, { token: 'net_healthy_below_pct' }],
+            unit: '%',
+          },
+        ],
+        validationConstraints: [
+          {
+            leftToken: 'net_healthy_below_pct',
+            relation: 'greaterThan',
+            rightToken: 'net_thin_below_pct',
+            message: 'The healthy net-margin limit must be higher than the thin limit.',
+          },
+          {
+            leftToken: 'net_thin_below_pct',
+            relation: 'greaterThan',
+            rightToken: 'net_severe_below_pct',
+            message: 'The thin net-margin limit must be higher than the severe limit.',
+          },
+        ],
+      },
+      {
+        id: 'cost_of_sales_share',
+        title: 'Cost of Sales Share',
+        settings: [
+          {
+            token: 'typical_min_pct',
+            displayLabel: 'Typical minimum',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'typical minimum cost-of-sales share',
+          },
+          {
+            token: 'typical_max_pct',
+            displayLabel: 'Typical maximum',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'typical maximum cost-of-sales share',
+          },
+          {
+            token: 'margin_pressure_pct',
+            displayLabel: 'Margin pressure',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'margin-pressure limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Low cost-of-sales share',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'typical_min_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Typical cost-of-sales share',
+            segments: [{ token: 'typical_min_pct' }, { text: '-' }, { token: 'typical_max_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'High cost-of-sales share',
+            segments: [{ token: 'typical_max_pct' }, { text: '-' }, { token: 'margin_pressure_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Margin pressure',
+            segments: [{ text: 'Above' }, { token: 'margin_pressure_pct' }],
+            unit: '%',
+          },
+        ],
+        validationConstraints: [
+          {
+            leftToken: 'typical_min_pct',
+            relation: 'lessThan',
+            rightToken: 'typical_max_pct',
+            message: 'The typical maximum cost-of-sales share must be higher than the typical minimum.',
+          },
+          {
+            leftToken: 'typical_max_pct',
+            relation: 'lessThan',
+            rightToken: 'margin_pressure_pct',
+            message: 'The margin-pressure limit must be higher than the typical maximum.',
+          },
+        ],
+      },
+    ],
+  },
+  fin_monthly_trend: {
+    title: 'Monthly P&L Trend: Loss and Profit-Decline Rules',
+    description: '',
+    appliesToPromptLabel: 'Monthly P&L Trend',
+    searchAliases: [
+      'Financial overview trend',
+      'Loss-month exposure',
+      'Operating profit decline',
+      'Monthly profitability trend',
+    ],
+    rules: [
+      {
+        id: 'loss_month_exposure',
+        title: 'Loss-Month Exposure',
+        settings: [
+          {
+            token: 'concern_pct',
+            displayLabel: 'Concern loss-month share',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'loss-month concern limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Watch signal',
+            segments: [{ text: 'Any loss month' }],
+            unit: '',
+          },
+          {
+            label: 'No concern from loss-month share',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'concern_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Concern loss-month share',
+            segments: [{ text: 'Above' }, { token: 'concern_pct' }],
+            unit: '%',
+          },
+        ],
+      },
+      {
+        id: 'operating_profit_decline',
+        title: 'Operating Profit Decline',
+        settings: [
+          {
+            token: 'severe_pct',
+            displayLabel: 'Severe first-to-last decline',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'severe operating-profit decline limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Tracked decline',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'severe_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Severe profit decline',
+            segments: [{ text: 'Above' }, { token: 'severe_pct' }],
+            unit: '%',
+          },
+        ],
+      },
+    ],
+  },
 };
 
 const componentMap = new Map(THRESHOLD_REGISTRY.map((entry) => [entry.componentKey, entry]));

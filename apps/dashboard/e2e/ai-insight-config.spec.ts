@@ -220,6 +220,17 @@ test.describe('AI Insight Config after feedback removal', () => {
       ex_opex_table: 'Operating Costs Breakdown: Category and Account Concentration Rules',
     });
 
+    const financialOverviewTitles = Object.fromEntries(
+      ['fin_pnl_summary', 'fin_monthly_trend'].map((key) => {
+        const prompt = body.prompts.find((candidate) => candidate.promptKey === key);
+        return [key, prompt?.thresholdPresentation?.title];
+      }),
+    );
+    expect(financialOverviewTitles).toEqual({
+      fin_pnl_summary: 'P&L Summary: Profitability and Cost Structure Rules',
+      fin_monthly_trend: 'Monthly P&L Trend: Loss and Profit-Decline Rules',
+    });
+
     const customerMarginKpiTitles = Object.fromEntries(
       ['cm_net_sales', 'cm_cogs', 'cm_margin_pct', 'cm_margin_trend'].map((key) => {
         const prompt = body.prompts.find((candidate) => candidate.promptKey === key);
@@ -727,6 +738,86 @@ test.describe('AI Insight Config after feedback removal', () => {
     } finally {
       await saveThresholdValues(request, 'ex_cogs_table', originals.ex_cogs_table);
       await saveThresholdValues(request, 'ex_opex_table', originals.ex_opex_table);
+    }
+  });
+
+  test('financial overview metadata is business-readable and updates the prompt preview', async ({ page, request }) => {
+    const originals = {
+      fin_pnl_summary: await readThresholdValues(request, 'fin_pnl_summary'),
+      fin_monthly_trend: await readThresholdValues(request, 'fin_monthly_trend'),
+    };
+    const nextGrossTypicalPct = originals.fin_pnl_summary.gross_typical_below_pct >= 100
+      ? originals.fin_pnl_summary.gross_typical_below_pct - 1
+      : originals.fin_pnl_summary.gross_typical_below_pct + 1;
+    const nextLossConcernPct = originals.fin_monthly_trend.concern_pct >= 100
+      ? originals.fin_monthly_trend.concern_pct - 1
+      : originals.fin_monthly_trend.concern_pct + 1;
+
+    await setAdminRole(page);
+    await openAdminConfig(page);
+
+    try {
+      await selectPromptBySearch(page, 'Gross margin quality', 'fin_pnl_summary');
+      let configPanel = page.getByTestId('configuration-panel');
+      await expect(configPanel).toContainText('P&L Summary: Profitability and Cost Structure Rules');
+      await expect(configPanel).toContainText('Gross Margin Quality');
+      await expect(configPanel).toContainText('Operating Cost Ratio');
+      await expect(configPanel).toContainText('Operating Margin Quality');
+      await expect(configPanel).toContainText('Net Margin Quality');
+      await expect(configPanel).toContainText('Cost of Sales Share');
+      await expect(configPanel).toContainText('Severe margin pressure');
+      await expect(configPanel).toContainText('Margin pressure');
+      await expect(configPanel).not.toContainText('Gross margin band');
+      await expect(configPanel).not.toContainText('Typical below');
+      await expect(configPanel).not.toContainText('gross_typical_below_pct');
+      await expect(page.getByTestId('prompt-tree')).not.toContainText('Gross margin band');
+
+      const invalidGrossTypicalPct = Math.max(0, originals.fin_pnl_summary.gross_watch_below_pct - 1);
+      await page.getByTestId('threshold-input-gross_typical_below_pct').fill(String(invalidGrossTypicalPct));
+      await expect(page.getByTestId('threshold-validation-error').first()).toContainText(
+        'The typical gross-margin limit must be higher than the watch limit.',
+      );
+      await expect(configPanel).not.toContainText('Typical below');
+      await page.getByRole('button', { name: 'Reset' }).click();
+
+      await selectPromptBySearch(page, 'Loss-month exposure', 'fin_monthly_trend');
+      configPanel = page.getByTestId('configuration-panel');
+      await expect(configPanel).toContainText('Monthly P&L Trend: Loss and Profit-Decline Rules');
+      await expect(configPanel).toContainText('Loss-Month Exposure');
+      await expect(configPanel).toContainText('Operating Profit Decline');
+      await expect(configPanel).toContainText('Any loss month');
+      await expect(configPanel).toContainText('Severe profit decline');
+      await expect(configPanel).not.toContainText('Concern above window share');
+      await expect(configPanel).not.toContainText('Severe decline above');
+      await expect(configPanel).not.toContainText('concern_pct');
+      await expect(page.getByTestId('prompt-tree')).not.toContainText('Concern above window share');
+
+      await editPromptThreshold({
+        page,
+        request,
+        search: 'Gross margin quality',
+        promptKey: 'fin_pnl_summary',
+        token: 'gross_typical_below_pct',
+        value: nextGrossTypicalPct,
+        expectedBusinessLabel: 'Gross Margin Quality',
+        expectedConfigText: 'Strong gross margin',
+        expectedPromptText: `>${nextGrossTypicalPct}% Strong`,
+      });
+
+      await editPromptThreshold({
+        page,
+        request,
+        search: 'Loss-month exposure',
+        promptKey: 'fin_monthly_trend',
+        token: 'concern_pct',
+        value: nextLossConcernPct,
+        expectedBusinessLabel: 'Loss-Month Exposure',
+        expectedConfigText: 'Concern loss-month share',
+        expectedPromptText: `Loss months / total >${nextLossConcernPct}% = Concern`,
+      });
+    } finally {
+      await saveThresholdValues(request, 'fin_pnl_summary', originals.fin_pnl_summary);
+      await saveThresholdValues(request, 'fin_monthly_trend', originals.fin_monthly_trend);
     }
   });
 
