@@ -2188,6 +2188,525 @@ export const THRESHOLD_PRESENTATION: Record<string, ThresholdComponentPresentati
       },
     ],
   },
+  sp_margin_trend: {
+    title: 'Supplier Profitability Trend: Profit and Margin Streak Rules',
+    description: '',
+    appliesToPromptLabel: 'Profitability Trend',
+    searchAliases: ['Supplier profitability trend', 'Gross profit trend', 'Margin decline trend', 'Supplier Performance chart'],
+    rules: [
+      {
+        id: 'profit_streak',
+        title: 'Gross Profit Streak',
+        settings: [
+          {
+            token: 'growth_months',
+            displayLabel: 'Good growth streak',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'good gross-profit streak',
+          },
+          {
+            token: 'profit_decline_months',
+            displayLabel: 'Bad decline streak',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'bad gross-profit decline streak',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Good gross-profit trend',
+            segments: [{ token: 'growth_months', editable: true }, { text: 'or more' }],
+            unit: 'months',
+          },
+          {
+            label: 'Bad gross-profit trend',
+            segments: [{ token: 'profit_decline_months', editable: true }, { text: 'or more' }],
+            unit: 'months',
+          },
+        ],
+      },
+      {
+        id: 'margin_decline',
+        title: 'Margin Percentage Decline',
+        settings: [
+          {
+            token: 'margin_decline_months',
+            displayLabel: 'Margin decline flag',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'margin decline flag',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Flag margin compression',
+            segments: [{ token: 'margin_decline_months', editable: true }, { text: 'or more' }],
+            unit: 'months',
+          },
+        ],
+      },
+    ],
+  },
+  sp_margin_distribution: {
+    title: 'Supplier Margin Distribution: Margin Shape Rules',
+    description: '',
+    appliesToPromptLabel: 'Margin Distribution',
+    searchAliases: ['Supplier margin distribution', 'Supplier margin shape', 'Thin-margin sourcing', 'Supplier Performance chart'],
+    rules: [
+      {
+        id: 'thin_margin_share',
+        title: 'Thin-Margin Supplier and Item Share',
+        settings: [
+          {
+            token: 'sub_10_bad_pct',
+            displayLabel: 'Bad',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'thin-margin supplier and item share limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Controlled thin-margin exposure',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'sub_10_bad_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Thin-margin sourcing base',
+            segments: [{ text: 'Above' }, { token: 'sub_10_bad_pct' }],
+            unit: '%',
+          },
+        ],
+      },
+      {
+        id: 'premium_margin_share',
+        title: 'Premium-Margin Supplier and Item Share',
+        settings: [
+          {
+            token: 'premium_good_pct',
+            displayLabel: 'Good',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'premium-margin supplier and item share limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Standard margin mix',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'premium_good_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Premium sourcing base',
+            segments: [{ text: 'Above' }, { token: 'premium_good_pct' }],
+            unit: '%',
+          },
+        ],
+      },
+    ],
+  },
+  sm_top_bottom: {
+    title: 'Top and Bottom Suppliers and Items: Profit Concentration Rules',
+    description: '',
+    appliesToPromptLabel: 'Top/Bottom Suppliers & Items',
+    searchAliases: ['Top and bottom suppliers', 'Supplier profit concentration', 'Supplier loss makers', 'Supplier Performance breakdown'],
+    rules: [
+      {
+        id: 'top_supplier_profit_share',
+        title: 'Top Supplier Profit Share',
+        settings: [
+          {
+            token: 'top_1_bad_pct',
+            displayLabel: 'Concentration risk',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'top supplier profit-share limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Balanced profit base',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'top_1_bad_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Single-supplier concentration risk',
+            segments: [{ text: 'Above' }, { token: 'top_1_bad_pct' }],
+            unit: '%',
+          },
+        ],
+      },
+      {
+        id: 'top_10_supplier_profit_share',
+        title: 'Top 10 Supplier Profit Share',
+        settings: [
+          {
+            token: 'top_10_good_pct',
+            displayLabel: 'Diversified',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'diversified top-10 supplier-share limit',
+          },
+          {
+            token: 'top_10_bad_pct',
+            displayLabel: 'Concentrated',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'concentrated top-10 supplier-share limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Diversified sourcing profit spread',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'top_10_good_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Normal concentration',
+            segments: [{ token: 'top_10_good_pct' }, { text: '-' }, { token: 'top_10_bad_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Concentrated sourcing base',
+            segments: [{ text: 'Above' }, { token: 'top_10_bad_pct' }],
+            unit: '%',
+          },
+        ],
+        validationConstraints: [
+          {
+            leftToken: 'top_10_good_pct',
+            relation: 'lessThan',
+            rightToken: 'top_10_bad_pct',
+            message: 'The concentrated top-10 supplier-share limit must be higher than the diversified limit.',
+          },
+        ],
+      },
+      {
+        id: 'loss_making_profit_floor',
+        title: 'Loss-Making Supplier and Item Floor',
+        settings: [
+          {
+            token: 'loss_profit_rm',
+            displayLabel: 'Loss-making',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'loss-making profit floor',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Loss-making supplier or item',
+            segments: [{ text: 'Below' }, { token: 'loss_profit_rm', editable: true }],
+            unit: 'RM',
+          },
+          {
+            label: 'Not loss-making',
+            segments: [{ token: 'loss_profit_rm' }, { text: 'or above' }],
+            unit: 'RM',
+          },
+        ],
+      },
+    ],
+  },
+  sm_supplier_table: {
+    title: 'Supplier Analysis Table: Revenue Concentration and Margin Quality Rules',
+    description: '',
+    appliesToPromptLabel: 'Supplier Analysis Table',
+    searchAliases: ['Supplier analysis table', 'Supplier revenue concentration', 'Supplier margin quality', 'Supplier Performance table'],
+    rules: [
+      {
+        id: 'top_10_supplier_revenue_share',
+        title: 'Top 10 Supplier Revenue Share',
+        settings: [
+          {
+            token: 'top_10_neutral_pct',
+            displayLabel: 'Typical',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'typical top-10 revenue-share limit',
+          },
+          {
+            token: 'top_10_bad_pct',
+            displayLabel: 'Concentrated',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'concentrated top-10 revenue-share limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Diversified supplier revenue',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'top_10_neutral_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Typical distribution',
+            segments: [{ token: 'top_10_neutral_pct' }, { text: '-' }, { token: 'top_10_bad_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Concentrated supplier revenue',
+            segments: [{ text: 'Above' }, { token: 'top_10_bad_pct' }],
+            unit: '%',
+          },
+        ],
+        validationConstraints: [
+          {
+            leftToken: 'top_10_neutral_pct',
+            relation: 'lessThan',
+            rightToken: 'top_10_bad_pct',
+            message: 'The concentrated top-10 revenue-share limit must be higher than the typical distribution limit.',
+          },
+        ],
+      },
+      {
+        id: 'supplier_margin_quality',
+        title: 'Supplier Margin Quality',
+        settings: [
+          {
+            token: 'loss_margin_pct',
+            displayLabel: 'Loss-making',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'loss-making margin limit',
+          },
+          {
+            token: 'thin_margin_pct',
+            displayLabel: 'Thin margin',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'thin-margin supplier limit',
+          },
+          {
+            token: 'thin_active_bad_pct',
+            displayLabel: 'Portfolio concern',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'thin-margin active-supplier share limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Loss-making supplier',
+            segments: [{ text: 'Below' }, { token: 'loss_margin_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Thin-margin supplier',
+            segments: [{ token: 'loss_margin_pct' }, { text: '-' }, { token: 'thin_margin_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Healthier supplier margin',
+            segments: [{ text: 'Above' }, { token: 'thin_margin_pct' }],
+            unit: '%',
+          },
+          {
+            label: 'Controlled thin-margin active base',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'thin_active_bad_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Portfolio quality concern',
+            segments: [{ text: 'Above' }, { token: 'thin_active_bad_pct' }],
+            unit: '%',
+          },
+          {
+            label: 'Critical revenue trigger',
+            segments: [{ text: 'Above RM 100,000 revenue' }],
+            unit: '',
+          },
+        ],
+        validationConstraints: [
+          {
+            leftToken: 'loss_margin_pct',
+            relation: 'lessThan',
+            rightToken: 'thin_margin_pct',
+            message: 'The thin-margin supplier limit must be higher than the loss-making margin limit.',
+          },
+        ],
+      },
+    ],
+  },
+  sm_item_pricing: {
+    title: 'Item Price Comparison: Procurement Alignment Rules',
+    description: '',
+    appliesToPromptLabel: 'Item Price Comparison',
+    searchAliases: ['Item price comparison', 'Anchor item procurement', 'Supplier price spread', 'Supplier Performance table'],
+    rules: [
+      {
+        id: 'margin_arbitrage_spread',
+        title: 'Cross-Supplier Margin Spread',
+        settings: [
+          {
+            token: 'arbitrage_spread_pp',
+            displayLabel: 'Arbitrage opportunity',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'cross-supplier margin-spread limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Normal supplier spread',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'arbitrage_spread_pp', editable: true }],
+            unit: 'pp',
+          },
+          {
+            label: 'Significant arbitrage opportunity',
+            segments: [{ text: 'Above' }, { token: 'arbitrage_spread_pp' }],
+            unit: 'pp',
+          },
+        ],
+      },
+      {
+        id: 'anchor_item_margin_floor',
+        title: 'Anchor Item Margin Floor',
+        settings: [
+          {
+            token: 'loss_margin_pct',
+            displayLabel: 'Loss-making',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'anchor item loss-making margin limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Loss-making supplier price',
+            segments: [{ text: 'Below' }, { token: 'loss_margin_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Positive anchor-item margin',
+            segments: [{ token: 'loss_margin_pct' }, { text: 'or above' }],
+            unit: '%',
+          },
+        ],
+      },
+      {
+        id: 'best_price_volume_share',
+        title: 'Best-Price Supplier Volume Share',
+        settings: [
+          {
+            token: 'best_price_volume_flag_pct',
+            displayLabel: 'Volume risk',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'best-price volume risk limit',
+          },
+          {
+            token: 'best_price_volume_good_pct',
+            displayLabel: 'Aligned volume',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'best-price aligned volume limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Volume on expensive suppliers',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'best_price_volume_flag_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Mixed sourcing',
+            segments: [{ token: 'best_price_volume_flag_pct' }, { text: '-' }, { token: 'best_price_volume_good_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Procurement on best price',
+            segments: [{ text: 'Above' }, { token: 'best_price_volume_good_pct' }],
+            unit: '%',
+          },
+        ],
+        validationConstraints: [
+          {
+            leftToken: 'best_price_volume_flag_pct',
+            relation: 'lessThan',
+            rightToken: 'best_price_volume_good_pct',
+            message: 'The best-price aligned volume limit must be higher than the volume risk limit.',
+          },
+        ],
+      },
+    ],
+  },
+  sm_price_scatter: {
+    title: 'Purchase vs Selling Price: Catalog Margin Rules',
+    description: '',
+    appliesToPromptLabel: 'Purchase vs Selling Price',
+    searchAliases: ['Purchase vs selling price', 'Catalog margin quality', 'Thin-margin catalog', 'Supplier Performance scatter'],
+    rules: [
+      {
+        id: 'catalog_margin_shape',
+        title: 'Catalog Margin Shape',
+        settings: [
+          {
+            token: 'thin_universe_bad_pct',
+            displayLabel: 'Thin catalog',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'thin-margin catalog limit',
+          },
+          {
+            token: 'premium_universe_good_pct',
+            displayLabel: 'Premium pocket',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'premium catalog limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Controlled thin-margin catalog',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'thin_universe_bad_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Thin-margin catalog',
+            segments: [{ text: 'Above' }, { token: 'thin_universe_bad_pct' }],
+            unit: '%',
+          },
+          {
+            label: 'Standard catalog mix',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'premium_universe_good_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Premium pocket worth protecting',
+            segments: [{ text: 'Above' }, { token: 'premium_universe_good_pct' }],
+            unit: '%',
+          },
+        ],
+      },
+      {
+        id: 'high_revenue_loss_maker',
+        title: 'High-Revenue Loss-Maker Trigger',
+        settings: [
+          {
+            token: 'loss_margin_pct',
+            displayLabel: 'Severe loss margin',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'severe loss-making margin limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Severe loss-making margin',
+            segments: [{ text: 'Below' }, { token: 'loss_margin_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Severe revenue threshold',
+            segments: [{ text: 'Above RM 100,000 revenue' }],
+            unit: '',
+          },
+        ],
+      },
+    ],
+  },
   rt_total_returns: {
     title: 'Total Returns: Return Exposure Rules',
     description: '',

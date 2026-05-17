@@ -391,17 +391,17 @@ Thresholds (MoM):
 
 Report direction and whether the change correlates with margin % (consolidation + improving margin = good story; consolidation + flat/falling margin = concentration risk without payoff).`,
 
-  sp_margin_trend: `"Profitability Trend" chart — monthly bars = Est. GP (RM), line = Margin % (right axis). Monthly only.
+  sp_margin_trend: `"Profitability Trend" chart — monthly bars = Est. Gross Profit (RM), line = Margin % (right axis). Monthly only.
 
 Two questions: profit direction (RM) and efficiency (margin %).
 
 Thresholds:
-- {{sp_margin_trend.growth_months}}+ consecutive months GP growth = Good
+- {{sp_margin_trend.growth_months}}+ consecutive months Gross Profit growth = Good
 - Flat / mixed = Neutral
-- {{sp_margin_trend.profit_decline_months}}+ consecutive months GP decline = Bad
-- Margin % declining {{sp_margin_trend.margin_decline_months}}+ months = Flag (even if GP flat — slow-moving sourcing problem)
+- {{sp_margin_trend.profit_decline_months}}+ consecutive months Gross Profit decline = Bad
+- Margin % declining {{sp_margin_trend.margin_decline_months}}+ months = Flag (even if Gross Profit is flat — slow-moving sourcing problem)
 
-Look for: bars-vs-line divergence (e.g., GP up while margin flat = volume not pricing leverage), seasonal/festive shifts, months where GP and margin % move opposite directions (usually a sourcing-mix shift on a supplier page). Cite specific months from the monthly breakdown.`,
+Look for: bars-vs-line divergence (e.g., Gross Profit up while Margin % is flat = volume not pricing leverage), seasonal/festive shifts, months where Gross Profit and Margin % move opposite directions (usually a sourcing-mix shift on a supplier page). Cite specific months from the monthly breakdown.`,
 
   sp_margin_distribution: `"Margin Distribution" histogram — entities (suppliers OR items) per fixed Margin % bucket: <0%, 0–5%, 5–10%, 10–15%, 15–20%, 20–30%, 30%+.
 

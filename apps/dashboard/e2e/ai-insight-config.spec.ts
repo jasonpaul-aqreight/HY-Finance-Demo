@@ -222,6 +222,30 @@ test.describe('AI Insight Config after feedback removal', () => {
       sp_margin_pct: 'Supplier Margin Percentage: Gross Margin Rules',
       sp_active_suppliers: 'Active Suppliers: Supplier Base Movement Rules',
     });
+
+    const supplierChartTitles = Object.fromEntries(
+      ['sp_margin_trend', 'sp_margin_distribution'].map((key) => {
+        const prompt = body.prompts.find((candidate) => candidate.promptKey === key);
+        return [key, prompt?.thresholdPresentation?.title];
+      }),
+    );
+    expect(supplierChartTitles).toEqual({
+      sp_margin_trend: 'Supplier Profitability Trend: Profit and Margin Streak Rules',
+      sp_margin_distribution: 'Supplier Margin Distribution: Margin Shape Rules',
+    });
+
+    const supplierBreakdownTitles = Object.fromEntries(
+      ['sm_top_bottom', 'sm_supplier_table', 'sm_item_pricing', 'sm_price_scatter'].map((key) => {
+        const prompt = body.prompts.find((candidate) => candidate.promptKey === key);
+        return [key, prompt?.thresholdPresentation?.title];
+      }),
+    );
+    expect(supplierBreakdownTitles).toEqual({
+      sm_top_bottom: 'Top and Bottom Suppliers and Items: Profit Concentration Rules',
+      sm_supplier_table: 'Supplier Analysis Table: Revenue Concentration and Margin Quality Rules',
+      sm_item_pricing: 'Item Price Comparison: Procurement Alignment Rules',
+      sm_price_scatter: 'Purchase vs Selling Price: Catalog Margin Rules',
+    });
   });
 
   test('admin config page has no feedback, version, router, editor, or guidance UI', async ({ page }) => {
@@ -561,6 +585,104 @@ test.describe('AI Insight Config after feedback removal', () => {
       });
     } finally {
       await saveThresholdValues(request, 'sp_margin_pct', originals.sp_margin_pct);
+    }
+  });
+
+  test('supplier chart metadata is business-readable and updates the prompt preview', async ({ page, request }) => {
+    const originals = {
+      sp_margin_distribution: await readThresholdValues(request, 'sp_margin_distribution'),
+    };
+    const nextSubTenPct = originals.sp_margin_distribution.sub_10_bad_pct >= 100
+      ? originals.sp_margin_distribution.sub_10_bad_pct - 1
+      : originals.sp_margin_distribution.sub_10_bad_pct + 1;
+
+    await setAdminRole(page);
+    await openAdminConfig(page);
+
+    try {
+      await selectPromptBySearch(page, 'Supplier margin shape', 'sp_margin_distribution');
+      const configPanel = page.getByTestId('configuration-panel');
+      await expect(configPanel).toContainText('Supplier Margin Distribution: Margin Shape Rules');
+      await expect(configPanel).toContainText('Thin-Margin Supplier and Item Share');
+      await expect(configPanel).toContainText('Premium-Margin Supplier and Item Share');
+      await expect(configPanel).toContainText('Controlled thin-margin exposure');
+      await expect(configPanel).not.toContainText('Portfolio shape');
+      await expect(configPanel).not.toContainText('Bad if sub-10% share above');
+      await expect(configPanel).not.toContainText('sub_10_bad_pct');
+      await expect(page.getByTestId('prompt-tree')).not.toContainText('Bad if sub-10% share above');
+
+      await editPromptThreshold({
+        page,
+        request,
+        search: 'Supplier margin shape',
+        promptKey: 'sp_margin_distribution',
+        token: 'sub_10_bad_pct',
+        value: nextSubTenPct,
+        expectedBusinessLabel: 'Thin-Margin Supplier and Item Share',
+        expectedConfigText: 'Thin-margin sourcing base',
+        expectedPromptText: `>${nextSubTenPct}% in sub-10% bands = Bad`,
+      });
+    } finally {
+      await saveThresholdValues(request, 'sp_margin_distribution', originals.sp_margin_distribution);
+    }
+  });
+
+  test('supplier breakdown metadata is business-readable and updates the prompt preview', async ({ page, request }) => {
+    const originals = {
+      sm_item_pricing: await readThresholdValues(request, 'sm_item_pricing'),
+    };
+    const nextSpreadPp = originals.sm_item_pricing.arbitrage_spread_pp >= 100
+      ? originals.sm_item_pricing.arbitrage_spread_pp - 1
+      : originals.sm_item_pricing.arbitrage_spread_pp + 1;
+
+    await setAdminRole(page);
+    await openAdminConfig(page);
+
+    try {
+      await selectPromptBySearch(page, 'Supplier profit concentration', 'sm_top_bottom');
+      let configPanel = page.getByTestId('configuration-panel');
+      await expect(configPanel).toContainText('Top and Bottom Suppliers and Items: Profit Concentration Rules');
+      await expect(configPanel).toContainText('Top Supplier Profit Share');
+      await expect(configPanel).toContainText('Top 10 Supplier Profit Share');
+      await expect(configPanel).toContainText('Loss-Making Supplier and Item Floor');
+      await expect(configPanel).toContainText('Diversified sourcing profit spread');
+      await expect(configPanel).not.toContainText('Supplier concentration');
+      await expect(configPanel).not.toContainText('Top 1 bad above');
+      await expect(configPanel).not.toContainText('loss_profit_rm');
+      await expect(page.getByTestId('prompt-tree')).not.toContainText('Top 1 bad above');
+
+      await selectPromptBySearch(page, 'Supplier revenue concentration', 'sm_supplier_table');
+      configPanel = page.getByTestId('configuration-panel');
+      await expect(configPanel).toContainText('Supplier Analysis Table: Revenue Concentration and Margin Quality Rules');
+      await expect(configPanel).toContainText('Top 10 Supplier Revenue Share');
+      await expect(configPanel).toContainText('Supplier Margin Quality');
+      await expect(configPanel).toContainText('Critical revenue trigger');
+      await expect(configPanel).not.toContainText('Revenue concentration');
+      await expect(configPanel).not.toContainText('Neutral lower bound');
+      await expect(configPanel).not.toContainText('critical_revenue_rm');
+
+      await selectPromptBySearch(page, 'Catalog margin quality', 'sm_price_scatter');
+      configPanel = page.getByTestId('configuration-panel');
+      await expect(configPanel).toContainText('Purchase vs Selling Price: Catalog Margin Rules');
+      await expect(configPanel).toContainText('Catalog Margin Shape');
+      await expect(configPanel).toContainText('Controlled thin-margin catalog');
+      await expect(configPanel).not.toContainText('Catalog quality');
+      await expect(configPanel).not.toContainText('Thin-margin universe share above');
+      await expect(configPanel).not.toContainText('thin_universe_bad_pct');
+
+      await editPromptThreshold({
+        page,
+        request,
+        search: 'Anchor item procurement',
+        promptKey: 'sm_item_pricing',
+        token: 'arbitrage_spread_pp',
+        value: nextSpreadPp,
+        expectedBusinessLabel: 'Cross-Supplier Margin Spread',
+        expectedConfigText: 'Significant arbitrage opportunity',
+        expectedPromptText: `Margin spread >${nextSpreadPp}pp = Significant arbitrage opportunity`,
+      });
+    } finally {
+      await saveThresholdValues(request, 'sm_item_pricing', originals.sm_item_pricing);
     }
   });
 
