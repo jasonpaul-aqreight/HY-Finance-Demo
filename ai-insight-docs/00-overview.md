@@ -145,7 +145,7 @@ Build order is the numeric order. Each document's verification checkpoint must p
 
 ## 7. The per-document template
 
-Every layer document `01`–`10` follows the same eight-part structure (skeleton in `_TEMPLATE.md`). `04a` is the one exception: it is a reference *companion* to `04`, not a layer of its own, so it uses a catalog structure (master index + a fixed-schema entry per section/component) rather than the eight-part template.
+Every layer document `01`–`10` follows the same eight-part structure. `04a` is the one exception: it is a reference *companion* to `04`, not a layer of its own, so it uses a catalog structure (master index + a fixed-schema entry per section/component) rather than the eight-part template.
 
 1. **Purpose** — the layer's single responsibility and what you can build after reading it.
 2. **Prerequisites** — exact prior docs and contracts required first.

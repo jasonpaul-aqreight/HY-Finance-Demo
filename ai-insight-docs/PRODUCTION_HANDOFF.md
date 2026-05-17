@@ -4,11 +4,7 @@ Use this as the entry point for the production developer (human or AI agent) imp
 
 ## Readiness
 
-The implementation-readiness audit is complete. `IMPLEMENTATION_READINESS_TRACKER.md` records no remaining P0/P1 documentation blockers. The remaining items below are production/product decisions and hardening tasks, not documentation gaps.
-
-Primary tracker:
-
-- `ai-insight-docs/IMPLEMENTATION_READINESS_TRACKER.md`
+The implementation-readiness audit is complete. No remaining P0/P1 documentation blockers. The remaining items below ("Must Resolve Before Production Enablement" + "Production Hardening Tasks") are production/product decisions and hardening tasks, not documentation gaps.
 
 ## What to include in the implementer bundle
 
@@ -18,15 +14,10 @@ Primary tracker:
 - `12-finance-domain-config.md` — Finance domain pack (Budget Setting + Variance KPI).
 - `11-validation-and-tuning.md` — model quality and numeric-trust acceptance.
 - `assets/` — reference screenshots (non-load-bearing confirmation artefacts, linked from `07`/`08`/`09`/`12` §7). The wireframes, state matrix, and per-step assertions in the docs are the normative spec; the images only confirm them.
-- `IMPLEMENTATION_READINESS_TRACKER.md` — open decisions and hardening list.
 
 **Available but optional:**
 
 - `10-adding-a-domain-pack.md` — Spine guide for putting a *second* domain on the unchanged engine (HR, etc.). Not needed to implement Finance; read only if you also need to add another pack. **See the HR Transfer Warning below before treating this as an HR implementation plan.**
-
-**Exclude (not specification):**
-
-- `_TEMPLATE.md` — empty 8-part scaffold used while writing the docs; not an implementation artefact.
 
 ## Build Order
 
