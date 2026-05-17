@@ -135,75 +135,75 @@ Follow the iteration process strictly:
 <claude-mem-context>
 # Memory Context
 
-# [Hoi-Yong_Finance] recent context, 2026-05-16 11:32pm GMT+8
+# [Hoi-Yong_Finance] recent context, 2026-05-17 9:09pm GMT+8
 
 Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
 Format: ID TIME TYPE TITLE
 Fetch details: get_observations([IDs]) | Search: mem-search skill
 
-Stats: 50 obs (19,310t read) | 322,465t work | 94% savings
+Stats: 50 obs (24,187t read) | 304,716t work | 92% savings
 
-### May 16, 2026
-S749 AI Insight Config Rework — planning session wrap-up and handoff to Amelia (BMad dev) for implementation (May 16 at 2:53 PM)
-S750 AI Insight Config Rework — session wrap-up, memory index update, plan handoff to Amelia (May 16 at 4:24 PM)
-S751 AI Insight Config Rework — memory finalization with duplicate-run resolution and post-implementation follow-up instructions added (May 16 at 4:28 PM)
-S752 AI Insight Config Rework — plan file finalized with "Execution &amp; Handoff" copy-paste prompts for Amelia + all memory fully written (May 16 at 4:34 PM)
-S753 AI Insight Config Rework — all artifacts finalized; plan doc and memory fully updated with Execution &amp; Handoff section; ready for Amelia Phase 1 (May 16 at 4:34 PM)
-S754 Review and approve the AI Insight Configurable Thresholds plan, then patch identified technical gaps before implementation begins (May 16 at 4:35 PM)
-S755 Review AI Insight Configurable Thresholds plan for technical gaps, then patch the plan file after user approved with "Yes patch it" (May 16 at 5:06 PM)
-S756 Patch the AI Insight Configurable Thresholds plan with 5 binding technical contracts identified during review (May 16 at 5:06 PM)
-S757 Approve and finalize the AI Insight Configurable Thresholds plan (Revision 2), then prepare to kick off Phase 0 implementation (May 16 at 5:08 PM)
-S758 AI Insight Configurable Thresholds plan reviewed, patched with 5 binding contracts, approved — awaiting Phase 0 kickoff decision (May 16 at 5:10 PM)
-5383 9:20p 🔵 Threshold Tokens Appear in Three Surfaces: prompts-defaults, data-fetcher, and component-info — component-info Has Static Placeholder Fallbacks
-5384 9:21p 🔵 component-info.ts IS Dynamically Rendered via component-info-renderer.ts — Previous Static Stale Risk Assessment Was Wrong
-5385 " ⚖️ Simplify "No Threshold" Message in Prompt UI
-5386 " ⚖️ H1/H2 Terminology is Not Hoi Yong Domain Language — Needs Replacement
-5387 9:31p 🔵 Threshold Config and Prompt Defaults File Structure for AI Insight Prompts
-5388 " 🔵 AI Insight Threshold Config Has E2E Tests and JSON Snapshots
-5389 9:32p 🔵 Located Verbose "No Threshold" Message in ConfigurationPanel.tsx
-5395 " 🔵 H1/H2 Split Logic in data-fetcher.ts — Positional, Not Calendar-Based
-5397 " 🔵 H1/H2 Also Present in Docs Audit Artifact — Adds to Rename Scope
-5398 " 🟣 H1/H2 Replaced with Fiscal Quarter Groups in Invoiced vs Collected Data Fetcher
-5390 " 🔵 H1/H2 Terminology Scope — Three Files in AI Insight Pipeline
-5391 " 🔵 Current Working Tree State — AI Insight Config Feature in Progress
-5392 9:33p 🔵 ReadOnlyState Component Has Two Distinct Usage Contexts in ConfigurationPanel
-5393 " 🔴 Simplified "No Threshold" Message — Moved to Title, Body Removed
-5394 9:34p ✅ Production Build Passes After ConfigurationPanel.tsx Copy Change
-5396 9:35p 🔵 No Q1/Q2/Quarter Terminology in Payment/Collection Domain — Fiscal Year is Mar–Feb
-5404 9:38p ✅ Production Build Passes After Full H1/H2 → Fiscal Quarter Rename
-5399 9:40p 🔵 Post-Patch File Read Shows Stale Cache — Old H1/H2 Code Still Visible in Read Output
-5400 9:41p 🔵 Fiscal Quarter Patch to data-fetcher.ts May Not Have Applied — H1/H2 Still Found by rg After Patch
-5401 " 🔵 prompts-defaults.ts Still Contains H1/H2 — Not Yet Updated After data-fetcher.ts Change
-5402 " ✅ Fiscal Quarter Patch Re-Applied to data-fetcher.ts — Second Successful write_file Call
-5403 " ✅ prompts-defaults.ts Updated — H1/H2 References Replaced with Fiscal Quarter Language
-5405 9:43p 🔵 types.ts Added to Modified Files — H1/H2 Comment Likely Updated
-5406 " 🔵 Git Diff Confirms H1/H2 Rename Scope: 3 Files, 132 Insertions, 71 Deletions
-5407 " ✅ H1/H2 Terminology Fully Removed from ai-insight Source Directory
-5410 " 🔵 Hoi-Yong Finance Project Structure and AI Insight Architecture
-5408 " 🔵 Fiscal Quarter Implementation Confirmed Live in data-fetcher.ts
-5409 9:44p ⚖️ Plan Doc Formalizes H1/H2 → Fiscal Quarter Rule with Explicit Quarter Boundaries
-5411 " 🔵 Session 4 Starting Git State — Uncommitted Session 2/3 Changes Present
-5412 " ⚖️ AI Insight Config Client-Ready Threshold Settings Plan — Full Design Decisions
-5413 " 🔵 BMAD Framework Configured in Hoi-Yong Finance Project
-5414 9:45p 🔵 THRESHOLD_PRESENTATION Map State — Session 2/3 Entries Present, Sales KPIs Missing
-5415 " 🔵 Sales KPI Prompt Threshold Tokens Identified in prompts-defaults.ts
-5416 9:47p 🔵 Sales KPI Threshold Token Definitions — Exact Defaults and Structure Confirmed
-5417 " 🔵 Playwright e2e Spec Current Coverage — Session 2/3 Tests Established Patterns for Session 4
-5418 " 🔵 Playwright Test Cleanup Pattern — Finally Block Must Restore All Edited Threshold Values
-5419 " 🔵 THRESHOLD_PRESENTATION Schema Pattern — Full Structure Confirmed from Existing Entries
-5425 " 🔵 Sales KPI Fetchers Hardcode Threshold Values in Data Block Status Text
-5420 9:48p 🔵 Multi-Rule THRESHOLD_PRESENTATION Pattern — bs_statement Confirms net_sales Needs Two Rules
-5421 9:49p 🔵 Threshold Runtime Internals — Token Key Format, Validation Fallback, and Cache TTL
-5422 " 🔵 ConfigurationPanel Rendering Logic — Title Display Conditional on Multiple Rules
-5423 9:50p 🔵 PromptConfigDashboard Default Selection Logic Prioritizes Prompts With Presentation Metadata
-5424 " 🔵 Sales KPI Prompt Templates — Exact Token Injection Points and Band Labels Confirmed
-5426 9:51p 🔵 by_customer Fetcher Uses Live net_sales Credit Note Thresholds — Separate from credit_notes Component Tokens
-5427 9:52p 🔵 PromptTree Search Indexes Business Labels When Presentation Exists — Token Names Become Unsearchable
-5428 9:53p 🔵 test-thresholds.ts Scope — Sales KPI Prompts Not in Snapshot; Snapshot Safe After THRESHOLD_PRESENTATION Addition
-5429 " 🔵 Snapshot Contains No Sales KPI or Presentation Terms; Config API Route Confirmed Thin
-5430 " 🔵 Thresholds API Routes Already Return thresholdPresentation — Zero Route Changes Needed for Session 4
-5431 9:54p 🔵 prompt-config.ts Uses Generic Logic — No Hardcoded Sales KPI References
-5432 10:01p ⚖️ Sales KPI Prompt Overlap Identified — Component Insight Modal Deduplication Deferred to Separate Study
+### May 17, 2026
+S774 Cross-reference legacy AI Insight PRDs (10-base, 11-finance) against new ai-insight-docs/ to identify gaps — what should be added so devs can build the production feature without ambiguity (May 17 at 6:41 PM)
+S778 All pre-writing decisions finalized — proceeding to write ai-insight-docs/11-finance-domain-config.md covering Budget Setting, Credit Score config, and unbuilt KPI budget badge feature, plus patch existing docs for tool column whitelist gaps (May 17 at 6:59 PM)
+S777 User confirmed doc scope and approved proceeding: create ai-insight-docs/11-finance-domain-config.md (for developers) covering Budget Setting, Credit Score config, KPI budget badges, plus patch existing docs for tool column whitelist gaps and other confirmed missing content (May 17 at 7:00 PM)
+S776 Gap analysis between legacy AI Insight PRDs and new ai-insight-docs/ complete; now planning specific documentation additions — 11-validation-and-tuning.md, tool column whitelist patch, and new Finance domain config docs for Budget Setting and Credit Score Setting (May 17 at 7:00 PM)
+S779 User asked whether Finance KPI screenshots (budget tag, vs budget, variance, last year) and Budget Setting screenshots are included in the documentation — triggering a B7 gap-audit review of docs 11/12 and screenshot coverage. (May 17 at 7:06 PM)
+S780 User asked whether Finance KPI screenshots (budget tag, vs budget, variance, last year) and Budget Setting screenshots are included in the documentation — primary session completed B7 work, committed, and pushed to GitHub. (May 17 at 7:28 PM)
+S781 User asked whether Finance KPI (budget tag, vs budget, variance, last year) and Budget Setting screenshots are included in the documentation. Primary session addressed the question, completed all B7 doc work, committed and pushed e341c9a, then updated both memory files. (May 17 at 7:38 PM)
+S782 User asked whether Finance KPI (budget tag, vs budget, variance, last year) and Budget Setting screenshots are included in the documentation. Primary session responded, completed all B7 gap-audit work, and committed + pushed e341c9a to GitHub. (May 17 at 7:38 PM)
+S783 User asked whether Finance KPI and Budget Setting screenshots are included in the documentation. Primary session ran a full screenshot audit confirming the gap, then completed B7 doc work (docs 11/12 + 4 patches). Commit e341c9a created and pushed to GitHub. Claude's response to user is still at the "Want me to commit?" stage in the current replay batch. (May 17 at 7:40 PM)
+S784 User asked whether Finance KPI and Budget Setting screenshots are included in the documentation. Primary session confirmed the gap via screenshot audit, completed all B7 doc work (docs 11/12 + 4 patches), and committed + pushed e341c9a. (May 17 at 7:42 PM)
+5973 8:21p 🔵 Pre-Existing Worktree State at Tracker Creation: Two Untracked Screenshots and scripts/ Directory
+5981 8:22p 🔵 BudgetSettingDialog Shows Raw Line Codes (NS/CO/EP) Not Human Labels in Table Column
+5977 8:24p 🔵 doc 08-admin.md: Admin Layer Contracts Read — Batch Trigger, Status Self-Heal, and Threshold Config
+5978 " 🔵 doc 12-finance-domain-config.md: Budget Setting + Variance KPI Contracts Read — Not Yet Deployed to Production
+5979 8:25p 🔵 doc 07-frontend.md Verification Checkpoint: Screenshots Are Confirming Evidence, Not Normative Spec
+5982 8:29p 🔵 Variance KPI Route Filters to Only NS/CO/EP — OI Excluded Despite Being a Budget-Configurable Line
+5983 " 🔵 V3VarianceKpiTile Interface in Code Diverges Significantly From doc 12 §4.3 Spec — Multiple Field Name and Shape Mismatches
+5984 8:30p 🔵 getVarianceKpiTiles Produces Only 3 Tiles (NS/CO/EP); budget_global line_item PK Stores Full Labels Not Codes
+5985 8:31p 🔵 PLKpiCardsV3: StatusBadge Renders "No Budget" Pill (Not Hidden); AnalyzeIcon Links to financial_overview Section
+5986 8:32p 🔵 PLKpiCardsV3 Row Layout and financial_overview AI Component Keys Confirmed
+5987 " 🔵 BudgetSettingDialog Always Receives Hardcoded userName="Admin" — approved_by Never Shows Real User
+5990 8:33p ✅ Session 2 Audit Phase Complete — Findings Ready, Awaiting Approval Before Doc Patches
+5994 " 🔴 doc 08-admin.md Patch Not Yet Reflected in Re-Read — Rule 12 and Verification Check 4 Still Show Old Text
+5988 " 🔴 AI Insight Docs Session 2: Six Implementation Mismatches Fixed in Docs 07, 08, 12
+5989 " ⚖️ Six Open Production Hardening Decisions Recorded in Tracker After Session 2 Audit
+5991 8:35p ✅ User Approved Session 2 Doc Patches — Application to docs 07, 08, 12 Now In Progress
+5992 " ✅ doc 07-frontend.md Patched: Section Hook Missing Stale-Safe Guard Documented
+5993 8:36p ✅ doc 08-admin.md Patched: Cache-Control no-store Scope Corrected and Stale-Heal Test Fixed
+5995 8:41p ✅ Session-3 Started for Hoi-Yong Finance AI Insight Implementation
+5996 " 🔵 Session-3 Working Branch Has 5 Uncommitted Modified Files
+5997 " 🔵 AI Insight Docs Readiness Tracker: Sessions 1 & 2 Complete, Session 3 Scope Loaded
+5998 8:42p 🔵 Session 2 Doc Patches Uncommitted; Session 1 Pushed as Commit 4a451ed
+5999 " 🔵 Session 3 Audit Scope: Prompt Catalog, Domain-Pack, and Validation Docs
+6000 8:43p 🔵 AI_Insight_Study Has a Financial Variance Eval Subdirectory Not Listed in Session 3 Scope
+6001 " ✅ Session 2 Doc Patches: Exact Corrections to 07-frontend, 08-admin, and 12-finance-domain-config
+6002 " 🔵 data-fetcher.ts Is 5,820 Lines — Largest File in Session 3 Audit Scope
+6003 " 🔵 Prompt Catalog Has 69 Components Across 7 Pages; Validation Doc References Removed "Click Analyze" Behavior
+6004 8:44p 🔵 Summary System Prompt Hardcodes SQL Server dbo.* Syntax — Confirms Session 1 Dialect Decision
+6005 8:46p 🔵 AI Insight Engine Now OpenRouter-Only; No Direct Claude SDK; HOW_TO_RUN_ITERATION Uses Removed "Click Analyze" Trigger
+6006 8:47p 🔵 SECTION_COMPONENTS Confirms 69 Components Across 16 Finance Sections; 2-Tool Cap in Summary User Prompt
+6007 " 🔵 Tool Policy Confirmed: 9 Aggregate Tables; aggregate_only Mutates Tool Schema, Not Just Validates
+6008 " 🔵 executeRdsQuery Generates SQL Server Syntax: SELECT TOP + Bracket-Quoted Columns — Dialect Mismatch Confirmed
+6009 8:50p 🔵 prompts-defaults.ts Comment Reveals Prompt DB Tables Were Dropped; Code Is Now the Runtime Source
+6010 8:54p ✅ AI Insight Docs Session 3 Audit Patches Applied
+6011 " ⚖️ Open Production Decisions Consolidated After Session 3
+6012 " ✅ Project Memory Updated With Session 3 Audit Outcomes
+6013 8:57p 🔵 Session 4 of AI Insight Docs Readiness Audit Initiated
+6014 " 🔵 AI Insight Docs Audit Sessions 1–3 Completed Prior to Session 4
+6015 " 🔵 Session 3 Outcomes and Full Open Decisions List Loaded for Session 4
+6016 " 🔵 ai-insight-docs Complete File Inventory Confirmed for Session 4
+6017 " 🔵 Session 4 Cross-Document Consistency Sweep: Key Terms All Verified
+6018 8:58p 🔵 All 13 Layer Docs Conform to 8-Section Template Structure
+6019 " 🔵 00-overview.md ENV Matrix and Documentation Map Verified Clean
+6020 9:00p 🔵 Cache-Control no-store Gap Confirmed in Source Routes via Direct Code Verification
+6021 " 🔵 Public AI Insight Section Route Inaccessible via Direct Shell Path Due to Bracket Globbing
+6022 9:01p 🔵 Budget and Variance-KPI Route Implementation Verified Against Doc 12 Contracts
+6023 " 🔵 Public Section Route Confirmed: No Cache Headers, Matches Doc 06 Handler Skeleton Exactly
+6024 9:05p ✅ AI Insight Docs Session 4: Final Consistency Pass Completed
+6025 9:07p ✅ AI Insight Docs Implementation Readiness Tracker Updated
+6026 9:08p 🔵 Seven Files Modified Across AI Insight Docs Project
 
-Access 322k tokens of past work via get_observations([IDs]) or mem-search skill.
+Access 305k tokens of past work via get_observations([IDs]) or mem-search skill.
 </claude-mem-context>

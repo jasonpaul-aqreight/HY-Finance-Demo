@@ -8,7 +8,7 @@
 
 ## 1. Purpose
 
-This layer is the **operator's cockpit**. It is the only place a human starts a generation pass and the only place the runtime business numbers are edited. It contributes two surfaces: a *batch surface* (a card that triggers a run and shows its live and last-run status, backed by an admin-gated trigger route and an unauthenticated status route) and a *threshold-configuration surface* (a prompt browser plus an editor that writes the threshold registry the Domain Pack renders from). It owns the admin HTTP envelopes, the authorization gate, and the operator UI; it owns no orchestration, no prompts, and no threshold semantics — those are called. After this document you can build the admin surface that drives doc 05 and edits the doc 02 registry without re-implementing either.
+This layer is the **operator's cockpit** for AI Insight itself. It is the only place a human starts a generation pass and the only place AI Insight threshold tokens are edited. It contributes two surfaces: a *batch surface* (a card that triggers a run and shows its live and last-run status, backed by an admin-gated trigger route and an unauthenticated status route) and a *threshold-configuration surface* (a prompt browser plus an editor that writes the threshold registry the Domain Pack renders from). Domain-specific business settings, such as Finance Budget Setting, are separate Domain Pack surfaces (see doc 12). This layer owns the admin HTTP envelopes, the authorization gate, and the operator UI; it owns no orchestration, no prompts, and no threshold semantics — those are called. After this document you can build the admin surface that drives doc 05 and edits the doc 02 registry without re-implementing either.
 
 ## 2. Prerequisites
 

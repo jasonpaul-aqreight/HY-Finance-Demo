@@ -13,7 +13,7 @@ Goal: verify the documentation against the Finance demo implementation and suppo
 | 1 | Engine contracts: docs 00-06 | Done | 2026-05-17 | Findings resolved with approved doc patches; one dialect decision remains |
 | 2 | Frontend, admin, finance config: docs 07, 08, 12 | Done | 2026-05-17 | Findings resolved with approved doc patches; production hardening decisions recorded |
 | 3 | Prompt catalog, domain-pack, validation: docs 04a, 09, 10, 11 | Done | 2026-05-17 | Findings resolved with approved doc patches; prompt-source follow-ups recorded |
-| 4 | Final consistency and production-readiness pass | Not started | - | Final readiness report + unresolved decisions |
+| 4 | Final consistency and production-readiness pass | Done | 2026-05-17 | Final readiness report; no P0/P1 doc blockers remain |
 
 ## Source-Of-Truth Order
 
@@ -398,6 +398,36 @@ All `/ai-insight-docs` files:
 - The implementation order is clear for a production developer.
 - Remaining decisions are isolated, named, and assigned to user/product/production engineering.
 
+### Session 4 Outcome - 2026-05-17
+
+Status: completed after user approval.
+
+Changed files:
+
+- `ai-insight-docs/01-storage.md`
+- `ai-insight-docs/04a-prompt-catalog.md`
+- `ai-insight-docs/08-admin.md`
+- `ai-insight-docs/09-end-to-end-walkthrough.md`
+- `ai-insight-docs/12-finance-domain-config.md`
+- `ai-insight-docs/IMPLEMENTATION_READINESS_TRACKER.md`
+
+Applied final consistency fixes:
+
+- Clarified doc 08's scope: it owns AI Insight batch/status and threshold-token editing, while Domain Pack business setting editors such as Finance Budget Setting belong outside the Engine admin surface.
+- Clarified doc 12's Variance KPI contract: Net Sales, Cost of Sales, and Operating Costs are budget-linked; Gross Profit is a derived card with no budget badge or comparison rows.
+- Clarified that `No Budget` is a visible neutral badge on budget-linked cards when no saved budget row exists.
+- Corrected doc 01's source-read wording so local `pc_*` projections are described as queried by component fetchers and, when enabled, by the `query_local_table` tool.
+- Removed date/commit/audit process metadata from finished docs while preserving the production-facing drift and deployment notes.
+- Corrected doc 09 screenshot step references.
+- Added the missing Session 1 row to the changed-files log.
+
+Final readiness report:
+
+- **Resolved findings:** Sessions 1-4 P0/P1 doc findings are resolved in docs or explicitly captured as open production decisions.
+- **P0/P1 blockers:** none remaining in `/ai-insight-docs` after this pass.
+- **Remaining decisions:** see Open Decisions below. These are production/product decisions, not documentation blockers.
+- **Recommended production build order:** build docs `00 -> 01 -> 02 -> 03 -> 04/04a -> 05 -> 06 -> 07 -> 08 -> 09`; then apply Finance-specific doc 12 where needed and use doc 11 for section-quality rollout. Resolve the RDS dialect decision before enabling production drill-down tools, and resolve the `financial_variance` prompt-source drift before porting that section as a production rule.
+
 ### Copy-Paste Prompt For A New Session
 
 ```text
@@ -441,19 +471,21 @@ Add notes below as sessions complete.
 
 ## Open Decisions
 
-- `query_rds_table` dialect/driver must be resolved before production rebuild. The reference uses a Node `pg` pool for `RDS_DATABASE_URL`, but the AI tool executor currently emits SQL Server-shaped SQL (`dbo.*`, `SELECT TOP`, bracket-quoted columns). Production must choose one concrete dialect and align the driver, executor, examples, and tests.
-- Budget Setting must decide whether Other Income is editable. The migration may seed it and FP&A helpers can derive with it, but the current dialog rejects it and the variance-KPI route filters it out.
-- Production should reject negative annual budgets on both client and server.
-- Production should add explicit `Cache-Control: no-store` to budget, variance-KPI, and all admin routes.
-- Production should decide whether Budget Setting save must immediately revalidate the variance-KPI cards.
-- Production should add request-key/cancel protection to the section insight hook if the reference hook remains the rebuild base.
-- The `financial_variance` budget prompt source should be updated in `prompts-defaults.ts` after product approval. The current prompt catalog is source-exact, but `fv_variance_summary` still says Other Income/fixed +/-5/15 threshold language while the fetcher/doc 12 contract uses the current editable rows and saved per-line tolerance.
-- `AI_Insight_Study/HOW_TO_RUN_ITERATION.md` still contains legacy `payment_outstanding` and manual Analyze assumptions; refresh or parameterize it before the next optimization worker uses it literally.
+- **Production engineering:** `query_rds_table` dialect/driver must be resolved before production rebuild. The reference uses a Node `pg` pool for `RDS_DATABASE_URL`, but the AI tool executor currently emits SQL Server-shaped SQL (`dbo.*`, `SELECT TOP`, bracket-quoted columns). Production must choose one concrete dialect and align the driver, executor, examples, and tests.
+- **Product + production engineering:** Budget Setting must decide whether Other Income is editable. The migration may seed it and FP&A helpers can derive with it, but the current dialog rejects it and the variance-KPI route filters it out.
+- **Production engineering:** Production should reject negative annual budgets on both client and server.
+- **Production engineering:** Production should add explicit `Cache-Control: no-store` to budget, variance-KPI, and all admin routes.
+- **Product + frontend engineering:** Production should decide whether Budget Setting save must immediately revalidate the variance-KPI cards.
+- **Production frontend engineering:** Production should add request-key/cancel protection to the section insight hook if the reference hook remains the rebuild base.
+- **Product + AI Insight engineering:** The `financial_variance` budget prompt source should be updated in `prompts-defaults.ts` after product approval. The current prompt catalog is source-exact, but `fv_variance_summary` still says Other Income/fixed +/-5/15 threshold language while the fetcher/doc 12 contract uses the current editable rows and saved per-line tolerance.
+- **AI Insight study owner:** `AI_Insight_Study/HOW_TO_RUN_ITERATION.md` still contains legacy `payment_outstanding` and manual Analyze assumptions; refresh or parameterize it before the next optimization worker uses it literally.
 
 ## Changed Files Log
 
 | Date | Session | Files changed | Notes |
 |---|---:|---|---|
 | 2026-05-17 | 0 | `ai-insight-docs/IMPLEMENTATION_READINESS_TRACKER.md` | Tracker created |
+| 2026-05-17 | 1 | `ai-insight-docs/00-overview.md`, `ai-insight-docs/02-domain-catalog-and-thresholds.md`, `ai-insight-docs/03-model-provider.md`, `ai-insight-docs/04-insight-generation-and-prompts.md`, `ai-insight-docs/05-batch-orchestration.md`, `ai-insight-docs/06-api.md`, `ai-insight-docs/IMPLEMENTATION_READINESS_TRACKER.md` | Engine-contract audit patches; datastore split, scope map, model-provider, tool-cap, stale-run, and read API cache guidance corrected |
 | 2026-05-17 | 2 | `ai-insight-docs/07-frontend.md`, `ai-insight-docs/08-admin.md`, `ai-insight-docs/12-finance-domain-config.md`, `ai-insight-docs/IMPLEMENTATION_READINESS_TRACKER.md` | Frontend/admin/finance-config audit patches; production hardening decisions recorded |
 | 2026-05-17 | 3 | `ai-insight-docs/04a-prompt-catalog.md`, `ai-insight-docs/09-end-to-end-walkthrough.md`, `ai-insight-docs/10-adding-a-domain-pack.md`, `ai-insight-docs/11-validation-and-tuning.md`, `ai-insight-docs/IMPLEMENTATION_READINESS_TRACKER.md` | Prompt catalog/domain-pack/validation audit patches; prompt-source and study-runbook follow-ups recorded |
+| 2026-05-17 | 4 | `ai-insight-docs/01-storage.md`, `ai-insight-docs/04a-prompt-catalog.md`, `ai-insight-docs/08-admin.md`, `ai-insight-docs/09-end-to-end-walkthrough.md`, `ai-insight-docs/12-finance-domain-config.md`, `ai-insight-docs/IMPLEMENTATION_READINESS_TRACKER.md` | Final consistency pass; no P0/P1 doc blockers remain |

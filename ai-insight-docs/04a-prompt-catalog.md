@@ -1485,7 +1485,7 @@ Hard rules:
 
 #### Section `financial_variance` — tool `aggregate_only`
 
-> **Implementation drift warning (2026-05-17).** The entries below are source-exact to `DEFAULT_COMPONENT_PROMPTS` as of this audit, but the `fv_variance_summary` budget wording is not fully aligned with the current fetcher and doc 12. The fetcher currently emits approved-budget rows for Net Sales, Cost of Sales, and Operating Costs, and tells the model to use each row's saved Budget Position/Tolerance instead of fixed +/-5/15 bands. Treat the Other Income/four-line/fixed-threshold wording inside the verbatim prompt as a prompt-source follow-up, not a production rebuild rule. Update `prompts-defaults.ts` and this catalog together if that prompt is corrected.
+> **Production alignment note.** The entries below are source-exact to `DEFAULT_COMPONENT_PROMPTS`, but the `fv_variance_summary` budget wording is not fully aligned with the current fetcher and doc 12. The fetcher currently emits approved-budget rows for Net Sales, Cost of Sales, and Operating Costs, and tells the model to use each row's saved Budget Position/Tolerance instead of fixed +/-5/15 bands. Treat the Other Income/four-line/fixed-threshold wording inside the verbatim prompt as a prompt-source follow-up, not a production rebuild rule. Update `prompts-defaults.ts` and this catalog together if that prompt is corrected.
 
 **`fv_variance_summary`** · kpi
 

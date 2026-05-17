@@ -11,9 +11,9 @@
 This document specifies **two Finance-domain configuration surfaces** that AI Insight *consumes* but does not *own*:
 
 1. **Budget Setting** — the operator UI and persistence that an admin uses to set per-line annual budgets and per-line variance tolerances. Its values flow into AI Insight's `financial_variance` section (doc 04a) as evidence data inside the fetcher's raw block.
-2. **Variance KPI surface** — the polarity-aware KPI cards on the Financial page (Net Sales / Cost of Sales / Gross Profit / Operating Costs) that render "On Budget" / "Over Budget" badges plus *vs Budget*, *Variance %*, and *Last Year* comparison rows.
+2. **Variance KPI surface** — the polarity-aware KPI cards on the Financial page. Net Sales, Cost of Sales, and Operating Costs are budget-linked and render "On Budget" / "Over Budget" style badges plus *vs Budget*, *Variance %*, and *Last Year* comparison rows. Gross Profit appears in the same row as a derived card with no budget badge or comparison rows.
 
-> **Production status (as of 2026-05-17).** Both surfaces are **built in this sandbox repo** (latest commit `a0cbab3`, 2026-05-16) but **not yet deployed to the production app (`Hoi-Yong_HR`)**. This document records the current sandbox behavior and calls out production hardening where the sandbox implementation is loose. Migration `023_budget_global.sql` must be applied to the production database before the UI can be deployed, with the schema adjustment noted in §4.1.
+> **Production status.** Both surfaces are **built in this sandbox repo** but **not yet deployed to the production app (`Hoi-Yong_HR`)**. This document records the current sandbox behavior and calls out production hardening where the sandbox implementation is loose. Migration `023_budget_global.sql` must be applied to the production database before the UI can be deployed, with the schema adjustment noted in §4.1.
 
 These two surfaces are sibling features: the Budget Setting dialog is where the numbers are *defined*; the Variance KPI cards are where the same numbers are *consumed by the operator at a glance*. AI Insight's `financial_variance` section is a third consumer of the same data, downstream of both.
 
@@ -304,7 +304,7 @@ Six positions, three semantic classes:
 | `below-target` | Below budget *and* `higherIsBetter` (e.g. Net Sales miss) | **Below Target** (red) |
 | `over-budget` | Above budget *and* `!higherIsBetter` (e.g. costs ran hot) | **Over Budget** (red) |
 | `under-budget` | Below budget *and* `!higherIsBetter` (e.g. costs ran lean) | **Under Budget** (emerald) |
-| `no-budget` | No budget row exists for this line | **No Budget** (neutral) — usually hidden |
+| `no-budget` | No budget row exists for this budget-linked line | **No Budget** (neutral) — shown on Net Sales / Cost of Sales / Operating Costs when no saved budget row exists; cards without any variance tile have no badge |
 
 `getBudgetPositionLabel(position)` returns the human-readable string.
 
@@ -343,7 +343,7 @@ The `financial_variance` section's four components read `budget_global` during f
 | 6 | PUT with non-finite number | `400` with a budget-value error; nothing persisted | Defensive against NaN / Infinity from JSON. |
 | 7 | Note exceeds 50 words client-side | Truncated to 50 words before send | UX limit, not a security limit; server is permissive. |
 | 8 | Saving a subset of lines (e.g. only Net Sales) | Upsert only the posted lines; others unchanged | The form posts all three editable rows, but partial posts are safe at the API level. |
-| 9 | `budget_global` empty (fresh install) | `GET /api/budget` returns `{ budget: [] }`; variance KPI tiles still return `NS`/`CO`/`EP` with `budget:null`; row-1 budget-linked cards show a neutral `No Budget` pill and dash placeholders for budget variance fields; AI Insight section emits "no approved baseline" data block | Invariants 4, 5; doc 04a conditional rules cover the prompt side. |
+| 9 | `budget_global` empty (fresh install) | `GET /api/budget` returns `{ budget: [] }`; variance KPI tiles still return `NS`/`CO`/`EP` with `budget:null`; row-1 budget-linked cards show a neutral `No Budget` pill and dash placeholders for budget variance fields; AI Insight section emits "no approved budget baseline" data block | Invariants 4, 5; doc 04a conditional rules cover the prompt side. |
 | 10 | Tolerance edited from 5% to 10% | KPI badge flips immediately on next render (no re-save of actuals); AI section reflects on next batch run | Invariant 4 — badge is derived; the table is the only state. |
 | 11 | `variancePct` undefined because `annual_budget = 0` | `getBudgetPosition` falls through to direction-only branch; if `varianceRm = 0` ⇒ `on-budget`; else direction by polarity | Don't divide by zero; still emit a meaningful position. |
 | 12 | Gross Profit / Operating Profit / Net Profit cards | No variance tile is consumed; no badge; no comparison footer | Invariant 6 — only input lines are configurable. |
@@ -387,9 +387,9 @@ Source paths are evidence; the spec above is what binds.
 | `apps/dashboard/src/hooks/pnl/usePLDataV3.ts` | `useV3VarianceKpi(fy, range)` — SWR-backed read of the tile API. |
 | `apps/dashboard/src/components/ai-insight/BudgetSettingDialog.tsx` | The dialog UI, the client-side validation, the word-clamp on note. |
 | `apps/dashboard/src/components/pnl/dashboard-v3/DashboardShellV3.tsx` | Hosts the Budget Setting button (admin-gated) and the KPI cards. |
-| `docs/plans/variance-panel-rework.md` | Approved spec (2026-05-14) for this work — supplementary context only; this document is the binding spec for the production port. |
+| `docs/plans/variance-panel-rework.md` | Supplementary context only; this document is the binding spec for the production port. |
 
-**Sandbox-only commit:** `a0cbab3` (2026-05-16) — *"feat(financials): polarity-aware KPI cards + Budget Setting Dialog rework"*. Production deployment requires applying `migrations/023_budget_global.sql` and porting the components above.
+Production deployment requires applying `migrations/023_budget_global.sql`, adding `tolerance_pct` directly in the production migration, and porting the components above.
 
 Rendered reference captures on the reference stack (the wireframes/contracts in §5.1 and §5.4–§5.6 are the normative description; these confirm them):
 
