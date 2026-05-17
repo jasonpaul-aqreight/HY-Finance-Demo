@@ -80,7 +80,7 @@ Request body (optional): `{ triggeredBy?: string }`. Resolution order for the ru
 
 Request body: `{ componentKey: string, values: Record<token, number>, updatedBy?: string }`.
 
-All admin routes are dynamic/uncached (`force-dynamic`, `Cache-Control: no-store`).
+All admin routes are dynamic. In the reference app, prompt-config and thresholds responses also send `Cache-Control: no-store`; batch trigger/status rely on `force-dynamic` and SWR polling rather than an explicit cache-control header. Production should send `Cache-Control: no-store` on all four admin routes.
 
 ### 4.2 Owned — view contracts (API ↔ UI)
 
@@ -164,7 +164,7 @@ Before enabling *Save* the editor validates the draft, and the server re-validat
 | 9 | Submitted threshold values fail validation | `400 { error:'Invalid threshold values', details }`; registry unchanged | Invariant 3 — server is the validation authority. |
 | 10 | Successful save | Cache invalidated; `PUT` returns rebuilt prompt + groups + presentation; UI patches in place + toast | Invariant 4 — edited numbers render immediately. |
 | 11 | System prompt or threshold-less component selected | Editor shows the matching read-only state; no save path | These have no configurable numbers. |
-| 12 | All admin routes | `force-dynamic` + `no-store` | Operator data must never be served stale from a cache. |
+| 12 | All admin routes | `force-dynamic`; production should also send `Cache-Control: no-store` on every admin response. The reference already sends `no-store` for prompt-config and thresholds, but not batch trigger/status. | Operator data must never be served stale from a cache. |
 | 13 | Background run continues after the trigger response | Expected (doc 05 §5.2); the card observes it via polling | The trigger is fire-and-forget by contract. |
 
 ### 6.1 Configuration owned by this layer
@@ -216,7 +216,7 @@ export async function POST(req) {
 1. **Admin trigger.** As admin, `POST` trigger ⇒ `200 { started:true, sections_total }`; status route then shows `running`, then a terminal state; the card mirrors this (progress → last-run).
 2. **Double trigger.** `POST` again while running ⇒ `409 Batch already running`; no second ledger row.
 3. **Non-admin.** Without the admin header: trigger ⇒ `403`; status `GET` ⇒ served normally; the card disables the button and shows the banner.
-4. **Stale heal.** Leave a `running` row with an old `started_at` and `AI_INSIGHT_BATCH_STALE_MIN=0`; `GET` status ⇒ the row is reclaimed (`error`) and the response is the healed state; a subsequent trigger proceeds.
+4. **Stale heal.** Set `AI_INSIGHT_BATCH_STALE_MIN=1`, leave a `running` row with `started_at` at least 2 minutes old, then `GET` status ⇒ the row is reclaimed (`error`) and the response is the healed state; a subsequent trigger proceeds. Do not use `0`; non-positive values fall back to the default stale window.
 5. **Config browse.** `GET` config ⇒ `prompts` includes system + component rows; the tree renders them; selecting a prompt shows its rendered preview.
 6. **Invalid save blocked.** Edit a threshold out of `[min,max]` ⇒ inline error, Save disabled; a forced `PUT` with that value ⇒ `400 { error:'Invalid threshold values', details }`; reading the component again shows the *old* value (nothing persisted).
 7. **Valid save renders.** Set a valid in-range value, Save ⇒ `200 { ok:true }`, toast shown, and the prompt preview now shows the new number substituted (no full reload). A non-admin `PUT` ⇒ `403`.

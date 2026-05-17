@@ -41,7 +41,7 @@ The layer is a **pure projection of stored insight into two view surfaces, drive
 2. **Absence is a designed state, not a failure.** "No insight generated yet" is a normal, explicitly worded screen, visually distinct from an error.
 3. **The two absences differ by contract.** A missing *section* (404) and a missing *component analysis* (200 + `exists:false`) are both normal "not generated yet" states, surfaced with their own copy — never an error.
 4. **Domain-blind.** The shell renders whatever the Domain Pack catalog/prompts produced; it embeds no domain vocabulary, thresholds, or page list of its own.
-5. **Stale-safe.** A change of `(page,sectionKey)` or `(sectionKey,componentKey)` while a fetch is in flight must not let an older response overwrite a newer view.
+5. **Stale-safe.** A change of `(page,sectionKey)` or `(sectionKey,componentKey)` while a fetch is in flight must not let an older response overwrite a newer view. The reference app fully enforces this for the component dialog; the section hook should add the same request-key/cancel guard in a production rebuild.
 
 **Boundary with adjacent layers**
 
@@ -163,6 +163,8 @@ The dialog reads only `componentInfo.name` (for the title), `analysis_md`, `gene
 5. Any thrown/network error ⇒ status `error`.
 6. The hook returns `{ status, data, error, refetch }`. `refetch` re-runs step 1; no other layer triggers it implicitly (read-only — invariant 1).
 
+Production note: the reference hook does not currently cancel or key-gate section responses. If the host changes `(page, sectionKey)` quickly, a late section response can still overwrite the newer view. A production rebuild should add the same cleanup/request-key guard used by the component dialog.
+
 ### 5.2 Section header + panel
 
 - `InsightSectionHeader(title, subtitle, page, sectionKey, …deprecated)` renders the header bar with a **Get Insight** toggle (default **expanded**). It calls `useInsightAnalysis(page, sectionKey)` and, while expanded, renders the panel with `{status, data, error}`. `[VERSION-SENSITIVE]` it also accepts deprecated `dateRange/fiscalPeriod/userName` props for call-site stability; these are **not** part of the read path and a clean rebuild omits them.
@@ -209,7 +211,7 @@ A single shared renderer converts insight markdown to sanitised HTML with **GFM*
 | 6 | Scope fields all null/empty | Scope line = "Current State" | Snapshot-scoped sections have neither date range nor fiscal period (doc 01/05). |
 | 7 | Component API `exists:false` or empty `analysis_md` | Dialog shows *absent* copy + the title still renders | Doc 06 invariant 3 — explainer/title is independent of analysis. |
 | 8 | Component fetch rejects | Dialog shows the same *absent* copy (no distinct error UI) | §3.2 — error collapses into absent at component grain. |
-| 9 | `(page,sectionKey)` or `(sectionKey,componentKey)` changes mid-fetch | Older response must not overwrite the newer view (request-key gate + teardown flag) | Invariant 5 — no stale cross-render. |
+| 9 | `(page,sectionKey)` or `(sectionKey,componentKey)` changes mid-fetch | Component dialog: older response must not overwrite the newer view (request-key gate + teardown flag). Section hook: production should add the same guard; current reference lacks it. | Invariant 5 — no stale cross-render. |
 | 10 | `componentInfo` null (unknown key) and no static fallback | Title falls back to the raw `componentKey` | Never render an empty title; doc 06 rule 5 returns `null` for unknown keys. |
 | 11 | Any user interaction on this layer | Only reads (two doc 06 GETs, one doc 08 status GET) occur — never a write or generate | Invariant 1 — the entire layer is read-only. |
 | 12 | Panel collapsed via the toggle | Body unmounts; the hook state persists for the session and re-renders on expand | The toggle is presentation only; it does not refetch or clear data. |

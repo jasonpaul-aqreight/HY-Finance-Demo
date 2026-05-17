@@ -11,8 +11,8 @@ Goal: verify the documentation against the Finance demo implementation and suppo
 |---:|---|---|---|---|
 | 0 | Create tracker and handoff instructions | Done | 2026-05-17 | This tracker |
 | 1 | Engine contracts: docs 00-06 | Done | 2026-05-17 | Findings resolved with approved doc patches; one dialect decision remains |
-| 2 | Frontend, admin, finance config: docs 07, 08, 12 | Not started | - | Findings + approved doc patches |
-| 3 | Prompt catalog, domain-pack, validation: docs 04a, 09, 10, 11 | Not started | - | Findings + approved doc patches |
+| 2 | Frontend, admin, finance config: docs 07, 08, 12 | Done | 2026-05-17 | Findings resolved with approved doc patches; production hardening decisions recorded |
+| 3 | Prompt catalog, domain-pack, validation: docs 04a, 09, 10, 11 | Done | 2026-05-17 | Findings resolved with approved doc patches; prompt-source follow-ups recorded |
 | 4 | Final consistency and production-readiness pass | Not started | - | Final readiness report + unresolved decisions |
 
 ## Source-Of-Truth Order
@@ -238,6 +238,34 @@ Required steps:
 9. Ask before committing.
 ```
 
+### Session 2 Outcome - 2026-05-17
+
+Status: completed after user approval.
+
+Changed files:
+
+- `ai-insight-docs/07-frontend.md`
+- `ai-insight-docs/08-admin.md`
+- `ai-insight-docs/12-finance-domain-config.md`
+- `ai-insight-docs/IMPLEMENTATION_READINESS_TRACKER.md`
+
+Applied fixes:
+
+- Clarified that the component dialog has stale-response protection, while the section hook currently lacks the same request-key/cancel guard and should add it for production.
+- Corrected admin cache guidance: prompt-config and threshold routes send `Cache-Control: no-store`; batch trigger/status rely on `force-dynamic` in the reference, and production should add explicit `no-store`.
+- Corrected the admin stale-run verification from `AI_INSIGHT_BATCH_STALE_MIN=0` to a positive stale window (`1`) with an older row.
+- Corrected the Budget Setting contract to match the sandbox: `budget_global.line_item` stores display names, the editable set is Net Sales / Cost of Sales / Operating Costs, and the migration/runtime split around `tolerance_pct` is now explicit.
+- Corrected the variance-KPI API contract from a nested `budget`/`yoy` shape to the flat `code`, `actual`, `budget`, `varianceRm`, `variancePct`, `yoyPct`, `tolerancePct`, `higherIsBetter`, `isFavourable`, `status` shape returned by the route.
+- Documented current Budget Setting validation/save behavior, including production hardening for negative annual budgets, cache headers, and KPI revalidation after save.
+
+Open decisions / production hardening:
+
+- Decide whether Other Income should be an editable Budget Setting row. The migration may seed it and FP&A helpers can derive with it, but the current dialog rejects it and the variance-KPI route filters it out.
+- Production should reject negative annual budgets on client and server.
+- Production should send explicit `Cache-Control: no-store` on budget, variance-KPI, and all admin routes.
+- Production should revalidate the variance-KPI SWR key after a Budget Setting save if immediate card refresh is required.
+- Production should add request-key/cancel protection to the section insight hook.
+
 ## Session 3 - Prompt Catalog, Domain-Pack, Validation Audit
 
 ### Scope
@@ -285,6 +313,35 @@ Implementation and artifacts to check:
 - Validation/tuning procedure matches the current study process and active baseline.
 - Eval-set expectations, quality gate, cost targets, and iteration roadmap are current.
 - Numeric trust rules, no-arithmetic rules, whitelist behavior, and tool-policy guidance are accurate.
+
+### Session 3 Outcome - 2026-05-17
+
+Status: completed after user approval.
+
+Changed files:
+
+- `ai-insight-docs/04a-prompt-catalog.md`
+- `ai-insight-docs/09-end-to-end-walkthrough.md`
+- `ai-insight-docs/10-adding-a-domain-pack.md`
+- `ai-insight-docs/11-validation-and-tuning.md`
+- `ai-insight-docs/IMPLEMENTATION_READINESS_TRACKER.md`
+
+Applied fixes:
+
+- Corrected the end-to-end walkthrough substrate: the Finance worked example requires local Finance `pc_*`, budget, and app-setting projections in `DATABASE_URL`; an engine-only empty database is only valid for a synthetic/domain-pack smoke test.
+- Corrected the stale-run verification guidance to use a positive stale window and an older `started_at`; non-positive `AI_INSIGHT_BATCH_STALE_MIN` falls back to `40`.
+- Clarified that `RDS_DATABASE_URL` is the fail-soft drill-down/source-query port, not a substitute for local Finance projections.
+- Corrected the domain-pack fetcher contract: fetcher output is the data body only; the wrapper adds scope and the component prompt builder adds the `Current Values:` header.
+- Corrected domain-pack read verification paths to the actual section/component API route shapes.
+- Clarified the current implementation seam: domain packs extend shared registries imported by the Engine pipeline; a future plugin-style pack module is optional, not the current reference shape.
+- Removed nonexistent `AI_INSIGHT_VALIDATION_BASELINE` / `cacheSystem` guidance from validation and tuning.
+- Marked `HOW_TO_RUN_ITERATION.md` as a historical pilot runbook that must be adapted before reuse for non-`payment_outstanding` sections.
+- Added a prompt-catalog warning that the `financial_variance` budget prompt source has drifted from the current fetcher/doc 12 contract and needs a product-approved prompt-source update.
+
+Open decisions / production hardening:
+
+- The `financial_variance` budget prompt source should be updated in `prompts-defaults.ts` after product approval so it matches the current Budget Setting and variance fetcher contract.
+- `AI_Insight_Study/HOW_TO_RUN_ITERATION.md` should be parameterized or refreshed before the next optimization worker uses it literally.
 
 ### Copy-Paste Prompt For A New Session
 
@@ -384,10 +441,19 @@ Add notes below as sessions complete.
 
 ## Open Decisions
 
-None recorded yet.
+- `query_rds_table` dialect/driver must be resolved before production rebuild. The reference uses a Node `pg` pool for `RDS_DATABASE_URL`, but the AI tool executor currently emits SQL Server-shaped SQL (`dbo.*`, `SELECT TOP`, bracket-quoted columns). Production must choose one concrete dialect and align the driver, executor, examples, and tests.
+- Budget Setting must decide whether Other Income is editable. The migration may seed it and FP&A helpers can derive with it, but the current dialog rejects it and the variance-KPI route filters it out.
+- Production should reject negative annual budgets on both client and server.
+- Production should add explicit `Cache-Control: no-store` to budget, variance-KPI, and all admin routes.
+- Production should decide whether Budget Setting save must immediately revalidate the variance-KPI cards.
+- Production should add request-key/cancel protection to the section insight hook if the reference hook remains the rebuild base.
+- The `financial_variance` budget prompt source should be updated in `prompts-defaults.ts` after product approval. The current prompt catalog is source-exact, but `fv_variance_summary` still says Other Income/fixed +/-5/15 threshold language while the fetcher/doc 12 contract uses the current editable rows and saved per-line tolerance.
+- `AI_Insight_Study/HOW_TO_RUN_ITERATION.md` still contains legacy `payment_outstanding` and manual Analyze assumptions; refresh or parameterize it before the next optimization worker uses it literally.
 
 ## Changed Files Log
 
 | Date | Session | Files changed | Notes |
 |---|---:|---|---|
 | 2026-05-17 | 0 | `ai-insight-docs/IMPLEMENTATION_READINESS_TRACKER.md` | Tracker created |
+| 2026-05-17 | 2 | `ai-insight-docs/07-frontend.md`, `ai-insight-docs/08-admin.md`, `ai-insight-docs/12-finance-domain-config.md`, `ai-insight-docs/IMPLEMENTATION_READINESS_TRACKER.md` | Frontend/admin/finance-config audit patches; production hardening decisions recorded |
+| 2026-05-17 | 3 | `ai-insight-docs/04a-prompt-catalog.md`, `ai-insight-docs/09-end-to-end-walkthrough.md`, `ai-insight-docs/10-adding-a-domain-pack.md`, `ai-insight-docs/11-validation-and-tuning.md`, `ai-insight-docs/IMPLEMENTATION_READINESS_TRACKER.md` | Prompt catalog/domain-pack/validation audit patches; prompt-source and study-runbook follow-ups recorded |

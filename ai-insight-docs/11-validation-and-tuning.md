@@ -24,7 +24,7 @@ A prod rebuild that passes the per-layer verification checkpoints in docs 01–1
 - **Doc 05** + **Doc 08 §5.2** — the admin batch trigger is how a production environment produces the runs you score. There is no per-section manual trigger in the production model.
 - **Doc 09** — the end-to-end walkthrough; a section result you can score lives at the end of that flow.
 
-This document has no ENV variables of its own; it consumes `AI_INSIGHT_DEBUG_FILE` (doc 04) and `AI_INSIGHT_VALIDATION_BASELINE` (cost-baseline cache toggle — referenced inline in §5.5, but the switch lives in the orchestrator).
+This document has no ENV variables of its own. It consumes `AI_INSIGHT_DEBUG_FILE` (doc 04) when you need raw prompt/debug artifacts. Cache metrics, when present, are read from the model provider's usage metadata; the current OpenRouter-only reference does not expose a validation-specific cache-disable switch.
 
 ## 3. Concept & Contract
 
@@ -173,7 +173,7 @@ One iteration is one structural change followed by re-scoring. Sequence:
 4. **Implement.** One focused change. No drive-by fixes; if you noticed something else, write it down for the next iteration.
 5. **Pre-flight.** Dev server up; DB snapshot matches eval fixture; type-check passes.
 6. **Run 2× and capture logs.** Trigger the admin batch (doc 08 §5.2). When the target section completes, copy `logs/ai-debug-<section>-<ts>.log` out and rename to `iter<N>_run1_log.log` / `iter<N>_run2_log.log`. Two back-to-back runs keep the snapshot stable.
-7. **Extract metrics.** From each log: total tokens, total cost, latency, summary turn count, tool-call count, failed tool calls, guard attempts, cache-hit ratio (when `AI_INSIGHT_VALIDATION_BASELINE=1` disables caching for cost baselining).
+7. **Extract metrics.** From each log: total tokens, total cost, latency, summary turn count, tool-call count, failed tool calls, guard attempts, and provider-reported cache-created/cache-read tokens if present.
 8. **Score quality** against §4.2 for each run, then take the median.
 9. **Decide** against §4.3.
 10. **Document.** A new iteration file (template in §7) — every section: hypothesis, change, before/after metrics, scores, decision, lessons learned.
@@ -244,7 +244,7 @@ When a section fails, the fix falls into exactly one of three structural classes
 
 ### 5.5 Caching note for cost iteration
 
-When iterating on the **cost** of a section (not its quality), set `AI_INSIGHT_VALIDATION_BASELINE = 1` for the baseline run. This disables the `cacheSystem` flag on every `callAiModel`, stripping the OpenRouter cache-control hint so the cost reflects an uncached run. Default-off; set it only for the baseline measurement, not for production runs (which want the cache hit).
+When iterating on the **cost** of a section (not its quality), compare like-for-like runs: same provider/model configuration, same section scope, same tool policy, and the same cache posture as far as the gateway exposes it. In the current OpenRouter-only reference there is no `AI_INSIGHT_VALIDATION_BASELINE` / `cacheSystem` switch in code. Use the debug log's `cache: created=..., read=...` fields and provider metadata as evidence; do not assume a local ENV can force an uncached OpenRouter baseline.
 
 ## 6. Rules & edge cases
 
@@ -294,11 +294,11 @@ The validation infrastructure lives outside `apps/` because it is a process, not
 
 | Path | Role |
 |---|---|
-| `AI_Insight_Study/HOW_TO_RUN_ITERATION.md` | The operator runbook (Playwright scripts, log paths, grep recipes). The reference uses manual per-section `Click Analyze` for iteration speed; in production-shaped iteration substitute the admin batch trigger (doc 08 §5.2) and filter to the target section's segment in the log. |
+| `AI_Insight_Study/HOW_TO_RUN_ITERATION.md` | Historical/pilot runbook (Playwright scripts, log paths, grep recipes). It is still useful for metric extraction patterns, but it hardcodes the old `payment_outstanding` / manual Analyze flow in places. For current production-shaped validation, use the admin batch trigger (doc 08 §5.2) or the rollout-tracker process and adapt section keys/log globs before running. |
 | `AI_Insight_Study/eval_set/quality_rubric.md` | Master rubric (this doc §4.2 is a recap; the file is the source). |
 | `AI_Insight_Study/eval_set/<section>/expected_values.json` | Per-section fixture (§4.1). |
 | `AI_Insight_Study/eval_set/<section>/snapshot_state.md` | Records the snapshot date and DB state the fixture targets; refresh together with the fixture. |
-| `AI_Insight_Study/ROLLOUT_TRACKER.md` | Per-section evaluation table. Columns: ID, Section Key, Date, Eval Source, Cost/Click, Quality, NA, Rel, Act, Clarity, Hallucinations, Guard, Tool Calls, Failed Calls, Result, Log Path, Notes. |
+| `AI_Insight_Study/ROLLOUT_TRACKER.md` | Current per-section rollout source for Finance sections. It records the revised acceptance gate, one-run Playwright rollout evaluations where approved, and the table columns: ID, Section Key, Date, Eval Source, Cost/Click, Quality, NA, Rel, Act, Clarity, Hallucinations, Guard, Tool Calls, Failed Calls, Result, Log Path, Notes. |
 | `AI_Insight_Study/MASTER_LOG.md` | Cross-section iteration log; one entry per iteration with hypothesis, change, before/after metrics, decision. |
 | `AI_Insight_Study/ITERATION_TEMPLATE.md` | The template each per-iteration file is copied from. |
 | `AI_Insight_Study/03_iteration_<NN>_<short_name>.md` | Per-iteration file written from the template above. |

@@ -8,7 +8,7 @@
 
 ## 1. Purpose
 
-This document is the **generalisation guide**: it turns the Engine/Domain-Pack split that docs 01–09 describe into a step-by-step recipe for putting an entirely new domain (e.g. HR, Manufacturing, Operations) on the existing Engine without modifying any Engine layer.
+This document is the **generalisation guide**: it turns the Engine/Domain-Pack split that docs 01–09 describe into a step-by-step recipe for putting an entirely new domain (e.g. HR, Manufacturing, Operations) on the existing Engine. The current reference implementation uses shared registry files rather than a plugin-style pack module, so adding a pack means adding rows/functions to those shared registries while leaving the Engine mechanisms unchanged.
 
 It owns nothing the Engine doesn't already export. Every contract named here is defined in an earlier document; this doc states **which contracts a Domain Pack must satisfy, in what order to build them, and how to prove the pack is wired correctly** end-to-end. The Finance Domain Pack (docs 02, 04, 04a) is the reference worked example throughout.
 
@@ -16,7 +16,7 @@ After this document a developer can:
 
 - decide what counts as a Domain Pack vs. an Engine change (and refuse the latter);
 - assemble the complete set of symbols a new pack must export;
-- bring up a minimal "Hello Pack" that the existing batch runner, read API, and frontend serve without code edits to the Engine itself;
+- bring up a minimal "Hello Pack" that the existing batch runner, read API, and frontend serve without changes to the Engine mechanisms;
 - read the partial HR scaffold already present in the Finance codebase as a half-built pack and finish it the same way.
 
 ## 2. Prerequisites
@@ -77,7 +77,7 @@ That is the entire seam. Anything else a domain wants (a special chart type, a n
 2. **Defaults equal seeds.** For every registry token, `defaultValue` and the seed-row value must be identical (doc 02 invariant 2). A pack that ships a divergence is broken.
 3. **Catalog completeness.** Every component that appears in `SECTION_COMPONENTS` must have (a) a prompt body, (b) a data fetcher, (c) optionally — if it has numeric bands — a `THRESHOLD_REGISTRY` entry and matching `COMPONENT_INFO_SOURCE` metadata. Half-wired components are caught by the §8 verification.
 4. **Threshold prose is fixed.** Editing a band edge edits the registry, never the prompt or metadata text (doc 02 invariant 1, re-stated for packs).
-5. **Domain leakage is one-way.** Pack files import from the Engine; Engine files **never** import from a pack file. If you find an `import` from `data-fetcher.ts` or `prompts-defaults.ts` inside the orchestrator, batch runner, storage, model provider, or API route, that is an Engine regression — not a pack feature.
+5. **Domain leakage is constrained.** In the current reference, Domain Pack artefacts live in shared registry files (`prompts.ts`, `prompts-defaults.ts`, `data-fetcher.ts`, `component-info.ts`, `threshold-config.ts`, `batch-scope.ts`, `tool-policy.ts`) that the Engine pipeline imports. A pack may add rows/functions to those registries, but must not add domain-specific branches to storage, model provider, read APIs, admin APIs, frontend shell components, or the orchestration mechanics. A future plugin-style rebuild may split these registries into separate pack modules; that is not how this sandbox is currently shaped.
 6. **Type-system scaffolding is not a pack.** Widening `SectionKey` and adding empty catalog entries makes a section *visible* to the Engine's exhaustive checks; the section becomes *active* only when (4)+(5)+(6)+(8) of §3.2 are filled and it is added to the ordered batch catalog.
 
 ### 3.4 Boundary with adjacent layers
@@ -237,7 +237,7 @@ ON CONFLICT (component_key, token) DO NOTHING;
 In the fetcher file (`apps/dashboard/src/lib/ai-insight/data-fetcher.ts`), add one branch per new component in the dispatch table the file uses, returning `FetcherResult = { prompt, allowed }`. The fetcher must:
 
 - Read its data via the **engine pool** (precomputed projection table) or the **read-only pool** (drill-down) — never both in the same call; never via direct `fetch`/HTTP.
-- Format `prompt` as a markdown block of `Current Values:` ready to be appended after the scope label. The Engine's `fetchComponentData` wrapper (doc 04 §5.2) prepends the scope label and then renders threshold tokens; the pack's fetcher therefore **may include `{{component_key.token}}`** inside the body if it wants the renderer to substitute them.
+- Format `prompt` as the markdown data body only. Do **not** include the outer `Current Values:` header; `buildComponentUserPrompt` adds that header after the component prompt and metadata. The Engine's `fetchComponentData` wrapper (doc 04 §5.2) prepends the scope label to the fetched body and then renders threshold tokens; the pack's fetcher therefore **may include `{{component_key.token}}`** inside the body if it wants the renderer to substitute them.
 - Build `allowed: AllowedValue[]` for every number the prompt body cites: `{ label: <human>, value: <number>, unit: 'RM'|'pct'|'days'|'count'|'ratio', tolerance?: <number> }`. The Engine's `fetchComponentData` then unions `allowedThresholds(componentKey)` into this list automatically; the fetcher does not add threshold tokens itself.
 - **Fail-soft.** Wrap every DB call in `try/catch`; on error return `{ prompt: 'No data for <componentKey> in this scope.', allowed: [] }`. Never throw.
 
@@ -254,7 +254,7 @@ async function fetchPeopleHeadcount(
     );
     const last = rows[rows.length - 1];
     return {
-      prompt: `Current Values:\n- Latest headcount: ${last.headcount}\n` +
+      prompt: `- Latest headcount: ${last.headcount}\n` +
               rows.map(r => `  - ${r.month}: ${r.headcount}`).join('\n'),
       allowed: [{ label: 'Latest headcount', value: Number(last.headcount), unit: 'count' }],
     };
@@ -262,7 +262,7 @@ async function fetchPeopleHeadcount(
 }
 ```
 
-**Verification:** call `fetchComponentData('people_headcount', 'people_headcount_trend', {start,end})` directly; expect a non-empty `prompt` ending after the threshold-rendered indicator text (because doc 04 §5.2 renders the prompt at the wrapper boundary) and a non-empty `allowed`.
+**Verification:** call `fetchComponentData('people_headcount', 'people_headcount_trend', {start,end})` directly; expect a non-empty `prompt` beginning with the scope label, followed by the threshold-rendered data body, and a non-empty `allowed`. The complete model user message adds the single `Current Values:` header later in `buildComponentUserPrompt`.
 
 ### Step 8 — Author the per-component prompt bodies
 
@@ -383,7 +383,7 @@ Activating HR is therefore the exact §5 recipe applied with `prefix = hr_*`, st
 
 ### 7.3 Where the Engine refuses to be modified
 
-For traceability: the files a pack must **not** edit. If a PR touches any of these in service of a new pack, it is an Engine PR by definition and needs Engine review.
+For traceability: the files a pack must **not** edit. If a PR touches any of these in service of a new pack, it is an Engine PR by definition and needs Engine review. This list excludes the shared registry files named in §3.3.5; those are the current reference's pack extension points.
 
 - `apps/dashboard/src/lib/postgres.ts` — pool model (doc 01).
 - `apps/dashboard/src/lib/ai-insight/storage.ts` — result store (doc 01).
@@ -411,7 +411,7 @@ The pack is built correctly when *all* of the following pass with **no edits to 
 
 **Check C — single-section batch.** `runInsightBatch('tester')` opens a run row with `sections_total = <previous_total + 1>`; the new section appears once in `current_section` during execution; on completion the run is `success` (or `partial` if an unrelated existing section happened to fail); `getSectionInsight('demo_overview', 'demo')` returns one row with a non-empty `summary_json` and one child `ai_insight_component` row for `demo_kpi` whose `analysis_md` is non-empty. **No Engine file in §7.3 was edited.**
 
-**Check D — read API & frontend.** `GET /api/ai-insight/section?page=demo&section=demo_overview` returns the section envelope (doc 06); `GET /api/ai-insight/component?page=demo&section=demo_overview&component=demo_kpi` returns the component envelope including `componentInfo` (doc 06). Navigating the new page route in a browser shows the doc 07 panel in its `present` state, with `demo_kpi`'s metadata containing the **rendered** band edge `12` (not `{{…}}`).
+**Check D — read API & frontend.** `GET /api/ai-insight/section/demo_overview?page=demo` returns the section envelope (doc 06); `GET /api/ai-insight/component/demo_overview/demo_kpi` returns the component envelope including `componentInfo` (doc 06). Navigating the new page route in a browser shows the doc 07 panel in its `present` state, with `demo_kpi`'s metadata containing the **rendered** band edge `12` (not `{{…}}`).
 
 **Check E — admin auto-discovery.** Open the threshold-config page (doc 08). The new component appears in the prompt tree under its page label `'Demo'`; selecting it shows the `headcount_band`-style group editor with the current value `12`; saving from this UI re-invalidates the cache (next batch's render shows the new value).
 

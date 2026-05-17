@@ -15,6 +15,7 @@ This document is the **integration acceptance for the whole engine**. Every prio
 - **Docs 00–08, each built and passing its own §8 checkpoint.** This walkthrough does not re-specify any layer; it assumes each is implemented to its own Definition of Done. If a step here fails, the failure localises to the owning layer's document.
 - **Doc 00** — the end-to-end flow (§5.2), the Engine/Domain/Spine split (§4), and the configuration matrix (§8). This document is **Spine**: its §3 is domain-neutral; its §5 runs the **Finance Domain Pack** as the worked example exactly as doc 00 §4 intends (any Domain Pack substitutes with no change to the Engine steps).
 - **Doc 03's mock model boundary.** The entire walkthrough runs through the mock (`AI_INSIGHT_MOCK_LLM` set), so it needs no gateway, no credential, and no network. This is the property that makes end-to-end acceptance reproducible.
+- **A source projection store for the worked pack.** The Finance worked example is not runnable against an engine-only empty database: its batch scopes and fetchers read `pc_*`, budget, and app-setting projection tables through `DATABASE_URL` (docs 00/01). For Finance, point `DATABASE_URL` at a database that can hold the engine tables **and** already has the Finance source projections. A fresh empty database is valid only for a synthetic Domain Pack whose fetchers do not query Finance projections.
 
 ## 3. Concept & Contract
 
@@ -76,52 +77,53 @@ Set, in the app environment:
 
 | Variable | Value for this run | Effect |
 |---|---|---|
-| `DATABASE_URL` | a fresh empty database | engine-owned store (doc 01) |
-| `RDS_DATABASE_URL` | any value (may be unreachable) | source store; fail-soft to empty (doc 01) |
+| `DATABASE_URL` | local database containing the engine tables plus the Finance `pc_*`/budget/app-setting projections | engine-owned store plus co-located Finance source projections (docs 00/01) |
+| `RDS_DATABASE_URL` | any value (may be unreachable unless exercising drill-down tools) | read-only drill-down/source-query port; fail-soft to empty/error text (doc 01) |
 | `OPENROUTER_API_KEY` | empty | forces reliance on the mock |
 | `AI_INSIGHT_MOCK_LLM` | set to a normal value | every model call is offline & deterministic (doc 03) |
 | `AI_INSIGHT_BATCH_DELAY_MS` | `0` | no inter-section pause, fastest run (doc 05) |
-| `AI_INSIGHT_BATCH_STALE_MIN` | `40` (default; `0` only for the stale-heal sub-check) | stale threshold (doc 05) |
+| `AI_INSIGHT_BATCH_STALE_MIN` | `40` default; use `1` only for the stale-heal sub-check | stale threshold (doc 05); non-positive values fall back to `40` |
 | `AI_INSIGHT_LOG_PROMPTS` | `false` | **must stay off — logging captures source data** (doc 03) |
 | `AI_INSIGHT_THRESHOLDS_USE_DEFAULTS` | unset | thresholds resolve from the DB table (doc 02) |
 
 ### 5.1 Build the substrate (docs 01 → 02)
 
-1. Apply the engine schema: `psql "$DATABASE_URL" -f apps/dashboard/sql/ai-insight-schema.sql`. Re-running is idempotent (doc 01 §8). Expect the four tables and the partial unique index on the running batch row.
-2. Apply the threshold seed: `psql "$DATABASE_URL" -f migrations/025_ai_insight_thresholds.sql`. Expect one row per registry token, every value equal to its registry default (doc 02 Check A — *defaults == seeds*).
+1. Confirm the Finance projection tables needed by the active batch scope already exist in `DATABASE_URL` (`pc_sales_daily`, `pc_ar_monthly`, `pc_ar_customer_snapshot`, `pc_pnl_period`, etc.; see docs 01/04/05 for the full set). The Finance worked example cannot pass without them.
+2. Apply the engine schema: `psql "$DATABASE_URL" -f apps/dashboard/sql/ai-insight-schema.sql`. Re-running is idempotent (doc 01 §8). Expect the four tables and the partial unique index on the running batch row.
+3. Apply the threshold seed: `psql "$DATABASE_URL" -f migrations/025_ai_insight_thresholds.sql`. Expect one row per registry token, every value equal to its registry default (doc 02 Check A — *defaults == seeds*).
 
 ### 5.2 Trigger one batch as the operator (docs 08 → 05)
 
-3. As **admin** (`x-user-role: admin`), `POST /api/admin/ai-insight/batch/trigger`. Expect an **immediate** `200 { started:true, sections_total }` — the response returns before generation finishes (fire-and-forget; doc 08 §5.2).
-4. **Immediately `POST` the trigger again** (the operator double-click). Expect `409 Batch already running` and **no** second ledger row — single-run exclusivity composed across docs 08→05→01 (end-to-end invariant 4).
+4. As **admin** (`x-user-role: admin`), `POST /api/admin/ai-insight/batch/trigger`. Expect an **immediate** `200 { started:true, sections_total }` — the response returns before generation finishes (fire-and-forget; doc 08 §5.2).
+5. **Immediately `POST` the trigger again** (the operator double-click). Expect `409 Batch already running` and **no** second ledger row — single-run exclusivity composed across docs 08→05→01 (end-to-end invariant 4).
 
 ### 5.3 Generation runs offline (docs 05 → 04 → 03 → 01)
 
-5. The background run iterates the active sections in catalog order (doc 05). For each section: resolve scope, fetch each component's data, call the model per component **through the mock** (doc 03 — no network), run the numeric guard, then the summary pass (doc 04), and **atomically replace** that section's stored insight (doc 01 — old component rows cascade-deleted, new ones written in one transaction).
-6. Poll `GET /api/admin/ai-insight/batch/status` during the run. Expect `current_section` and the counters to **advance between sections, not only at the end** (doc 05 Check 7); the operator card mirrors this (doc 08 §5.4).
-7. The run closes with a terminal status: `success` if every section produced an insight, `partial` if some sections failed but others succeeded, `error` if it could not proceed (doc 05). A failing section contributes a `section_errors` entry and does **not** prevent the others from persisting (end-to-end invariant 3).
+6. The background run iterates the active sections in catalog order (doc 05). For each section: resolve scope, fetch each component's data, call the model per component **through the mock** (doc 03 — no network), run the numeric guard, then the summary pass (doc 04), and **atomically replace** that section's stored insight (doc 01 — old component rows cascade-deleted, new ones written in one transaction).
+7. Poll `GET /api/admin/ai-insight/batch/status` during the run. Expect `current_section` and the counters to **advance between sections, not only at the end** (doc 05 Check 7); the operator card mirrors this (doc 08 §5.4).
+8. The run closes with a terminal status: `success` if every section produced an insight, `partial` if some sections failed but others succeeded, `error` if it could not proceed (doc 05). A failing section contributes a `section_errors` entry and does **not** prevent the others from persisting (end-to-end invariant 3).
 
 ### 5.4 Read back over the API (doc 06)
 
-8. For a section that generated, `GET /api/ai-insight/section/{section_key}?page={page}` ⇒ `200 { exists:true, …, provider_metadata }` with `provider_metadata` lifted to the top level. For a section key that never generated ⇒ `404 { exists:false }`.
-9. For a component under a generated section, `GET /api/ai-insight/component/{section_key}/{component_key}` ⇒ `200 { exists:true, componentInfo, analysis_md, … }`, with every `{{token}}` in `componentInfo` already substituted to a number. For a component whose section never ran ⇒ `200 { exists:false, componentInfo }` (note: **200, not 404** — doc 06 invariant 3).
+9. For a section that generated, `GET /api/ai-insight/section/{section_key}?page={page}` ⇒ `200 { exists:true, …, provider_metadata }` with `provider_metadata` lifted to the top level. For a section key that never generated ⇒ `404 { exists:false }`.
+10. For a component under a generated section, `GET /api/ai-insight/component/{section_key}/{component_key}` ⇒ `200 { exists:true, componentInfo, analysis_md, … }`, with every `{{token}}` in `componentInfo` already substituted to a number. For a component whose section never ran ⇒ `200 { exists:false, componentInfo }` (note: **200, not 404** — doc 06 invariant 3).
 
 ### 5.5 Render to the end user (doc 07)
 
-10. Open the dashboard page hosting that section. The panel is expanded by default and resolves to **present**: a scope line, a last-updated line, and the positive/negative cards (≤3 each). A card click opens the detail modal with the full markdown narrative (doc 07 §5.2–5.3).
-11. Open a component's analysis via its per-component icon ⇒ the component dialog titled by `componentInfo.name`, rendering `analysis_md` (doc 07 §5.4). A component whose section never ran shows the *absent* copy, not an error (doc 07 rule 7).
-12. Confirm the read-only seam: while doing 10–11 the only network calls are the doc 06 GETs (and the doc 08 status poll if mounted); **no generation occurs and engine row counts do not change** (end-to-end invariant 1).
+11. Open the dashboard page hosting that section. The panel is expanded by default and resolves to **present**: a scope line, a last-updated line, and the positive/negative cards (≤3 each). A card click opens the detail modal with the full markdown narrative (doc 07 §5.2–5.3).
+12. Open a component's analysis via its per-component icon ⇒ the component dialog titled by `componentInfo.name`, rendering `analysis_md` (doc 07 §5.4). A component whose section never ran shows the *absent* copy, not an error (doc 07 rule 7).
+13. Confirm the read-only seam: while doing 11–12 the only network calls are the doc 06 GETs (and the doc 08 status poll if mounted); **no generation occurs and engine row counts do not change** (end-to-end invariant 1).
 
 ### 5.6 Configuration round-trip (docs 08 → 02 → 04 → 07)
 
-13. In the threshold-config dashboard (`/admin/ai-insight-config`), select a component prompt that carries a configurable threshold; the preview shows the **rendered** prompt with the current number substituted.
-14. Edit the value out of range ⇒ inline error, *Save* disabled; a forced invalid `PUT` ⇒ `400 { error:'Invalid threshold values', details }` and **nothing persists** (doc 08 §5.6 / doc 02 validation).
-15. Set a valid in-range value and *Save* ⇒ `200 { ok:true }`, toast, and the preview now shows the **new** number (cache invalidated; doc 08 invariant 4 / doc 02). Trigger another batch (steps 3–7) and re-read (step 9): the new number now appears in the freshly generated narrative — **prompt prose unchanged** (end-to-end invariant 6).
+14. In the threshold-config dashboard (`/admin/ai-insight-config`), select a component prompt that carries a configurable threshold; the preview shows the **rendered** prompt with the current number substituted.
+15. Edit the value out of range ⇒ inline error, *Save* disabled; a forced invalid `PUT` ⇒ `400 { error:'Invalid threshold values', details }` and **nothing persists** (doc 08 §5.6 / doc 02 validation).
+16. Set a valid in-range value and *Save* ⇒ `200 { ok:true }`, toast, and the preview now shows the **new** number (cache invalidated; doc 08 invariant 4 / doc 02). Trigger another batch (steps 4–8) and re-read (step 10): the new number now appears in the freshly generated narrative — **prompt prose unchanged** (end-to-end invariant 6).
 
 ### 5.7 Resilience sub-checks (docs 05/01 observed end-to-end)
 
-16. **Stale self-heal.** With a `running` row left behind and `AI_INSIGHT_BATCH_STALE_MIN=0`, `GET` status once ⇒ the dead row is reclaimed (`error`) and the response is the healed state; the operator card flips off "running" without intervention; a subsequent trigger proceeds (end-to-end invariant 5).
-17. **Fail-soft source.** Point `RDS_DATABASE_URL` at an unreachable host and run again ⇒ source-backed components degrade to explanatory text, the section still generates and still renders — no crash anywhere in the chain (doc 01 fail-soft composed through doc 04).
+17. **Stale self-heal.** With a `running` row left behind, `AI_INSIGHT_BATCH_STALE_MIN=1`, and `started_at` at least 2 minutes old, `GET` status once ⇒ the dead row is reclaimed (`error`) and the response is the healed state; the operator card flips off "running" without intervention; a subsequent trigger proceeds (end-to-end invariant 5). Do not use `0`; non-positive values fall back to the default stale window.
+18. **Fail-soft drill-down source.** Point `RDS_DATABASE_URL` at an unreachable host and run a section/tool path that reaches `queryRds` or `query_rds_table` ⇒ the read-only drill-down call degrades to an empty/error string instead of crashing the batch. Finance component fetchers still require their local `pc_*` projections in `DATABASE_URL`; this sub-check does not remove that setup requirement.
 
 ## 6. Rules & edge cases
 
@@ -135,7 +137,7 @@ These are properties **only an end-to-end run can prove** — each composes per-
 | 4 | Crashed run left `running`, observed later | Reclaimed on observation; card never stuck "running" | doc 08 §5.3 + doc 01 reclaim |
 | 5 | Threshold edited then re-run | New number in rendered narrative; prose unchanged | doc 08 §5.6 + doc 02 render + doc 04 assembly + doc 07 render |
 | 6 | End user interacts with a generated page | Only reads; no write/generate; row counts stable | doc 00 inv. 1 + doc 06 inv. 1 + doc 07 inv. 1 |
-| 7 | `RDS_DATABASE_URL` unreachable during a run | Affected components degrade to text; section still generates & renders | doc 01 fail-soft + doc 04 fail-soft fetch |
+| 7 | `RDS_DATABASE_URL` unreachable during a drill-down/tool path | The affected read-only source query returns an empty/error string instead of crashing the batch; Finance component fetchers still require local `pc_*` projections in `DATABASE_URL` | doc 01 fail-soft + doc 04 fail-soft fetch |
 | 8 | `AI_INSIGHT_LOG_PROMPTS=true` in this run | **Do not** — it dumps source data to logs; keep `false` outside controlled debugging | doc 03 §8 config note |
 
 ### 6.1 Configuration owned by this layer
@@ -166,6 +168,6 @@ To run it as a single offline pass: set the §5.0 environment, execute §5.1 (ap
 4. **API reflects storage.** §5.4 — generated section ⇒ `200 exists:true` with top-level `provider_metadata`; never-generated section ⇒ `404`; never-generated component ⇒ `200 exists:false` (not 404).
 5. **Rendered to the user.** §5.5 — the panel shows the present state (scope + cards); a card opens the detail modal; the component dialog renders its analysis; the never-run component shows the *absent* copy, not an error; engine row counts are unchanged by all of this.
 6. **Config round-trip.** §5.6 — an invalid threshold cannot be saved (UI blocked + server `400`, nothing persisted); a valid save updates the preview immediately, and a subsequent run's rendered narrative carries the new number with unchanged prompt prose.
-7. **Resilience.** §5.7 — a stale `running` row is reclaimed on the next status observation (card un-sticks); an unreachable source store degrades affected components to text while the section still generates and renders.
+7. **Resilience.** §5.7 — a stale `running` row is reclaimed on the next status observation (card un-sticks); an unreachable drill-down/source-query port returns an empty/error string instead of crashing the batch, while Finance's local `pc_*` projections remain required for the worked example.
 
 **Definition of Done:** a developer who has read only docs `00`–`09`, with no access to this repository's source, can stand the system up entirely offline, execute §5 in order, and observe a generated insight rendered to an end user — with the seam (write-side once per trigger; read-side on every view) intact, single-run exclusivity held under concurrent triggers, fault isolation across sections, self-healing observation, and an edited threshold changing the rendered numbers without a prose change. Passing this is the engine's whole-system Definition of Done.
