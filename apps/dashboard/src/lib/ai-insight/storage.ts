@@ -69,15 +69,19 @@ export async function upsertSectionInsight(params: {
   }
 }
 
-export async function getSectionInsight(sectionKey: string) {
+export async function getSectionInsight(sectionKey: string, page?: string) {
   const pool = getPool();
+  const params = page ? [sectionKey, page] : [sectionKey];
   const { rows } = await pool.query(
     `SELECT id, page, section_key, summary_json, analysis_time_s, token_count,
             cost_usd, date_range_start, date_range_end, fiscal_year, fiscal_range,
             generated_by, generated_at
      FROM ai_insight_section
-     WHERE section_key = $1`,
-    [sectionKey],
+     WHERE section_key = $1
+       ${page ? 'AND page = $2' : ''}
+     ORDER BY generated_at DESC
+     LIMIT 1`,
+    params,
   );
   return rows[0] ?? null;
 }

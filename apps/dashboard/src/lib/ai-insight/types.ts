@@ -172,27 +172,3 @@ export interface SectionResult {
   cost_usd: number;
   provider_metadata?: AiProviderMetadata | null;
 }
-
-export interface LockStatus {
-  locked: boolean;
-  locked_by: string | null;
-  locked_at: string | null;
-  section_key: string | null;
-}
-
-// SSE event types
-export type SSEEventType = 'progress' | 'complete' | 'error' | 'cancelled';
-
-export interface SSEProgressData {
-  component: string;
-  status: 'analyzing' | 'complete' | 'error';
-  message?: string;
-}
-
-export interface SSECompleteData {
-  section_id: number;
-  analysis_time_s: number;
-  token_count: number;
-  cost_usd: number;
-  provider_metadata?: AiProviderMetadata;
-}

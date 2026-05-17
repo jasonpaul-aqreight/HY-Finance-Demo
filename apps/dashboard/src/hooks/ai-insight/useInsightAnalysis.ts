@@ -1,13 +1,11 @@
 'use client';
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type {
   SectionKey,
   PageKey,
   DateRange,
   FiscalPeriod,
-  SSEProgressData,
-  LockStatus,
   SummaryJson,
   AiProviderMetadata,
 } from '@/lib/ai-insight/types';
@@ -20,33 +18,51 @@ export interface SectionInsightData {
   cost_usd: number;
   date_range_start: string | null;
   date_range_end: string | null;
+  fiscal_year: string | null;
+  fiscal_range: string | null;
   generated_by: string;
   generated_at: string;
   provider_metadata?: AiProviderMetadata | null;
 }
 
-export type InsightStatus = 'idle' | 'loading' | 'analyzing' | 'complete' | 'error' | 'blocked';
+type ReadOnlyInsightStatus = 'idle' | 'loading' | 'complete' | 'error';
 
+// TEMP: removed in Phase 4 when AiInsightPanel drops manual analysis states.
+export type InsightStatus = ReadOnlyInsightStatus | 'analyzing' | 'blocked';
+
+// TEMP: removed in Phase 4 when AiInsightPanel drops progress rendering.
 export interface ProgressLine {
   component: string;
   status: 'analyzing' | 'complete' | 'error';
   message?: string;
 }
 
+// TEMP: removed in Phase 4 when AiInsightPanel drops lock rendering.
+interface LegacyLockInfo {
+  locked: boolean;
+  locked_by: string | null;
+  locked_at: string | null;
+  section_key: string | null;
+}
+
 export function useInsightAnalysis(page: PageKey, sectionKey: SectionKey) {
-  const [status, setStatus] = useState<InsightStatus>('idle');
+  const [status, setStatus] = useState<ReadOnlyInsightStatus>('idle');
   const [data, setData] = useState<SectionInsightData | null>(null);
-  const [progress, setProgress] = useState<ProgressLine[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [lockStatus, setLockStatus] = useState<LockStatus | null>(null);
-  const eventSourceRef = useRef<EventSource | null>(null);
-  const readerRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null);
 
   // Fetch existing stored insight on mount
   const fetchStored = useCallback(async () => {
     setStatus('loading');
+    setError(null);
     try {
-      const res = await fetch(`/api/ai-insight/section/${sectionKey}`);
+      const res = await fetch(`/api/ai-insight/section/${sectionKey}?page=${encodeURIComponent(page)}`);
+
+      if (res.status === 404) {
+        setData(null);
+        setStatus('idle');
+        return;
+      }
+
       if (res.ok) {
         const json = await res.json();
         if (json.exists) {
@@ -55,173 +71,28 @@ export function useInsightAnalysis(page: PageKey, sectionKey: SectionKey) {
           return;
         }
       }
-      setStatus('idle');
-    } catch {
-      setStatus('idle');
-    }
-  }, [sectionKey]);
-
-  // Check lock status
-  const checkLock = useCallback(async () => {
-    try {
-      const res = await fetch('/api/ai-insight/status');
-      const lock: LockStatus = await res.json();
-      setLockStatus(lock);
-      if (lock.locked && lock.section_key !== sectionKey) {
-        setStatus('blocked');
-      }
-      return lock;
-    } catch {
-      return null;
-    }
-  }, [sectionKey]);
-
-  // Start analysis via SSE
-  const analyze = useCallback(
-    async (dateRange: DateRange | null, userName: string, fiscalPeriod: FiscalPeriod | null = null) => {
-      // Check lock first
-      const lock = await checkLock();
-      if (lock?.locked) {
-        setStatus('blocked');
-        return;
-      }
-
-      setStatus('analyzing');
-      setProgress([]);
-      setError(null);
-
-      const res = await fetch('/api/ai-insight/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          page,
-          section_key: sectionKey,
-          date_range: dateRange,
-          fiscal_period: fiscalPeriod,
-          user_name: userName,
-        }),
-      });
 
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: 'Analysis failed' }));
-        if (res.status === 409) {
-          setLockStatus({ locked: true, locked_by: err.locked_by, locked_at: null, section_key: err.section_key });
-          setStatus('blocked');
-        } else {
-          setError(err.error || 'Analysis failed');
-          setStatus('error');
-        }
-        return;
+        throw new Error('Failed to load saved insight');
       }
 
-      // Read SSE stream using fetch + ReadableStream (EventSource doesn't support POST)
-      const reader = res.body?.getReader();
-      if (!reader) {
-        setError('No response stream');
-        setStatus('error');
-        return;
-      }
-      readerRef.current = reader;
-
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || '';
-
-          let eventType = '';
-          for (const line of lines) {
-            if (line.startsWith('event: ')) {
-              eventType = line.slice(7).trim();
-            } else if (line.startsWith('data: ') && eventType) {
-              const payload = JSON.parse(line.slice(6));
-              handleSSEEvent(eventType, payload);
-              eventType = '';
-            }
-          }
-        }
-      } catch {
-        // Reader was cancelled (e.g. by cancel button) — ignore
-      } finally {
-        readerRef.current = null;
-      }
-    },
-    [page, sectionKey, checkLock],
-  );
-
-  function handleSSEEvent(event: string, data: Record<string, unknown>) {
-    switch (event) {
-      case 'progress': {
-        const p = data as unknown as SSEProgressData;
-        setProgress((prev) => {
-          const existing = prev.findIndex((l) => l.component === p.component);
-          const line: ProgressLine = { component: p.component, status: p.status, message: p.message };
-          if (existing >= 0) {
-            const next = [...prev];
-            next[existing] = line;
-            return next;
-          }
-          return [...prev, line];
-        });
-        break;
-      }
-      case 'complete': {
-        // Refetch the stored data to get full summary_json
-        fetchStored();
-        break;
-      }
-      case 'cancelled': {
-        setError((data.message as string) || 'Analysis cancelled');
-        setStatus('idle');
-        // Reload previous stored result if any
-        fetchStored();
-        break;
-      }
-      case 'error': {
-        setError((data.message as string) || 'Analysis failed');
-        setStatus('error');
-        break;
-      }
-    }
-  }
-
-  // Cancel running analysis
-  const cancel = useCallback(async () => {
-    // Immediately update local state so UI responds instantly
-    setStatus('idle');
-    setProgress([]);
-    setError(null);
-
-    // Cancel the client-side SSE reader
-    if (readerRef.current) {
-      try {
-        readerRef.current.cancel();
-      } catch {
-        // Best effort
-      }
-      readerRef.current = null;
-    }
-
-    // Tell the server to abort
-    try {
-      await fetch('/api/ai-insight/cancel', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ section_key: sectionKey }),
-      });
+      setData(null);
+      setStatus('idle');
     } catch {
-      // Best effort
+      setError('Failed to load saved insight');
+      setStatus('error');
     }
+  }, [page, sectionKey]);
 
-    // Reload previous stored result if any
-    fetchStored();
-  }, [sectionKey, fetchStored]);
+  // TEMP: removed in Phase 4 when AiInsightPanel no longer accepts manual analysis props.
+  const analyze = useCallback((dateRange: DateRange | null, userName: string, fiscalPeriod: FiscalPeriod | null = null) => {
+    void dateRange;
+    void userName;
+    void fiscalPeriod;
+  }, []);
+
+  // TEMP: removed in Phase 4 when AiInsightPanel no longer accepts manual analysis props.
+  const cancel = useCallback(() => {}, []);
 
   // Load stored insight on mount
   useEffect(() => {
@@ -231,12 +102,13 @@ export function useInsightAnalysis(page: PageKey, sectionKey: SectionKey) {
   return {
     status,
     data,
-    progress,
+    // TEMP: removed in Phase 4 when AiInsightPanel drops progress rendering.
+    progress: [] as ProgressLine[],
     error,
-    lockStatus,
+    // TEMP: removed in Phase 4 when AiInsightPanel drops lock rendering.
+    lockStatus: null as LegacyLockInfo | null,
     analyze,
     cancel,
     refetch: fetchStored,
-    checkLock,
   };
 }
