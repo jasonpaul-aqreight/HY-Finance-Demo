@@ -24,6 +24,21 @@ External dependencies this layer touches, by role:
 - A **relational database** that supports transactions, a JSON/JSONB column type, and a *partial* unique index (a unique constraint over a filtered subset of rows).
 - A **connection pool** abstraction with explicit single-connection checkout for multi-statement transactions.
 
+**Source-of-truth datastore — assumed-existing schema.** The engine reads from a separate datastore it does not own (the local `pc_*` pre-computed tables queried via doc 04 §5.5's tool layer; the `app_settings` key-value store referenced in doc 02 §6.2; the `budget_global` table referenced in doc 12). A production rebuild **does not recreate this store** — it points at the one already in production. For traceability, the migrations that historically created the tables AI Insight consumes are listed below; a dev cloning this repo and running migrations from scratch would apply these, but a prod rebuild targeting an existing source datastore can skip them.
+
+| Migration | Creates / changes | Consumed by AI Insight |
+|---|---|---|
+| `003_precomputed_tables.sql` | Initial pre-computed `pc_*` set for sales, AR, returns, customer margin, supplier margin, P&L, opening balance, expenses. | All `pc_*` tables in doc 04 §5.5 `LOCAL_WHITELIST`. |
+| `005_app_settings.sql` | Key/value config store. | `app_settings` (`credit_score_v2` row — doc 02 §6.2). |
+| `010_ar_monthly_counts_and_supplier_is_active.sql` | Invoice/payment counts on `pc_ar_monthly`; `is_active` on `pc_supplier_margin`. | Column additions used by Payment / Supplier sections. |
+| `012_sales_daily_grain.sql` | Rebuilds sales breakdown tables at daily grain. | `pc_sales_daily`, `pc_sales_by_customer`, `pc_sales_by_outlet`, `pc_sales_by_fruit`. |
+| `013_supplier_margin_attributed_cogs.sql` | Adds attributed COGS to `pc_supplier_margin`. | Column addition used by Supplier Margin sections. |
+| `023_budget_global.sql` | Global (non-fiscal-keyed) budget table; **supersedes** the earlier fiscal-keyed `budget` table. | `budget_global` (doc 02 §6.2, doc 12). |
+
+**Engine-owned tables** (specified in §4 of this document; the rebuild creates these): `ai_insight_section`, `ai_insight_component`, `ai_insight_batch_run`. Plus `ai_insight_thresholds` (schema owned by doc 02 §4.3, persisted in this same engine store via `migrations/025_ai_insight_thresholds.sql`).
+
+> The legacy `ai_insight_prompts`, `ai_insight_prompt_versions`, `ai_insight_feedback`, and `ai_insight_lock` tables existed in earlier iterations and are **not** part of the current engine. The prompt-versions and feedback subsystem was retired (replaced by the threshold registry in doc 02); the singleton lock was replaced by the batch-run ledger in §4 below.
+
 No other document is required. Generation (doc 04) and orchestration (doc 05) are *callers* of this layer; their contracts are defined where they are built.
 
 ## 3. Concept & Contract

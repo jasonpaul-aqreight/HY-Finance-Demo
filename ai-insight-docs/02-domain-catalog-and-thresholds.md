@@ -271,6 +271,22 @@ These are intentionally **fixed in code/prose** and have no token. A production 
 - **Scope windows** — trailing-12-month month alignment, fiscal-year selection (doc 01 §5.6 / batch scope).
 - **Components with no registry entry** (e.g. pure narrative tables) — no tokens, evaluated qualitatively by the model.
 
+### 6.2 External data dependencies (read-only, not owned by AI Insight)
+
+The threshold registry above covers **prompt-side numeric tokens** the engine owns and the admin edits inline. Two other categories of configuration flow into AI Insight differently — they arrive in the **fetcher's data block**, not via `renderThresholdText`. The engine reads them; it does not own their UI, table, or CRUD. A dev rebuilding AI Insight must not re-implement these as thresholds.
+
+| Category | Source | Consumed by | Ownership |
+|---|---|---|---|
+| **Credit-score formula + risk-tier thresholds** | `app_settings` row with `key = 'credit_score_v2'` (JSONB: `{ creditScoreWeights:{utilization,overdueDays,timeliness,doubleBreach}, riskThresholds:{low,high} }`) | The precompute job that maintains `pc_ar_customer_snapshot.credit_score` / `risk_tier`. AI Insight reads the already-resolved tier/score as authoritative. | Built upstream (already in production). AI Insight rebuilds **must not** re-implement the formula and **must not** ship a new editor. |
+| **Annual budget + tolerance per P&L line** | `budget_global` table (`line_item PK, monthly_budget, annual_budget, tolerance_pct, approved_by, note, updated_at`) | `financial_variance` fetchers (`fv_variance_summary`, `fv_budget_suggestions`, `fv_trend_forecast`); also the Variance KPI surface. | A Domain Pack settings UI — specced in **doc 12** for the production build (not yet in prod). |
+
+**Implication for prompt authors (doc 04a).** When a fetcher emits a value derived from one of these external configs, treat it as **evidence data**, not a tunable threshold. Specifically:
+
+- Do **not** add `credit_score_v2` weights or `risk_tier` cutoffs to the threshold registry. The `customer_credit_health` component prompt already says *"treat resolved `risk_tier`/`credit_score` as authoritative — do not reverse-engineer the formula"* (see [04a §5](04a-prompt-catalog.md#5-catalog-entries)).
+- Do **not** add per-line budget values or per-line tolerance % to the threshold registry. They live in `budget_global`, are edited via the Budget Setting dialog (doc 12), and arrive in the prompt as part of the variance fetchers' raw data block. The token system has no way to express *"tolerance per line item"* — that is a per-row attribute, not a global constant.
+
+**Distinction in one line.** Threshold tokens are *global numeric judgement boundaries the AI Insight admin edits inline*; external dependencies are *upstream business data with their own editors* whose values flow in as part of the prompt's evidence, not its rubric.
+
 ## 7. Reference Implementation
 
 Source paths are evidence for the spec above, not a replacement.

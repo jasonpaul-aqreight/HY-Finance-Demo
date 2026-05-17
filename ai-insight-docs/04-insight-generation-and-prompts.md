@@ -184,13 +184,179 @@ loop:
 - A candidate **passes** if any of: it is a safe small integer count (0–12, 30, 60, 80, 90, 100, 120, 365); it matches an allowed value within tolerance; it is a derivable percentage of two allowed values (±0.2); or it is a supported lower-bound claim ("over/above/more than/≥ X" where some allowed value exceeds X). Default tolerances: RM ±1, pct ±0.1, days ±0.1, count ±0.5, ratio ±0.01 — plus RM also matches on absolute value and ±5% relative; pct also ±1.0 absolute or ±1% relative; days also ±1.0 absolute (display rounding).
 - Unmatched candidates ⇒ guard fails; `formatGuardError` produces the corrective message demanding verbatim values only.
 
-**Tool policy** (`policyForSection` → `toolsForSection` / `validateToolForSection`): `none` ⇒ no tools; `full` ⇒ both tools; `aggregate_only` ⇒ only `query_local_table` and only against the nine aggregate pre-compute tables (the tool's table enum is narrowed and its description annotated). Server-side validation re-checks every call: wrong tool or non-aggregate table under `aggregate_only` ⇒ a rejection string is returned to the model instead of executing.
+**Tool policy** (`policyForSection` → `toolsForSection` / `validateToolForSection`).
 
-**Tools** (`AI_TOOLS`, all read-only, max **100 rows**):
+- `none` ⇒ tool array is empty; the slot is invoked without `tools`.
+- `full` ⇒ both tools, full enums.
+- `aggregate_only` ⇒ only `query_local_table`, with its `table.enum` filtered to the **nine** aggregate pre-compute tables: `pc_sales_daily, pc_ar_monthly, pc_ar_aging_history, pc_customer_margin, pc_supplier_margin, pc_return_monthly, pc_return_products, pc_expense_monthly, pc_pnl_period`. The tool's `description` is appended with `[POLICY: aggregate_only — only these tables allowed: ...]` so the model sees the restriction in-prompt as well as in the enum.
 
-- `query_local_table` — a whitelisted column subset of pre-computed `pc_*` tables on the local pool. `pc_ar_customer_snapshot` is auto-deduplicated (`DISTINCT ON debtor_code`, latest snapshot).
-- `query_rds_table` — a whitelisted column subset of source `dbo.*` tables on the read-only source pool; for the document tables (`IV/CS/CN/ARInvoice/ARPayment`) a `Cancelled = 'F'` filter is **injected server-side** regardless of the model's WHERE.
-- Every `WHERE`/`ORDER BY` is screened by a blocklist (`;`, `--`, `/* */`, `UNION`, `SELECT`, DML/DDL, `EXEC`, `xp_`/`sp_`, …); a hit returns a rejection string, not an executed query. Parameters use `$1/$2…` placeholders. Errors are returned as text, never thrown.
+Server-side `validateToolForSection(sectionKey, toolName, input)` re-checks every call before execution. Outcomes:
+
+- `full` → `null` (allow).
+- `none` → string *`Tool <name> is not allowed for section <key> (policy: none).`*
+- `aggregate_only` with `query_rds_table` or a non-aggregate table → string *`Tool <name> is not allowed for section <key> (policy: aggregate_only — only query_local_table on aggregate tables is permitted).`* or *`Table <name> is not allowed for section <key> (policy: aggregate_only). Allowed tables: ...`*
+
+A rejection is a **string** returned to the model as a `tool_result` — never thrown. The model sees the message on the next turn and can pivot.
+
+**Tool catalog** (`AI_TOOLS`, both read-only). `ROW_LIMIT = 100` caps the `limit` argument (`Math.min(input.limit ?? 100, 100)`).
+
+#### `query_local_table` — pre-computed local Postgres
+
+Input schema, as exposed to the model (verbatim from `AI_TOOLS`):
+
+```ts
+{
+  type: 'object',
+  properties: {
+    table:        { type: 'string', enum: [/* 15 tables, full enum when policy=full;
+                                              narrowed to 9 aggregate tables when policy=aggregate_only */] },
+    columns:      { type: 'array', items: { type: 'string' },
+                    description: 'Columns to select (must be from the allowed list for this table)' },
+    where_clause: { type: 'string',
+                    description: 'Optional WHERE clause (without the WHERE keyword). Use $1, $2, etc. for parameters.' },
+    params:       { type: 'array', items: { type: 'string' },
+                    description: 'Parameter values for the WHERE clause placeholders' },
+    order_by:     { type: 'string',
+                    description: 'Optional ORDER BY clause (without the ORDER BY keywords)' },
+    limit:        { type: 'number',
+                    description: 'Maximum rows to return (default: 100, max: 100)' },
+  },
+  required: ['table', 'columns'],
+}
+```
+
+Per-table column whitelist (`LOCAL_WHITELIST`, exact and exhaustive — any column outside this list returns the string *`Columns not allowed for <table>: <list>. Allowed: <whitelist>`*):
+
+| Table | Allowed columns |
+|---|---|
+| `pc_sales_daily` | doc_date, invoice_total, cash_total, cn_total, net_revenue, doc_count |
+| `pc_sales_by_customer` | doc_date, debtor_code, company_name, debtor_type, sales_agent, invoice_sales, cash_sales, credit_notes, total_sales, doc_count |
+| `pc_sales_by_outlet` | doc_date, dimension, dimension_key, dimension_label, is_active, invoice_sales, cash_sales, credit_notes, total_sales, doc_count, customer_count |
+| `pc_sales_by_fruit` | doc_date, fruit_name, fruit_country, fruit_variant, invoice_sales, cash_sales, credit_notes, total_sales, total_qty, doc_count |
+| `pc_ar_monthly` | month, invoiced, collected, cn_applied, refunded, total_outstanding, total_billed, customer_count |
+| `pc_ar_customer_snapshot` | debtor_code, company_name, debtor_type, sales_agent, display_term, credit_limit, total_outstanding, overdue_amount, utilization_pct, credit_score, risk_tier, is_active, invoice_count, avg_payment_days, max_overdue_days |
+| `pc_ar_aging_history` | snapshot_date, bucket, dimension, invoice_count, total_outstanding |
+| `pc_customer_margin` | month, debtor_code, company_name, debtor_type, sales_agent, is_active, iv_revenue, dn_revenue, cn_revenue, iv_cost, dn_cost, cn_cost, iv_count, cn_count |
+| `pc_supplier_margin` | month, creditor_code, creditor_name, item_code, item_group, is_active, sales_revenue, attributed_cogs, purchase_qty, purchase_value |
+| `pc_return_monthly` | month, cn_count, cn_total, knock_off_total, refund_total, unresolved_total, reconciled_count, partial_count, outstanding_count |
+| `pc_return_products` | month, item_code, item_description, fruit_name, fruit_variant, fruit_country, cn_count, total_qty, total_amount, goods_returned_qty, credit_only_qty |
+| `pc_return_aging` | snapshot_date, bucket, count, amount |
+| `pc_return_by_customer` | month, debtor_code, company_name, cn_count, cn_total, knock_off_total, refund_total, unresolved, outstanding_count |
+| `pc_expense_monthly` | month, acc_no, account_name, acc_type, net_amount |
+| `pc_pnl_period` | period_no, acc_type, acc_no, account_name, parent_acc_no, home_dr, home_cr, proj_no |
+
+**Special case — `pc_ar_customer_snapshot` auto-dedup.** The handler runs `SELECT MAX(snapshot_date) AS d FROM pc_ar_customer_snapshot`, prefixes `snapshot_date = '<d>'` (AND-combined with any user WHERE), wraps as `SELECT DISTINCT ON ("debtor_code") <cols> FROM pc_ar_customer_snapshot WHERE … ORDER BY debtor_code`, and if the caller supplied an `order_by` wraps the whole thing as `SELECT * FROM (<inner>) sub ORDER BY <caller order_by>` so the dedup applies first and the requested sort second. Then `LIMIT 100`.
+
+#### `query_rds_table` — read-only source SQL Server
+
+Input schema (verbatim — note `where_clause` is **required** here, unlike the local tool):
+
+```ts
+{
+  type: 'object',
+  properties: {
+    table:        { type: 'string',
+                    enum: ['dbo.IV','dbo.CS','dbo.CN','dbo.ARInvoice','dbo.ARPayment','dbo.ARPaymentKnockOff'] },
+    columns:      { type: 'array', items: { type: 'string' } },
+    where_clause: { type: 'string',
+                    description: "WHERE clause (without the WHERE keyword). Must include Cancelled = 'F' for applicable tables." },
+    params:       { type: 'array', items: { type: 'string' } },
+    order_by:     { type: 'string' },
+    limit:        { type: 'number', description: 'default 100, max 100' },
+  },
+  required: ['table', 'columns', 'where_clause'],
+}
+```
+
+Per-table column whitelist (`RDS_WHITELIST`, exact):
+
+| Table | Allowed columns |
+|---|---|
+| `dbo.IV` | DocNo, DocDate, DebtorCode, LocalNetTotal, Description, SalesAgent, SalesLocation, Cancelled |
+| `dbo.CS` | DocNo, DocDate, DebtorCode, LocalNetTotal, Description, SalesAgent, SalesLocation, Cancelled |
+| `dbo.CN` | DocNo, DocDate, DebtorCode, LocalNetTotal, Description, SalesAgent, CNType, Cancelled |
+| `dbo.ARInvoice` | DocNo, DocDate, DueDate, DebtorCode, LocalNetTotal, Outstanding, DisplayTerm, Cancelled |
+| `dbo.ARPayment` | DocNo, DocDate, DebtorCode, LocalPaymentAmt, Description, Cancelled |
+| `dbo.ARPaymentKnockOff` | DocKey, KnockOffDocKey, KnockOffAmt, KnockOffDate |
+
+**`Cancelled = 'F'` server-side injection.** Applies to the five document tables `dbo.IV, dbo.CS, dbo.CN, dbo.ARInvoice, dbo.ARPayment` — **not** to `dbo.ARPaymentKnockOff` (no `Cancelled` column). Detection regex: `/Cancelled\s*=\s*'F'/i`. Rewrite:
+
+```
+if table NOT in cancelled-set     → where unchanged
+if where already matches regex    → where unchanged
+if where empty/blank              → "Cancelled = 'F'"
+else                              → "(<where>) AND Cancelled = 'F'"
+```
+
+The model is **also** instructed in its `where_clause` description to include the filter, but server injection is the authoritative guarantee — prompt drift cannot leak a voided document.
+
+#### `params` placeholder convention (both tools)
+
+- `where_clause` uses Postgres-style `$1, $2, …, $N` placeholders.
+- `params: string[]` supplies values in positional order.
+- No application-side count check — driver under/over-supply errors are caught by `executeToolCall`'s try/catch and returned to the model as the string `Error executing query: <message>`.
+- The blocklist below screens nested SQL, comments, and DDL/DML regardless of placeholder use.
+
+#### WHERE / ORDER BY safety blocklist (`validateWhereClauseSafety`, applied to both clauses)
+
+Eighteen patterns. A hit returns the string *`WHERE clause rejected: contains disallowed token (<label>). Use only column comparisons with $1/$2 parameter placeholders.`* — never executed.
+
+| Pattern (case-insensitive where flagged) | Reported label |
+|---|---|
+| `;` | statement terminator (;) |
+| `--` | line comment (--) |
+| `/*` | block comment start (/*) |
+| `*/` | block comment end (*/) |
+| `\bUNION\b` | UNION |
+| `\bSELECT\b` | nested SELECT |
+| `\bINSERT\b` | INSERT |
+| `\bUPDATE\b` | UPDATE |
+| `\bDELETE\b` | DELETE |
+| `\bDROP\b` | DROP |
+| `\bTRUNCATE\b` | TRUNCATE |
+| `\bALTER\b` | ALTER |
+| `\bEXEC\b` | EXEC |
+| `\bEXECUTE\b` | EXECUTE |
+| `\bGRANT\b` | GRANT |
+| `\bREVOKE\b` | REVOKE |
+| `\bxp_\w+` | extended stored procedure (xp_*) |
+| `\bsp_\w+` | system stored procedure (sp_*) |
+
+#### Result formatting back to the model (`formatRowsAsTable`)
+
+Both executors serialise rows via the same helper. Exact shape:
+
+```
+<N> row(s) returned:
+
+| col1 | col2 | col3 |
+| --- | --- | --- |
+| v1 | v2 | v3 |
+…
+```
+
+Cell value transforms:
+
+- `null` / `undefined` → `-`
+- `Date` → `toISOString().slice(0, 10)` (YYYY-MM-DD)
+- `number` → `toLocaleString('en-MY')` (e.g. `1,234,567.89`)
+- everything else → `String(v)`
+
+Empty result: the executor returns the literal string `No rows returned.` (and `formatRowsAsTable` carries a `No data.` fallback for an empty rows array).
+
+#### `executeToolCall(toolName, input) → Promise<string>` — never throws
+
+```ts
+try {
+  if (toolName === 'query_local_table') return await executeLocalQuery(input);
+  if (toolName === 'query_rds_table')   return await executeRdsQuery(input);
+  return `Unknown tool: ${toolName}`;
+} catch (err) {
+  return `Error executing query: ${err instanceof Error ? err.message : String(err)}`;
+}
+```
+
+Per-executor pipeline: column whitelist check → `validateWhereClauseSafety(where_clause)` → `validateWhereClauseSafety(order_by)` → (RDS only) `ensureRdsCancelledFilter` → driver query → `formatRowsAsTable`. Every branch returns a string; the orchestrator routes whatever comes back into a `tool_result` block whose numbers are then whitelisted under all units for the current guard attempt (§5.3 step 4).
 
 ### 5.6 Summary parsing (`parseSummaryResponse`)
 

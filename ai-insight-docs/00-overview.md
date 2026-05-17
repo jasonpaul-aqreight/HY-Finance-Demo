@@ -136,8 +136,12 @@ Build order is the numeric order. Each document's verification checkpoint must p
 | 08 | Admin | Engine | Batch trigger/status surface + threshold config UI | 00, 05, 02 |
 | 09 | End-to-end walkthrough | Spine | A full verified run, trigger → rendered insight | 00–08 |
 | 10 | Adding a domain pack | Spine | A second domain on the same Engine, using Finance as the worked example | 00–09 |
+| 11 | Validation & tuning | Spine | Quality-acceptance gate, rubric, iteration procedure, three canonical tuning patterns | 00, 02, 04, 04a, 05, 08, 09 |
+| 12 | Finance domain config (Budget Setting + Variance KPI) | Domain Pack | Operator-edited budget table + KPI badge surface that feeds AI Insight's `financial_variance` section | 00, 01, 02, 04, 04a, 08 |
 
 **Dependency chain (critical path):** `00 → 01 → 02 → 03 → 04 → 05`, with `06 → 07` and `08` joining once `05`/`02` exist; `09` verifies the whole; `10` generalises it. `04a` (Prompt Catalog) is a reference companion to `04`: it hangs off `04` (assembly mechanism) and `02` (token values) and is read alongside `04`, not a separate critical-path step.
+
+`11` (Validation & tuning) and `12` (Finance domain config) are off-critical-path docs read **after** the engine is built. `11` is a quality contract — the rubric and iteration procedure used to decide whether a section is shippable; consult it once `09` runs end-to-end. `12` is a Domain Pack settings surface — the Budget Setting CRUD and Variance KPI badge feature that exists in this sandbox but is **not yet in production**; consult it when porting that feature.
 
 ## 7. The per-document template
 
