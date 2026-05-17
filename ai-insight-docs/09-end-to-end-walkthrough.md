@@ -144,7 +144,13 @@ None. This document sets no defaults; it only chooses values (table in §5.0) fo
 
 ## 7. Reference Implementation
 
-This document adds no source. It is realised as the **ordered execution of the steps in §5** against the implementations the prior documents cite (doc 01 schema/storage, doc 02 thresholds, doc 03 mock boundary, doc 04 pipeline, doc 05 conductor, doc 06 routes, doc 07 surfaces, doc 08 admin). The artifacts this walkthrough **produces** are: a populated engine datastore, one terminal batch-run record, and rendered captures of the present-state panel, the detail modal, the component dialog, the operator batch card, and the threshold-config dashboard, stored in `assets/`. The wireframes in doc 07 §3.1 and the per-step observable assertions in §5/§8 are the normative description; the captures are confirmation artifacts and the acceptance does not depend on them.
+This document adds no source. It is realised as the **ordered execution of the steps in §5** against the implementations the prior documents cite (doc 01 schema/storage, doc 02 thresholds, doc 03 mock boundary, doc 04 pipeline, doc 05 conductor, doc 06 routes, doc 07 surfaces, doc 08 admin). The artifacts this walkthrough **produces** are a populated engine datastore, one terminal batch-run record, and the following rendered captures on the reference stack (confirmation artifacts; the per-step assertions in §5/§8 are the normative description and the acceptance does not depend on these):
+
+- `assets/07-section-panel.png` — §5.5 step 10: the section's insight rendered to an end user (present state).
+- `assets/07-insight-detail-dialog.png` — §5.5 step 10: a card expanded to its full markdown narrative.
+- `assets/07-component-dialog.png` — §5.5 step 11: one component's analysis rendered.
+- `assets/08-batch-card.png` — §5.2 / §5.3: the operator batch card after a completed run (terminal status, counts, cost, tokens).
+- `assets/08-threshold-config.png` — §5.6: the threshold-config dashboard with the rendered prompt preview (what-you-configure-is-what-renders).
 
 To run it as a single offline pass: set the §5.0 environment, execute §5.1 (apply both SQL files), then §5.2–§5.5 (trigger, observe, read, render), then optionally §5.6–§5.7.
 

@@ -49,6 +49,8 @@ next-env.d.ts
 
 # ─── Screenshots (verification artifacts) ────────────────────────────────────
 *.png
+# Keep AI Insight documentation screenshots (referenced by docs 07/09)
+!ai-insight-docs/assets/*.png
 
 # ─── Serena / Claude agent state ─────────────────────────────────────────────
 .serena/

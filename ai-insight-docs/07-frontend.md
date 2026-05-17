@@ -272,7 +272,11 @@ const info = (!loading ? componentData?.componentInfo : null) ?? STATIC_FALLBACK
 const isSubtitle = onlyChildIsStrong && strongText.endsWith(':');
 ```
 
-Rendered reference screenshots of each state are kept in `assets/` and are reproduced by the doc 09 walkthrough on the live reference stack; the wireframes in §3.1 and the state matrix in §3.2 are the normative description and stand alone without them.
+Rendered reference captures on the reference stack (the wireframes in §3.1 and the state matrix in §3.2 are the normative description; these confirm them):
+
+- `assets/07-section-panel.png` — the panel *present* state: scope line, last-updated line, positive/negative cards (§5.2).
+- `assets/07-insight-detail-dialog.png` — a sentiment-coloured detail modal rendering one insight's markdown (§5.3).
+- `assets/07-component-dialog.png` — the branded component dialog titled by `componentInfo.name`, rendering `analysis_md` (§5.4).
 
 ## 8. Verification checkpoint
 
