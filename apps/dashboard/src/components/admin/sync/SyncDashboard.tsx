@@ -3,6 +3,7 @@
 import { SyncStatusCard } from './SyncStatusCard';
 import { SyncScheduleForm } from './SyncScheduleForm';
 import { SyncHistoryTable } from './SyncHistoryTable';
+import { AiInsightBatchCard } from './AiInsightBatchCard';
 
 export function SyncDashboard() {
   return (
@@ -12,6 +13,7 @@ export function SyncDashboard() {
         <div className="space-y-6">
           <SyncScheduleForm />
           <SyncStatusCard />
+          <AiInsightBatchCard />
         </div>
 
         {/* Right column: History full height */}
