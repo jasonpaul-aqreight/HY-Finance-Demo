@@ -1,6 +1,6 @@
 # AI Insight Production Handoff
 
-Use this as the entry point for the production developer implementing Finance AI Insight from `ai-insight-docs/`.
+Use this as the entry point for the production developer (human or AI agent) implementing Finance AI Insight from `ai-insight-docs/`.
 
 ## Readiness
 
@@ -9,6 +9,24 @@ The implementation-readiness audit is complete. `IMPLEMENTATION_READINESS_TRACKE
 Primary tracker:
 
 - `ai-insight-docs/IMPLEMENTATION_READINESS_TRACKER.md`
+
+## What to include in the implementer bundle
+
+**In scope (read these):**
+
+- `00`–`09` + `04a` — the engine spec (build sequence below).
+- `12-finance-domain-config.md` — Finance domain pack (Budget Setting + Variance KPI).
+- `11-validation-and-tuning.md` — model quality and numeric-trust acceptance.
+- `assets/` — reference screenshots (non-load-bearing confirmation artefacts, linked from `07`/`08`/`09`/`12` §7). The wireframes, state matrix, and per-step assertions in the docs are the normative spec; the images only confirm them.
+- `IMPLEMENTATION_READINESS_TRACKER.md` — open decisions and hardening list.
+
+**Available but optional:**
+
+- `10-adding-a-domain-pack.md` — Spine guide for putting a *second* domain on the unchanged engine (HR, etc.). Not needed to implement Finance; read only if you also need to add another pack. **See the HR Transfer Warning below before treating this as an HR implementation plan.**
+
+**Exclude (not specification):**
+
+- `_TEMPLATE.md` — empty 8-part scaffold used while writing the docs; not an implementation artefact.
 
 ## Build Order
 

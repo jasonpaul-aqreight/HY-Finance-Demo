@@ -1,3 +1,6 @@
+> ⚠️ **This file is a documentation-authoring scaffold, not a specification.**
+> Implementers (human or agent) building the AI Insight engine should **ignore this file** — it is the empty 8-part skeleton used when writing docs `01`–`10`. It contains no engine contract, no behavior, and no acceptance check. Excluded from any production / implementation bundle.
+
 # NN — {Layer name}
 
 > **Classification:** Engine | Domain Pack | Spine

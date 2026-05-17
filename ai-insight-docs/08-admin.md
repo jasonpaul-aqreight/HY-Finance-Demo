@@ -207,6 +207,11 @@ export async function POST(req) {
 }
 ```
 
+Rendered reference captures on the reference stack (the envelope contracts in §4.1 and the operator UI behavior in §5.4–5.5 are the normative description; these confirm them):
+
+- `assets/08-batch-card.png` — the operator batch card after a completed run: terminal status badge, completion time, runtime, `completed/total + failed`, actual cost/tokens (§5.4).
+- `assets/08-threshold-config.png` — the threshold-config dashboard: prompt tree + business-rule editor + rendered prompt preview with tokens substituted (§5.5).
+
 ## 8. Verification checkpoint
 
 **Setup (no source access):** implement the four routes and the two UI surfaces per §3–§6 over docs 05/01/02. Use the doc 03 mock so a triggered run completes offline. Have a Domain Pack with at least one component carrying configurable thresholds with a presentation and a min/max.
