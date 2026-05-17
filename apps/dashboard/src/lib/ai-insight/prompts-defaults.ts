@@ -293,7 +293,7 @@ Report: shape (skew), share below 10%, size of loss bucket, and whether shape ma
   // Customer Margin Section 2: Customer Margin Breakdown
   cm_top_customers: `"Top Customers" chart — two lists in the data:
 (A) Top 10 by Gross Profit (RM)
-(B) Top 10 by Margin % (filtered to ≥RM 10,000 revenue)
+(B) Top 10 by Margin % (filtered to ≥RM {{cm_top_customers.top_margin_revenue_floor_rm}} revenue)
 Cover both lenses.
 
 Thresholds:
@@ -301,7 +301,7 @@ Thresholds:
 - Top 10 > {{cm_top_customers.top_10_bad_pct}}% of total GP = Bad (concentrated portfolio)
 - Top 10 < {{cm_top_customers.top_10_good_pct}}% of total GP = Good (diversified)
 - Top-by-profit with margin <{{cm_top_customers.thin_margin_pct}}% = Flag (thin anchor)
-- Top-by-margin with revenue <RM 50K = niche premium (protect, not load-bearing)
+- Top-by-margin with revenue <RM {{cm_top_customers.niche_premium_revenue_rm}} = niche premium (protect, not load-bearing)
 
 Report:
 - RM anchors vs efficiency leaders, and any overlap
@@ -442,7 +442,7 @@ Thresholds:
 - {{sm_supplier_table.top_10_neutral_pct}}–{{sm_supplier_table.top_10_bad_pct}}% = Neutral (typical for distribution)
 - Loss-makers (margin <{{sm_supplier_table.loss_margin_pct}}) >0 = Always flag; name them
 - Thin-margin (<{{sm_supplier_table.thin_margin_pct}}%) >{{sm_supplier_table.thin_active_bad_pct}}% of active = Portfolio quality concern
-- Bottom-10 with revenue >RM 100K AND margin <{{sm_supplier_table.thin_margin_pct}}% = Critical
+- Bottom-10 with revenue >RM {{sm_supplier_table.critical_revenue_rm}} AND margin <{{sm_supplier_table.thin_margin_pct}}% = Critical
 
 Report: revenue concentration, whether bottom-margin tail is a few big offenders or long tail, supplier-type clustering in bottom 10, and any mismatch between biggest-revenue and best-margin suppliers (the actionable signal). Cite named suppliers.`,
 
@@ -470,7 +470,7 @@ Thresholds:
 - Top-50 item with margin <0 = Always flag (these move the P&L)
 - >{{sm_price_scatter.thin_universe_bad_pct}}% of universe in <5% bucket = Thin-margin catalog
 - >{{sm_price_scatter.premium_universe_good_pct}}% of universe in 20+ bucket = Premium pocket worth protecting
-- Top-50 item with margin <{{sm_price_scatter.loss_margin_pct}} AND revenue >RM 100K = Severe (fixing one moves the needle)
+- Top-50 item with margin <{{sm_price_scatter.loss_margin_pct}} AND revenue >RM {{sm_price_scatter.severe_revenue_rm}} = Severe (fixing one moves the needle)
 
 Report: bucket-distribution shape (left-skewed loss / centered thin / right-skewed premium / bimodal), price-spread outliers in top-50, named loss-making top-50 items with supplier names and RM revenue, and whether loss-makers cluster on same suppliers (structural quality issue) or are spread across many (item-level problem). Cite items by name.`,
 

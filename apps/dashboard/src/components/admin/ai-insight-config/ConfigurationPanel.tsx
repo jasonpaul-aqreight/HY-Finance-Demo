@@ -217,6 +217,7 @@ function segmentValue(
 function RangeSegment({
   segment,
   tokensByName,
+  settingsByToken,
   draft,
   validation,
   disabled,
@@ -225,6 +226,7 @@ function RangeSegment({
 }: {
   segment: ThresholdRangeSegmentView;
   tokensByName: Map<string, ThresholdTokenView>;
+  settingsByToken: Map<string, ThresholdBusinessSettingView>;
   draft: Record<string, string>;
   validation: ValidationState;
   disabled: boolean;
@@ -232,6 +234,7 @@ function RangeSegment({
   onChange: (token: ThresholdTokenView, value: string) => void;
 }) {
   const token = segment.token ? tokensByName.get(segment.token) : null;
+  const setting = token ? settingsByToken.get(token.token) : null;
 
   if (segment.editable && token) {
     const tokenError = validation.tokenErrors[token.token];
@@ -245,7 +248,7 @@ function RangeSegment({
         value={draft[token.token] ?? ''}
         onChange={(event) => onChange(token, event.target.value)}
         disabled={disabled || saving}
-        aria-label={token.label}
+        aria-label={setting?.validationLabel ?? setting?.displayLabel ?? token.label}
         aria-invalid={tokenError ? true : undefined}
         data-testid={`threshold-input-${token.token}`}
         className={`mx-1 inline-flex h-7 ${inputWidth(token)} rounded-lg border bg-background px-2 text-center font-semibold outline-none transition-colors focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-50 ${
@@ -263,6 +266,7 @@ function RangeSegment({
 function BusinessRangeTable({
   ranges,
   tokensByName,
+  settingsByToken,
   draft,
   validation,
   disabled,
@@ -271,6 +275,7 @@ function BusinessRangeTable({
 }: {
   ranges: ThresholdBusinessRangeView[];
   tokensByName: Map<string, ThresholdTokenView>;
+  settingsByToken: Map<string, ThresholdBusinessSettingView>;
   draft: Record<string, string>;
   validation: ValidationState;
   disabled: boolean;
@@ -291,6 +296,7 @@ function BusinessRangeTable({
                 key={`${range.label}-${index}`}
                 segment={segment}
                 tokensByName={tokensByName}
+                settingsByToken={settingsByToken}
                 draft={draft}
                 validation={validation}
                 disabled={disabled}
@@ -309,6 +315,7 @@ function BusinessRangeTable({
 function BusinessRuleCard({
   rule,
   tokensByName,
+  settingsByToken,
   draft,
   validation,
   disabled,
@@ -317,6 +324,7 @@ function BusinessRuleCard({
 }: {
   rule: ThresholdBusinessRuleView;
   tokensByName: Map<string, ThresholdTokenView>;
+  settingsByToken: Map<string, ThresholdBusinessSettingView>;
   draft: Record<string, string>;
   validation: ValidationState;
   disabled: boolean;
@@ -340,6 +348,7 @@ function BusinessRuleCard({
         <BusinessRangeTable
           ranges={rule.ranges}
           tokensByName={tokensByName}
+          settingsByToken={settingsByToken}
           draft={draft}
           validation={validation}
           disabled={disabled}
@@ -368,6 +377,7 @@ export function ConfigurationPanel({ prompt, isAdmin, role, onSaved }: Props) {
   const groups = useMemo(() => prompt?.thresholdGroups ?? [], [prompt]);
   const presentation = prompt?.thresholdPresentation ?? null;
   const tokensByName = useMemo(() => tokenMap(groups), [groups]);
+  const settingsByToken = useMemo(() => settingMap(presentation), [presentation]);
   const hasRuntimeConfig = prompt?.category === 'component' && groups.length > 0;
   const hasClientReadyConfig = hasRuntimeConfig && Boolean(presentation?.rules.length);
 
@@ -505,6 +515,7 @@ export function ConfigurationPanel({ prompt, isAdmin, role, onSaved }: Props) {
                 key={rule.id}
                 rule={rule}
                 tokensByName={tokensByName}
+                settingsByToken={settingsByToken}
                 draft={draft}
                 validation={validation}
                 disabled={!isAdmin}

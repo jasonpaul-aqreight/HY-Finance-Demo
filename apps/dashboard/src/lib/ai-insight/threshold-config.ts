@@ -662,33 +662,33 @@ export const THRESHOLD_PRESENTATION: Record<string, ThresholdComponentPresentati
         settings: [
           {
             token: 'good_days',
-            displayLabel: 'Good',
+            displayLabel: 'Good collection speed',
             sentencePrefix: '',
             sentenceSuffix: '',
-            validationLabel: 'good limit',
+            validationLabel: 'good collection speed limit',
           },
           {
             token: 'warning_days',
-            displayLabel: 'Warning',
+            displayLabel: 'Warning collection speed',
             sentencePrefix: '',
             sentenceSuffix: '',
-            validationLabel: 'warning limit',
+            validationLabel: 'warning collection speed limit',
           },
         ],
         ranges: [
           {
-            label: 'Good',
+            label: 'Good collection speed',
             segments: [{ text: '0' }, { text: '-' }, { token: 'good_days', editable: true }],
             unit: 'days',
           },
           {
-            label: 'Warning',
+            label: 'Warning collection speed',
             segments: [{ token: 'good_days', offset: 1 }, { text: '-' }, { token: 'warning_days', editable: true }],
             unit: 'days',
           },
           {
-            label: 'Critical',
-            segments: [{ token: 'warning_days' }, { text: '> above' }],
+            label: 'Critical collection delay',
+            segments: [{ text: 'Above' }, { token: 'warning_days' }],
             unit: 'days',
           },
         ],
@@ -697,7 +697,7 @@ export const THRESHOLD_PRESENTATION: Record<string, ThresholdComponentPresentati
             leftToken: 'good_days',
             relation: 'lessThan',
             rightToken: 'warning_days',
-            message: 'The warning limit must be higher than the good limit.',
+            message: 'The warning collection speed limit must be higher than the good collection speed limit.',
           },
         ],
       },
@@ -1742,6 +1742,20 @@ export const THRESHOLD_PRESENTATION: Record<string, ThresholdComponentPresentati
             sentenceSuffix: '',
             validationLabel: 'thin anchor margin limit',
           },
+          {
+            token: 'top_margin_revenue_floor_rm',
+            displayLabel: 'Top-margin revenue floor',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'top-margin revenue floor',
+          },
+          {
+            token: 'niche_premium_revenue_rm',
+            displayLabel: 'Niche premium ceiling',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'niche premium revenue ceiling',
+          },
         ],
         ranges: [
           {
@@ -1753,6 +1767,34 @@ export const THRESHOLD_PRESENTATION: Record<string, ThresholdComponentPresentati
             label: 'Acceptable anchor margin',
             segments: [{ text: 'Above' }, { token: 'thin_margin_pct' }],
             unit: '%',
+          },
+          {
+            label: 'Small-volume customer excluded from top-margin lens',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'top_margin_revenue_floor_rm', editable: true }],
+            unit: 'RM',
+          },
+          {
+            label: 'Eligible for top-margin lens',
+            segments: [{ text: 'Above' }, { token: 'top_margin_revenue_floor_rm' }],
+            unit: 'RM',
+          },
+          {
+            label: 'Niche premium account',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'niche_premium_revenue_rm', editable: true }],
+            unit: 'RM',
+          },
+          {
+            label: 'Load-bearing premium account',
+            segments: [{ text: 'Above' }, { token: 'niche_premium_revenue_rm' }],
+            unit: 'RM',
+          },
+        ],
+        validationConstraints: [
+          {
+            leftToken: 'top_margin_revenue_floor_rm',
+            relation: 'lessThan',
+            rightToken: 'niche_premium_revenue_rm',
+            message: 'The niche premium ceiling must be higher than the top-margin revenue floor.',
           },
         ],
       },
@@ -2485,6 +2527,13 @@ export const THRESHOLD_PRESENTATION: Record<string, ThresholdComponentPresentati
             sentenceSuffix: '',
             validationLabel: 'thin-margin active-supplier share limit',
           },
+          {
+            token: 'critical_revenue_rm',
+            displayLabel: 'Critical revenue trigger',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'critical supplier revenue trigger',
+          },
         ],
         ranges: [
           {
@@ -2514,8 +2563,8 @@ export const THRESHOLD_PRESENTATION: Record<string, ThresholdComponentPresentati
           },
           {
             label: 'Critical revenue trigger',
-            segments: [{ text: 'Above RM 100,000 revenue' }],
-            unit: '',
+            segments: [{ text: 'Above' }, { token: 'critical_revenue_rm', editable: true }],
+            unit: 'RM',
           },
         ],
         validationConstraints: [
@@ -2691,6 +2740,13 @@ export const THRESHOLD_PRESENTATION: Record<string, ThresholdComponentPresentati
             sentenceSuffix: '',
             validationLabel: 'severe loss-making margin limit',
           },
+          {
+            token: 'severe_revenue_rm',
+            displayLabel: 'Severe revenue trigger',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'severe item revenue trigger',
+          },
         ],
         ranges: [
           {
@@ -2700,8 +2756,8 @@ export const THRESHOLD_PRESENTATION: Record<string, ThresholdComponentPresentati
           },
           {
             label: 'Severe revenue threshold',
-            segments: [{ text: 'Above RM 100,000 revenue' }],
-            unit: '',
+            segments: [{ text: 'Above' }, { token: 'severe_revenue_rm', editable: true }],
+            unit: 'RM',
           },
         ],
       },
@@ -3296,7 +3352,7 @@ export const THRESHOLD_PRESENTATION: Record<string, ThresholdComponentPresentati
           },
           {
             label: 'Material',
-            segments: [{ token: 'material_pct' }, { text: '> above' }],
+            segments: [{ text: 'Above' }, { token: 'material_pct' }],
             unit: '%',
           },
         ],
@@ -3361,7 +3417,7 @@ export const THRESHOLD_PRESENTATION: Record<string, ThresholdComponentPresentati
           },
           {
             label: 'Strong',
-            segments: [{ token: 'healthy_below_ratio' }, { text: '> above' }],
+            segments: [{ text: 'Above' }, { token: 'healthy_below_ratio' }],
             unit: 'ratio',
           },
         ],
@@ -3400,7 +3456,7 @@ export const THRESHOLD_PRESENTATION: Record<string, ThresholdComponentPresentati
           },
           {
             label: 'Material',
-            segments: [{ token: 'current_ratio_drift_material_ratio' }, { text: '> above' }],
+            segments: [{ text: 'Above' }, { token: 'current_ratio_drift_material_ratio' }],
             unit: 'ratio',
           },
         ],
@@ -3457,7 +3513,7 @@ export const THRESHOLD_PRESENTATION: Record<string, ThresholdComponentPresentati
           },
           {
             label: 'Severe',
-            segments: [{ token: 'leveraged_below_ratio' }, { text: '> above' }],
+            segments: [{ text: 'Above' }, { token: 'leveraged_below_ratio' }],
             unit: 'ratio',
           },
         ],
@@ -3496,7 +3552,7 @@ export const THRESHOLD_PRESENTATION: Record<string, ThresholdComponentPresentati
           },
           {
             label: 'Material',
-            segments: [{ token: 'debt_to_equity_drift_material_ratio' }, { text: '> above' }],
+            segments: [{ text: 'Above' }, { token: 'debt_to_equity_drift_material_ratio' }],
             unit: 'ratio',
           },
         ],
@@ -3545,7 +3601,7 @@ export const THRESHOLD_PRESENTATION: Record<string, ThresholdComponentPresentati
           },
           {
             label: 'Strong',
-            segments: [{ token: 'healthy_below_pct' }, { text: '> above' }],
+            segments: [{ text: 'Above' }, { token: 'healthy_below_pct' }],
             unit: '%',
           },
         ],
@@ -3584,7 +3640,7 @@ export const THRESHOLD_PRESENTATION: Record<string, ThresholdComponentPresentati
           },
           {
             label: 'Material',
-            segments: [{ token: 'drift_material_pp' }, { text: '> above' }],
+            segments: [{ text: 'Above' }, { token: 'drift_material_pp' }],
             unit: 'pp',
           },
         ],
@@ -4225,7 +4281,7 @@ export const THRESHOLD_PRESENTATION: Record<string, ThresholdComponentPresentati
           },
           {
             label: 'Severe',
-            segments: [{ token: 'top_1_severe_pct' }, { text: '> above' }],
+            segments: [{ text: 'Above' }, { token: 'top_1_severe_pct' }],
             unit: '%',
           },
         ],
@@ -4274,7 +4330,7 @@ export const THRESHOLD_PRESENTATION: Record<string, ThresholdComponentPresentati
           },
           {
             label: 'Concentrated',
-            segments: [{ token: 'top_10_concentrated_pct' }, { text: '> above' }],
+            segments: [{ text: 'Above' }, { token: 'top_10_concentrated_pct' }],
             unit: '%',
           },
         ],

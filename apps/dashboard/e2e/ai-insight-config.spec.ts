@@ -976,6 +976,7 @@ test.describe('AI Insight Config after feedback removal', () => {
   test('customer margin chart metadata is business-readable and updates the prompt preview', async ({ page, request }) => {
     const originals = {
       cm_margin_distribution: await readThresholdValues(request, 'cm_margin_distribution'),
+      cm_top_customers: await readThresholdValues(request, 'cm_top_customers'),
     };
     const nextSubTenPct = originals.cm_margin_distribution.sub_10_bad_pct >= 100
       ? originals.cm_margin_distribution.sub_10_bad_pct - 1
@@ -996,6 +997,23 @@ test.describe('AI Insight Config after feedback removal', () => {
       await expect(configPanel).not.toContainText('sub_10_bad_pct');
       await expect(page.getByTestId('prompt-tree')).not.toContainText('Bad if sub-10% share above');
 
+      await selectPromptBySearch(page, 'Anchor account margin', 'cm_top_customers');
+      await expect(configPanel).toContainText('Top Customers: Profit Concentration and Anchor Quality Rules');
+      await expect(configPanel).toContainText('Anchor Account Margin Quality');
+      await expect(configPanel).toContainText('Small-volume customer excluded from top-margin lens');
+      await expect(configPanel).toContainText('Niche premium account');
+      await expect(page.getByTestId('threshold-input-top_margin_revenue_floor_rm')).toBeVisible();
+      await expect(page.getByTestId('threshold-input-niche_premium_revenue_rm')).toBeVisible();
+      await expect(page.getByLabel('top-margin revenue floor')).toBeVisible();
+      await expect(page.getByLabel('niche premium revenue ceiling')).toBeVisible();
+      await expect(configPanel).not.toContainText('niche_premium_revenue_rm');
+      await expect(page.getByTestId('prompt-text-body')).toContainText(
+        `filtered to ≥RM ${originals.cm_top_customers.top_margin_revenue_floor_rm} revenue`,
+      );
+      await expect(page.getByTestId('prompt-text-body')).toContainText(
+        `revenue <RM ${originals.cm_top_customers.niche_premium_revenue_rm} = niche premium`,
+      );
+
       await editPromptThreshold({
         page,
         request,
@@ -1009,6 +1027,7 @@ test.describe('AI Insight Config after feedback removal', () => {
       });
     } finally {
       await saveThresholdValues(request, 'cm_margin_distribution', originals.cm_margin_distribution);
+      await saveThresholdValues(request, 'cm_top_customers', originals.cm_top_customers);
     }
   });
 
@@ -1095,7 +1114,9 @@ test.describe('AI Insight Config after feedback removal', () => {
 
   test('supplier breakdown metadata is business-readable and updates the prompt preview', async ({ page, request }) => {
     const originals = {
+      sm_supplier_table: await readThresholdValues(request, 'sm_supplier_table'),
       sm_item_pricing: await readThresholdValues(request, 'sm_item_pricing'),
+      sm_price_scatter: await readThresholdValues(request, 'sm_price_scatter'),
     };
     const nextSpreadPp = originals.sm_item_pricing.arbitrage_spread_pp >= 100
       ? originals.sm_item_pricing.arbitrage_spread_pp - 1
@@ -1123,6 +1144,10 @@ test.describe('AI Insight Config after feedback removal', () => {
       await expect(configPanel).toContainText('Top 10 Supplier Revenue Share');
       await expect(configPanel).toContainText('Supplier Margin Quality');
       await expect(configPanel).toContainText('Critical revenue trigger');
+      await expect(page.getByTestId('threshold-input-critical_revenue_rm')).toBeVisible();
+      await expect(page.getByTestId('prompt-text-body')).toContainText(
+        `Bottom-10 with revenue >RM ${originals.sm_supplier_table.critical_revenue_rm}`,
+      );
       await expect(configPanel).not.toContainText('Revenue concentration');
       await expect(configPanel).not.toContainText('Neutral lower bound');
       await expect(configPanel).not.toContainText('critical_revenue_rm');
@@ -1132,6 +1157,11 @@ test.describe('AI Insight Config after feedback removal', () => {
       await expect(configPanel).toContainText('Purchase vs Selling Price: Catalog Margin Rules');
       await expect(configPanel).toContainText('Catalog Margin Shape');
       await expect(configPanel).toContainText('Controlled thin-margin catalog');
+      await expect(configPanel).toContainText('Severe revenue threshold');
+      await expect(page.getByTestId('threshold-input-severe_revenue_rm')).toBeVisible();
+      await expect(page.getByTestId('prompt-text-body')).toContainText(
+        `revenue >RM ${originals.sm_price_scatter.severe_revenue_rm} = Severe`,
+      );
       await expect(configPanel).not.toContainText('Catalog quality');
       await expect(configPanel).not.toContainText('Thin-margin universe share above');
       await expect(configPanel).not.toContainText('thin_universe_bad_pct');
