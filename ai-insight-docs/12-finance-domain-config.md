@@ -389,6 +389,11 @@ Source paths are evidence; the spec above is what binds.
 
 **Sandbox-only commit:** `a0cbab3` (2026-05-16) — *"feat(financials): polarity-aware KPI cards + Budget Setting Dialog rework"*. Production deployment requires applying `migrations/023_budget_global.sql` and porting the components above.
 
+Rendered reference captures on the reference stack (the wireframes/contracts in §5.1 and §5.4–§5.6 are the normative description; these confirm them):
+
+- `assets/12-financial-kpi-cards.png` — the four-card KPI band on the Financial page: **Net Sales** RM 81,520,186 / "On Budget" (emerald pill), **Cost of Sales** RM 75,888,549 / "On Budget" (variance within tolerance — emerald pill, but the cost-line Variance % / Last Year render **red** because `higherIsBetter=false` makes upward unfavourable), **Gross Profit** RM 5,631,637 derived (no badge, no comparison rows, subtitle "Sales − Cost of Sales"), **Operating Costs** RM 9,050,916 / "Over Budget" (red pill, Variance +29.3%, Last Year +38.0%). Confirms §5.4, §5.5, §5.6.
+- `assets/12-budget-setting-dialog.png` — the Budget Setting modal in its admin-edit state: three editable line rows (Net Sales 78,500,000 / 5%; Cost of Sales 72,300,000 / 5%; Operating Costs 7,000,000 / 5%), `Annual Budget` + `Tolerance (%)` columns, free-text Note with a live `9 / 50 words` counter, `Last updated by Analyst (Mary) on 5/16/2026, 2:29:57 PM` footer, Save button bottom-right. Confirms §5.1, §5.3.
+
 ## 8. Verification checkpoint
 
 **Setup.** Apply doc 01's schema and `migrations/023_budget_global.sql`. Confirm `budget_global` contains the four canonical line items at sensible seed values (e.g. NS 78500000, CO 72300000, EP 7000000, OI 0; tolerance 5%). Build the engine per docs 01–08 so an AI Insight batch can run.
