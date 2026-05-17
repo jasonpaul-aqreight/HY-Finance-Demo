@@ -3591,6 +3591,599 @@ export const THRESHOLD_PRESENTATION: Record<string, ThresholdComponentPresentati
       },
     ],
   },
+  ex_total_costs: {
+    title: 'Total Costs: Cost Growth and Mix Rules',
+    description: '',
+    appliesToPromptLabel: 'Total Costs',
+    searchAliases: ['Total cost growth', 'Cost of Sales mix', 'Operating Costs mix', 'Expenses KPI'],
+    rules: [
+      {
+        id: 'total_cost_growth',
+        title: 'Total Cost Growth',
+        settings: [
+          {
+            token: 'healthy_below_pct',
+            displayLabel: 'Healthy movement',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'healthy movement limit',
+          },
+          {
+            token: 'watch_pct',
+            displayLabel: 'Watch',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'watch limit',
+          },
+          {
+            token: 'concern_pct',
+            displayLabel: 'Concern',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'concern limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Healthy cost movement',
+            segments: [{ text: '-100' }, { text: '-' }, { token: 'healthy_below_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Watch',
+            segments: [{ token: 'healthy_below_pct' }, { text: '-' }, { token: 'watch_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Concern',
+            segments: [{ token: 'watch_pct' }, { text: '-' }, { token: 'concern_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Severe cost growth',
+            segments: [{ text: 'Above' }, { token: 'concern_pct' }],
+            unit: '%',
+          },
+        ],
+        validationConstraints: [
+          {
+            leftToken: 'healthy_below_pct',
+            relation: 'lessThan',
+            rightToken: 'watch_pct',
+            message: 'The watch limit must be higher than the healthy movement limit.',
+          },
+          {
+            leftToken: 'watch_pct',
+            relation: 'lessThan',
+            rightToken: 'concern_pct',
+            message: 'The concern limit must be higher than the watch limit.',
+          },
+        ],
+      },
+      {
+        id: 'cost_sales_mix',
+        title: 'Cost of Sales Mix',
+        settings: [
+          {
+            token: 'opex_dominated_pct',
+            displayLabel: 'Operating-cost-dominated',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'operating-cost-dominated limit',
+          },
+          {
+            token: 'cogs_typical_min_pct',
+            displayLabel: 'Typical lower bound',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'normal Cost of Sales lower limit',
+          },
+          {
+            token: 'cogs_typical_max_pct',
+            displayLabel: 'Typical upper bound',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'normal Cost of Sales upper limit',
+          },
+          {
+            token: 'cogs_dominated_pct',
+            displayLabel: 'Cost-of-sales-dominated',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'Cost of Sales dominance limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Operating-cost-dominated base',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'opex_dominated_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Mixed cost base',
+            segments: [{ token: 'opex_dominated_pct' }, { text: '-' }, { token: 'cogs_typical_min_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Normal Cost of Sales mix',
+            segments: [
+              { token: 'cogs_typical_min_pct' },
+              { text: '-' },
+              { token: 'cogs_typical_max_pct', editable: true },
+            ],
+            unit: '%',
+          },
+          {
+            label: 'Elevated Cost of Sales share',
+            segments: [{ token: 'cogs_typical_max_pct' }, { text: '-' }, { token: 'cogs_dominated_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Cost-of-sales-dominated risk',
+            segments: [{ text: 'Above' }, { token: 'cogs_dominated_pct' }],
+            unit: '%',
+          },
+        ],
+        validationConstraints: [
+          {
+            leftToken: 'opex_dominated_pct',
+            relation: 'lessThan',
+            rightToken: 'cogs_typical_min_pct',
+            message: 'The normal Cost of Sales lower limit must be higher than the operating-cost-dominated limit.',
+          },
+          {
+            leftToken: 'cogs_typical_min_pct',
+            relation: 'lessThan',
+            rightToken: 'cogs_typical_max_pct',
+            message: 'The normal Cost of Sales upper limit must be higher than the lower limit.',
+          },
+          {
+            leftToken: 'cogs_typical_max_pct',
+            relation: 'lessThan',
+            rightToken: 'cogs_dominated_pct',
+            message: 'The Cost of Sales dominance limit must be higher than the normal upper limit.',
+          },
+        ],
+      },
+    ],
+  },
+  ex_cogs: {
+    title: 'Cost of Sales: Cost Share and Growth Rules',
+    description: '',
+    appliesToPromptLabel: 'Cost of Sales',
+    searchAliases: ['Cost of Sales benchmark', 'COGS share', 'Cost of Sales growth', 'Expenses KPI'],
+    rules: [
+      {
+        id: 'cost_sales_share',
+        title: 'Cost of Sales Share of Total Costs',
+        settings: [
+          {
+            token: 'typical_min_pct',
+            displayLabel: 'Typical lower bound',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'typical Cost of Sales lower limit',
+          },
+          {
+            token: 'typical_max_pct',
+            displayLabel: 'Typical upper bound',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'typical Cost of Sales upper limit',
+          },
+          {
+            token: 'margin_pressure_pct',
+            displayLabel: 'Margin-pressure risk',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'margin-pressure limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Low Cost of Sales share',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'typical_min_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Typical Cost of Sales share',
+            segments: [{ token: 'typical_min_pct' }, { text: '-' }, { token: 'typical_max_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Elevated Cost of Sales share',
+            segments: [{ token: 'typical_max_pct' }, { text: '-' }, { token: 'margin_pressure_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Margin-pressure risk',
+            segments: [{ text: 'Above' }, { token: 'margin_pressure_pct' }],
+            unit: '%',
+          },
+        ],
+        validationConstraints: [
+          {
+            leftToken: 'typical_min_pct',
+            relation: 'lessThan',
+            rightToken: 'typical_max_pct',
+            message: 'The typical Cost of Sales upper limit must be higher than the lower limit.',
+          },
+          {
+            leftToken: 'typical_max_pct',
+            relation: 'lessThan',
+            rightToken: 'margin_pressure_pct',
+            message: 'The margin-pressure limit must be higher than the typical Cost of Sales upper limit.',
+          },
+        ],
+      },
+      {
+        id: 'cost_sales_growth',
+        title: 'Cost of Sales Growth vs Sales',
+        settings: [
+          {
+            token: 'concern_pct',
+            displayLabel: 'Concern trigger',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'Cost of Sales growth concern limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Normal when sales also grew',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'concern_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Review if sales are flat or declining',
+            segments: [{ text: 'Above' }, { token: 'concern_pct' }],
+            unit: '%',
+          },
+        ],
+      },
+    ],
+  },
+  ex_opex: {
+    title: 'Operating Costs: Structural Cost Rules',
+    description: '',
+    appliesToPromptLabel: 'Operating Costs',
+    searchAliases: ['Operating cost growth', 'Operating cost share', 'OpEx growth', 'Expenses KPI'],
+    rules: [
+      {
+        id: 'operating_cost_growth',
+        title: 'Operating Cost Growth Discipline',
+        settings: [
+          {
+            token: 'healthy_below_pct',
+            displayLabel: 'Healthy movement',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'healthy movement limit',
+          },
+          {
+            token: 'concern_pct',
+            displayLabel: 'Concern',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'concern limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Healthy cost discipline',
+            segments: [{ text: '-100' }, { text: '-' }, { token: 'healthy_below_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Watch',
+            segments: [{ token: 'healthy_below_pct' }, { text: '-' }, { token: 'concern_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Concern',
+            segments: [{ text: 'Above' }, { token: 'concern_pct' }],
+            unit: '%',
+          },
+        ],
+        validationConstraints: [
+          {
+            leftToken: 'healthy_below_pct',
+            relation: 'lessThan',
+            rightToken: 'concern_pct',
+            message: 'The concern limit must be higher than the healthy movement limit.',
+          },
+        ],
+      },
+      {
+        id: 'operating_cost_share',
+        title: 'Operating Costs Share of Total Costs',
+        settings: [
+          {
+            token: 'opex_dominated_pct',
+            displayLabel: 'Operating-cost-dominated',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'operating-cost-dominated limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Balanced or Cost-of-Sales-led base',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'opex_dominated_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Operating-cost-dominated base',
+            segments: [{ text: 'Above' }, { token: 'opex_dominated_pct' }],
+            unit: '%',
+          },
+        ],
+      },
+    ],
+  },
+  ex_yoy_costs: {
+    title: 'vs Last Year: Total Cost Growth Rules',
+    description: '',
+    appliesToPromptLabel: 'vs Last Year',
+    searchAliases: ['Expense YoY', 'Cost movement vs last year', 'Total cost growth', 'Expenses KPI'],
+    rules: [
+      {
+        id: 'total_cost_yoy_movement',
+        title: 'Total Cost YoY Movement',
+        settings: [
+          {
+            token: 'healthy_below_pct',
+            displayLabel: 'Healthy movement',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'healthy movement limit',
+          },
+          {
+            token: 'watch_pct',
+            displayLabel: 'Watch',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'watch limit',
+          },
+          {
+            token: 'concern_pct',
+            displayLabel: 'Concern',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'concern limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Healthy cost movement',
+            segments: [{ text: '-100' }, { text: '-' }, { token: 'healthy_below_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Watch',
+            segments: [{ token: 'healthy_below_pct' }, { text: '-' }, { token: 'watch_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Concern',
+            segments: [{ token: 'watch_pct' }, { text: '-' }, { token: 'concern_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Severe cost growth',
+            segments: [{ text: 'Above' }, { token: 'concern_pct' }],
+            unit: '%',
+          },
+        ],
+        validationConstraints: [
+          {
+            leftToken: 'healthy_below_pct',
+            relation: 'lessThan',
+            rightToken: 'watch_pct',
+            message: 'The watch limit must be higher than the healthy movement limit.',
+          },
+          {
+            leftToken: 'watch_pct',
+            relation: 'lessThan',
+            rightToken: 'concern_pct',
+            message: 'The concern limit must be higher than the watch limit.',
+          },
+        ],
+      },
+    ],
+  },
+  ex_cost_trend: {
+    title: 'Cost Trend: Monthly and Prior-Year Growth Rules',
+    description: '',
+    appliesToPromptLabel: 'Cost Trend',
+    searchAliases: ['Cost trend chart', 'Monthly cost growth', 'Period YoY cost growth', 'Expenses chart'],
+    rules: [
+      {
+        id: 'monthly_cost_growth',
+        title: 'Monthly Cost Growth',
+        settings: [
+          {
+            token: 'mom_concern_pct',
+            displayLabel: 'Concern',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'monthly concern limit',
+          },
+          {
+            token: 'mom_severe_pct',
+            displayLabel: 'Severe',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'monthly severe limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Stable monthly cost movement',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'mom_concern_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Concern monthly cost increase',
+            segments: [{ token: 'mom_concern_pct' }, { text: '-' }, { token: 'mom_severe_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Severe monthly cost increase',
+            segments: [{ text: 'Above' }, { token: 'mom_severe_pct' }],
+            unit: '%',
+          },
+        ],
+        validationConstraints: [
+          {
+            leftToken: 'mom_concern_pct',
+            relation: 'lessThan',
+            rightToken: 'mom_severe_pct',
+            message: 'The monthly severe limit must be higher than the concern limit.',
+          },
+        ],
+      },
+      {
+        id: 'period_yoy_growth',
+        title: 'Period vs Last Year Growth',
+        settings: [
+          {
+            token: 'period_yoy_severe_pct',
+            displayLabel: 'Severe',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'prior-year severe limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Normal prior-year movement',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'period_yoy_severe_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Severe prior-year increase',
+            segments: [{ text: 'Above' }, { token: 'period_yoy_severe_pct' }],
+            unit: '%',
+          },
+        ],
+      },
+    ],
+  },
+  ex_cost_composition: {
+    title: 'Cost Composition: Cost Mix and Drift Rules',
+    description: '',
+    appliesToPromptLabel: 'Cost Composition',
+    searchAliases: ['Cost composition chart', 'Cost of Sales share', 'Cost of Sales share drift', 'COGS share drift', 'Expenses chart'],
+    rules: [
+      {
+        id: 'cost_sales_share',
+        title: 'Cost of Sales Share of Total Costs',
+        settings: [
+          {
+            token: 'opex_dominated_pct',
+            displayLabel: 'Operating-cost-dominated',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'operating-cost-dominated limit',
+          },
+          {
+            token: 'typical_min_pct',
+            displayLabel: 'Typical lower bound',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'typical Cost of Sales lower limit',
+          },
+          {
+            token: 'typical_max_pct',
+            displayLabel: 'Typical upper bound',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'typical Cost of Sales upper limit',
+          },
+          {
+            token: 'cogs_dominated_pct',
+            displayLabel: 'Cost-of-sales-dominated',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'Cost-of-sales-dominated limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Operating-cost-dominated mix',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'opex_dominated_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Mixed cost base',
+            segments: [{ token: 'opex_dominated_pct' }, { text: '-' }, { token: 'typical_min_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Typical fruit-distribution mix',
+            segments: [{ token: 'typical_min_pct' }, { text: '-' }, { token: 'typical_max_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Elevated Cost of Sales share',
+            segments: [{ token: 'typical_max_pct' }, { text: '-' }, { token: 'cogs_dominated_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Cost-of-sales-dominated margin pressure',
+            segments: [{ text: 'Above' }, { token: 'cogs_dominated_pct' }],
+            unit: '%',
+          },
+        ],
+        validationConstraints: [
+          {
+            leftToken: 'opex_dominated_pct',
+            relation: 'lessThan',
+            rightToken: 'typical_min_pct',
+            message: 'The typical Cost of Sales lower limit must be higher than the operating-cost-dominated limit.',
+          },
+          {
+            leftToken: 'typical_min_pct',
+            relation: 'lessThan',
+            rightToken: 'typical_max_pct',
+            message: 'The typical Cost of Sales upper limit must be higher than the lower limit.',
+          },
+          {
+            leftToken: 'typical_max_pct',
+            relation: 'lessThan',
+            rightToken: 'cogs_dominated_pct',
+            message: 'The Cost-of-sales-dominated limit must be higher than the typical Cost of Sales upper limit.',
+          },
+        ],
+      },
+      {
+        id: 'cost_sales_share_drift',
+        title: 'Cost of Sales Share Drift',
+        settings: [
+          {
+            token: 'material_drift_pp',
+            displayLabel: 'Material drift',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'material drift limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Normal mix movement',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'material_drift_pp', editable: true }],
+            unit: 'pp',
+          },
+          {
+            label: 'Material drift in either direction',
+            segments: [{ text: 'Above' }, { token: 'material_drift_pp' }],
+            unit: 'pp',
+          },
+        ],
+      },
+    ],
+  },
   ex_top_expenses: {
     title: 'Top Expenses: Cost Concentration Rules',
     description: '',
@@ -3691,6 +4284,296 @@ export const THRESHOLD_PRESENTATION: Record<string, ThresholdComponentPresentati
             relation: 'greaterThan',
             rightToken: 'top_10_diversified_pct',
             message: 'The concentrated limit must be higher than the diversified limit.',
+          },
+        ],
+      },
+    ],
+  },
+  ex_cogs_table: {
+    title: 'Cost of Sales Breakdown: Account Concentration Rules',
+    description: '',
+    appliesToPromptLabel: 'Cost of Sales Breakdown',
+    searchAliases: [
+      'COGS breakdown',
+      'Largest COGS account',
+      'Top-three COGS accounts',
+      'Thin COGS surface',
+      'Expenses table',
+    ],
+    rules: [
+      {
+        id: 'largest_cogs_account_share',
+        title: 'Largest COGS Account Share',
+        settings: [
+          {
+            token: 'top_1_severe_pct',
+            displayLabel: 'Severe single-account exposure',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'severe single-account limit',
+          },
+          {
+            token: 'top_1_concentrated_pct',
+            displayLabel: 'Concentrated account exposure',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'concentrated account limit',
+          },
+          {
+            token: 'top_1_diversified_pct',
+            displayLabel: 'Diversified account base',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'diversified account limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Diversified account base',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'top_1_diversified_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Moderate account concentration',
+            segments: [
+              { token: 'top_1_diversified_pct', offset: 1 },
+              { text: '-' },
+              { token: 'top_1_concentrated_pct', editable: true },
+            ],
+            unit: '%',
+          },
+          {
+            label: 'Concentrated account exposure',
+            segments: [{ token: 'top_1_concentrated_pct' }, { text: '-' }, { token: 'top_1_severe_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Severe single-account exposure',
+            segments: [{ text: 'Above' }, { token: 'top_1_severe_pct' }],
+            unit: '%',
+          },
+        ],
+        validationConstraints: [
+          {
+            leftToken: 'top_1_severe_pct',
+            relation: 'greaterThan',
+            rightToken: 'top_1_concentrated_pct',
+            message: 'The severe single-account limit must be higher than the concentrated account limit.',
+          },
+          {
+            leftToken: 'top_1_concentrated_pct',
+            relation: 'greaterThan',
+            rightToken: 'top_1_diversified_pct',
+            message: 'The concentrated account limit must be higher than the diversified account limit.',
+          },
+        ],
+      },
+      {
+        id: 'top_three_cogs_accounts',
+        title: 'Top-Three COGS Account Share',
+        settings: [
+          {
+            token: 'top_3_concentrated_pct',
+            displayLabel: 'Concentrated top-three exposure',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'top-three concentrated limit',
+          },
+          {
+            token: 'top_3_diversified_pct',
+            displayLabel: 'Diversified top-three base',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'top-three diversified limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Diversified top-three base',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'top_3_diversified_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Moderate top-three concentration',
+            segments: [
+              { token: 'top_3_diversified_pct', offset: 1 },
+              { text: '-' },
+              { token: 'top_3_concentrated_pct', editable: true },
+            ],
+            unit: '%',
+          },
+          {
+            label: 'Concentrated top-three exposure',
+            segments: [{ text: 'Above' }, { token: 'top_3_concentrated_pct' }],
+            unit: '%',
+          },
+        ],
+        validationConstraints: [
+          {
+            leftToken: 'top_3_concentrated_pct',
+            relation: 'greaterThan',
+            rightToken: 'top_3_diversified_pct',
+            message: 'The top-three concentrated limit must be higher than the diversified limit.',
+          },
+        ],
+      },
+      {
+        id: 'cogs_account_surface',
+        title: 'COGS Account Surface',
+        settings: [
+          {
+            token: 'thin_account_count',
+            displayLabel: 'Thin account surface',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'thin account surface limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Thin surface',
+            segments: [{ text: 'Fewer than' }, { token: 'thin_account_count', editable: true }, { text: 'accounts' }],
+            unit: '',
+          },
+          {
+            label: 'Normal surface',
+            segments: [{ text: 'At least' }, { token: 'thin_account_count' }, { text: 'accounts' }],
+            unit: '',
+          },
+        ],
+      },
+    ],
+  },
+  ex_opex_table: {
+    title: 'Operating Costs Breakdown: Category and Account Concentration Rules',
+    description: '',
+    appliesToPromptLabel: 'Operating Costs Breakdown',
+    searchAliases: [
+      'OpEx breakdown',
+      'Operating cost categories',
+      'Category concentration',
+      'Single-account OpEx risk',
+      'Expenses table',
+    ],
+    rules: [
+      {
+        id: 'opex_category_concentration',
+        title: 'Operating Cost Category Share',
+        settings: [
+          {
+            token: 'top_category_dominant_pct',
+            displayLabel: 'Dominant category concentration',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'dominant category limit',
+          },
+          {
+            token: 'top_category_typical_pct',
+            displayLabel: 'Typical category dominance',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'typical category limit',
+          },
+          {
+            token: 'top_category_diversified_pct',
+            displayLabel: 'Diversified category base',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'diversified category limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Diversified category spread',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'top_category_diversified_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Moderate category concentration',
+            segments: [
+              { token: 'top_category_diversified_pct', offset: 1 },
+              { text: '-' },
+              { token: 'top_category_typical_pct', editable: true },
+            ],
+            unit: '%',
+          },
+          {
+            label: 'Typical category dominance',
+            segments: [
+              { token: 'top_category_typical_pct' },
+              { text: '-' },
+              { token: 'top_category_dominant_pct', editable: true },
+            ],
+            unit: '%',
+          },
+          {
+            label: 'Dominant cost center',
+            segments: [{ text: 'Above' }, { token: 'top_category_dominant_pct' }],
+            unit: '%',
+          },
+        ],
+        validationConstraints: [
+          {
+            leftToken: 'top_category_dominant_pct',
+            relation: 'greaterThan',
+            rightToken: 'top_category_typical_pct',
+            message: 'The dominant category limit must be higher than the typical category limit.',
+          },
+          {
+            leftToken: 'top_category_typical_pct',
+            relation: 'greaterThan',
+            rightToken: 'top_category_diversified_pct',
+            message: 'The typical category limit must be higher than the diversified category limit.',
+          },
+        ],
+      },
+      {
+        id: 'opex_account_concentration',
+        title: 'Operating Cost Account Share',
+        settings: [
+          {
+            token: 'top_1_account_risk_pct',
+            displayLabel: 'Single-account OpEx risk',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'single-account risk limit',
+          },
+          {
+            token: 'top_3_accounts_concentrated_pct',
+            displayLabel: 'Top-three account concentration',
+            sentencePrefix: '',
+            sentenceSuffix: '',
+            validationLabel: 'top-three account limit',
+          },
+        ],
+        ranges: [
+          {
+            label: 'Normal single-account exposure',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'top_1_account_risk_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Single-account risk',
+            segments: [{ text: 'Above' }, { token: 'top_1_account_risk_pct' }],
+            unit: '%',
+          },
+          {
+            label: 'Normal top-three account spread',
+            segments: [{ text: '0' }, { text: '-' }, { token: 'top_3_accounts_concentrated_pct', editable: true }],
+            unit: '%',
+          },
+          {
+            label: 'Concentrated top-three account exposure',
+            segments: [{ text: 'Above' }, { token: 'top_3_accounts_concentrated_pct' }],
+            unit: '%',
+          },
+        ],
+        validationConstraints: [
+          {
+            leftToken: 'top_1_account_risk_pct',
+            relation: 'lessThan',
+            rightToken: 'top_3_accounts_concentrated_pct',
+            message: 'The top-three account limit must be higher than the single-account risk limit.',
           },
         ],
       },

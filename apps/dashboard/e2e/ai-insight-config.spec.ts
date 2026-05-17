@@ -185,6 +185,41 @@ test.describe('AI Insight Config after feedback removal', () => {
       ru_debtors_table: 'Customer Returns: Debtor Concentration Rules',
     });
 
+    const expensesKpiTitles = Object.fromEntries(
+      ['ex_total_costs', 'ex_cogs', 'ex_opex', 'ex_yoy_costs'].map((key) => {
+        const prompt = body.prompts.find((candidate) => candidate.promptKey === key);
+        return [key, prompt?.thresholdPresentation?.title];
+      }),
+    );
+    expect(expensesKpiTitles).toEqual({
+      ex_total_costs: 'Total Costs: Cost Growth and Mix Rules',
+      ex_cogs: 'Cost of Sales: Cost Share and Growth Rules',
+      ex_opex: 'Operating Costs: Structural Cost Rules',
+      ex_yoy_costs: 'vs Last Year: Total Cost Growth Rules',
+    });
+
+    const expensesChartTitles = Object.fromEntries(
+      ['ex_cost_trend', 'ex_cost_composition'].map((key) => {
+        const prompt = body.prompts.find((candidate) => candidate.promptKey === key);
+        return [key, prompt?.thresholdPresentation?.title];
+      }),
+    );
+    expect(expensesChartTitles).toEqual({
+      ex_cost_trend: 'Cost Trend: Monthly and Prior-Year Growth Rules',
+      ex_cost_composition: 'Cost Composition: Cost Mix and Drift Rules',
+    });
+
+    const expensesTableTitles = Object.fromEntries(
+      ['ex_cogs_table', 'ex_opex_table'].map((key) => {
+        const prompt = body.prompts.find((candidate) => candidate.promptKey === key);
+        return [key, prompt?.thresholdPresentation?.title];
+      }),
+    );
+    expect(expensesTableTitles).toEqual({
+      ex_cogs_table: 'Cost of Sales Breakdown: Account Concentration Rules',
+      ex_opex_table: 'Operating Costs Breakdown: Category and Account Concentration Rules',
+    });
+
     const customerMarginKpiTitles = Object.fromEntries(
       ['cm_net_sales', 'cm_cogs', 'cm_margin_pct', 'cm_margin_trend'].map((key) => {
         const prompt = body.prompts.find((candidate) => candidate.promptKey === key);
@@ -464,6 +499,234 @@ test.describe('AI Insight Config after feedback removal', () => {
       });
     } finally {
       await saveThresholdValues(request, 'rt_product_bar', originals.rt_product_bar);
+    }
+  });
+
+  test('expenses KPI metadata is business-readable and updates the prompt preview', async ({ page, request }) => {
+    const originals = {
+      ex_cogs: await readThresholdValues(request, 'ex_cogs'),
+    };
+    const nextCogsConcernPct = originals.ex_cogs.concern_pct >= 100
+      ? originals.ex_cogs.concern_pct - 1
+      : originals.ex_cogs.concern_pct + 1;
+
+    await setAdminRole(page);
+    await openAdminConfig(page);
+
+    try {
+      await selectPromptBySearch(page, 'Total cost growth', 'ex_total_costs');
+      let configPanel = page.getByTestId('configuration-panel');
+      await expect(configPanel).toContainText('Total Costs: Cost Growth and Mix Rules');
+      await expect(configPanel).toContainText('Total Cost Growth');
+      await expect(configPanel).toContainText('Cost of Sales Mix');
+      await expect(configPanel).toContainText('Operating-cost-dominated base');
+      await expect(configPanel).not.toContainText('Cost YoY band');
+      await expect(configPanel).not.toContainText('COGS typical minimum');
+      await expect(configPanel).not.toContainText('cogs_typical_min_pct');
+      await expect(page.getByTestId('prompt-tree')).not.toContainText('Cost YoY band');
+
+      await selectPromptBySearch(page, 'Cost of Sales benchmark', 'ex_cogs');
+      configPanel = page.getByTestId('configuration-panel');
+      await expect(configPanel).toContainText('Cost of Sales: Cost Share and Growth Rules');
+      await expect(configPanel).toContainText('Cost of Sales Share of Total Costs');
+      await expect(configPanel).toContainText('Cost of Sales Growth vs Sales');
+      await expect(configPanel).toContainText('Review if sales are flat or declining');
+      await expect(configPanel).not.toContainText('Margin pressure above');
+      await expect(configPanel).not.toContainText('Concern above with flat sales');
+      await expect(configPanel).not.toContainText('typical_min_pct');
+      await expect(page.getByTestId('prompt-tree')).not.toContainText('Margin pressure above');
+
+      await selectPromptBySearch(page, 'Operating cost share', 'ex_opex');
+      configPanel = page.getByTestId('configuration-panel');
+      await expect(configPanel).toContainText('Operating Costs: Structural Cost Rules');
+      await expect(configPanel).toContainText('Operating Cost Growth Discipline');
+      await expect(configPanel).toContainText('Operating Costs Share of Total Costs');
+      await expect(configPanel).toContainText('Balanced or Cost-of-Sales-led base');
+      await expect(configPanel).not.toContainText('OpEx YoY');
+      await expect(configPanel).not.toContainText('OpEx dominated above');
+      await expect(configPanel).not.toContainText('healthy_below_pct');
+      await expect(page.getByTestId('prompt-tree')).not.toContainText('OpEx dominated above');
+
+      await selectPromptBySearch(page, 'Expense YoY', 'ex_yoy_costs');
+      configPanel = page.getByTestId('configuration-panel');
+      await expect(configPanel).toContainText('Total Cost YoY Movement');
+      await expect(configPanel).toContainText('Severe cost growth');
+      await expect(configPanel).not.toContainText('Cost YoY band');
+      await expect(configPanel).not.toContainText('Healthy below');
+      await expect(configPanel).not.toContainText('healthy_below_pct');
+
+      await editPromptThreshold({
+        page,
+        request,
+        search: 'Cost of Sales growth',
+        promptKey: 'ex_cogs',
+        token: 'concern_pct',
+        value: nextCogsConcernPct,
+        expectedBusinessLabel: 'Cost of Sales Growth vs Sales',
+        expectedConfigText: 'Review if sales are flat or declining',
+        expectedPromptText: `COGS YoY >${nextCogsConcernPct}% with flat/declining sales = Concern`,
+      });
+    } finally {
+      await saveThresholdValues(request, 'ex_cogs', originals.ex_cogs);
+    }
+  });
+
+  test('expenses chart metadata is business-readable and updates the prompt preview', async ({ page, request }) => {
+    const originals = {
+      ex_cost_trend: await readThresholdValues(request, 'ex_cost_trend'),
+      ex_cost_composition: await readThresholdValues(request, 'ex_cost_composition'),
+    };
+    const nextPeriodYoySeverePct = originals.ex_cost_trend.period_yoy_severe_pct >= 100
+      ? originals.ex_cost_trend.period_yoy_severe_pct - 1
+      : originals.ex_cost_trend.period_yoy_severe_pct + 1;
+    const nextMaterialDriftPp = originals.ex_cost_composition.material_drift_pp >= 100
+      ? originals.ex_cost_composition.material_drift_pp - 1
+      : originals.ex_cost_composition.material_drift_pp + 1;
+
+    await setAdminRole(page);
+    await openAdminConfig(page);
+
+    try {
+      await selectPromptBySearch(page, 'Monthly cost growth', 'ex_cost_trend');
+      let configPanel = page.getByTestId('configuration-panel');
+      await expect(configPanel).toContainText('Cost Trend: Monthly and Prior-Year Growth Rules');
+      await expect(configPanel).toContainText('Monthly Cost Growth');
+      await expect(configPanel).toContainText('Period vs Last Year Growth');
+      await expect(configPanel).toContainText('Stable monthly cost movement');
+      await expect(configPanel).not.toContainText('MoM concern above');
+      await expect(configPanel).not.toContainText('Period YoY severe above');
+      await expect(configPanel).not.toContainText('mom_concern_pct');
+      await expect(page.getByTestId('prompt-tree')).not.toContainText('MoM concern above');
+
+      const invalidMomSevere = Math.max(0, originals.ex_cost_trend.mom_concern_pct - 1);
+      await page.getByTestId('threshold-input-mom_severe_pct').fill(String(invalidMomSevere));
+      await expect(page.getByTestId('threshold-validation-error').first()).toContainText(
+        'The monthly severe limit must be higher than the concern limit.',
+      );
+      await expect(configPanel).not.toContainText('MoM severe above');
+      await page.getByRole('button', { name: 'Reset' }).click();
+
+      await selectPromptBySearch(page, 'Cost composition chart', 'ex_cost_composition');
+      configPanel = page.getByTestId('configuration-panel');
+      await expect(configPanel).toContainText('Cost Composition: Cost Mix and Drift Rules');
+      await expect(configPanel).toContainText('Cost of Sales Share of Total Costs');
+      await expect(configPanel).toContainText('Typical fruit-distribution mix');
+      await expect(configPanel).toContainText('Cost-of-sales-dominated margin pressure');
+      await expect(configPanel).toContainText('Cost of Sales Share Drift');
+      await expect(configPanel).toContainText('Material drift in either direction');
+      await expect(configPanel).not.toContainText('COGS dominated above');
+      await expect(configPanel).not.toContainText('COGS-dominated margin pressure');
+      await expect(configPanel).not.toContainText('Material drift above');
+      await expect(configPanel).not.toContainText('typical_min_pct');
+      await expect(page.getByTestId('prompt-tree')).not.toContainText('COGS dominated above');
+
+      await editPromptThreshold({
+        page,
+        request,
+        search: 'Period YoY cost growth',
+        promptKey: 'ex_cost_trend',
+        token: 'period_yoy_severe_pct',
+        value: nextPeriodYoySeverePct,
+        expectedBusinessLabel: 'Period vs Last Year Growth',
+        expectedConfigText: 'Severe prior-year increase',
+        expectedPromptText: `Period YoY total >${nextPeriodYoySeverePct}% = Severe`,
+      });
+
+      await editPromptThreshold({
+        page,
+        request,
+        search: 'Cost of Sales share drift',
+        promptKey: 'ex_cost_composition',
+        token: 'material_drift_pp',
+        value: nextMaterialDriftPp,
+        expectedBusinessLabel: 'Cost of Sales Share Drift',
+        expectedConfigText: 'Material drift in either direction',
+        expectedPromptText: `COGS drift >+${nextMaterialDriftPp}pp with flat sales = Margin compression`,
+      });
+    } finally {
+      await saveThresholdValues(request, 'ex_cost_trend', originals.ex_cost_trend);
+      await saveThresholdValues(request, 'ex_cost_composition', originals.ex_cost_composition);
+    }
+  });
+
+  test('expenses table metadata is business-readable and updates the prompt preview', async ({ page, request }) => {
+    const originals = {
+      ex_cogs_table: await readThresholdValues(request, 'ex_cogs_table'),
+      ex_opex_table: await readThresholdValues(request, 'ex_opex_table'),
+    };
+    const nextCogsTop3ConcentratedPct = originals.ex_cogs_table.top_3_concentrated_pct >= 100
+      ? originals.ex_cogs_table.top_3_concentrated_pct - 1
+      : originals.ex_cogs_table.top_3_concentrated_pct + 1;
+    const nextOpexAccountRiskPct = originals.ex_opex_table.top_1_account_risk_pct >= 100
+      ? originals.ex_opex_table.top_1_account_risk_pct - 1
+      : originals.ex_opex_table.top_1_account_risk_pct + 1;
+
+    await setAdminRole(page);
+    await openAdminConfig(page);
+
+    try {
+      await selectPromptBySearch(page, 'Largest COGS account', 'ex_cogs_table');
+      let configPanel = page.getByTestId('configuration-panel');
+      await expect(configPanel).toContainText('Cost of Sales Breakdown: Account Concentration Rules');
+      await expect(configPanel).toContainText('Largest COGS Account Share');
+      await expect(configPanel).toContainText('Top-Three COGS Account Share');
+      await expect(configPanel).toContainText('COGS Account Surface');
+      await expect(configPanel).toContainText('Diversified account base');
+      await expect(configPanel).toContainText('Normal surface');
+      await expect(configPanel).not.toContainText('COGS concentration');
+      await expect(configPanel).not.toContainText('Top 1 severe above');
+      await expect(configPanel).not.toContainText('Top 3 concentrated above');
+      await expect(configPanel).not.toContainText('Thin surface below');
+      await expect(configPanel).not.toContainText('top_1_severe_pct');
+      await expect(page.getByTestId('prompt-tree')).not.toContainText('Top 1 severe above');
+
+      const invalidTop1Severe = Math.max(0, originals.ex_cogs_table.top_1_concentrated_pct - 1);
+      await page.getByTestId('threshold-input-top_1_severe_pct').fill(String(invalidTop1Severe));
+      await expect(page.getByTestId('threshold-validation-error').first()).toContainText(
+        'The severe single-account limit must be higher than the concentrated account limit.',
+      );
+      await expect(configPanel).not.toContainText('Top 1 severe above');
+      await page.getByRole('button', { name: 'Reset' }).click();
+
+      await selectPromptBySearch(page, 'Operating cost categories', 'ex_opex_table');
+      configPanel = page.getByTestId('configuration-panel');
+      await expect(configPanel).toContainText('Operating Costs Breakdown: Category and Account Concentration Rules');
+      await expect(configPanel).toContainText('Operating Cost Category Share');
+      await expect(configPanel).toContainText('Operating Cost Account Share');
+      await expect(configPanel).toContainText('Dominant cost center');
+      await expect(configPanel).toContainText('Normal single-account exposure');
+      await expect(configPanel).not.toContainText('Category concentration');
+      await expect(configPanel).not.toContainText('Top category dominant above');
+      await expect(configPanel).not.toContainText('Top 1 account risk above');
+      await expect(configPanel).not.toContainText('top_category_dominant_pct');
+      await expect(page.getByTestId('prompt-tree')).not.toContainText('Top category dominant above');
+
+      await editPromptThreshold({
+        page,
+        request,
+        search: 'Top-three COGS accounts',
+        promptKey: 'ex_cogs_table',
+        token: 'top_3_concentrated_pct',
+        value: nextCogsTop3ConcentratedPct,
+        expectedBusinessLabel: 'Top-Three COGS Account Share',
+        expectedConfigText: 'Concentrated top-three exposure',
+        expectedPromptText: `Top 3 >${nextCogsTop3ConcentratedPct}% = Concentrated`,
+      });
+
+      await editPromptThreshold({
+        page,
+        request,
+        search: 'Single-account OpEx risk',
+        promptKey: 'ex_opex_table',
+        token: 'top_1_account_risk_pct',
+        value: nextOpexAccountRiskPct,
+        expectedBusinessLabel: 'Operating Cost Account Share',
+        expectedConfigText: 'Single-account risk',
+        expectedPromptText: `Top 1 account >${nextOpexAccountRiskPct}% of total OpEx = Single-account risk`,
+      });
+    } finally {
+      await saveThresholdValues(request, 'ex_cogs_table', originals.ex_cogs_table);
+      await saveThresholdValues(request, 'ex_opex_table', originals.ex_opex_table);
     }
   });
 
