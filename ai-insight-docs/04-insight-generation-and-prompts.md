@@ -175,6 +175,8 @@ loop:
 
 `finalize` extracts the text block, echoes it to stdout if prompt logging is on, logs it, and returns.
 
+**Tool-cap nuance.** The production contract is a hard cap of two executed tool calls per summary attempt. The reference loop gates the next model turn once `toolCallCount >= 2`; if a single model response contains multiple `tool_use` blocks, a rebuild should execute only the remaining allowed blocks and return a cap-reached tool result for any extras. Do not let one response bypass the cap by emitting many tool calls at once.
+
 ### 5.5 Numeric guard, tool policy, tools
 
 **Numeric guard** (`runNumericGuard(text, allowed)`):
@@ -247,7 +249,7 @@ Per-table column whitelist (`LOCAL_WHITELIST`, exact and exhaustive — any colu
 
 **Special case — `pc_ar_customer_snapshot` auto-dedup.** The handler runs `SELECT MAX(snapshot_date) AS d FROM pc_ar_customer_snapshot`, prefixes `snapshot_date = '<d>'` (AND-combined with any user WHERE), wraps as `SELECT DISTINCT ON ("debtor_code") <cols> FROM pc_ar_customer_snapshot WHERE … ORDER BY debtor_code`, and if the caller supplied an `order_by` wraps the whole thing as `SELECT * FROM (<inner>) sub ORDER BY <caller order_by>` so the dedup applies first and the requested sort second. Then `LIMIT 100`.
 
-#### `query_rds_table` — read-only source SQL Server
+#### `query_rds_table` — read-only source drill-down
 
 Input schema (verbatim — note `where_clause` is **required** here, unlike the local tool):
 
@@ -267,6 +269,8 @@ Input schema (verbatim — note `where_clause` is **required** here, unlike the 
   required: ['table', 'columns', 'where_clause'],
 }
 ```
+
+**Dialect decision.** The current Finance codebase uses the Node `pg` pool for `RDS_DATABASE_URL`, while this tool's table names and generated SQL are written in a SQL Server-like shape (`dbo.*`, `SELECT TOP`, bracket-quoted columns). A production rebuild must choose one concrete driver/dialect for the drill-down port and make the executor, examples, and verification tests match it. Do not mix PostgreSQL `pg` execution with SQL Server syntax.
 
 Per-table column whitelist (`RDS_WHITELIST`, exact):
 

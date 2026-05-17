@@ -163,6 +163,22 @@ The catalog declares **7 finance pages** and **16 batch-active sections** holdin
 | Expenses | `expense_overview` | 7 | range |
 | Expenses | `expense_breakdown` | 2 | range |
 
+The batch runner resolves those scope kinds through this Finance-specific resolver map:
+
+| Section keys | Machine page key persisted to storage | Resolver source | Concrete scope rule |
+|---|---|---|---|
+| `sales_trend`, `sales_breakdown` | `sales` | `pc_sales_daily.doc_date` | `MIN/MAX(doc_date)` then month-aligned trailing 12 months ending at the max month. |
+| `payment_collection_trend` | `payment` | `pc_ar_monthly.month` where `invoiced > 0` | `MIN/MAX(month || '-01')` then month-aligned trailing 12 months ending at the max month. |
+| `payment_outstanding` | `payment` | none for batch scope; fetcher labels from `pc_ar_customer_snapshot.snapshot_date` | Snapshot scope: `dateRange=null`, `fiscalPeriod=null`. |
+| `financial_overview`, `financial_variance`, `financial_balance_sheet`, `financial_pnl` | `financial` | `getFiscalYears()` | Pick the second listed fiscal year when available, otherwise the first; persist `fiscalYear='FY####'`, `fiscalRange='fy'`. |
+| `customer_margin_overview`, `customer_margin_breakdown` | `customer-margin` | `pc_customer_margin.month` | `MIN/MAX(month || '-01')` then month-aligned trailing 12 months ending at the max month. |
+| `supplier_margin_overview`, `supplier_margin_breakdown` | `supplier-performance` | `pc_supplier_margin.month` | `MIN/MAX(month || '-01')` then month-aligned trailing 12 months ending at the max month. |
+| `return_trend` | `return` | `pc_return_monthly.month` | `MIN/MAX(month || '-01')` then month-aligned trailing 12 months ending at the max month. |
+| `return_unsettled` | `return` | none for batch scope; fetcher labels from `pc_return_aging.snapshot_date` | Snapshot scope: `dateRange=null`, `fiscalPeriod=null`. |
+| `expense_overview`, `expense_breakdown` | `expenses` | expenses date-bounds query | Month-aligned trailing 12 months ending at the max expense month. |
+
+If a range resolver cannot find a max date, it throws and the batch records that section as failed. Snapshot sections never compute a window. Fiscal sections never populate `date_range_start/end`.
+
 Five HR sections (`employee_demographics`, `attendance_leave`, `overtime_work_hours`, `payroll_compensation`, `performance_talent`) exist in the type system as **empty scaffolds** — no components, not in the batch set, not generated. They are the seam doc 10 uses to add a domain.
 
 Component types observed: `kpi` (single number with a band), `chart` (trend/distribution), `table` (row-level detail), `breakdown` (dimensional split). The type drives nothing in this layer except display; generation (doc 04) keys prompts off the component `key`.

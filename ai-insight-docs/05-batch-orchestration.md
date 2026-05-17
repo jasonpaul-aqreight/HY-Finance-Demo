@@ -233,7 +233,7 @@ async function runInsightBatch(triggeredBy = 'admin'): Promise<BatchRun> {
 2. **All-success status.** Replace the throwing scope with a valid one; rerun. Terminal status is `success`; both section rows present; re-running again **replaces** them (no duplicates — idempotent at section grain).
 3. **Single-run guard (in-process).** While a run is in progress, call `runInsightBatch` again ⇒ `BatchAlreadyRunningError`, no second ledger row.
 4. **Single-run guard (datastore).** Insert a `running` row directly, then call `runInsightBatch` in a fresh process state ⇒ `BatchAlreadyRunningError` from the unique-index path; no partial row created.
-5. **Stale reclaim.** Set `AI_INSIGHT_BATCH_STALE_MIN=0`, leave a `running` row with an old `started_at`, trigger a run ⇒ the old row is force-failed (`error`, "Run interrupted…") and the new run proceeds.
+5. **Stale reclaim.** Set `AI_INSIGHT_BATCH_STALE_MIN=1`, leave a `running` row with `started_at` at least 2 minutes old, trigger a run ⇒ the old row is force-failed (`error`, "Run interrupted…") and the new run proceeds. Do not use `0` for this check; non-positive values fall back to the default stale window.
 6. **Pacing.** Set `AI_INSIGHT_BATCH_DELAY_MS=200` and time a 2-section run: total wall time ≥ ~200 ms more than the no-delay baseline; set it to `0` and the pause disappears.
 7. **Progress observability.** Poll the latest run during execution: `current_section` and the counters advance between sections, not only at the end.
 

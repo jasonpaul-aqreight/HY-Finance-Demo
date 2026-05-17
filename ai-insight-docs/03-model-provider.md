@@ -276,7 +276,7 @@ baseProviderPreference(order) = { order, allowFallbacks:false, requireParameters
 
 ## 8. Verification checkpoint
 
-**Setup (no source access, no gateway, no credential needed):** implement the boundary per §3–§5; build a tiny harness that calls `callAiModel`.
+**Setup (no source access):** implement the boundary per §3–§5; build a tiny harness that calls `callAiModel`. Checks 1–3 need no gateway and no credential because the mock path intercepts first. Checks 4–6 exercise the live-path adapter; for the cancellation check, configure a non-empty dummy credential and stub the gateway/client so the test observes the already-aborted signal without making a network call. An empty credential must fail at the credential gate before cancellation can be tested.
 
 **Action & expected observable result:**
 
@@ -284,7 +284,7 @@ baseProviderPreference(order) = { order, allowFallbacks:false, requireParameters
 2. **Offline summary call, well-formed.** Mock switch set to a normal value; `slot:'summary'`. Expect a text block containing the delimiter markers (`===INSIGHT===` … `---DETAIL---` … `===END===`).
 3. **Offline summary call, malformed.** Mock switch set to the "bad" value; `slot:'summary'`. Expect a text block with **no** delimiter markers (drives doc 04's parser fallback).
 4. **Fail-fast misconfiguration.** Mock switch unset, API key empty; call any slot. Expect an immediate error whose classification is **non-fallback-eligible** (no model chain iteration, no network).
-5. **Cancellation.** Provide an already-aborted signal with the mock unset. Expect the distinct `Analysis aborted` error, classified non-eligible.
+5. **Cancellation.** Provide an already-aborted signal with the mock unset and a non-empty dummy credential/stubbed gateway. Expect the distinct `Analysis aborted` error, classified non-eligible. With an empty credential, the expected result is instead the fail-fast credential error from Check 4.
 6. **Cost provenance.** Inspect any response: `usage.costUsd` is a number and `usage.costSource` is exactly one of the two enum values, consistently with whether a gateway cost was present.
 
 **Definition of Done:** a developer who has read only `00` and `03`, with no access to this repo's source, can implement the boundary and a mock such that all six checks pass — and the layers above can be developed and tested entirely offline through it.

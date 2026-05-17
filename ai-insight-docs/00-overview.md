@@ -112,7 +112,7 @@ Engine and Spine documents must never hardcode finance concepts. Domain Pack doc
 | Layer | Reference stack realisation |
 |---|---|
 | Engine datastore | Local PostgreSQL via connection pool (`DATABASE_URL`). Tables: `ai_insight_section`, `ai_insight_component`, `ai_insight_batch_run` (+ a deprecated `ai_insight_lock`). |
-| Source-of-truth data | A separate read-only PostgreSQL (`RDS_DATABASE_URL`) queried with graceful fallback. Schema **not owned** by the engine. |
+| Source-of-truth data | Two read surfaces: most Finance `pc_*`, budget, and app-setting projections are read from the local PostgreSQL pool (`DATABASE_URL`); drill-down/source queries use a separate fail-soft pool (`RDS_DATABASE_URL`). Schema is **not owned** by the engine. See doc 01 for the physical-placement nuance. |
 | Model provider | OpenRouter SDK (`@openrouter/sdk`) with a per-slot model fallback chain and a mock-LLM interception for tests. |
 | Batch / API / Admin | Next.js App Router route handlers. `[VERSION-SENSITIVE]` — on Pages Router these become API routes; the batch trigger is fire-and-forget within the server process. |
 | Frontend | React components reading the API via hooks; insights are markdown rendered to HTML. |
@@ -169,8 +169,8 @@ Every environment variable the engine reads, with default and owning layer. Each
 
 | Variable | Default | Owner | Purpose |
 |---|---|---|---|
-| `DATABASE_URL` | — (required) | 01 | Connection string for the engine-owned local Postgres (insight + batch tables). Pool max 20. |
-| `RDS_DATABASE_URL` | — (required for real data) | 01 | Connection string for the read-only source-of-truth datastore (drill-down/source queries). Pool max 5; queries fall back to empty on failure. |
+| `DATABASE_URL` | — (required) | 01 | Connection string for the local Postgres pool. Holds engine-owned tables and, in the Finance reference, the local `pc_*`/budget/app-setting projections. Pool max 20. |
+| `RDS_DATABASE_URL` | — (required for drill-down tools) | 01 | Connection string for the read-only drill-down/source-query pool. Pool max 5; queries fall back to empty on failure. |
 | `OPENROUTER_API_KEY` | `''` | 03 | Auth token for the OpenRouter gateway. Empty ⇒ live calls fail; use the mock toggle for offline work. |
 | `AI_INSIGHT_OPENROUTER_TIMEOUT_MS` | `45000` | 03 | Per-request HTTP timeout for model calls. |
 | `AI_INSIGHT_OPENROUTER_COMPONENT_MODEL` | `deepseek/deepseek-v4-flash` | 03 | Primary model for per-component analyses. |
@@ -188,10 +188,11 @@ Every environment variable the engine reads, with default and owning layer. Each
 
 ## 9. The data-domain contract (stack-neutral)
 
-The engine assumes **two distinct datastores** and must never conflate them:
+The engine assumes a **writable engine store** plus **read-only source data contracts** and must never conflate ownership:
 
-- **Engine-owned store (writable):** holds the engine's own tables only. The engine has full schema authority here. Specified completely in doc 01.
-- **Source-of-truth store (read-only, not owned):** the domain's operational/financial data the engine reads to build insights. The engine treats its schema as an **external contract** — it documents *what it needs to read*, not how that store is built, and degrades gracefully (empty result, not crash) if a read fails. Doc 01 specifies this as a read contract; the concrete queries belong to the Domain Pack (doc 04).
+- **Engine-owned store (writable):** holds the engine's own tables. The engine has full schema authority over these tables. Specified completely in doc 01.
+- **Source-of-truth projections (read-only, not owned):** the domain's operational/financial data the engine reads to build insights. In the Finance reference, many of these projections are physically co-located in the local Postgres database (`pc_*`, budget, app settings), but they are still logically external to AI Insight: the engine reads them and does not own their schema.
+- **Drill-down/source port (read-only, fail-soft):** optional deeper queries via `RDS_DATABASE_URL`. Failures degrade to an empty result instead of crashing the insight pipeline.
 
 This separation is what lets the same Engine power a different domain: swap the Domain Pack and point the read contract at a different source.
 

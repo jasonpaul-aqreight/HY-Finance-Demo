@@ -129,6 +129,14 @@ Note the deliberate asymmetry with §5.1: a missing **section** is a `404`; a mi
 
 None. This layer reads no environment variables; its behavior is fully determined by the request and the stores it consumes.
 
+### 6.2 Cache / dynamic behavior
+
+`[VERSION-SENSITIVE]` — the reference Next.js route handlers do not set an explicit `dynamic = 'force-dynamic'` export and do not attach `Cache-Control: no-store` headers. They are dynamic route handlers that read request parameters and return the current persisted database row at execution time. A production rebuild must make this cache policy explicit for its runtime:
+
+- Prefer `no-store` or an equivalent dynamic/read-through policy when the frontend must show a newly completed batch immediately.
+- If HTTP or framework caching is enabled, key section reads by both `section_key` and optional `page`, key component reads by `section_key + component_key`, and invalidate those keys when a batch writes new insights.
+- Never let a cached 404/`exists:false` hide a later successful batch result.
+
 ## 7. Reference Implementation
 
 Source paths are traceability evidence for the spec above — not a substitute for it.
