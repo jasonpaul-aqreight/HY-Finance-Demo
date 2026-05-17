@@ -57,7 +57,7 @@ The engine is a **batch-generated, persisted, read-only analysis layer** over a 
 This is the central organising principle of the documentation and the codebase.
 
 - **Engine** — domain-neutral machinery: storage, the model provider, batch orchestration, the read API, the frontend shell, the admin surface. Reusable for any domain. *Docs 01, 03, 05, 06, 07, 08.*
-- **Domain Pack** — everything finance-specific: the catalog of pages/sections/components, the data each consumes, the prompt text, and the threshold registry/defaults. A different domain (e.g. HR) is a different Domain Pack on the same Engine. *Docs 02, 04.*
+- **Domain Pack** — everything finance-specific: the catalog of pages/sections/components, the data each consumes, the prompt text, and the threshold registry/defaults. A different domain (e.g. HR) is a different Domain Pack on the same Engine. *Docs 02, 04, 04a.*
 - **Spine** — the connective tissue: this overview, the end-to-end walkthrough, and the guide for adding a new Domain Pack. *Docs 00, 09, 10.*
 
 Engine and Spine documents must never hardcode finance concepts. Domain Pack documents are finance-specific by design and serve as the worked example for doc 10 ("adding a domain pack").
@@ -128,7 +128,8 @@ Build order is the numeric order. Each document's verification checkpoint must p
 | 01 | Storage | Engine | The engine-owned datastore + the read contract on source data | 00 |
 | 02 | Domain catalog & thresholds | Domain Pack | The page/section/component catalog + threshold registry, token dictionary, renderer | 00, 01 |
 | 03 | Model provider | Engine | A model-call boundary with fallback + mock interception | 00 |
-| 04 | Insight generation & prompts | Domain Pack | Per-section generation: data fetch, prompts, numeric guard, summary — incl. the Prompt Catalog | 00–03 |
+| 04 | Insight generation & prompts | Domain Pack | Per-section generation: data fetch, prompt assembly, token rendering, numeric guard, summary pass | 00–03 |
+| 04a | Prompt Catalog | Domain Pack | The verbatim system prompts + one entry per section/component (template, rendered example, output shape) | 00, 02, 04 |
 | 05 | Batch orchestration | Engine | One-at-a-time batch runner with lifecycle + progress | 00, 01, 04 |
 | 06 | API | Engine | Read endpoints for section/component insight | 00, 01 |
 | 07 | Frontend | Engine | Read-only panel + component dialog | 00, 06 |
@@ -136,11 +137,11 @@ Build order is the numeric order. Each document's verification checkpoint must p
 | 09 | End-to-end walkthrough | Spine | A full verified run, trigger → rendered insight | 00–08 |
 | 10 | Adding a domain pack | Spine | A second domain on the same Engine, using Finance as the worked example | 00–09 |
 
-**Dependency chain (critical path):** `00 → 01 → 02 → 03 → 04 → 05`, with `06 → 07` and `08` joining once `05`/`02` exist; `09` verifies the whole; `10` generalises it.
+**Dependency chain (critical path):** `00 → 01 → 02 → 03 → 04 → 05`, with `06 → 07` and `08` joining once `05`/`02` exist; `09` verifies the whole; `10` generalises it. `04a` (Prompt Catalog) is a reference companion to `04`: it hangs off `04` (assembly mechanism) and `02` (token values) and is read alongside `04`, not a separate critical-path step.
 
 ## 7. The per-document template
 
-Every document `01`–`10` follows the same eight-part structure (skeleton in `_TEMPLATE.md`):
+Every layer document `01`–`10` follows the same eight-part structure (skeleton in `_TEMPLATE.md`). `04a` is the one exception: it is a reference *companion* to `04`, not a layer of its own, so it uses a catalog structure (master index + a fixed-schema entry per section/component) rather than the eight-part template.
 
 1. **Purpose** — the layer's single responsibility and what you can build after reading it.
 2. **Prerequisites** — exact prior docs and contracts required first.
