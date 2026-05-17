@@ -8,6 +8,7 @@ import {
   estimateCost,
   getOpenRouterClient,
 } from './client';
+import { mockAiModelResponse } from './mock-llm';
 import type {
   AiMessage,
   AiProviderMetadata,
@@ -98,6 +99,10 @@ const SUMMARY_PROVIDER_ORDER = [
 ];
 
 export async function callAiModel(request: AiModelRequest): Promise<AiModelResponse> {
+  if (process.env.AI_INSIGHT_MOCK_LLM) {
+    return mockAiModelResponse(request);
+  }
+
   const models = openRouterModelsForSlot(request.slot);
   const modelFallbackPath: string[] = [];
   const fallbackErrors: string[] = [];

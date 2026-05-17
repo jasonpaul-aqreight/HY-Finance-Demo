@@ -2,6 +2,7 @@
 -- Run against the local PostgreSQL (DATABASE_URL)
 
 -- 1. Global lock (singleton row)
+-- DEPRECATED (batch rework): retained only so older local databases keep applying this idempotent schema.
 CREATE TABLE IF NOT EXISTS ai_insight_lock (
   id            INTEGER PRIMARY KEY DEFAULT 1,
   locked_by     TEXT,
@@ -47,3 +48,25 @@ CREATE TABLE IF NOT EXISTS ai_insight_component (
   generated_at    TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   UNIQUE (section_id, component_key)
 );
+
+CREATE TABLE IF NOT EXISTS ai_insight_batch_run (
+  id SERIAL PRIMARY KEY,
+  status TEXT NOT NULL DEFAULT 'idle',          -- idle|running|success|partial|error
+  started_at TIMESTAMP WITH TIME ZONE,
+  finished_at TIMESTAMP WITH TIME ZONE,
+  total_runtime_s NUMERIC(8,1),
+  total_cost_usd NUMERIC(10,4),
+  total_tokens INTEGER,
+  sections_total INTEGER NOT NULL DEFAULT 0,
+  sections_completed INTEGER NOT NULL DEFAULT 0,
+  sections_failed INTEGER NOT NULL DEFAULT 0,
+  current_section TEXT,
+  section_errors JSONB NOT NULL DEFAULT '[]'::jsonb,
+  error_message TEXT,
+  triggered_by TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS ai_insight_batch_run_one_running
+  ON ai_insight_batch_run (status)
+  WHERE status = 'running';
