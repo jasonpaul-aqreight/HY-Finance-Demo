@@ -135,75 +135,76 @@ Follow the iteration process strictly:
 <claude-mem-context>
 # Memory Context
 
-# [Hoi-Yong_Finance] recent context, 2026-05-17 9:09pm GMT+8
+# [Hoi-Yong_Finance] recent context, 2026-05-20 10:47am GMT+8
 
 Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
 Format: ID TIME TYPE TITLE
 Fetch details: get_observations([IDs]) | Search: mem-search skill
 
-Stats: 50 obs (24,187t read) | 304,716t work | 92% savings
+Stats: 50 obs (22,891t read) | 261,148t work | 91% savings
 
 ### May 17, 2026
-S774 Cross-reference legacy AI Insight PRDs (10-base, 11-finance) against new ai-insight-docs/ to identify gaps — what should be added so devs can build the production feature without ambiguity (May 17 at 6:41 PM)
-S778 All pre-writing decisions finalized — proceeding to write ai-insight-docs/11-finance-domain-config.md covering Budget Setting, Credit Score config, and unbuilt KPI budget badge feature, plus patch existing docs for tool column whitelist gaps (May 17 at 6:59 PM)
-S777 User confirmed doc scope and approved proceeding: create ai-insight-docs/11-finance-domain-config.md (for developers) covering Budget Setting, Credit Score config, KPI budget badges, plus patch existing docs for tool column whitelist gaps and other confirmed missing content (May 17 at 7:00 PM)
-S776 Gap analysis between legacy AI Insight PRDs and new ai-insight-docs/ complete; now planning specific documentation additions — 11-validation-and-tuning.md, tool column whitelist patch, and new Finance domain config docs for Budget Setting and Credit Score Setting (May 17 at 7:00 PM)
-S779 User asked whether Finance KPI screenshots (budget tag, vs budget, variance, last year) and Budget Setting screenshots are included in the documentation — triggering a B7 gap-audit review of docs 11/12 and screenshot coverage. (May 17 at 7:06 PM)
-S780 User asked whether Finance KPI screenshots (budget tag, vs budget, variance, last year) and Budget Setting screenshots are included in the documentation — primary session completed B7 work, committed, and pushed to GitHub. (May 17 at 7:28 PM)
-S781 User asked whether Finance KPI (budget tag, vs budget, variance, last year) and Budget Setting screenshots are included in the documentation. Primary session addressed the question, completed all B7 doc work, committed and pushed e341c9a, then updated both memory files. (May 17 at 7:38 PM)
-S782 User asked whether Finance KPI (budget tag, vs budget, variance, last year) and Budget Setting screenshots are included in the documentation. Primary session responded, completed all B7 gap-audit work, and committed + pushed e341c9a to GitHub. (May 17 at 7:38 PM)
 S783 User asked whether Finance KPI and Budget Setting screenshots are included in the documentation. Primary session ran a full screenshot audit confirming the gap, then completed B7 doc work (docs 11/12 + 4 patches). Commit e341c9a created and pushed to GitHub. Claude's response to user is still at the "Want me to commit?" stage in the current replay batch. (May 17 at 7:40 PM)
-S784 User asked whether Finance KPI and Budget Setting screenshots are included in the documentation. Primary session confirmed the gap via screenshot audit, completed all B7 doc work (docs 11/12 + 4 patches), and committed + pushed e341c9a. (May 17 at 7:42 PM)
-5973 8:21p 🔵 Pre-Existing Worktree State at Tracker Creation: Two Untracked Screenshots and scripts/ Directory
-5981 8:22p 🔵 BudgetSettingDialog Shows Raw Line Codes (NS/CO/EP) Not Human Labels in Table Column
-5977 8:24p 🔵 doc 08-admin.md: Admin Layer Contracts Read — Batch Trigger, Status Self-Heal, and Threshold Config
-5978 " 🔵 doc 12-finance-domain-config.md: Budget Setting + Variance KPI Contracts Read — Not Yet Deployed to Production
-5979 8:25p 🔵 doc 07-frontend.md Verification Checkpoint: Screenshots Are Confirming Evidence, Not Normative Spec
-5982 8:29p 🔵 Variance KPI Route Filters to Only NS/CO/EP — OI Excluded Despite Being a Budget-Configurable Line
-5983 " 🔵 V3VarianceKpiTile Interface in Code Diverges Significantly From doc 12 §4.3 Spec — Multiple Field Name and Shape Mismatches
-5984 8:30p 🔵 getVarianceKpiTiles Produces Only 3 Tiles (NS/CO/EP); budget_global line_item PK Stores Full Labels Not Codes
-5985 8:31p 🔵 PLKpiCardsV3: StatusBadge Renders "No Budget" Pill (Not Hidden); AnalyzeIcon Links to financial_overview Section
-5986 8:32p 🔵 PLKpiCardsV3 Row Layout and financial_overview AI Component Keys Confirmed
-5987 " 🔵 BudgetSettingDialog Always Receives Hardcoded userName="Admin" — approved_by Never Shows Real User
-5990 8:33p ✅ Session 2 Audit Phase Complete — Findings Ready, Awaiting Approval Before Doc Patches
-5994 " 🔴 doc 08-admin.md Patch Not Yet Reflected in Re-Read — Rule 12 and Verification Check 4 Still Show Old Text
-5988 " 🔴 AI Insight Docs Session 2: Six Implementation Mismatches Fixed in Docs 07, 08, 12
-5989 " ⚖️ Six Open Production Hardening Decisions Recorded in Tracker After Session 2 Audit
-5991 8:35p ✅ User Approved Session 2 Doc Patches — Application to docs 07, 08, 12 Now In Progress
-5992 " ✅ doc 07-frontend.md Patched: Section Hook Missing Stale-Safe Guard Documented
-5993 8:36p ✅ doc 08-admin.md Patched: Cache-Control no-store Scope Corrected and Stale-Heal Test Fixed
-5995 8:41p ✅ Session-3 Started for Hoi-Yong Finance AI Insight Implementation
-5996 " 🔵 Session-3 Working Branch Has 5 Uncommitted Modified Files
-5997 " 🔵 AI Insight Docs Readiness Tracker: Sessions 1 & 2 Complete, Session 3 Scope Loaded
-5998 8:42p 🔵 Session 2 Doc Patches Uncommitted; Session 1 Pushed as Commit 4a451ed
-5999 " 🔵 Session 3 Audit Scope: Prompt Catalog, Domain-Pack, and Validation Docs
-6000 8:43p 🔵 AI_Insight_Study Has a Financial Variance Eval Subdirectory Not Listed in Session 3 Scope
-6001 " ✅ Session 2 Doc Patches: Exact Corrections to 07-frontend, 08-admin, and 12-finance-domain-config
-6002 " 🔵 data-fetcher.ts Is 5,820 Lines — Largest File in Session 3 Audit Scope
-6003 " 🔵 Prompt Catalog Has 69 Components Across 7 Pages; Validation Doc References Removed "Click Analyze" Behavior
-6004 8:44p 🔵 Summary System Prompt Hardcodes SQL Server dbo.* Syntax — Confirms Session 1 Dialect Decision
-6005 8:46p 🔵 AI Insight Engine Now OpenRouter-Only; No Direct Claude SDK; HOW_TO_RUN_ITERATION Uses Removed "Click Analyze" Trigger
-6006 8:47p 🔵 SECTION_COMPONENTS Confirms 69 Components Across 16 Finance Sections; 2-Tool Cap in Summary User Prompt
-6007 " 🔵 Tool Policy Confirmed: 9 Aggregate Tables; aggregate_only Mutates Tool Schema, Not Just Validates
-6008 " 🔵 executeRdsQuery Generates SQL Server Syntax: SELECT TOP + Bracket-Quoted Columns — Dialect Mismatch Confirmed
-6009 8:50p 🔵 prompts-defaults.ts Comment Reveals Prompt DB Tables Were Dropped; Code Is Now the Runtime Source
-6010 8:54p ✅ AI Insight Docs Session 3 Audit Patches Applied
-6011 " ⚖️ Open Production Decisions Consolidated After Session 3
-6012 " ✅ Project Memory Updated With Session 3 Audit Outcomes
-6013 8:57p 🔵 Session 4 of AI Insight Docs Readiness Audit Initiated
-6014 " 🔵 AI Insight Docs Audit Sessions 1–3 Completed Prior to Session 4
-6015 " 🔵 Session 3 Outcomes and Full Open Decisions List Loaded for Session 4
-6016 " 🔵 ai-insight-docs Complete File Inventory Confirmed for Session 4
-6017 " 🔵 Session 4 Cross-Document Consistency Sweep: Key Terms All Verified
-6018 8:58p 🔵 All 13 Layer Docs Conform to 8-Section Template Structure
-6019 " 🔵 00-overview.md ENV Matrix and Documentation Map Verified Clean
-6020 9:00p 🔵 Cache-Control no-store Gap Confirmed in Source Routes via Direct Code Verification
-6021 " 🔵 Public AI Insight Section Route Inaccessible via Direct Shell Path Due to Bracket Globbing
-6022 9:01p 🔵 Budget and Variance-KPI Route Implementation Verified Against Doc 12 Contracts
-6023 " 🔵 Public Section Route Confirmed: No Cache Headers, Matches Doc 06 Handler Skeleton Exactly
+S784 User asked whether Finance KPI and Budget Setting screenshots are included in the documentation. Primary session confirmed the gap via screenshot audit, completed all B7 doc work (docs 11/12 + 4 patches), and committed + pushed e341c9a. (May 17 at 7:41 PM)
+S785 AI Insight Documentation Build 6 completion + pre-handoff assessment of ai-insight-docs for AI Agent Amelia (May 17 at 7:42 PM)
 6024 9:05p ✅ AI Insight Docs Session 4: Final Consistency Pass Completed
 6025 9:07p ✅ AI Insight Docs Implementation Readiness Tracker Updated
+6029 " ⚖️ Production Build Order and Two Remaining Open Decisions Documented
+6030 " 🔵 Production Hardening Gaps Identified in Frontend and Admin Layers
+6031 " 🔵 AI Insight Engine Uses OpenRouter Exclusively — No Direct Anthropic or OpenAI SDK
 6026 9:08p 🔵 Seven Files Modified Across AI Insight Docs Project
+6027 9:09p 🔵 AI Insight Docs Readiness Audit Fully Completed — All 4 Sessions Done
+6028 " ⚖️ query_rds_table SQL Dialect Must Be Resolved Before Production
+6032 9:10p 🔵 Complete Open Decisions List — Eight Items Requiring Human Resolution
+6033 " ✅ Session 3 Fixed Domain-Pack and Prompt Catalog Contracts
+6034 " ✅ Session 4 Final Pass Corrected Admin Scope, Variance KPI Cards, and Storage Wording
+6035 " 🔵 Finance Budget Setting and Variance KPI Not Yet Deployed to Production App
+6036 9:12p 🔵 Finance-Specific Cancelled Filter Is Baked Into Engine tools.ts — New Domain Packs Must Respect This Boundary
+6037 " 🔵 Batch Orchestrator Has Single-Process Assumption — Serverless Deployments Require Durable Worker
+6038 " 🔵 Public Read API Cache Policy Must Be Made Explicit in Production
+6039 " 🔵 Finance Budget Setting and Variance KPI Reference Implementation File Map Documented
+6040 " 🔵 Seven Verification Checkpoints Defined for Budget Setting and Variance KPI Production Acceptance
+6041 9:13p 🔵 fv_variance_summary Prompt Uses Fixed ±5/15% Bands While Fetcher Sends Per-Line Saved Tolerance
+6043 " 🔵 "Approve as Budget" Button Is Finance-Specific Code Baked Into Shared InsightSectionHeader
+6044 " 🔵 Applying a New Prompt Version Does Not Auto-Trigger Re-Analysis — Intentional Paid-Action Gate
+S786 AI Insight docs handoff assessment for AI Agent Amelia + Build 6 completion confirmation (May 17 at 9:15 PM)
+S787 Amelia handoff assessment: _TEMPLATE.md purpose, assets/ linkage audit, and B6 documentation completion (May 17 at 9:15 PM)
+6048 9:15p 🔵 ai-insight-docs assets/ Contains 7 PNGs; Doc 12 and Tracker File Exist Beyond the 11-Doc Set
+S788 Amelia handoff assessment answered: _TEMPLATE.md is an authoring artifact to exclude; assets/ are all linked but require scope decision for doc 12 (May 17 at 9:16 PM)
+S789 Amelia handoff preparation for ai-insight-docs — _TEMPLATE.md and assets/ audit, then three fixes committed and pushed (May 17 at 9:16 PM)
+6049 9:17p 🔵 PRODUCTION_HANDOFF.md Is the Entry Point for AI Agent Amelia — Reveals Full Doc Scope and P0 Blockers
+6053 " ✅ PRODUCTION_HANDOFF.md Updated with Implementer Bundle Scope Section
+6054 " ✅ Amelia Handoff Cleanup — 3 Files Modified, 27 Insertions Staged for Commit
+S790 Amelia handoff preparation complete — three fixes committed and pushed (3ba33d9) (May 17 at 9:17 PM)
+6050 " ✅ _TEMPLATE.md Updated with Implementer Warning Banner
+6051 " 🔵 08-admin.md Insertion Point Located for Adding §7 Reference Captures Block
+6052 9:18p ✅ 08-admin.md §7 Reference Captures Block Added for 08-*.png Screenshots
+6055 9:19p ✅ Amelia Handoff Fixes Committed and Pushed — commit 3ba33d9
+S791 Amelia handoff complete — tracker structure inspected, commit 3ba33d9 pushed (repeated idempotently) (May 17 at 9:19 PM)
+6056 9:20p 🔵 IMPLEMENTATION_READINESS_TRACKER.md Structure: 4 Completed Audit Sessions, No P0/P1 Blockers
+6057 9:21p 🔵 IMPLEMENTATION_READINESS_TRACKER.md Open Decisions — 8 Specific Items with Owner Assignments
+S792 Amelia handoff complete — tracker Open Decisions and Session Notes fully read; all fixes on remote (May 17 at 9:22 PM)
+6058 9:23p ✅ 00-overview.md §7 Stripped of _TEMPLATE.md Reference
+6059 " ✅ PRODUCTION_HANDOFF.md Bundle Scope Refined — Tracker and Template Exclude Lines Removed
+### May 19, 2026
+7602 4:27p 🔵 Hoi-Yong Finance AI Insight Documentation Inventory
+7603 " 🔵 Hoi-Yong Finance Uses .serena and .claude Memory Directories
+7609 " 🔵 AI Insight Concept Handoff — Architecture, HR Gap Analysis, and User Preferences
+7604 4:28p 🔵 AI Insight Persistent Memory Files Inventoried in .serena and .claude
+7606 4:29p 🔵 AI Insight Optimization Master Log — Full Iteration History and Architecture Decisions
+7607 " 🔵 AI Insight Production Handoff Doc — Build Order, Blockers, and HR Transfer Warning
+7608 " 🔵 Hoi-Yong Finance CLAUDE.md — Project AI Collaboration Norms
+7610 4:30p 🔵 AI Insight Interaction Model and Prompt Architecture from Claude Project Memory
+7612 " ⚖️ UI Readability Rule — No Gray/Muted Text for Important Labels
+7614 " 🔵 SQLite-to-PostgreSQL Migration Lessons — API Param Validation and Service Separation
+7616 4:31p ⚖️ AI Insight Model Ladder Updated 2026-05-16 — DeepSeek-v4-Pro Replaces GLM 5.1 as Summary Primary
+7618 " ⚖️ AI Insight Rollout S05 — OpenRouter Provider Decision and Privacy-Preserving Routing Requirements
+7620 " 🔵 AI Insight Docs Readiness Audit Complete — 4-Session Audit, Final State 2026-05-17
+7621 " 🟣 AI Insight Config Threshold Metadata — Sales KPIs and Breakdown Implemented (Sessions 4-5, 2026-05-16)
+7622 4:32p ⚖️ AI Insight PRD Update Deferred — Obsolete Features to Remove, New Features to Add
+7624 4:33p 🔵 Hoi-Yong_HR Has No Existing Memory Files, CLAUDE.md, or AGENTS.md
+7625 " 🔵 Hoi-Yong_HR Project Structure — Has CLAUDE.md, AGENTS.md, and All Agent Dirs
+7626 " 🔵 Hoi-Yong_HR Working Tree — Active Changes Including AWS SES Sprint Proposal
 
-Access 305k tokens of past work via get_observations([IDs]) or mem-search skill.
+Access 261k tokens of past work via get_observations([IDs]) or mem-search skill.
 </claude-mem-context>
